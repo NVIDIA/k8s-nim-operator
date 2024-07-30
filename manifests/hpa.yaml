@@ -1,0 +1,35 @@
+{{- if .Enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  labels:
+  {{- if .Labels }}
+    {{- .Labels | yaml | nindent 4 }}
+  {{- end }}
+  annotations:
+  {{- if .Annotations }}
+    {{- .Annotations | yaml | nindent 4 }}
+  {{- end }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: {{ .Kind }}
+    {{- if .DeploymentName }}
+    name: {{ .DeploymentName }}
+    {{- else if .StatefulSetName }}
+    name: {{ .StatefulSetName }}
+    {{- end }}
+  minReplicas: {{ .MinReplicas }}
+  maxReplicas: {{ .MaxReplicas }}
+  metrics:
+    {{- range .Metrics }}
+    - {{ . | yaml | nindent 4 }}
+    {{- end }}
+  {{- if .ScaleDownStabilizationSecs }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: {{ .ScaleDownStabilizationSecs }}
+  {{- end }}
+{{- end }}
