@@ -1,0 +1,11 @@
+approvers:
+  - shivamerla
+  - rajatc
+  - jmancuso
+  - mkhadkevich
+reviewers:
+  - shivamerla
+  - rajatc
+  - jmancuso
+  - mkhadkevich
+component: "K8s NIM Operator"

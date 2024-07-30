@@ -1,0 +1,10 @@
+0f3de1afe11d355e01657424a267fbaad19bfea3143a9879307c49aed8299db0:
+  model: meta/llama3-70b-instruct
+  release: '1.0.0'
+  tags:
+    feat_lora: 'true'
+    feat_lora_max_rank: '32'
+    llm_engine: vllm
+    precision: fp16
+    tp: '8'
+  container_url: nvcr.io/nim/meta/llama3-70b-instruct:1.0.0

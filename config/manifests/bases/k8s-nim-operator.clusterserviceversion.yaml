@@ -1,0 +1,73 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: k8s-nim-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: EmbeddingService is the Schema for the embeddingservices API
+      displayName: Embedding Service
+      kind: EmbeddingService
+      name: embeddingservices.apps.nvidia.com
+      version: v1alpha1
+    - description: NIMCache is the Schema for the nimcaches API
+      displayName: NIMCache
+      kind: NIMCache
+      name: nimcaches.apps.nvidia.com
+      version: v1alpha1
+    - description: NIMPipeline is the Schema for the nimpipelines API
+      displayName: NIMPipeline
+      kind: NIMPipeline
+      name: nimpipelines.apps.nvidia.com
+      version: v1alpha1
+    - description: NIMService is the Schema for the nimservices API
+      displayName: NIMService
+      kind: NIMService
+      name: nimservices.apps.nvidia.com
+      version: v1alpha1
+    - description: RerankingService is the Schema for the rerankingservices API
+      displayName: Reranking Service
+      kind: RerankingService
+      name: rerankingservices.apps.nvidia.com
+      version: v1alpha1
+  description: The NVIDIA NIM Operator is a Kubernetes operator designed to facilitate
+    the deployment, management, and scaling of NVIDIA NeMo (Neural Modules) services
+    on Kubernetes clusters. NeMo is a toolkit for building, training, and fine-tuning
+    state-of-the-art deep learning models for a variety of applications, including
+    speech recognition, natural language processing (NLP), and text-to-speech synthesis.
+    The NeMo Operator streamlines the integration of these powerful AI capabilities
+    into cloud-native environments such as Kubernetes, leveraging NVIDIA GPUs.
+  displayName: NVIDIA NIM Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - ai
+  - nim
+  - nvidia nim
+  - nemo
+  links:
+  - name: K8s Nim Operator
+    url: https://k8s-nim-operator.domain
+  maturity: alpha
+  provider:
+    name: NVIDIA
+  version: 0.0.0

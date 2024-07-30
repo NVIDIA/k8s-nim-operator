@@ -1,0 +1,86 @@
+operator:
+  replicas: 1
+  image:
+    repository: nvcr.io/nvstaging/cloud-native/k8s-nim-operator
+    tag: v0.1.0
+    pullSecrets:
+      - ngc-secret
+    pullPolicy: Always
+  args:
+  - --health-probe-bind-address=:8081
+  - --metrics-bind-address=127.0.0.1:8080
+  - --leader-elect
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+        drop:
+        - ALL
+  resources:
+      limits:
+        cpu: "1"
+        memory: 256Mi
+      requests:
+        cpu: 500m
+        memory: 128Mi
+  nodeSelector: {}
+  annotations: {}
+  tolerations:
+  - key: "node-role.kubernetes.io/master"
+    operator: "Equal"
+    value: ""
+    effect: "NoSchedule"
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Equal"
+    value: ""
+    effect: "NoSchedule"
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: "node-role.kubernetes.io/master"
+                operator: In
+                values: [""]
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: "node-role.kubernetes.io/control-plane"
+                operator: In
+                values: [""]
+
+kubeProxy:
+  image:
+    repository: gcr.io/kubebuilder/kube-rbac-proxy
+    tag: v0.15.0
+    pullPolicy: IfNotPresent
+  args:
+  - --secure-listen-address=0.0.0.0:8443
+  - --upstream=http://127.0.0.1:8080/
+  - --logtostderr=true
+  - --v=0
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+metricsService:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+  type: ClusterIP
+
+nfd:
+  nodeFeatureRules:
+    deviceID: true
+
