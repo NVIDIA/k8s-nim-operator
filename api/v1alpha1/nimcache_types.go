@@ -137,9 +137,10 @@ type NIMCacheStatus struct {
 
 // NIMProfile defines the profiles that were cached
 type NIMProfile struct {
-	Model   string            `yaml:"model" json:"model,omitempty"`
-	Release string            `yaml:"release" json:"release,omitempty"`
-	Tags    map[string]string `yaml:"tags" json:"tags,omitempty"`
+	Name    string            `json:"name,omitempty"`
+	Model   string            `json:"model,omitempty"`
+	Release string            `json:"release,omitempty"`
+	Config  map[string]string `json:"config,omitempty"`
 }
 
 // Resources defines the minimum resources required for caching NIM.
