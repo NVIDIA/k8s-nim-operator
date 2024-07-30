@@ -167,7 +167,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
-				Scale: appsv1alpha1.Autoscaling{Enabled: ptr.To[bool](false), MinReplicas: 2},
+				Scale: appsv1alpha1.Autoscaling{Enabled: ptr.To[bool](false)},
 				ReadinessProbe: &corev1.Probe{
 					ProbeHandler: corev1.ProbeHandler{
 						HTTPGet: &corev1.HTTPGetAction{
