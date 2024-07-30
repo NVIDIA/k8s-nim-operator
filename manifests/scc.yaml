@@ -1,9 +1,7 @@
-{{- if .Enabled }}
 apiVersion: security.openshift.io/v1
 kind: SecurityContextConstraints
 metadata:
   name: {{ .Name }}
-  namespace: {{ .Namespace }}
 allowHostDirVolumePlugin: false
 allowHostIPC: false
 allowHostNetwork: false
@@ -24,8 +22,7 @@ seLinuxContext:
   type: RunAsAny
 supplementalGroups:
   type: RunAsAny
-users:
-- system:serviceaccount:{{ .Namespace }}:{{ .ServiceAccountName }}
+users: []
 volumes:
 - configMap
 - hostPath
@@ -34,4 +31,3 @@ volumes:
 - projected
 - secret
 - downwardAPI
-{{- end }}
