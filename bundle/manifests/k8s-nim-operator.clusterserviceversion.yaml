@@ -635,7 +635,7 @@ spec:
                             apiVersion: v1
                             fieldPath: metadata.namespace
                     image: 'nvcr.io/nvidia/cloud-native/k8s-nim-operator:v0.1.0'
-                    imagePullPolicy: IfNotPresent
+                    imagePullPolicy: Always
                     livenessProbe:
                       failureThreshold: 3
                       httpGet:
