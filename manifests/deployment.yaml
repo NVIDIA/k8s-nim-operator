@@ -12,7 +12,9 @@ metadata:
     {{ $key }}: {{ $value }}
     {{- end }}
 spec:
+  {{- if .Replicas }}
   replicas: {{ .Replicas }}
+  {{- end }}
   strategy:
     type: RollingUpdate
     rollingUpdate:

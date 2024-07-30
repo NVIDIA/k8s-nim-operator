@@ -26,7 +26,7 @@ spec:
       - ngc-secret
   authSecret: ngc-api-secret
   nimCache:
-    name: meta-llama3-8b-instruct-latest
+    name: meta-llama3-8b-instruct
     profile: ''
   scale:
     minReplicas: 1
@@ -83,7 +83,7 @@ spec:
       args:
         - -X
         - "POST"
-        - 'http://meta-llama3-8b-instruct-latest:8090/v1/chat/completions'
+        - 'http://meta-llama3-8b-instruct:8000/v1/chat/completions'
         - -H
         - 'accept: application/json'
         - -H
