@@ -164,9 +164,23 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 	return envVars
 }
 
+// GetStandardAnnotations returns default annotations to apply to the NIMService instance
+func (n *NIMService) GetStandardAnnotations() map[string]string {
+	standardAnnotations := map[string]string{
+		"openshift.io/scc": "anyuid",
+	}
+	return standardAnnotations
+}
+
 // GetServiceAnnotations returns annotations to apply to the NIMService instance
 func (n *NIMService) GetServiceAnnotations() map[string]string {
-	return nil
+	standardAnnotations := n.GetStandardAnnotations()
+
+	if n.Spec.Annotations != nil {
+		return utils.MergeMaps(standardAnnotations, n.Spec.Annotations)
+	}
+
+	return standardAnnotations
 }
 
 // GetServiceLabels returns merged labels to apply to the NIMService instance
@@ -350,11 +364,6 @@ func (n *NIMService) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
 }
 
-// IsSCCEnabled returns true if scc is required for NIMService deployment
-func (n *NIMService) IsSCCEnabled() bool {
-	return n.Spec.Scale.Enabled != nil && *n.Spec.Scale.Enabled
-}
-
 // GetServicePort returns the service port for the NIMService deployment
 func (n *NIMService) GetServicePort() int32 {
 	return n.Spec.Expose.Service.OpenAIPort
@@ -535,11 +544,8 @@ func (n *NIMService) GetHPAParams() *rendertypes.HPAParams {
 // GetSCCParams return params to render SCC from templates
 func (n *NIMService) GetSCCParams() *rendertypes.SCCParams {
 	params := &rendertypes.SCCParams{}
-
-	params.Enabled = n.IsSCCEnabled()
 	// Set metadata
-	params.Name = n.GetName()
-	params.Namespace = n.GetNamespace()
+	params.Name = "nim-service-scc"
 
 	params.ServiceAccountName = n.GetServiceAccountName()
 	return params

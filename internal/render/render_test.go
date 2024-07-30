@@ -299,9 +299,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 
 		It("should render SCC template correctly", func() {
 			params := types.SCCParams{
-				Enabled:            true,
 				Name:               "test-scc",
-				Namespace:          "default",
 				ServiceAccountName: "test-service-account",
 			}
 
@@ -309,7 +307,6 @@ var _ = Describe("K8s Resources Rendering", func() {
 			scc, err := r.SCC(&params)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(scc.Name).To(Equal("test-scc"))
-			Expect(scc.Namespace).To(Equal("default"))
 		})
 
 		It("should render Ingress template correctly", func() {
