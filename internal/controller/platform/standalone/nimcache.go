@@ -367,8 +367,9 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 				for _, selectedProfile := range selectedProfiles {
 					if profileName == selectedProfile {
 						nimCache.Status.Profiles = append(nimCache.Status.Profiles, appsv1alpha1.NIMProfile{
+							Name:    profileName,
 							Model:   profileData.Model,
-							Tags:    profileData.Tags,
+							Config:  profileData.Tags,
 							Release: profileData.Release,
 						})
 					}
