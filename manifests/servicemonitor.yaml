@@ -1,0 +1,29 @@
+{{- if .Enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  labels:
+  {{- if .Labels }}
+    {{- .Labels | yaml | nindent 4 }}
+  {{- end }}
+  annotations:
+  {{- if .Annotations }}
+    {{- .Annotations | yaml | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    labels:
+    {{- if .MatchLabels }}
+      {{- .MatchLabels | yaml | nindent 6 }}
+    {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Namespace }}
+  endpoints:
+    - port: {{ .Port }}
+      path: {{ .Path }}
+      interval: {{ .Interval }}
+      scrapeTimeout: {{ .ScrapeTimeout }}
+{{- end }}

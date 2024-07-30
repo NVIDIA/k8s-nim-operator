@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-nim-operator.fullname" . }}
+  labels:
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: k8s-nim-operator
+    app.kubernetes.io/part-of: k8s-nim-operator
+    control-plane: controller-manager
+  {{- include "k8s-nim-operator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.operator.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+    {{- include "k8s-nim-operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+      {{- include "k8s-nim-operator.selectorLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+    spec:
+      containers:
+      - args: {{- toYaml .Values.kubeProxy.args | nindent 8 }}
+        image: {{ .Values.kubeProxy.image.repository }}:{{ .Values.kubeProxy.image.tag }}
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        resources: {{- toYaml .Values.kubeProxy.resources | nindent
+          10 }}
+        securityContext: {{- toYaml .Values.kubeProxy.containerSecurityContext
+          | nindent 10 }}
+      - args: {{- toYaml .Values.operator.args | nindent 8 }}
+        command:
+        - /manager
+        image: {{ include "k8s-nim-operator.fullimage" . }}
+        imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+        env:
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources: {{- toYaml .Values.operator.resources | nindent 10 }}
+        securityContext: {{- toYaml .Values.operator.containerSecurityContext | nindent 10 }}
+      imagePullSecrets:
+      {{- range .Values.operator.image.pullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: k8s-nim-operator
+      terminationGracePeriodSeconds: 10
+    {{- with .Values.operator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.operator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.operator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

@@ -1,0 +1,16 @@
+{{- if .Values.nfd.nodeFeatureRules.deviceID }}
+kind: NodeFeatureRule
+apiVersion: nfd.k8s-sigs.io/v1alpha1
+metadata:
+  name: nfd-pci-device-rule
+spec:
+  rules:
+    - name: "NVIDIA PCIe Device Label"
+      labelsTemplate: |
+        {{`{{ range .pci.device }}pci-{{ .vendor }}-{{ .device }}.present=true`}}
+        {{`{{ end }}`}}
+      matchFeatures:
+        - feature: pci.device
+          matchExpressions:
+            vendor: {op: In, value: ["10de"]}
+{{- end }}

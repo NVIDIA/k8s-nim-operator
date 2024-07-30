@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  labels:
+    {{- range $key, $value := .Labels }}
+    {{ $key }}: {{ $value }}
+    {{- end }}
+  annotations:
+    {{- range $key, $value := .Annotations }}
+    {{ $key }}: {{ $value }}
+    {{- end }}
+spec:
+  replicas: {{ .Replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Name }}
+  serviceName: {{ .ServiceName }}
+  podManagementPolicy: "Parallel"
+  template:
+    metadata:
+      labels:
+        app: {{ .Name }}
+    spec:
+      containers:
+      - name: {{ .ContainerName }}
+        image: {{ .Image }}
+        imagePullPolicy: {{ .ImagePullPolicy }}
+        volumeMounts:
+        {{- range .VolumeMounts }}
+        - name: {{ .Name }}
+          mountPath: {{ .MountPath }}
+        {{- end }}
+        env:
+        {{- range .Env }}
+        - name: {{ .Name }}
+          value: {{ .Value }}
+        {{- end }}
+        {{- with .Resources }}
+        resources:
+          {{ . | yaml | nindent 10 }}
+        {{- end }}
+      volumes:
+      {{- range .Volumes }}
+      - name: {{ .Name }}
+        {{- if .PersistentVolumeClaim }}
+        persistentVolumeClaim:
+          claimName: {{ .PersistentVolumeClaim.ClaimName }}
+        {{- else if .ConfigMap }}
+        configMap:
+          name: {{ .ConfigMap.Name }}
+        {{- end }}
+      {{- end }}
+      {{- if .NodeSelector }}
+      nodeSelector:
+        {{- range $key, $value := .NodeSelector }}
+        {{ $key }}: {{ $value }}
+        {{- end }}
+      {{- end }}
+      {{- if .Tolerations }}
+      tolerations:
+        {{- range .Tolerations }}
+        - key: {{ .Key }}
+          operator: {{ .Operator }}
+          value: {{ .Value }}
+          effect: {{ .Effect }}
+        {{- end }}
+      {{- end }}
+      {{- if .ImagePullSecrets }}
+      imagePullSecrets:
+      {{- range .ImagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}

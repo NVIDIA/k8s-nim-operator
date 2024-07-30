@@ -1,0 +1,363 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.15.0
+  name: nimcaches.apps.nvidia.com
+spec:
+  group: apps.nvidia.com
+  names:
+    kind: NIMCache
+    listKind: NIMCacheList
+    plural: nimcaches
+    singular: nimcache
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.state
+      name: Status
+      type: string
+    - jsonPath: .status.pvc
+      name: PVC
+      type: string
+    - jsonPath: .status.profiles
+      name: Profiles
+      priority: 1
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: NIMCache is the Schema for the nimcaches API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: NIMCacheSpec defines the desired state of NIMCache
+            properties:
+              gpuSelectors:
+                additionalProperties:
+                  type: string
+                description: NodeSelectors are the node selector labels to schedule
+                  the caching job.
+                type: object
+              resources:
+                description: Resources defines the minimum resources required for
+                  the caching job to run(cpu, memory, gpu).
+                properties:
+                  cpu:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: CPU indicates the minimum number of CPUs to use while
+                      caching NIM
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  gpus:
+                    description: GPUs specifies the number of GPUs to assign to the
+                      caching job.
+                    minimum: 0
+                    type: integer
+                  memory:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: |-
+                      Memory indicates the minimum amount of memory to use while caching NIM
+                      Valid values are numbers followed by one of the suffixes Ki, Mi, Gi, or Ti (e.g. "4Gi", "4096Mi").
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
+              source:
+                description: Source is the NIM model source to cache
+                properties:
+                  dataStore:
+                    description: NGCSource represents models stored in NVIDIA DataStore
+                      service
+                    properties:
+                      authSecret:
+                        description: The name of an existing auth secret containing
+                          the AUTH_TOKEN"
+                        type: string
+                      checkpointName:
+                        type: string
+                      datasetName:
+                        type: string
+                      endpoint:
+                        description: The endpoint for datastore
+                        type: string
+                      modelName:
+                        description: Name of either model/checkpoint or dataset to
+                          download
+                        type: string
+                      modelPuller:
+                        description: ModelPuller is the container image that can pull
+                          the model
+                        type: string
+                      pullSecret:
+                        description: PullSecret for the model puller image
+                        type: string
+                    required:
+                    - authSecret
+                    - endpoint
+                    - modelPuller
+                    type: object
+                  ngc:
+                    description: NGCSource represents models stored in NGC
+                    properties:
+                      authSecret:
+                        description: The name of an existing pull secret containing
+                          the NGC_API_KEY
+                        type: string
+                      model:
+                        description: Model spec for caching
+                        properties:
+                          autoDetect:
+                            description: AutoDetect enables auto-detection of model
+                              profiles with specified model parameters
+                            type: boolean
+                          engine:
+                            description: Engine is the backend engine (tensort_llm,
+                              vllm)
+                            type: string
+                          gpus:
+                            description: GPU is the spec for matching GPUs for caching
+                              optimized models
+                            items:
+                              description: GPUSpec is the spec required to cache models
+                                for selected gpu type
+                              properties:
+                                ids:
+                                  description: IDs are the device-ids for a specific
+                                    GPU SKU
+                                  items:
+                                    type: string
+                                  type: array
+                                product:
+                                  description: Product is the GPU product string (h100,
+                                    a100, l40s)
+                                  type: string
+                              type: object
+                            type: array
+                          lora:
+                            description: Lora indicates a finetuned model with LoRa
+                              adapters
+                            type: boolean
+                          precision:
+                            description: Precision is the precision for model quantization
+                            type: string
+                          profiles:
+                            description: Profiles are the specific model profiles
+                              to cache
+                            items:
+                              type: string
+                            type: array
+                          qosProfile:
+                            description: QoSProfile is the supported QoS profile types
+                              for the models (throughput, latency)
+                            type: string
+                          tensorParallelism:
+                            description: TensorParallelism is the minimum GPUs required
+                              for the model computations
+                            type: string
+                        type: object
+                      modelPuller:
+                        description: ModelPuller is the container image that can pull
+                          the model
+                        type: string
+                      pullSecret:
+                        description: PullSecret to pull the model puller image
+                        type: string
+                    required:
+                    - authSecret
+                    - modelPuller
+                    type: object
+                type: object
+              storage:
+                description: Storage is the target storage for caching NIM model
+                properties:
+                  hostPath:
+                    description: HostPath is the host path volume for caching NIM
+                    type: string
+                  pvc:
+                    description: PersistentVolumeClaim is the pvc volume used for
+                      caching NIM
+                    properties:
+                      create:
+                        description: Create indicates to create a new PVC
+                        type: boolean
+                      name:
+                        description: Name is the name of the PVC
+                        type: string
+                      size:
+                        description: Size of the NIM cache in Gi, used during PVC
+                          creation
+                        type: string
+                      storageClass:
+                        description: StorageClass to be used for PVC creation. Leave
+                          it as empty if the PVC is already created.
+                        type: string
+                      volumeAccessMode:
+                        description: VolumeAccessMode is the volume access mode of
+                          the PVC
+                        type: string
+                    type: object
+                type: object
+              tolerations:
+                description: Tolerations for running the job to cache the NIM model
+                items:
+                  description: |-
+                    The pod this Toleration is attached to tolerates any taint that matches
+                    the triple <key,value,effect> using the matching operator <operator>.
+                  properties:
+                    effect:
+                      description: |-
+                        Effect indicates the taint effect to match. Empty means match all taint effects.
+                        When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                      type: string
+                    key:
+                      description: |-
+                        Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                        If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                      type: string
+                    operator:
+                      description: |-
+                        Operator represents a key's relationship to the value.
+                        Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod can
+                        tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: |-
+                        TolerationSeconds represents the period of time the toleration (which must be
+                        of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                        it is not set, which means tolerate the taint forever (do not evict). Zero and
+                        negative values will be treated as 0 (evict immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: |-
+                        Value is the taint value the toleration matches to.
+                        If the operator is Exists, the value should be empty, otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
+            required:
+            - resources
+            - source
+            - storage
+            type: object
+          status:
+            description: NIMCacheStatus defines the observed state of NIMCache
+            properties:
+              conditions:
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource.\n---\nThis struct is intended for
+                    direct use as an array at the field path .status.conditions.  For
+                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
+                    observations of a foo's current state.\n\t    // Known .status.conditions.type
+                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
+                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                    \   // other fields\n\t}"
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              profiles:
+                items:
+                  description: NIMProfile defines the profiles that were cached
+                  properties:
+                    model:
+                      type: string
+                    release:
+                      type: string
+                    tags:
+                      additionalProperties:
+                        type: string
+                      type: object
+                  type: object
+                type: array
+              pvc:
+                type: string
+              state:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
