@@ -144,9 +144,7 @@ type RoleBindingParams struct {
 
 // SCCParams holds the parameters for rendering a SecurityContextConstraints template
 type SCCParams struct {
-	Enabled            bool
 	Name               string
-	Namespace          string
 	ServiceAccountName string
 }
 
