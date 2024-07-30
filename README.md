@@ -2,7 +2,7 @@
 An Operator for deployment and maintenance of various NeMo microservices along with NVIDIA Inferencing Microservices (NIMs) in a Kubernetes environment.
 
 ## Description
-The NVIDIA NIM Operator is a Kubernetes operator designed to facilitate the deployment, management, and scaling of NVIDIA Inferencing Services (NIMs) and related NeMo (Neural Modules) services on Kubernetes clusters. The NIM Operator streamlines the integration of these powerful AI capabilities into cloud-native environments such as Kubernetes, leveraging NVIDIA GPUs.
+The NVIDIA NIM Operator is a Kubernetes operator designed to facilitate the deployment, management, and scaling of NVIDIA NIMs and related NeMo microservices. The NIM Operator streamlines the integration of these powerful AI capabilities into cloud-native environments such as Kubernetes, leveraging NVIDIA GPUs.
 
 ## Getting Started
 
@@ -13,7 +13,7 @@ The NVIDIA NIM Operator is a Kubernetes operator designed to facilitate the depl
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-build docker-push IMG=nvcr.io/nvstaging/cloud-native/k8s-nim-operator:tag
+make docker-build docker-push IMG=nvcr.io/nvidia/cloud-native/k8s-nim-operator:v0.1.0
 ```
 
 **NOTE:** This image ought to be published in the personal registry you specified.
@@ -67,7 +67,7 @@ Following are the steps to build the installer and distribute this project to us
 1. Build the installer for the image built and published in the registry:
 
 ```sh
-make build-installer IMG=nvcr.io/nvstaging/cloud-native/k8s-nim-operator:tag
+make build-installer IMG=nvcr.io/nvidia/cloud-native/k8s-nim-operator:v0.1.0
 ```
 
 NOTE: The makefile target mentioned above generates an 'install.yaml'
