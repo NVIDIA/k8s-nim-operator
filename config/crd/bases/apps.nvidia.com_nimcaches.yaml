@@ -341,14 +341,16 @@ spec:
                 items:
                   description: NIMProfile defines the profiles that were cached
                   properties:
-                    model:
-                      type: string
-                    release:
-                      type: string
-                    tags:
+                    config:
                       additionalProperties:
                         type: string
                       type: object
+                    model:
+                      type: string
+                    name:
+                      type: string
+                    release:
+                      type: string
                   type: object
                 type: array
               pvc:
