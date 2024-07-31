@@ -29,11 +29,12 @@ type NIMPipelineSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// NIMService configures attributes to deploy a NIM service as part of the pipeline
-	NIMService NIMServicePipelineSpec `json:"nimService,omitempty"`
+	Services []NIMServicePipelineSpec `json:"services,omitempty"`
 }
 
 // NIMServicePipelineSpec defines the desired state of NIMService as part of the NIMPipeline
 type NIMServicePipelineSpec struct {
+	Name    string         `json:"name,omitempty"`
 	Enabled *bool          `json:"enabled,omitempty"`
 	Spec    NIMServiceSpec `json:"spec,omitempty"`
 }
