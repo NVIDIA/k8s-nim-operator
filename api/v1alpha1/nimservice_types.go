@@ -47,6 +47,9 @@ const (
 
 // NIMServiceSpec defines the desired state of NIMService
 type NIMServiceSpec struct {
+	// +kubebuilder:validation:Enum=llm;embedding;reranking
+	// +kubebuilder:default=llm
+	Type    string          `json:"type,omitempty"`
 	Image   Image           `json:"image,omitempty"`
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
