@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	v1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -315,10 +316,13 @@ var _ = Describe("K8s Resources Rendering", func() {
 				Enabled:   true,
 				Name:      "test-ingress",
 				Namespace: "default",
-				Host:      "example.com",
-				Path:      "/",
-				Port:      80,
-				ClassName: "test",
+				Spec: v1.IngressSpec{Rules: []v1.IngressRule{
+					{
+						Host:             "chart-example.local",
+						IngressRuleValue: v1.IngressRuleValue{},
+					},
+				},
+				},
 			}
 
 			r := render.NewRenderer(templatesDir)
