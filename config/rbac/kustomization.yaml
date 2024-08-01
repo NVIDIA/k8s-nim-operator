@@ -17,10 +17,6 @@ resources:
 - nimpipeline_viewer_role.yaml
 - nimcache_editor_role.yaml
 - nimcache_viewer_role.yaml
-- rerankingservice_editor_role.yaml
-- rerankingservice_viewer_role.yaml
-- embeddingservice_editor_role.yaml
-- embeddingservice_viewer_role.yaml
 - nimservice_editor_role.yaml
 - nimservice_viewer_role.yaml
 
