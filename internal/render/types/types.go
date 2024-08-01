@@ -156,12 +156,7 @@ type IngressParams struct {
 	Namespace   string
 	Labels      map[string]string
 	Annotations map[string]string
-	Host        string
-	Path        string
-	Port        int
-	ClassName   string
-	Hosts       []IngressHost
-	TLS         []networkingv1.IngressTLS
+	Spec        networkingv1.IngressSpec
 }
 
 // IngressHost defines attributes for ingress host

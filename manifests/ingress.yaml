@@ -13,30 +13,7 @@ metadata:
     {{- .Annotations | yaml | nindent 4 }}
   {{- end }}
 spec:
-  ingressClassName: {{ .ClassName }}
-  tls:
-    {{- range .TLS }}
-    - hosts:
-        {{- range .Hosts }}
-        - {{ . | quote }}
-        {{- end }}
-      secretName: {{ .SecretName }}
-    {{- end }}
-  rules:
-    {{- range .Hosts }}
-    - host: {{ .Host | quote }}
-      http:
-        paths:
-          {{- range .Paths }}
-          - path: {{ .Path }}
-            {{- if .PathType }}
-            pathType: {{ .PathType }}
-            {{- end }}
-            backend:
-              service:
-                name: "{{ .ServiceName }}"
-                port:
-                  number: {{ .ServicePort }}
-          {{- end }}
-    {{- end }}
+  {{- if .Spec }}
+    {{- .Spec | yaml | nindent 2 }}
+  {{- end }}
 {{- end }}
