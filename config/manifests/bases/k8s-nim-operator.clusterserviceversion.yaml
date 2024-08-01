@@ -10,11 +10,6 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: EmbeddingService is the Schema for the embeddingservices API
-      displayName: Embedding Service
-      kind: EmbeddingService
-      name: embeddingservices.apps.nvidia.com
-      version: v1alpha1
     - description: NIMCache is the Schema for the nimcaches API
       displayName: NIMCache
       kind: NIMCache
@@ -29,11 +24,6 @@ spec:
       displayName: NIMService
       kind: NIMService
       name: nimservices.apps.nvidia.com
-      version: v1alpha1
-    - description: RerankingService is the Schema for the rerankingservices API
-      displayName: Reranking Service
-      kind: RerankingService
-      name: rerankingservices.apps.nvidia.com
       version: v1alpha1
   description: The NVIDIA NIM Operator is a Kubernetes operator designed to facilitate
     the deployment, management, and scaling of NVIDIA NeMo (Neural Modules) services

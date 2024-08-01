@@ -1,8 +1,6 @@
 ## Append samples of your project ##
 resources:
 - apps_v1alpha1_nimservice.yaml
-- apps_v1alpha1_embeddingservice.yaml
-- apps_v1alpha1_rerankingservice.yaml
 - apps_v1alpha1_nimcache.yaml
 - apps_v1alpha1_nimpipeline.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
