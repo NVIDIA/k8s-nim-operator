@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 )
@@ -178,19 +179,12 @@ type IngressPath struct {
 
 // HPAParams holds the parameters for rendering a HorizontalPodAutoscaler template
 type HPAParams struct {
-	Enabled                    bool
-	Name                       string
-	Namespace                  string
-	Labels                     map[string]string
-	Annotations                map[string]string
-	Kind                       string
-	DeploymentName             string
-	StatefulSetName            string
-	MinReplicas                int32
-	MaxReplicas                int32
-	CPUUtilization             int32
-	Metrics                    []string
-	ScaleDownStabilizationSecs int32
+	Enabled     bool
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	HPASpec     autoscalingv2.HorizontalPodAutoscalerSpec
 }
 
 // ServiceMonitorParams holds the parameters for rendering a ServiceMonitor template
