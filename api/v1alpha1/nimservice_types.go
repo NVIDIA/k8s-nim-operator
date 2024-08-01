@@ -24,6 +24,7 @@ import (
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -351,6 +352,7 @@ func (n *NIMService) GetExternalPVC() *string {
 	return n.Spec.Storage.PVC.Name
 }
 
+// GetHPASpec returns the HPA spec for the NIMService deployment
 func (n *NIMService) GetHPASpec() autoscalingv2.HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPASpec
 }
@@ -376,6 +378,11 @@ func (n *NIMService) IsAutoScalingEnabled() bool {
 // IsIngressEnabled returns true if ingress is enabled for NIMService deployment
 func (n *NIMService) IsIngressEnabled() bool {
 	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
+}
+
+// GetIngressSpec returns the Ingress spec NIMService deployment
+func (n *NIMService) GetIngressSpec() networkingv1.IngressSpec {
+	return n.Spec.Expose.Ingress.Spec
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NIMService deployment
@@ -512,8 +519,7 @@ func (n *NIMService) GetIngressParams() *rendertypes.IngressParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetServiceAnnotations()
-
-	// TODO: set ingress rules
+	params.Spec = n.GetIngressSpec()
 	return params
 }
 

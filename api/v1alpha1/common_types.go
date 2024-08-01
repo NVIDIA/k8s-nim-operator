@@ -66,10 +66,8 @@ type Image struct {
 // Ingress defines attributes to enable ingress for the service
 type Ingress struct {
 	// ingress, or virtualService - not both
-	Enabled   *bool                     `json:"enabled,omitempty"`
-	ClassName string                    `json:"className,omitempty"`
-	Hosts     []IngressHost             `json:"hosts,omitempty"`
-	TLS       []networkingv1.IngressTLS `json:"tls,omitempty"`
+	Enabled *bool                    `json:"enabled,omitempty"`
+	Spec    networkingv1.IngressSpec `json:"spec,omitempty"`
 }
 
 // IngressHost defines attributes for ingress host
