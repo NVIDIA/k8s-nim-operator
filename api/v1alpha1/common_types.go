@@ -51,11 +51,8 @@ type ServiceMonitor struct {
 
 // Autoscaling defines attributes to automatically scale the service based on metrics
 type Autoscaling struct {
-	Enabled                    *bool                      `json:"enabled,omitempty"`
-	MinReplicas                int                        `json:"minReplicas,omitempty"`
-	MaxReplicas                int                        `json:"maxReplicas,omitempty"`
-	ScaleDownStabilizationSecs int                        `json:"scaleDownStabilizationSecs,omitempty"`
-	Metrics                    []autoscalingv2.MetricSpec `json:"metrics,omitempty"`
+	Enabled *bool                                     `json:"enabled,omitempty"`
+	HPASpec autoscalingv2.HorizontalPodAutoscalerSpec `json:"hpaspec,omitempty"`
 }
 
 // Image defines image attributes

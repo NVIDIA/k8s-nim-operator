@@ -13,23 +13,7 @@ metadata:
     {{- .Annotations | yaml | nindent 4 }}
   {{- end }}
 spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: {{ .Kind }}
-    {{- if .DeploymentName }}
-    name: {{ .DeploymentName }}
-    {{- else if .StatefulSetName }}
-    name: {{ .StatefulSetName }}
-    {{- end }}
-  minReplicas: {{ .MinReplicas }}
-  maxReplicas: {{ .MaxReplicas }}
-  metrics:
-    {{- range .Metrics }}
-    - {{ . | yaml | nindent 4 }}
-    {{- end }}
-  {{- if .ScaleDownStabilizationSecs }}
-  behavior:
-    scaleDown:
-      stabilizationWindowSeconds: {{ .ScaleDownStabilizationSecs }}
+  {{- if .HPASpec }}
+    {{- .HPASpec | yaml | nindent 2 }}
   {{- end }}
 {{- end }}

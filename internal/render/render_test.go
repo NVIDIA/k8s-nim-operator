@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -328,15 +329,20 @@ var _ = Describe("K8s Resources Rendering", func() {
 		})
 
 		It("should render HPA template correctly", func() {
+			minRep := int32(1)
 			params := types.HPAParams{
-				Enabled:         true,
-				Name:            "test-hpa",
-				Namespace:       "default",
-				MinReplicas:     1,
-				MaxReplicas:     10,
-				CPUUtilization:  80,
-				StatefulSetName: "test-statefulset",
-				DeploymentName:  "test-deployment",
+				Enabled:   true,
+				Name:      "test-hpa",
+				Namespace: "default",
+				HPASpec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						Name:       "test-deployment",
+						Kind:       "Deployment",
+						APIVersion: "apps/v1",
+					},
+					MinReplicas: &minRep,
+					MaxReplicas: 10,
+				},
 			}
 			r := render.NewRenderer(templatesDir)
 			hpa, err := r.HPA(&params)
