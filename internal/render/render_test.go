@@ -334,7 +334,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 				Enabled:   true,
 				Name:      "test-hpa",
 				Namespace: "default",
-				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+				HPASpec: autoscalingv2.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
 						Name:       "test-deployment",
 						Kind:       "Deployment",

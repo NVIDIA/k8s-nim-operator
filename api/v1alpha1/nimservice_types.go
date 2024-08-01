@@ -342,7 +342,7 @@ func (n *NIMService) GetExternalPVC() *string {
 }
 
 func (n *NIMService) GetHPASpec() autoscalingv2.HorizontalPodAutoscalerSpec {
-	return n.Spec.Scale.Spec
+	return n.Spec.Scale.HPASpec
 }
 
 // GetReplicas returns replicas for the NIMService deployment
@@ -549,7 +549,7 @@ func (n *NIMService) GetHPAParams() *rendertypes.HPAParams {
 	hpaSpec.ScaleTargetRef.Kind = n.GetDeploymentKind()
 	hpaSpec.ScaleTargetRef.Name = n.GetName()
 	hpaSpec.ScaleTargetRef.APIVersion = "apps/v1"
-	params.Spec = hpaSpec
+	params.HPASpec = hpaSpec
 	return params
 }
 
