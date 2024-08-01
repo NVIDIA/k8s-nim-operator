@@ -121,3 +121,27 @@ func (u *updater) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NIMS
 	cr.Status.State = NotReady
 	return u.client.Status().Update(ctx, cr)
 }
+
+// UpdateCondition updates the given condition into the conditions list
+func UpdateCondition(conditions *[]metav1.Condition, conditionType string, status metav1.ConditionStatus, reason, message string) {
+	for i := range *conditions {
+		if (*conditions)[i].Type == conditionType {
+			// existing condition
+			(*conditions)[i].Status = status
+			(*conditions)[i].LastTransitionTime = metav1.Now()
+			(*conditions)[i].Reason = reason
+			(*conditions)[i].Message = message
+			// condition updated
+			return
+		}
+	}
+	// new condition
+	*conditions = append(*conditions, metav1.Condition{
+		Type:               conditionType,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	})
+	// condition updated
+}

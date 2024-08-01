@@ -111,6 +111,16 @@ type NIMServiceList struct {
 	Items           []NIMService `json:"items"`
 }
 
+// GetPVCName returns the name to be used for the PVC based on the custom spec
+// Prefers pvc.Name if explicitly set by the user in the NIMService instance
+func (n *NIMService) GetPVCName(pvc PersistentVolumeClaim) string {
+	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
+	if pvc.Name != nil {
+		pvcName = *pvc.Name
+	}
+	return pvcName
+}
+
 // GetStandardSelectorLabels returns the standard selector labels for the NIMService deployment
 func (n *NIMService) GetStandardSelectorLabels() map[string]string {
 	return map[string]string{
