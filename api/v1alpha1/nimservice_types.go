@@ -22,6 +22,7 @@ import (
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -71,6 +72,7 @@ type NIMServiceSpec struct {
 	StartupProbe   *corev1.Probe                `json:"startupProbe,omitempty"`
 	Scale          Autoscaling                  `json:"scale,omitempty"`
 	Metrics        Metrics                      `json:"metrics,omitempty"`
+	Replicas       int                          `json:"replicas,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume
@@ -339,12 +341,16 @@ func (n *NIMService) GetExternalPVC() *string {
 	return n.Spec.Storage.PVC.Name
 }
 
+func (n *NIMService) GetHPASpec() autoscalingv2.HorizontalPodAutoscalerSpec {
+	return n.Spec.Scale.HPASpec
+}
+
 // GetReplicas returns replicas for the NIMService deployment
 func (n *NIMService) GetReplicas() int {
 	if n.IsAutoScalingEnabled() {
 		return 0
 	}
-	return n.Spec.Scale.MinReplicas
+	return n.Spec.Replicas
 }
 
 // GetDeploymentKind returns the kind of deployment for NIMService
@@ -539,8 +545,11 @@ func (n *NIMService) GetHPAParams() *rendertypes.HPAParams {
 	params.Annotations = n.GetServiceAnnotations()
 
 	// Set HPA spec
-	params.Kind = n.GetDeploymentKind()
-	params.DeploymentName = n.GetName()
+	hpaSpec := n.GetHPASpec()
+	hpaSpec.ScaleTargetRef.Kind = n.GetDeploymentKind()
+	hpaSpec.ScaleTargetRef.Name = n.GetName()
+	hpaSpec.ScaleTargetRef.APIVersion = "apps/v1"
+	params.HPASpec = hpaSpec
 	return params
 }
 

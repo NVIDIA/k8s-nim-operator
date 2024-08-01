@@ -39,7 +39,7 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -69,7 +69,7 @@ type Renderer interface {
 	RoleBinding(params *types.RoleBindingParams) (*rbacv1.RoleBinding, error)
 	SCC(params *types.SCCParams) (*securityv1.SecurityContextConstraints, error)
 	Ingress(params *types.IngressParams) (*networkingv1.Ingress, error)
-	HPA(params *types.HPAParams) (*autoscalingv1.HorizontalPodAutoscaler, error)
+	HPA(params *types.HPAParams) (*autoscalingv2.HorizontalPodAutoscaler, error)
 	ServiceMonitor(params *types.ServiceMonitorParams) (*monitoringv1.ServiceMonitor, error)
 }
 
@@ -335,7 +335,7 @@ func (r *textTemplateRenderer) Ingress(params *types.IngressParams) (*networking
 }
 
 // HPA renders spec for HPA with the given templating data
-func (r *textTemplateRenderer) HPA(params *types.HPAParams) (*autoscalingv1.HorizontalPodAutoscaler, error) {
+func (r *textTemplateRenderer) HPA(params *types.HPAParams) (*autoscalingv2.HorizontalPodAutoscaler, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "hpa.yaml"), &TemplateData{Data: params})
 	if err != nil {
 		return nil, err
@@ -343,7 +343,7 @@ func (r *textTemplateRenderer) HPA(params *types.HPAParams) (*autoscalingv1.Hori
 	if len(objs) == 0 {
 		return nil, nil
 	}
-	hpa := &autoscalingv1.HorizontalPodAutoscaler{}
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{}
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, hpa)
 	if err != nil {
 		return nil, fmt.Errorf("error converting unstructured object to HPA: %w", err)
