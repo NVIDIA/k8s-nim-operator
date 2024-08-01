@@ -1,5 +1,5 @@
 # The NVIDIA NIM Operator
-An Operator for deployment and maintenance of various NeMo microservices along with NVIDIA Inferencing Microservices (NIMs) in a Kubernetes environment.
+An Operator for the deployment and maintenance of various NVIDIA NIMs and NeMo microservices in a Kubernetes environment.
 
 ## Description
 The NVIDIA NIM Operator is a Kubernetes operator designed to facilitate the deployment, management, and scaling of NVIDIA NIMs and related NeMo microservices. The NIM Operator streamlines the integration of these powerful AI capabilities into cloud-native environments such as Kubernetes, leveraging NVIDIA GPUs.
