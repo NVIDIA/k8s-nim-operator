@@ -23,6 +23,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -342,7 +343,7 @@ func (r *NIMServiceReconciler) getNIMCachePVC(ctx context.Context, nimService *a
 
 func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, error) {
 	logger := r.GetLogger()
-	pvcName := getPvcName(nimService, nimService.Spec.Storage.PVC)
+	pvcName := nimService.GetPVCName(nimService.Spec.Storage.PVC)
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nimService.GetNamespace()}
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, pvcNamespacedName, pvc)
@@ -353,7 +354,7 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
-			pvc, err = constructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace()})
+			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace()})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvc.Name)
 				return "", err
@@ -368,7 +369,7 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 			}
 			logger.Info("Created PVC for NIM Service", "pvc", pvcName)
 
-			updateCondition(&nimService.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
+			conditions.UpdateCondition(&nimService.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
 			nimService.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
 			if err := r.Status().Update(ctx, nimService); err != nil {
 				logger.Error(err, "Failed to update status", "NIMService", nimService.Name)
