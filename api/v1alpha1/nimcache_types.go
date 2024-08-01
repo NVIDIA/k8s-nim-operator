@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -223,6 +225,16 @@ type NIMCache struct {
 
 	Spec   NIMCacheSpec   `json:"spec,omitempty"`
 	Status NIMCacheStatus `json:"status,omitempty"`
+}
+
+// GetPVCName returns the name to be used for the PVC based on the custom spec
+// Prefers pvc.Name if explicitly set by the user in the NIMCache instance
+func (n *NIMCache) GetPVCName(pvc PersistentVolumeClaim) string {
+	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
+	if pvc.Name != nil {
+		pvcName = *pvc.Name
+	}
+	return pvcName
 }
 
 // +kubebuilder:object:root=true

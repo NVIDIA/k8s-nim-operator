@@ -70,24 +70,17 @@ func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
 func (k *KServe) Delete(ctx context.Context, r shared.Reconciler, resource client.Object) error {
 	logger := r.GetLogger()
 
-	if nimCache, ok := resource.(*appsv1alpha1.NIMCache); ok {
-		reconciler := NewNIMCacheReconciler(r)
-		err := reconciler.cleanupNIMCache(ctx, nimCache)
-		if err != nil {
-			logger.Error(err, "failed to cleanup nimcache resources", "name", nimCache.Name)
-			return err
-		}
-	} else if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
+	if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
 		reconciler := NewNIMServiceReconciler(r)
 		err := reconciler.cleanupNIMService(ctx, nimService)
 		if err != nil {
 			logger.Error(err, "failed to cleanup nimservice resources", "name", nimService.Name)
 			return err
 		}
-	} else {
-		return errors.NewBadRequest("invalid resource type")
+		return nil
 	}
-	return nil
+	return errors.NewBadRequest("invalid resource type")
+
 }
 
 // Sync handles reconciliation of Kserve resources

@@ -81,40 +81,27 @@ func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
 func (s *Standalone) Delete(ctx context.Context, r shared.Reconciler, resource client.Object) error {
 	logger := r.GetLogger()
 
-	if nimCache, ok := resource.(*appsv1alpha1.NIMCache); ok {
-		reconciler := NewNIMCacheReconciler(r)
-		err := reconciler.cleanupNIMCache(ctx, nimCache)
-		if err != nil {
-			logger.Error(err, "failed to cleanup resources", "name", nimCache.Name)
-			return err
-		}
-	} else if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
+	if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
 		reconciler := NewNIMServiceReconciler(r)
 		err := reconciler.cleanupNIMService(ctx, nimService)
 		if err != nil {
 			logger.Error(err, "failed to cleanup resources", "name", nimService.Name)
 			return err
 		}
-	} else {
-		return errors.NewBadRequest("invalid resource type")
+		return nil
 	}
-	return nil
+	return errors.NewBadRequest("invalid resource type")
 }
 
 // Sync handles reconciliation for standalone Standalone caching
 func (s *Standalone) Sync(ctx context.Context, r shared.Reconciler, resource client.Object) (ctrl.Result, error) {
 	logger := r.GetLogger()
 
-	if nimCache, ok := resource.(*appsv1alpha1.NIMCache); ok {
-		reconciler := NewNIMCacheReconciler(r)
-		logger.Info("Reconciling NIMCache instance")
-		return reconciler.reconcileNIMCache(ctx, nimCache)
-	} else if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
+	if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
 		reconciler := NewNIMServiceReconciler(r)
 		reconciler.renderer = render.NewRenderer(ManifestsDir)
 		logger.Info("Reconciling NIMService instance")
 		return reconciler.reconcileNIMService(ctx, nimService)
-	} else {
-		return ctrl.Result{}, errors.NewBadRequest("invalid resource type")
 	}
+	return ctrl.Result{}, errors.NewBadRequest("invalid resource type")
 }
