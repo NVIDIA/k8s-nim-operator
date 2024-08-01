@@ -184,7 +184,7 @@ type HPAParams struct {
 	Namespace   string
 	Labels      map[string]string
 	Annotations map[string]string
-	Spec        autoscalingv2.HorizontalPodAutoscalerSpec
+	HPASpec     autoscalingv2.HorizontalPodAutoscalerSpec
 }
 
 // ServiceMonitorParams holds the parameters for rendering a ServiceMonitor template
