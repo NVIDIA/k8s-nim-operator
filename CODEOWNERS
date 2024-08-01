@@ -1,11 +1,2 @@
-approvers:
-  - shivamerla
-  - rajatc
-  - jmancuso
-  - mkhadkevich
-reviewers:
-  - shivamerla
-  - rajatc
-  - jmancuso
-  - mkhadkevich
-component: "K8s NIM Operator"
+# General approvers for the nim-operator codebase
+* @arangogutierrez @shivamerla @visheshtanksale
