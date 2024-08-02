@@ -1,22 +1,30 @@
-# Caching NIM models
-Follow these steps to cache NIM models into a persistent storage (PVC)
+<!--
+  SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+-->
 
-### Pre-requisites
+# Caching NIM Models
 
-* NVIDIA GPU Operator have to be installed
-* NVIDIA NIM Operator for K8s have to be installed
-* Access to following NGC repositories required
-  - nvcr.io/nvstaging/cloud-native
-  - nvcr.io/nvidian/nim-llm-dev
-* Local Path Provisioner for creating a Persistent Volume (PV)
+Follow these steps to cache NIM models in a persistent volume.
 
-### 1. Create a Namespace for running NIM services
+## Prerequisites
+
+* NVIDIA GPU Operator is installed.
+* NVIDIA NIM Operator is installed.
+* Access to following NGC registries is required:
+  * nvcr.io/nvstaging/cloud-native
+  * nvcr.io/nvidian/nim-llm-dev
+* A persistent volume provisioner is installed.
+
+  The Local Path Provisioner from Rancher is acceptable for development on a single-node cluster.
+
+## 1. Create a Namespace for Running NIM Microservices
 
 ```sh
 kubectl create ns nim-service
 ```
 
-### 2. Create an Image Pull Secret for the NIM container
+### 2. Create an Image Pull Secret for the NIM Container
 
 Replace <ngc-cli-api-key> with your NGC CLI API key.
 
@@ -27,12 +35,13 @@ kubectl create secret -n nim-service docker-registry ngc-secret \
     --docker-password=<ngc-cli-api-key>
 ```
 
-### 3. Create the `NIMCache` instance with auto-selection of models enabled
+## 3. Create the NIM Cache Instance and Enable Model Auto-Detection
+
 Update the `NIMCache` custom resource (CR) with appropriate values for model selection.
 These include `model.precision`, `model.engine`, `model.qosProfile`, `model.gpu.product` and `model.gpu.ids`.
-With these, the NIM operator will extract supported profiles and use that for caching.
+With these, the NIM Operator can extract the supported profiles and use that for caching.
 
-Alternatively if `model.profiles` are specified, then that particular model profile will be downloaded.
+Alternatively, if you specify `model.profiles`, then the model puller downloads and caches that particular model profile.
 
 ```yaml
 apiVersion: apps.nvidia.com/v1alpha1
@@ -73,23 +82,26 @@ spec:
 kubectl create -f nimcache.yaml -n nim-service
 ```
 
-### 5. Verify the progress of NIM model caching
+### 5. Verify the Progress of NIM Model Caching
+
 Verify that the NIM Operator has initiated the caching job and track status via the CR.
 
 ```sh
 kubectl get nimcache -n nim-service -o wide
 ```
 
-```console
+```output
 NAME                             STATUS   PVC                                  AGE
 meta-llama3-8b-instruct   ready    meta-llama3-8b-instruct-pvc   2024-07-04T23:22:13Z
 ```
+
+Get the NIM cache so you can view the status:
 
 ```sh
 kubectl get nimcache -n nim-service -o yaml
 ```
 
-```console
+```output
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:

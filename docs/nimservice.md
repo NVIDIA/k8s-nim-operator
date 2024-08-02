@@ -1,13 +1,17 @@
+<!--
+  SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+-->
+
 # Create a NIM Service
 
-### Pre-requisites
+## Prerequisites
 
-* Create a namespace e.g. `nim-service`
-* Create a `NIMCache` instance in the namespace `nim-service` following the guide [here](https://gitlab-master.nvidia.com/dl/container-dev/k8s-nim-operator/-/blob/51e9727929b16982a2dba6d7fccbd0474f566bf8/docs/nimcache.md).
+* A `NIMCache` instance in the namespace `nim-service`.
 
-### 1. Create the CR for NIMService
+## 1. Create the NIM Service Instance
 
-nimservice.yaml:
+Create a file, such as `nimservice.yaml`, with contents like the following example:
 
 ```yaml
 apiVersion: apps.nvidia.com/v1alpha1
@@ -39,42 +43,43 @@ spec:
       openaiPort: 8000
 ```
 
+Apply the manifest:
+
 ```sh
 kubectl create -f nimservice.yaml -n nim-service
 ```
 
-### 2. Check the status of NIMService deployment
+### 2. Check the Status of NIM Service Deployment
 
 ```sh
 kubectl get nimservice -n nim-service
 ```
 
-```console
-kubectl get nimservice -n nim-service
-NAME                             STATUS   AGE
-meta-llama3-8b-instruct-latest   ready    115m
+```output
+NAME                      STATUS   AGE
+meta-llama3-8b-instruct   Ready    115m
 ```
 
 ```sh
 kubectl get pods -n nim-service
 ```
 
-```console
-NAME                                              READY   STATUS      RESTARTS   AGE
-meta-llama3-8b-instruct-latest-db9d899fd-mfmq2    1/1     Running     0          108m
-meta-llama3-8b-instruct-latest-job-xktnk          0/1     Completed   0          4m38s
+```output
+NAME                                       READY   STATUS      RESTARTS   AGE
+meta-llama3-8b-instruct-db9d899fd-mfmq2    1/1     Running     0          108m
+meta-llama3-8b-instruct-job-xktnk          0/1     Completed   0          4m38s
 ```
 
-### 3. Verify with a sample pod
+### 3. Verify the Microservice is Running
 
-test-pod.yaml:
+Create a file, `verify-pod.yaml`, with contents like the following example:
 
 ```yaml
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: test-streaming-chat
+  name: verify-streaming-chat
 spec:
   containers:
     - name: curl
@@ -118,9 +123,13 @@ spec:
   restartPolicy: Never
 ```
 
+Apply the manifest:
+
 ```sh
 kubectl create -f test-pod.yaml -n nim-service
 ```
+
+Confirm the verification pod ran to completion:
 
 ```sh
 kubectl get pods -n nim-service
@@ -130,6 +139,6 @@ kubectl get pods -n nim-service
 NAME                                              READY   STATUS      RESTARTS   AGE
 meta-llama3-8b-instruct-latest-db9d899fd-mfmq2    1/1     Running     0          112m
 meta-llama3-8b-instruct-latest-job-xktnk          0/1     Completed   0          8m8s
-test-streaming-chat                               0/1     Completed   0          99m
+verify-streaming-chat                             0/1     Completed   0          99m
 ```
 
