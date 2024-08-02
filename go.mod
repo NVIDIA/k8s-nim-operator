@@ -11,7 +11,7 @@ require (
 	github.com/onsi/gomega v1.32.0
 	github.com/openshift/api v0.0.0-20240708071937-c9a91940bf0f
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.75.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.30.2
 	k8s.io/apimachinery v0.30.2
