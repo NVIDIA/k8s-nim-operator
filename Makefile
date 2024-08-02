@@ -17,7 +17,6 @@ IMG ?= nvcr.io/nvidia/cloud-native/nim-operator:v0.1.0
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.30.0
 
-MODULE := github.com/NVIDIA/k8s-nim-operator
 GO_CMD ?= go
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
