@@ -11,9 +11,10 @@ Follow these steps to cache NIM models in a persistent volume.
 
 * NVIDIA GPU Operator is installed.
 * NVIDIA NIM Operator is installed.
-* Access to following NGC registries is required:
-  * nvcr.io/nvstaging/cloud-native
-  * nvcr.io/nvidian/nim-llm-dev
+* You must have an active subscription to an NVIDIA AI Enterprise product or be an NVIDIA Developer Program
+  [member](https://build.nvidia.com/explore/discover?integrate_nim=true&developer_enroll=true&self_hosted_api=true&signin=true).
+  Access to the containers and models for NVIDIA NIM microservices is restricted.
+
 * A persistent volume provisioner is installed.
 
   The Local Path Provisioner from Rancher is acceptable for development on a single-node cluster.
