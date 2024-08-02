@@ -66,7 +66,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build image
         env:
-          IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/nim-operator
+          IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/k8s-nim-operator
           VERSION: ${COMMIT_SHORT_SHA}
         run: |
           echo "${VERSION}"

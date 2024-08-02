@@ -24,7 +24,7 @@ MKDIR    ?= mkdir
 include $(CURDIR)/versions.mk
 
 ifeq ($(IMAGE_NAME),)
-IMAGE_NAME := $(REGISTRY)/$(DRIVER_NAME)
+IMAGE_NAME := $(REGISTRY)/$(MODULE_NAME)
 endif
 
 IMAGE_VERSION := $(VERSION)
