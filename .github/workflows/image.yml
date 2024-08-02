@@ -31,7 +31,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
     steps:
       - uses: actions/checkout@v4
         name: Check out code
