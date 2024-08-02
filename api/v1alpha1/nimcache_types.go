@@ -211,6 +211,7 @@ func (s *NIMSource) EnvFromSecrets() []v1.EnvFromSource {
 	return []corev1.EnvFromSource{}
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
