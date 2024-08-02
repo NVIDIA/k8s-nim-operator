@@ -42,3 +42,10 @@ updates:
     directory: "/deployments/devel"
     schedule:
       interval: "daily"
+
+  - package-ecosystem: "gomod"
+    target-branch: main
+    directory: "tools/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
