@@ -17,8 +17,8 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make build-bundle-image VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-DRIVER_NAME := nim-operator
-MODULE := github.com/NVIDIA/$(DRIVER_NAME)
+MODULE_NAME := k8s-nim-operator
+MODULE := github.com/NVIDIA/$(MODULE_NAME)
 
 REGISTRY ?= nvcr.io/nvidia
 
