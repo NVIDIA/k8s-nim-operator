@@ -27,7 +27,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -272,11 +271,11 @@ func (n *NIMService) GetResources() *corev1.ResourceRequirements {
 	return n.Spec.Resources
 }
 
-func (n *NIMService) IsLivenessProbeEnabled() bool {
-	if n.Spec.LivenessProbe.Enabled == nil {
+func IsProbeEnabled(probe Probe) bool {
+	if probe.Enabled == nil {
 		return true
 	}
-	return *n.Spec.LivenessProbe.Enabled
+	return *probe.Enabled
 }
 
 // GetLivenessProbe returns liveness probe for the NIMService container
@@ -287,6 +286,7 @@ func (n *NIMService) GetLivenessProbe() *corev1.Probe {
 	return n.Spec.LivenessProbe.Probe
 }
 
+// GetDefaultLivenessProbe returns the default liveness probe for the NIMService container
 func GetDefaultLivenessProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 15,
@@ -308,13 +308,6 @@ func GetDefaultLivenessProbe() *corev1.Probe {
 	return &probe
 }
 
-func (n *NIMService) IsReadinessProbeEnabled() bool {
-	if n.Spec.ReadinessProbe.Enabled == nil {
-		return true
-	}
-	return *n.Spec.ReadinessProbe.Enabled
-}
-
 // GetReadinessProbe returns readiness probe for the NIMService container
 func (n *NIMService) GetReadinessProbe() *corev1.Probe {
 	if n.Spec.ReadinessProbe.Probe == nil {
@@ -323,6 +316,7 @@ func (n *NIMService) GetReadinessProbe() *corev1.Probe {
 	return n.Spec.ReadinessProbe.Probe
 }
 
+// GetDefaultReadinessProbe returns the default readiness probe for the NIMService container
 func GetDefaultReadinessProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 15,
@@ -344,13 +338,6 @@ func GetDefaultReadinessProbe() *corev1.Probe {
 	return &probe
 }
 
-func (n *NIMService) IsStartupProbeEnabled() bool {
-	if n.Spec.StartupProbe.Enabled == nil {
-		return true
-	}
-	return *n.Spec.StartupProbe.Enabled
-}
-
 // GetStartupProbe returns startup probe for the NIMService container
 func (n *NIMService) GetStartupProbe() *corev1.Probe {
 	if n.Spec.StartupProbe.Probe == nil {
@@ -359,6 +346,7 @@ func (n *NIMService) GetStartupProbe() *corev1.Probe {
 	return n.Spec.StartupProbe.Probe
 }
 
+// GetDefaultStartupProbe returns the default startup probe for the NIMService container
 func GetDefaultStartupProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 40,
@@ -534,16 +522,13 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Image = n.GetImage()
 
 	// Set container probes
-	if n.IsLivenessProbeEnabled() {
-		log.Log.Info("Liveness")
+	if IsProbeEnabled(n.Spec.LivenessProbe) {
 		params.LivenessProbe = n.GetLivenessProbe()
 	}
-	if n.IsReadinessProbeEnabled() {
-		log.Log.Info("Readiness")
+	if IsProbeEnabled(n.Spec.ReadinessProbe) {
 		params.ReadinessProbe = n.GetReadinessProbe()
 	}
-	if n.IsStartupProbeEnabled() {
-		log.Log.Info("Startup")
+	if IsProbeEnabled(n.Spec.StartupProbe) {
 		params.StartupProbe = n.GetStartupProbe()
 	}
 
