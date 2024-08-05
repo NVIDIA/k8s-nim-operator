@@ -29,6 +29,3 @@ testbin/*
 # Credentials and runtime environment
 kubeconfig
 .env
-
-# TODO: remove from gitignore to include vendored files
-vendor
