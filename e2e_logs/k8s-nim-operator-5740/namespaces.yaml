@@ -1,0 +1,172 @@
+items:
+- metadata:
+    creationTimestamp: "2024-08-05T09:18:39Z"
+    labels:
+      kubernetes.io/metadata.name: default
+    managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            .: {}
+            f:kubernetes.io/metadata.name: {}
+      manager: kube-apiserver
+      operation: Update
+      time: "2024-08-05T09:18:39Z"
+    name: default
+    resourceVersion: "36"
+    uid: 8c4bcc97-e6ab-43c8-8f3c-964967f0b46c
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- metadata:
+    creationTimestamp: "2024-08-05T10:56:02Z"
+    labels:
+      e2e-framework: k8s-nim-operator
+      e2e-run: 2c5a8f42-bd32-46cb-b82b-12050571820f
+      kubernetes.io/metadata.name: k8s-nim-operator-5740
+    managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            .: {}
+            f:e2e-framework: {}
+            f:e2e-run: {}
+            f:kubernetes.io/metadata.name: {}
+      manager: e2e.test
+      operation: Update
+      time: "2024-08-05T10:56:02Z"
+    name: k8s-nim-operator-5740
+    resourceVersion: "5369"
+    uid: e4c484fc-4097-44a1-bc7d-ae52ccd83457
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- metadata:
+    creationTimestamp: "2024-08-05T10:12:50Z"
+    labels:
+      kubernetes.io/metadata.name: k8s-nim-operator-system
+      name: k8s-nim-operator-system
+    managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            .: {}
+            f:kubernetes.io/metadata.name: {}
+            f:name: {}
+      manager: helm
+      operation: Update
+      time: "2024-08-05T10:12:50Z"
+    name: k8s-nim-operator-system
+    resourceVersion: "3103"
+    uid: 0d26d3cf-c3cd-454f-9c12-aa65c7e2f5ae
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- metadata:
+    creationTimestamp: "2024-08-05T09:18:39Z"
+    labels:
+      kubernetes.io/metadata.name: kube-node-lease
+    managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            .: {}
+            f:kubernetes.io/metadata.name: {}
+      manager: kube-apiserver
+      operation: Update
+      time: "2024-08-05T09:18:39Z"
+    name: kube-node-lease
+    resourceVersion: "33"
+    uid: 88e6e870-7a53-44e3-939e-4e7092ba47a7
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- metadata:
+    creationTimestamp: "2024-08-05T09:18:39Z"
+    labels:
+      kubernetes.io/metadata.name: kube-public
+    managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            .: {}
+            f:kubernetes.io/metadata.name: {}
+      manager: kube-apiserver
+      operation: Update
+      time: "2024-08-05T09:18:39Z"
+    name: kube-public
+    resourceVersion: "22"
+    uid: 3cd22f53-46b4-479a-abd8-5dbcb0980aba
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- metadata:
+    creationTimestamp: "2024-08-05T09:18:39Z"
+    labels:
+      kubernetes.io/metadata.name: kube-system
+    managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            .: {}
+            f:kubernetes.io/metadata.name: {}
+      manager: kube-apiserver
+      operation: Update
+      time: "2024-08-05T09:18:39Z"
+    name: kube-system
+    resourceVersion: "8"
+    uid: 4dd9b55c-fce6-4c98-bc8c-0996e88ecc5d
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+- metadata:
+    creationTimestamp: "2024-08-05T10:12:22Z"
+    labels:
+      kubernetes.io/metadata.name: node-feature-discovery
+      name: node-feature-discovery
+    managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            .: {}
+            f:kubernetes.io/metadata.name: {}
+            f:name: {}
+      manager: helm
+      operation: Update
+      time: "2024-08-05T10:12:22Z"
+    name: node-feature-discovery
+    resourceVersion: "3007"
+    uid: d8b3035f-01f3-4b3c-bd5a-fb7ee2bd2d7e
+  spec:
+    finalizers:
+    - kubernetes
+  status:
+    phase: Active
+metadata:
+  resourceVersion: "5486"

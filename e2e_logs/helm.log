@@ -1,0 +1,173 @@
+k8s-nim-operator-5740	2024/08/05 12:56:02 creating 1 resource(s)
+k8s-nim-operator-5740	2024/08/05 12:56:02 creating 1 resource(s)
+k8s-nim-operator-5740	2024/08/05 12:56:02 creating 1 resource(s)
+k8s-nim-operator-5740	2024/08/05 12:56:02 beginning wait for 3 resources with timeout of 1m0s
+k8s-nim-operator-5740	2024/08/05 12:56:04 Clearing REST mapper cache
+k8s-nim-operator-5740	2024/08/05 12:56:04 creating 11 resource(s)
+k8s-nim-operator-5740	2024/08/05 12:56:04 beginning wait for 11 resources with timeout of 1m0s
+k8s-nim-operator-5740	2024/08/05 12:56:04 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. observedGeneration (0) does not match spec generation (1).
+k8s-nim-operator-5740	2024/08/05 12:56:06 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:08 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:10 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:12 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:14 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:16 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:18 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:20 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:22 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:24 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:26 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:28 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:30 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:32 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:34 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:36 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:38 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:40 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:42 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:44 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:46 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:48 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:50 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:52 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:54 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:56 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:56:58 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:57:00 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:57:02 Deployment is not ready: k8s-nim-operator-5740/nim-op-e2e-testfxzjd-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-5740	2024/08/05 12:57:04 Error received when checking status of resource k8s-nim-operator-metrics-service. Error: 'client rate limiter Wait returned an error: context deadline exceeded', Resource details: 'Resource: "/v1, Resource=services", GroupVersionKind: "/v1, Kind=Service"
+Name: "k8s-nim-operator-metrics-service", Namespace: "k8s-nim-operator-5740"'
+k8s-nim-operator-5740	2024/08/05 12:57:04 Retryable error? true
+k8s-nim-operator-5740	2024/08/05 12:57:04 Retrying as current number of retries 0 less than max number of retries 30
+k8s-nim-operator-5740	2024/08/05 12:57:04 uninstall: Deleting nim-op-e2e-testfxzjd
+k8s-nim-operator-5740	2024/08/05 12:57:04 uninstall: given cascade value: , defaulting to delete propagation background
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "k8s-nim-operator-metrics-service" Service
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "nim-op-e2e-testfxzjd-k8s-nim-operator" Deployment
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "k8s-nim-operator-leader-election-rolebinding" RoleBinding
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "k8s-nim-operator-leader-election-role" Role
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "k8s-nim-operator-rolebinding" ClusterRoleBinding
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "k8s-nim-operator-proxy-rolebinding" ClusterRoleBinding
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "k8s-nim-operator-proxy-role" ClusterRole
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "k8s-nim-operator-role" ClusterRole
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "k8s-nim-operator-metrics-reader" ClusterRole
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "k8s-nim-operator" ServiceAccount
+k8s-nim-operator-5740	2024/08/05 12:57:04 Starting delete for "nfd-pci-device-rule" NodeFeatureRule
+k8s-nim-operator-5740	2024/08/05 12:57:04 purge requested for nim-op-e2e-testfxzjd
+k8s-nim-operator-5740	2024/08/05 12:57:04 release uninstalled, response: &{0x1400047c230 }
+k8s-nim-operator-2158	2024/08/05 12:58:42 creating 1 resource(s)
+k8s-nim-operator-2158	2024/08/05 12:58:42 CRD nimcaches.apps.nvidia.com is already present. Skipping.
+k8s-nim-operator-2158	2024/08/05 12:58:42 creating 1 resource(s)
+k8s-nim-operator-2158	2024/08/05 12:58:42 CRD nimpipelines.apps.nvidia.com is already present. Skipping.
+k8s-nim-operator-2158	2024/08/05 12:58:42 creating 1 resource(s)
+k8s-nim-operator-2158	2024/08/05 12:58:42 CRD nimservices.apps.nvidia.com is already present. Skipping.
+k8s-nim-operator-2158	2024/08/05 12:58:42 creating 11 resource(s)
+k8s-nim-operator-2158	2024/08/05 12:58:42 beginning wait for 11 resources with timeout of 1m0s
+k8s-nim-operator-2158	2024/08/05 12:58:42 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. observedGeneration (0) does not match spec generation (1).
+k8s-nim-operator-2158	2024/08/05 12:58:44 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:58:46 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:58:48 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:58:50 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:58:52 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:58:54 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:58:56 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:58:58 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:00 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:02 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:04 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:06 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:08 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:10 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:12 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:14 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:16 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:18 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:20 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:22 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:24 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:26 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:28 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:30 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:32 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:34 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:36 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:38 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:40 Deployment is not ready: k8s-nim-operator-2158/nim-op-e2e-testv8frs-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-2158	2024/08/05 12:59:42 Error received when checking status of resource k8s-nim-operator-metrics-service. Error: 'client rate limiter Wait returned an error: context deadline exceeded', Resource details: 'Resource: "/v1, Resource=services", GroupVersionKind: "/v1, Kind=Service"
+Name: "k8s-nim-operator-metrics-service", Namespace: "k8s-nim-operator-2158"'
+k8s-nim-operator-2158	2024/08/05 12:59:42 Retryable error? true
+k8s-nim-operator-2158	2024/08/05 12:59:42 Retrying as current number of retries 0 less than max number of retries 30
+k8s-nim-operator-2158	2024/08/05 12:59:42 uninstall: Deleting nim-op-e2e-testv8frs
+k8s-nim-operator-2158	2024/08/05 12:59:42 uninstall: given cascade value: , defaulting to delete propagation background
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "k8s-nim-operator-metrics-service" Service
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "nim-op-e2e-testv8frs-k8s-nim-operator" Deployment
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "k8s-nim-operator-leader-election-rolebinding" RoleBinding
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "k8s-nim-operator-leader-election-role" Role
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "k8s-nim-operator-proxy-rolebinding" ClusterRoleBinding
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "k8s-nim-operator-rolebinding" ClusterRoleBinding
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "k8s-nim-operator-proxy-role" ClusterRole
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "k8s-nim-operator-role" ClusterRole
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "k8s-nim-operator-metrics-reader" ClusterRole
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "k8s-nim-operator" ServiceAccount
+k8s-nim-operator-2158	2024/08/05 12:59:42 Starting delete for "nfd-pci-device-rule" NodeFeatureRule
+k8s-nim-operator-2158	2024/08/05 12:59:42 purge requested for nim-op-e2e-testv8frs
+k8s-nim-operator-2158	2024/08/05 12:59:42 release uninstalled, response: &{0x14000312000 }
+k8s-nim-operator-1362	2024/08/05 13:00:13 creating 1 resource(s)
+k8s-nim-operator-1362	2024/08/05 13:00:13 CRD nimcaches.apps.nvidia.com is already present. Skipping.
+k8s-nim-operator-1362	2024/08/05 13:00:13 creating 1 resource(s)
+k8s-nim-operator-1362	2024/08/05 13:00:13 CRD nimpipelines.apps.nvidia.com is already present. Skipping.
+k8s-nim-operator-1362	2024/08/05 13:00:13 creating 1 resource(s)
+k8s-nim-operator-1362	2024/08/05 13:00:13 CRD nimservices.apps.nvidia.com is already present. Skipping.
+k8s-nim-operator-1362	2024/08/05 13:00:13 creating 11 resource(s)
+k8s-nim-operator-1362	2024/08/05 13:00:13 beginning wait for 11 resources with timeout of 1m0s
+k8s-nim-operator-1362	2024/08/05 13:00:13 Deployment is not ready: k8s-nim-operator-1362/nim-op-e2e-testqlpqn-k8s-nim-operator. observedGeneration (0) does not match spec generation (1).
+k8s-nim-operator-1362	2024/08/05 13:00:15 Deployment is not ready: k8s-nim-operator-1362/nim-op-e2e-testqlpqn-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-1362	2024/08/05 13:00:17 Deployment is not ready: k8s-nim-operator-1362/nim-op-e2e-testqlpqn-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-1362	2024/08/05 13:00:19 Deployment is not ready: k8s-nim-operator-1362/nim-op-e2e-testqlpqn-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-1362	2024/08/05 13:00:21 Deployment is not ready: k8s-nim-operator-1362/nim-op-e2e-testqlpqn-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-1362	2024/08/05 13:00:23 Deployment is not ready: k8s-nim-operator-1362/nim-op-e2e-testqlpqn-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-1362	2024/08/05 13:00:25 release installed successfully: nim-op-e2e-testqlpqn/k8s-nim-operator-0.1.0
+k8s-nim-operator-1362	2024/08/05 13:00:25 uninstall: Deleting nim-op-e2e-testqlpqn
+k8s-nim-operator-1362	2024/08/05 13:00:25 uninstall: given cascade value: , defaulting to delete propagation background
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "k8s-nim-operator-metrics-service" Service
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "nim-op-e2e-testqlpqn-k8s-nim-operator" Deployment
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "k8s-nim-operator-leader-election-rolebinding" RoleBinding
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "k8s-nim-operator-leader-election-role" Role
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "k8s-nim-operator-proxy-rolebinding" ClusterRoleBinding
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "k8s-nim-operator-rolebinding" ClusterRoleBinding
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "k8s-nim-operator-proxy-role" ClusterRole
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "k8s-nim-operator-role" ClusterRole
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "k8s-nim-operator-metrics-reader" ClusterRole
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "k8s-nim-operator" ServiceAccount
+k8s-nim-operator-1362	2024/08/05 13:00:25 Starting delete for "nfd-pci-device-rule" NodeFeatureRule
+k8s-nim-operator-1362	2024/08/05 13:00:25 purge requested for nim-op-e2e-testqlpqn
+k8s-nim-operator-1362	2024/08/05 13:00:25 release uninstalled, response: &{0x140004ca000 }
+k8s-nim-operator-3203	2024/08/05 13:06:59 creating 1 resource(s)
+k8s-nim-operator-3203	2024/08/05 13:06:59 CRD nimcaches.apps.nvidia.com is already present. Skipping.
+k8s-nim-operator-3203	2024/08/05 13:06:59 creating 1 resource(s)
+k8s-nim-operator-3203	2024/08/05 13:06:59 CRD nimpipelines.apps.nvidia.com is already present. Skipping.
+k8s-nim-operator-3203	2024/08/05 13:06:59 creating 1 resource(s)
+k8s-nim-operator-3203	2024/08/05 13:06:59 CRD nimservices.apps.nvidia.com is already present. Skipping.
+k8s-nim-operator-3203	2024/08/05 13:06:59 creating 11 resource(s)
+k8s-nim-operator-3203	2024/08/05 13:06:59 beginning wait for 11 resources with timeout of 1m0s
+k8s-nim-operator-3203	2024/08/05 13:06:59 Deployment is not ready: k8s-nim-operator-3203/nim-op-e2e-testfm2j4-k8s-nim-operator. observedGeneration (0) does not match spec generation (1).
+k8s-nim-operator-3203	2024/08/05 13:07:01 Deployment is not ready: k8s-nim-operator-3203/nim-op-e2e-testfm2j4-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-3203	2024/08/05 13:07:03 Deployment is not ready: k8s-nim-operator-3203/nim-op-e2e-testfm2j4-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-3203	2024/08/05 13:07:05 Deployment is not ready: k8s-nim-operator-3203/nim-op-e2e-testfm2j4-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-3203	2024/08/05 13:07:07 Deployment is not ready: k8s-nim-operator-3203/nim-op-e2e-testfm2j4-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-3203	2024/08/05 13:07:09 Deployment is not ready: k8s-nim-operator-3203/nim-op-e2e-testfm2j4-k8s-nim-operator. 0 out of 1 expected pods are ready
+k8s-nim-operator-3203	2024/08/05 13:07:11 release installed successfully: nim-op-e2e-testfm2j4/k8s-nim-operator-0.1.0
+k8s-nim-operator-3203	2024/08/05 13:07:11 uninstall: Deleting nim-op-e2e-testfm2j4
+k8s-nim-operator-3203	2024/08/05 13:07:11 uninstall: given cascade value: , defaulting to delete propagation background
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "k8s-nim-operator-metrics-service" Service
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "nim-op-e2e-testfm2j4-k8s-nim-operator" Deployment
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "k8s-nim-operator-leader-election-rolebinding" RoleBinding
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "k8s-nim-operator-leader-election-role" Role
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "k8s-nim-operator-proxy-rolebinding" ClusterRoleBinding
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "k8s-nim-operator-rolebinding" ClusterRoleBinding
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "k8s-nim-operator-role" ClusterRole
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "k8s-nim-operator-proxy-role" ClusterRole
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "k8s-nim-operator-metrics-reader" ClusterRole
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "k8s-nim-operator" ServiceAccount
+k8s-nim-operator-3203	2024/08/05 13:07:11 Starting delete for "nfd-pci-device-rule" NodeFeatureRule
+k8s-nim-operator-3203	2024/08/05 13:07:11 purge requested for nim-op-e2e-testfm2j4
+k8s-nim-operator-3203	2024/08/05 13:07:11 release uninstalled, response: &{0x1400022e0e0 }

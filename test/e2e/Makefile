@@ -19,7 +19,7 @@ include $(CURDIR)/versions.mk
 
 DRIVER_ENABLED ?= true
 
-E2E_IMAGE_REPO ?= $(REGISTRY)/$(DRIVER_NAME)
+E2E_IMAGE_REPO ?= $(REGISTRY)/$(MODULE_NAME)
 E2E_IMAGE_TAG ?= $(VERSION)
 E2E_IMAGE_PULL_POLICY ?= IfNotPresent
 HELM_CHART ?= $(CURDIR)/deployments/helm/k8s-nim-operator
@@ -31,9 +31,8 @@ e2e-test:
 		echo "[ERR] KUBECONFIG missing, must be defined"; \
 		exit 1; \
 	fi
-	$(GO_CMD) test -v $(CURDIR)/tests/e2e -args \
+	cd $(CURDIR)/test/e2e && $(GO_CMD) test -v . -args \
 		-kubeconfig=$(KUBECONFIG) \
-		-driver-enabled=$(DRIVER_ENABLED) \
 		-image.repo=$(E2E_IMAGE_REPO) \
 		-image.tag=$(E2E_IMAGE_TAG) \
 		-image.pull-policy=$(E2E_IMAGE_PULL_POLICY) \

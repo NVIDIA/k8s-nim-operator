@@ -27,7 +27,6 @@ import (
 
 	helm "github.com/mittwald/go-helm-client"
 	helmValues "github.com/mittwald/go-helm-client/values"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -48,7 +47,7 @@ var _ = NVDescribe("NIM Operator", func() {
 
 		// Init global suite vars vars
 		var (
-			crds      []*apiextensionsv1.CustomResourceDefinition
+			crds      []string
 			extClient *extclient.Clientset
 
 			helmReleaseName string
@@ -66,11 +65,17 @@ var _ = NVDescribe("NIM Operator", func() {
 			"daemonsets",
 		}
 
+		crds = []string{
+			"nimcaches.apps.nvidia.com",
+			"nimservices.apps.nvidia.com",
+			"nimpipelines.apps.nvidia.com",
+		}
+
 		values := helmValues.Options{
 			Values: []string{
-				fmt.Sprintf("image.repository=%s", *ImageRepo),
-				fmt.Sprintf("image.tag=%s", *ImageTag),
-				fmt.Sprintf("image.pullPolicy=%s", *ImagePullPolicy),
+				fmt.Sprintf("operator.image.repository=%s", *ImageRepo),
+				fmt.Sprintf("operator.image.tag=%s", *ImageTag),
+				fmt.Sprintf("operator.image.pullPolicy=%s", *ImagePullPolicy),
 			},
 		}
 
@@ -83,7 +88,7 @@ var _ = NVDescribe("NIM Operator", func() {
 		BeforeAll(func(ctx context.Context) {
 			// Create clients for apiextensions and our CRD api
 			extClient = extclient.NewForConfigOrDie(f.ClientConfig())
-			helmReleaseName = "nimop-e2e-test" + rand.String(5)
+			helmReleaseName = "nim-op-e2e-test" + rand.String(5)
 		})
 
 		JustBeforeEach(func(ctx context.Context) {
@@ -124,16 +129,36 @@ var _ = NVDescribe("NIM Operator", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		// Clean up
 		AfterAll(func(ctx context.Context) {
+			// Delete CRDs
 			for _, crd := range crds {
-				err := extClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, crd.Name, metav1.DeleteOptions{})
+				err := extClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, crd, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		Context("and the NIM Operator is deployed", func() {
-			It("it should create nimcaches.apps.nvidia.com/nimcaches CRD", func(ctx context.Context) {
-				f.ApiExtClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{})
+			It("it should create *.apps.nvidia.com CRD's", func(ctx context.Context) {
+				crdl, err := f.ApiExtClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Look for the 3 NIMCache, NIMService and NIMPipeline CRDs
+				nimCrds := map[string]bool{
+					"nimcaches.apps.nvidia.com":    false,
+					"nimservices.apps.nvidia.com":  false,
+					"nimpipelines.apps.nvidia.com": false,
+				}
+
+				for _, crd := range crdl.Items {
+					if _, ok := nimCrds[crd.Name]; ok {
+						nimCrds[crd.Name] = true
+					}
+				}
+
+				for crdName, found := range nimCrds {
+					Expect(found).To(BeTrue(), "CRD %q not found", crdName)
+				}
 			})
 		})
 	})

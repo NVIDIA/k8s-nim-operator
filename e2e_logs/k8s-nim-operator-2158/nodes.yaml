@@ -1,0 +1,321 @@
+items:
+- metadata:
+    annotations:
+      kubeadm.alpha.kubernetes.io/cri-socket: unix:///var/run/cri-dockerd.sock
+      nfd.node.kubernetes.io/feature-labels: cpu-cpuid.AES,cpu-cpuid.ASIMD,cpu-cpuid.ASIMDDP,cpu-cpuid.ASIMDFHM,cpu-cpuid.ASIMDHP,cpu-cpuid.ASIMDRDM,cpu-cpuid.ATOMICS,cpu-cpuid.CPUID,cpu-cpuid.CRC32,cpu-cpuid.DCPODP,cpu-cpuid.DCPOP,cpu-cpuid.DIT,cpu-cpuid.EVTSTRM,cpu-cpuid.FCMA,cpu-cpuid.FLAGM,cpu-cpuid.FLAGM2,cpu-cpuid.FP,cpu-cpuid.FPHP,cpu-cpuid.FRINT,cpu-cpuid.ILRCPC,cpu-cpuid.JSCVT,cpu-cpuid.LRCPC,cpu-cpuid.PACA,cpu-cpuid.PACG,cpu-cpuid.PMULL,cpu-cpuid.SB,cpu-cpuid.SHA1,cpu-cpuid.SHA2,cpu-cpuid.SHA3,cpu-cpuid.SHA512,cpu-cpuid.SSBS,cpu-cpuid.USCAT,cpu-hardware_multithreading,cpu-model.family,cpu-model.id,cpu-model.vendor_id,kernel-config.NO_HZ,kernel-config.NO_HZ_IDLE,kernel-version.full,kernel-version.major,kernel-version.minor,kernel-version.revision,memory-swap,storage-nonrotationaldisk,system-os_release.ID,system-os_release.VERSION_ID,system-os_release.VERSION_ID.major,system-os_release.VERSION_ID.minor
+      node.alpha.kubernetes.io/ttl: "0"
+      volumes.kubernetes.io/controller-managed-attach-detach: "true"
+    creationTimestamp: "2024-08-05T09:18:39Z"
+    labels:
+      beta.kubernetes.io/arch: arm64
+      beta.kubernetes.io/os: linux
+      feature.node.kubernetes.io/cpu-cpuid.AES: "true"
+      feature.node.kubernetes.io/cpu-cpuid.ASIMD: "true"
+      feature.node.kubernetes.io/cpu-cpuid.ASIMDDP: "true"
+      feature.node.kubernetes.io/cpu-cpuid.ASIMDFHM: "true"
+      feature.node.kubernetes.io/cpu-cpuid.ASIMDHP: "true"
+      feature.node.kubernetes.io/cpu-cpuid.ASIMDRDM: "true"
+      feature.node.kubernetes.io/cpu-cpuid.ATOMICS: "true"
+      feature.node.kubernetes.io/cpu-cpuid.CPUID: "true"
+      feature.node.kubernetes.io/cpu-cpuid.CRC32: "true"
+      feature.node.kubernetes.io/cpu-cpuid.DCPODP: "true"
+      feature.node.kubernetes.io/cpu-cpuid.DCPOP: "true"
+      feature.node.kubernetes.io/cpu-cpuid.DIT: "true"
+      feature.node.kubernetes.io/cpu-cpuid.EVTSTRM: "true"
+      feature.node.kubernetes.io/cpu-cpuid.FCMA: "true"
+      feature.node.kubernetes.io/cpu-cpuid.FLAGM: "true"
+      feature.node.kubernetes.io/cpu-cpuid.FLAGM2: "true"
+      feature.node.kubernetes.io/cpu-cpuid.FP: "true"
+      feature.node.kubernetes.io/cpu-cpuid.FPHP: "true"
+      feature.node.kubernetes.io/cpu-cpuid.FRINT: "true"
+      feature.node.kubernetes.io/cpu-cpuid.ILRCPC: "true"
+      feature.node.kubernetes.io/cpu-cpuid.JSCVT: "true"
+      feature.node.kubernetes.io/cpu-cpuid.LRCPC: "true"
+      feature.node.kubernetes.io/cpu-cpuid.PACA: "true"
+      feature.node.kubernetes.io/cpu-cpuid.PACG: "true"
+      feature.node.kubernetes.io/cpu-cpuid.PMULL: "true"
+      feature.node.kubernetes.io/cpu-cpuid.SB: "true"
+      feature.node.kubernetes.io/cpu-cpuid.SHA1: "true"
+      feature.node.kubernetes.io/cpu-cpuid.SHA2: "true"
+      feature.node.kubernetes.io/cpu-cpuid.SHA3: "true"
+      feature.node.kubernetes.io/cpu-cpuid.SHA512: "true"
+      feature.node.kubernetes.io/cpu-cpuid.SSBS: "true"
+      feature.node.kubernetes.io/cpu-cpuid.USCAT: "true"
+      feature.node.kubernetes.io/cpu-hardware_multithreading: "false"
+      feature.node.kubernetes.io/cpu-model.family: "15"
+      feature.node.kubernetes.io/cpu-model.id: "0"
+      feature.node.kubernetes.io/cpu-model.vendor_id: VendorUnknown
+      feature.node.kubernetes.io/kernel-config.NO_HZ: "true"
+      feature.node.kubernetes.io/kernel-config.NO_HZ_IDLE: "true"
+      feature.node.kubernetes.io/kernel-version.full: 6.6.32-linuxkit
+      feature.node.kubernetes.io/kernel-version.major: "6"
+      feature.node.kubernetes.io/kernel-version.minor: "6"
+      feature.node.kubernetes.io/kernel-version.revision: "32"
+      feature.node.kubernetes.io/memory-swap: "true"
+      feature.node.kubernetes.io/storage-nonrotationaldisk: "true"
+      feature.node.kubernetes.io/system-os_release.ID: ubuntu
+      feature.node.kubernetes.io/system-os_release.VERSION_ID: "22.04"
+      feature.node.kubernetes.io/system-os_release.VERSION_ID.major: "22"
+      feature.node.kubernetes.io/system-os_release.VERSION_ID.minor: "04"
+      kubernetes.io/arch: arm64
+      kubernetes.io/hostname: minikube
+      kubernetes.io/os: linux
+      minikube.k8s.io/commit: 248d1ec5b3f9be5569977749a725f47b018078ff
+      minikube.k8s.io/name: minikube
+      minikube.k8s.io/primary: "true"
+      minikube.k8s.io/updated_at: 2024_08_05T11_18_42_0700
+      minikube.k8s.io/version: v1.33.1
+      node-role.kubernetes.io/control-plane: ""
+      node.kubernetes.io/exclude-from-external-load-balancers: ""
+    managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:volumes.kubernetes.io/controller-managed-attach-detach: {}
+          f:labels:
+            .: {}
+            f:beta.kubernetes.io/arch: {}
+            f:beta.kubernetes.io/os: {}
+            f:kubernetes.io/arch: {}
+            f:kubernetes.io/hostname: {}
+            f:kubernetes.io/os: {}
+      manager: kubelet
+      operation: Update
+      time: "2024-08-05T09:18:39Z"
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            f:kubeadm.alpha.kubernetes.io/cri-socket: {}
+          f:labels:
+            f:node-role.kubernetes.io/control-plane: {}
+            f:node.kubernetes.io/exclude-from-external-load-balancers: {}
+      manager: kubeadm
+      operation: Update
+      time: "2024-08-05T09:18:40Z"
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            f:minikube.k8s.io/commit: {}
+            f:minikube.k8s.io/name: {}
+            f:minikube.k8s.io/primary: {}
+            f:minikube.k8s.io/updated_at: {}
+            f:minikube.k8s.io/version: {}
+      manager: kubectl-label
+      operation: Update
+      time: "2024-08-05T09:18:42Z"
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            f:node.alpha.kubernetes.io/ttl: {}
+        f:spec:
+          f:podCIDR: {}
+          f:podCIDRs:
+            .: {}
+            v:"10.244.0.0/24": {}
+      manager: kube-controller-manager
+      operation: Update
+      time: "2024-08-05T09:18:55Z"
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            f:nfd.node.kubernetes.io/feature-labels: {}
+          f:labels:
+            f:feature.node.kubernetes.io/cpu-cpuid.AES: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.ASIMD: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.ASIMDDP: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.ASIMDFHM: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.ASIMDHP: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.ASIMDRDM: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.ATOMICS: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.CPUID: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.CRC32: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.DCPODP: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.DCPOP: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.DIT: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.EVTSTRM: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.FCMA: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.FLAGM: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.FLAGM2: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.FP: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.FPHP: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.FRINT: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.ILRCPC: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.JSCVT: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.LRCPC: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.PACA: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.PACG: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.PMULL: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.SB: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.SHA1: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.SHA2: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.SHA3: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.SHA512: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.SSBS: {}
+            f:feature.node.kubernetes.io/cpu-cpuid.USCAT: {}
+            f:feature.node.kubernetes.io/cpu-hardware_multithreading: {}
+            f:feature.node.kubernetes.io/cpu-model.family: {}
+            f:feature.node.kubernetes.io/cpu-model.id: {}
+            f:feature.node.kubernetes.io/cpu-model.vendor_id: {}
+            f:feature.node.kubernetes.io/kernel-config.NO_HZ: {}
+            f:feature.node.kubernetes.io/kernel-config.NO_HZ_IDLE: {}
+            f:feature.node.kubernetes.io/kernel-version.full: {}
+            f:feature.node.kubernetes.io/kernel-version.major: {}
+            f:feature.node.kubernetes.io/kernel-version.minor: {}
+            f:feature.node.kubernetes.io/kernel-version.revision: {}
+            f:feature.node.kubernetes.io/memory-swap: {}
+            f:feature.node.kubernetes.io/storage-nonrotationaldisk: {}
+            f:feature.node.kubernetes.io/system-os_release.ID: {}
+            f:feature.node.kubernetes.io/system-os_release.VERSION_ID: {}
+            f:feature.node.kubernetes.io/system-os_release.VERSION_ID.major: {}
+            f:feature.node.kubernetes.io/system-os_release.VERSION_ID.minor: {}
+      manager: nfd-master
+      operation: Update
+      time: "2024-08-05T10:12:38Z"
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:status:
+          f:conditions:
+            k:{"type":"DiskPressure"}:
+              f:lastHeartbeatTime: {}
+            k:{"type":"MemoryPressure"}:
+              f:lastHeartbeatTime: {}
+            k:{"type":"PIDPressure"}:
+              f:lastHeartbeatTime: {}
+            k:{"type":"Ready"}:
+              f:lastHeartbeatTime: {}
+              f:message: {}
+              f:reason: {}
+              f:status: {}
+          f:images: {}
+      manager: kubelet
+      operation: Update
+      subresource: status
+      time: "2024-08-05T10:59:13Z"
+    name: minikube
+    resourceVersion: "5681"
+    uid: cabd382a-4c7b-4364-9662-facf5ddb98e3
+  spec:
+    podCIDR: 10.244.0.0/24
+    podCIDRs:
+    - 10.244.0.0/24
+  status:
+    addresses:
+    - address: 192.168.49.2
+      type: InternalIP
+    - address: minikube
+      type: Hostname
+    allocatable:
+      cpu: "10"
+      ephemeral-storage: 61202244Ki
+      hugepages-1Gi: "0"
+      hugepages-2Mi: "0"
+      hugepages-32Mi: "0"
+      hugepages-64Ki: "0"
+      memory: 8028924Ki
+      pods: "110"
+    capacity:
+      cpu: "10"
+      ephemeral-storage: 61202244Ki
+      hugepages-1Gi: "0"
+      hugepages-2Mi: "0"
+      hugepages-32Mi: "0"
+      hugepages-64Ki: "0"
+      memory: 8028924Ki
+      pods: "110"
+    conditions:
+    - lastHeartbeatTime: "2024-08-05T10:59:13Z"
+      lastTransitionTime: "2024-08-05T09:18:39Z"
+      message: kubelet has sufficient memory available
+      reason: KubeletHasSufficientMemory
+      status: "False"
+      type: MemoryPressure
+    - lastHeartbeatTime: "2024-08-05T10:59:13Z"
+      lastTransitionTime: "2024-08-05T09:18:39Z"
+      message: kubelet has no disk pressure
+      reason: KubeletHasNoDiskPressure
+      status: "False"
+      type: DiskPressure
+    - lastHeartbeatTime: "2024-08-05T10:59:13Z"
+      lastTransitionTime: "2024-08-05T09:18:39Z"
+      message: kubelet has sufficient PID available
+      reason: KubeletHasSufficientPID
+      status: "False"
+      type: PIDPressure
+    - lastHeartbeatTime: "2024-08-05T10:59:13Z"
+      lastTransitionTime: "2024-08-05T09:18:39Z"
+      message: kubelet is posting ready status
+      reason: KubeletReady
+      status: "True"
+      type: Ready
+    daemonEndpoints:
+      kubeletEndpoint:
+        Port: 10250
+    images:
+    - names:
+      - registry.k8s.io/nfd/node-feature-discovery@sha256:d3950e366f8425de2579b7a2fb2c9d85f3e274fe00570047f64bf542b06dfe26
+      - registry.k8s.io/nfd/node-feature-discovery:v0.16.3
+      sizeBytes: 219029073
+    - names:
+      - registry.k8s.io/etcd@sha256:44a8e24dcbba3470ee1fee21d5e88d128c936e9b55d4bc51fbef8086f8ed123b
+      - registry.k8s.io/etcd:3.5.12-0
+      sizeBytes: 138984067
+    - names:
+      - registry.k8s.io/kube-apiserver@sha256:6b8e197b2d39c321189a475ac755a77896e34b56729425590fbc99f3a96468a3
+      - registry.k8s.io/kube-apiserver:v1.30.0
+      sizeBytes: 112480900
+    - names:
+      - registry.k8s.io/kube-controller-manager@sha256:5f52f00f17d5784b5ca004dffca59710fa1a9eec8d54cebdf9433a1d134150fe
+      - registry.k8s.io/kube-controller-manager:v1.30.0
+      sizeBytes: 107172834
+    - names:
+      - registry.k8s.io/kube-proxy@sha256:ec532ff47eaf39822387e51ec73f1f2502eb74658c6303319db88d2c380d0210
+      - registry.k8s.io/kube-proxy:v1.30.0
+      sizeBytes: 87874752
+    - names:
+      - registry.k8s.io/kube-scheduler@sha256:2353c3a1803229970fcb571cffc9b2f120372350e01c7381b4b650c4a02b9d67
+      - registry.k8s.io/kube-scheduler:v1.30.0
+      sizeBytes: 60511189
+    - names:
+      - nvcr.io/nvidia/k8s-nim-operator:v0.1.0
+      sizeBytes: 59264989
+    - names:
+      - registry.k8s.io/coredns/coredns@sha256:1eeb4c7316bacb1d4c8ead65571cd92dd21e27359f0d4917f1a5822a73b75db1
+      - registry.k8s.io/coredns/coredns:v1.11.1
+      sizeBytes: 57387595
+    - names:
+      - gcr.io/kubebuilder/kube-rbac-proxy@sha256:d8cc6ffb98190e8dd403bfe67ddcb454e6127d32b87acc237b3e5240f70a20fb
+      - gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
+      sizeBytes: 54204503
+    - names:
+      - gcr.io/k8s-minikube/storage-provisioner@sha256:18eb69d1418e854ad5a19e399310e52808a8321e4c441c1dddad8977a0d7a944
+      - gcr.io/k8s-minikube/storage-provisioner:v5
+      sizeBytes: 29032448
+    - names:
+      - registry.k8s.io/pause@sha256:7031c1b283388d2c2e09b57badb803c05ebed362dc88d84b480cc47f72a21097
+      - registry.k8s.io/pause:3.9
+      sizeBytes: 514000
+    nodeInfo:
+      architecture: arm64
+      bootID: 0201c1f1-9de0-4db8-a2be-76cc81010d57
+      containerRuntimeVersion: docker://26.1.1
+      kernelVersion: 6.6.32-linuxkit
+      kubeProxyVersion: v1.30.0
+      kubeletVersion: v1.30.0
+      machineID: d7d8e5aaa8744375829a59e683b07bd8
+      operatingSystem: linux
+      osImage: Ubuntu 22.04.4 LTS
+      systemUUID: d7d8e5aaa8744375829a59e683b07bd8
+metadata:
+  resourceVersion: "5716"
