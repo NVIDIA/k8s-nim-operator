@@ -5,7 +5,7 @@ operator:
     tag: v0.1.0
     pullSecrets:
       - ngc-secret
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
   args:
   - --health-probe-bind-address=:8081
   - --metrics-bind-address=127.0.0.1:8080
