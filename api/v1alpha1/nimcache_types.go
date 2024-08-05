@@ -47,12 +47,27 @@ type NIMSource struct {
 	// NGCSource represents models stored in NGC
 	NGC *NGCSource `json:"ngc,omitempty"`
 
+	// GITSource represents models stored in NGC
+	GIT *GITSource `json:"git,omitempty"`
+
 	// NGCSource represents models stored in NVIDIA DataStore service
 	DataStore *DataStoreSource `json:"dataStore,omitempty"`
 }
 
 // NGCSource references a model stored on NVIDIA NGC
 type NGCSource struct {
+	// The name of an existing pull secret containing the NGC_API_KEY
+	AuthSecret string `json:"authSecret"`
+	// ModelPuller is the container image that can pull the model
+	ModelPuller string `json:"modelPuller"`
+	// PullSecret to pull the model puller image
+	PullSecret string `json:"pullSecret,omitempty"`
+	// Model spec for caching
+	Model ModelSpec `json:"model,omitempty"`
+}
+
+// GITSource references a model stored on NVIDIA NGC
+type GITSource struct {
 	// The name of an existing pull secret containing the NGC_API_KEY
 	AuthSecret string `json:"authSecret"`
 	// ModelPuller is the container image that can pull the model

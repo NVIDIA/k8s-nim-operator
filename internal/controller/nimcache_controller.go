@@ -820,6 +820,75 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 			job.Spec.Template.Spec.Containers[0].Args = []string{"--profiles"}
 			job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
 		}
+	} else if nimCache.Spec.Source.GIT != nil {
+		job.Spec.Template.Spec.Containers = []corev1.Container{
+			{
+				Name:  "nim-cache",
+				Image: nimCache.Spec.Source.GIT.ModelPuller,
+				// TODO: finalize standard image / command line / config
+				// to download model from git
+				Command: []string{"tdb-git-download-to-cache"},
+				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
+				Env: []corev1.EnvVar{
+					{
+						Name:  "HF_HOME",
+						Value: "/model-store", // Need to be set to a writable directory by non-root user
+					},
+					{
+						Name:  "NIM_CACHE_PATH", // Note: in the download mode, NIM_CACHE_PATH is not used
+						Value: "/model-store",
+					},
+					{
+						Name:  "NGC_HOME", // Note: NGC_HOME is required and handled as NIM_CACHE_PATH in the download mode
+						Value: "/model-store",
+					},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "nim-cache-volume",
+						MountPath: "/model-store",
+					},
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: map[corev1.ResourceName]apiResource.Quantity{
+						"cpu":            nimCache.Spec.Resources.CPU,
+						"memory":         nimCache.Spec.Resources.Memory,
+						"nvidia.com/gpu": *apiResource.NewQuantity(int64(nimCache.Spec.Resources.GPUs), apiResource.DecimalExponent),
+					},
+					Requests: map[corev1.ResourceName]apiResource.Quantity{
+						"cpu":            nimCache.Spec.Resources.CPU,
+						"memory":         nimCache.Spec.Resources.Memory,
+						"nvidia.com/gpu": *apiResource.NewQuantity(int64(nimCache.Spec.Resources.GPUs), apiResource.DecimalExponent),
+					},
+				},
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+				SecurityContext: &corev1.SecurityContext{
+					AllowPrivilegeEscalation: ptr.To[bool](false),
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+					RunAsNonRoot: ptr.To[bool](true),
+					RunAsGroup:   ptr.To[int64](2000),
+					RunAsUser:    ptr.To[int64](1000),
+				},
+			},
+		}
+		job.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
+			{
+				Name: nimCache.Spec.Source.GIT.PullSecret,
+			},
+		}
+		// Pass specific profiles to download based on user selection or auto-selection
+		// TODO: See if the logic applies to git model repo
+		selectedProfiles, err := getSelectedProfiles(nimCache)
+		if err != nil {
+			return nil, err
+		}
+		if selectedProfiles != nil {
+			job.Spec.Template.Spec.Containers[0].Args = []string{"--profiles"}
+			job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
+		}
 	}
 	return job, nil
 }
