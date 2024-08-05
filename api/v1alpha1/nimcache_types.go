@@ -68,7 +68,7 @@ type NGCSource struct {
 
 // GITSource references a model stored on NVIDIA NGC
 type GITSource struct {
-	// The name of an existing pull secret containing the NGC_API_KEY
+	// The name of an existing auth secret for the git repo
 	AuthSecret string `json:"authSecret"`
 	// ModelPuller is the container image that can pull the model
 	ModelPuller string `json:"modelPuller"`
