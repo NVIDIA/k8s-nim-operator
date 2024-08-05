@@ -305,6 +305,28 @@ var _ = Describe("NIMCache Controller", func() {
 				jobName := types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}
 				return client.Get(ctx, jobName, job)
 			}, time.Second*10).Should(Succeed())
+
+			nimCache.Spec.Source.NGC = nil
+			nimCache.Spec.Source.GIT = &appsv1alpha1.GITSource{
+				ModelPuller: "nvcr.io/nim:test-git-puller",
+				PullSecret:  "my-secret",
+				Path:        "https://github.com/modelx",
+			}
+
+			err = client.Delete(context.TODO(), job)
+			Expect(err).ToNot(HaveOccurred())
+
+			job, err = constructJob(nimCache)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = client.Create(context.TODO(), job)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() error {
+				job := &batchv1.Job{}
+				jobName := types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}
+				return client.Get(ctx, jobName, job)
+			}, time.Second*10).Should(Succeed())
 		})
 
 		It("should create a ConfigMap with the given model manifest data", func() {

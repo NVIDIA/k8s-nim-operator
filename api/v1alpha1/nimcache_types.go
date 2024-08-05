@@ -76,6 +76,8 @@ type GITSource struct {
 	PullSecret string `json:"pullSecret,omitempty"`
 	// Model spec for caching
 	Model ModelSpec `json:"model,omitempty"`
+	// Path is the git repo path
+	Path string `json:"path"`
 }
 
 // ModelSpec is the spec required to cache selected models

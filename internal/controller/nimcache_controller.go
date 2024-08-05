@@ -289,8 +289,10 @@ func isModelSelectionDone(nimCache *appsv1alpha1.NIMCache) bool {
 
 func getSelectedProfiles(nimCache *appsv1alpha1.NIMCache) ([]string, error) {
 	// Return profiles explicitly specified by the user in the spec
-	if len(nimCache.Spec.Source.NGC.Model.Profiles) > 0 {
+	if nimCache.Spec.Source.NGC != nil && len(nimCache.Spec.Source.NGC.Model.Profiles) > 0 {
 		return nimCache.Spec.Source.NGC.Model.Profiles, nil
+	} else if nimCache.Spec.Source.GIT != nil && len(nimCache.Spec.Source.GIT.Model.Profiles) > 0 {
+		return nimCache.Spec.Source.GIT.Model.Profiles, nil
 	} else if isModelSelectionRequired(nimCache) {
 		// Retrieve the selected profiles from the annotation
 		var selectedProfiles []string
