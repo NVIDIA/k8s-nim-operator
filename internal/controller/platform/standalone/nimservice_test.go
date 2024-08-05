@@ -84,7 +84,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
 			Build()
-
+		boolTrue := true
 		cwd, err := os.Getwd()
 		if err != nil {
 			panic(err)
@@ -168,27 +168,36 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 				},
 				Scale: appsv1alpha1.Autoscaling{Enabled: ptr.To[bool](false)},
-				ReadinessProbe: &corev1.Probe{
-					ProbeHandler: corev1.ProbeHandler{
-						HTTPGet: &corev1.HTTPGetAction{
-							Path: "/ready",
-							Port: intstr.IntOrString{IntVal: 8080},
+				ReadinessProbe: appsv1alpha1.Probe{
+					Enabled: &boolTrue,
+					Probe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Path: "/ready",
+								Port: intstr.IntOrString{IntVal: 8080},
+							},
 						},
 					},
 				},
-				LivenessProbe: &corev1.Probe{
-					ProbeHandler: corev1.ProbeHandler{
-						HTTPGet: &corev1.HTTPGetAction{
-							Path: "/live",
-							Port: intstr.IntOrString{IntVal: 8080},
+				LivenessProbe: appsv1alpha1.Probe{
+					Enabled: &boolTrue,
+					Probe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Path: "/live",
+								Port: intstr.IntOrString{IntVal: 8080},
+							},
 						},
 					},
 				},
-				StartupProbe: &corev1.Probe{
-					ProbeHandler: corev1.ProbeHandler{
-						HTTPGet: &corev1.HTTPGetAction{
-							Path: "/start",
-							Port: intstr.IntOrString{IntVal: 8080},
+				StartupProbe: appsv1alpha1.Probe{
+					Enabled: &boolTrue,
+					Probe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Path: "/start",
+								Port: intstr.IntOrString{IntVal: 8080},
+							},
 						},
 					},
 				},
@@ -286,9 +295,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(deployment.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal(nimService.GetContainerName()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(nimService.GetImage()))
-			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(Equal(nimService.Spec.ReadinessProbe))
-			Expect(deployment.Spec.Template.Spec.Containers[0].LivenessProbe).To(Equal(nimService.Spec.LivenessProbe))
-			Expect(deployment.Spec.Template.Spec.Containers[0].StartupProbe).To(Equal(nimService.Spec.StartupProbe))
+			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(Equal(nimService.Spec.ReadinessProbe.Probe))
+			Expect(deployment.Spec.Template.Spec.Containers[0].LivenessProbe).To(Equal(nimService.Spec.LivenessProbe.Probe))
+			Expect(deployment.Spec.Template.Spec.Containers[0].StartupProbe).To(Equal(nimService.Spec.StartupProbe.Probe))
 
 			sortEnvVars(deployment.Spec.Template.Spec.Containers[0].Env)
 			sortEnvVars(nimService.Spec.Env)
