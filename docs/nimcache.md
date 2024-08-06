@@ -24,8 +24,16 @@ Follow these steps to cache NIM models in a persistent volume.
 ```sh
 kubectl create ns nim-service
 ```
+### 2.Export NGC CLI API KEY
+`NOTE:` Ignore this step if you already export the NGC_CLI_API_KEY
 
-### 2. Create an Image Pull Secret for the NIM Container
+Please refer to get [NGC API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#ngc-api-keys)
+
+```sh
+export NGC_CLI_API_KEY=<ngc-cli-api-key>
+```
+
+### 3. Create an Image Pull Secret for the NIM Container
 
 Replace <ngc-cli-api-key> with your NGC CLI API key.
 
@@ -33,10 +41,10 @@ Replace <ngc-cli-api-key> with your NGC CLI API key.
 kubectl create secret -n nim-service docker-registry ngc-secret \
     --docker-server=nvcr.io \
     --docker-username='$oauthtoken' \
-    --docker-password=<ngc-cli-api-key>
+    --docker-password=$NGC_CLI_API_KEY
 ```
 
-## 3. Create the NIM Cache Instance and Enable Model Auto-Detection
+## 4. Create the NIM Cache Instance and Enable Model Auto-Detection
 
 Update the `NIMCache` custom resource (CR) with appropriate values for model selection.
 These include `model.precision`, `model.engine`, `model.qosProfile`, `model.gpu.product` and `model.gpu.ids`.
@@ -77,13 +85,13 @@ spec:
       volumeAccessMode: ReadWriteOnce
 ```
 
-### 4. Create the CR
+### 5. Create the CR
 
 ```sh
 kubectl create -f nimcache.yaml -n nim-service
 ```
 
-### 5. Verify the Progress of NIM Model Caching
+### 6. Verify the Progress of NIM Model Caching
 
 Verify that the NIM Operator has initiated the caching job and track status via the CR.
 
