@@ -29,3 +29,6 @@ testbin/*
 # Credentials and runtime environment
 kubeconfig
 .env
+
+# e2e logs
+e2e_logs

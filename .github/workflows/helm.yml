@@ -24,4 +24,4 @@ jobs:
       with:
         version: v3.14.4
     - name: Lint Helm Charts
-      run: helm lint helm/*
+      run: helm lint deployments/helm/*
