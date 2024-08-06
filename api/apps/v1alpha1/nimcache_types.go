@@ -35,7 +35,7 @@ type NIMCacheSpec struct {
 	// Storage is the target storage for caching NIM model
 	Storage Storage `json:"storage"`
 	// Resources defines the minimum resources required for the caching job to run(cpu, memory, gpu).
-	Resources Resources `json:"resources"`
+	Resources Resources `json:"resources,omitempty"`
 	// Tolerations for running the job to cache the NIM model
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// NodeSelectors are the node selector labels to schedule the caching job.
@@ -56,6 +56,7 @@ type NGCSource struct {
 	// The name of an existing pull secret containing the NGC_API_KEY
 	AuthSecret string `json:"authSecret"`
 	// ModelPuller is the container image that can pull the model
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="modelPuller is an immutable field. Please create a new NIMCache resource instead when you want to change this container."
 	ModelPuller string `json:"modelPuller"`
 	// PullSecret to pull the model puller image
 	PullSecret string `json:"pullSecret,omitempty"`

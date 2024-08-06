@@ -183,6 +183,11 @@ spec:
                         description: ModelPuller is the container image that can pull
                           the model
                         type: string
+                        x-kubernetes-validations:
+                        - message: modelPuller is an immutable field. Please create
+                            a new NIMCache resource instead when you want to change
+                            this container.
+                          rule: self == oldSelf
                       pullSecret:
                         description: PullSecret to pull the model puller image
                         type: string
@@ -261,7 +266,6 @@ spec:
                   type: object
                 type: array
             required:
-            - resources
             - source
             - storage
             type: object

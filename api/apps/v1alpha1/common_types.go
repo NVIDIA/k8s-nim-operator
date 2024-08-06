@@ -52,7 +52,7 @@ type ServiceMonitor struct {
 // Autoscaling defines attributes to automatically scale the service based on metrics
 type Autoscaling struct {
 	Enabled *bool                                     `json:"enabled,omitempty"`
-	HPASpec autoscalingv2.HorizontalPodAutoscalerSpec `json:"hpaspec,omitempty"`
+	HPASpec autoscalingv2.HorizontalPodAutoscalerSpec `json:"hpa,omitempty"`
 }
 
 // Image defines image attributes

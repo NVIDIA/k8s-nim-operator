@@ -1295,7 +1295,7 @@ spec:
                           properties:
                             enabled:
                               type: boolean
-                            hpaspec:
+                            hpa:
                               description: HorizontalPodAutoscalerSpec describes the
                                 desired functionality of the HorizontalPodAutoscaler.
                               properties:
