@@ -72,7 +72,7 @@ meta-llama3-8b-instruct-job-xktnk          0/1     Completed   0          4m38s
 
 ### 3. Verify the Microservice is Running
 
-#### Example 1:
+#### Example 1: Verify Streaming Chat
 
 Create a file, `verify-pod.yaml`, with contents like the following example:
 
@@ -131,16 +131,16 @@ Apply the manifest:
 kubectl create -f test-pod.yaml -n nim-service
 ```
 
-#### Example 2: 
+#### Example 2: Verify Chat Completion
 
-Create a file, `verify-pod-2.yaml`, with contents like the following example:
+Create a file, `verify-chat-completions`, with contents like the following example:
 
 ```yaml
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: verify-streaming-chat-2
+  name: verify-chat-completions
 spec:
   containers:
     - name: curl
@@ -169,7 +169,7 @@ spec:
 Apply the manifest:
 
 ```sh
-kubectl create -f verify-pod-2.yaml -n nim-service
+kubectl create -f verify-chat-completions.yaml -n nim-service
 ```
 
 Confirm the verification pod ran to completion:
@@ -183,14 +183,14 @@ NAME                                              READY   STATUS      RESTARTS  
 meta-llama3-8b-instruct-latest-db9d899fd-mfmq2    1/1     Running     0          112m
 meta-llama3-8b-instruct-latest-job-xktnk          0/1     Completed   0          8m8s
 verify-streaming-chat                             0/1     Completed   0          99m
-verify-streaming-chat-2                           0/1     Completed   0          97m
+verify-chat-completions                           0/1     Completed   0          97m
 ```
 Verify the logs 
 
 ```sh
-kubectl logs verify-streaming-chat-2
+kubectl logs verify-streaming-chat
 ```
 
 ```sh
-kubectl logs verify-streaming-chat
+kubectl logs verify-chat-completions 
 ```
