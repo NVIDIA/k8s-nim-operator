@@ -44,11 +44,7 @@ func NewV7FromReader(r io.Reader) (UUID, error) {
 
 // makeV7 fill 48 bits time (uuid[0] - uuid[5]), set version b0111 (uuid[6])
 // uuid[8] already has the right version number (Variant is 10)
-<<<<<<< HEAD
 // see function  NewV7 and NewV7FromReader
-=======
-// see function NewV7 and NewV7FromReader
->>>>>>> 3933f5e... Update vendor packages
 func makeV7(uuid []byte) {
 	/*
 		 0                   1                   2                   3
@@ -56,11 +52,7 @@ func makeV7(uuid []byte) {
 		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 		|                           unix_ts_ms                          |
 		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-<<<<<<< HEAD
 		|          unix_ts_ms           |  ver  |       rand_a          |
-=======
-		|          unix_ts_ms           |  ver  |  rand_a (12 bit seq)  |
->>>>>>> 3933f5e... Update vendor packages
 		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 		|var|                        rand_b                             |
 		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -69,11 +61,7 @@ func makeV7(uuid []byte) {
 	*/
 	_ = uuid[15] // bounds check
 
-<<<<<<< HEAD
 	t := timeNow().UnixMilli()
-=======
-	t, s := getV7Time()
->>>>>>> 3933f5e... Update vendor packages
 
 	uuid[0] = byte(t >> 40)
 	uuid[1] = byte(t >> 32)
@@ -82,40 +70,6 @@ func makeV7(uuid []byte) {
 	uuid[4] = byte(t >> 8)
 	uuid[5] = byte(t)
 
-<<<<<<< HEAD
 	uuid[6] = 0x70 | (uuid[6] & 0x0F)
 	// uuid[8] has already has right version
-=======
-	uuid[6] = 0x70 | (0x0F & byte(s>>8))
-	uuid[7] = byte(s)
-}
-
-// lastV7time is the last time we returned stored as:
-//
-//	52 bits of time in milliseconds since epoch
-//	12 bits of (fractional nanoseconds) >> 8
-var lastV7time int64
-
-const nanoPerMilli = 1000000
-
-// getV7Time returns the time in milliseconds and nanoseconds / 256.
-// The returned (milli << 12 + seq) is guarenteed to be greater than
-// (milli << 12 + seq) returned by any previous call to getV7Time.
-func getV7Time() (milli, seq int64) {
-	timeMu.Lock()
-	defer timeMu.Unlock()
-
-	nano := timeNow().UnixNano()
-	milli = nano / nanoPerMilli
-	// Sequence number is between 0 and 3906 (nanoPerMilli>>8)
-	seq = (nano - milli*nanoPerMilli) >> 8
-	now := milli<<12 + seq
-	if now <= lastV7time {
-		now = lastV7time + 1
-		milli = now >> 12
-		seq = now & 0xfff
-	}
-	lastV7time = now
-	return milli, seq
->>>>>>> 3933f5e... Update vendor packages
 }
