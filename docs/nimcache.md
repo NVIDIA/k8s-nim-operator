@@ -27,7 +27,7 @@ kubectl create ns nim-service
 ### 2.Export NGC CLI API KEY
 `NOTE:` Ignore this step if you already export the NGC_CLI_API_KEY
 
-Please refer to get [NGC API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#ngc-api-keys)
+Refer to get a [NGC CLI API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#ngc-api-keys)
 
 ```sh
 export NGC_CLI_API_KEY=<ngc-cli-api-key>
