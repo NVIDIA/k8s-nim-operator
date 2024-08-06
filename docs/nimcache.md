@@ -35,8 +35,6 @@ export NGC_CLI_API_KEY=<ngc-cli-api-key>
 
 ### 3. Create an Image Pull Secret for the NIM Container
 
-Replace <ngc-cli-api-key> with your NGC CLI API key.
-
 ```sh
 kubectl create secret -n nim-service docker-registry ngc-secret \
     --docker-server=nvcr.io \
