@@ -94,7 +94,7 @@ generate-clientset: install-tools
 		--output-dir $(CURDIR)/api \
 		--output-pkg $(MODULE)/api \
 		--input-base $(CURDIR)/api \
-		--input v1alpha1
+		--input "apps/v1alpha1"
 
 validate-generated-assets: manifests generate generate-clientset
 	@echo "- Verifying that the generated code and manifests are in-sync..."

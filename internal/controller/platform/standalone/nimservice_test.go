@@ -24,7 +24,7 @@ import (
 
 	"os"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	. "github.com/onsi/ginkgo/v2"

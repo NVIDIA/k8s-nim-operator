@@ -18,30 +18,30 @@ limitations under the License.
 package fake
 
 import (
-	internalversion "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/v1alpha1/internalversion"
+	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/apps/v1alpha1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeV1alpha1 struct {
+type FakeAppsV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeV1alpha1) NIMCaches(namespace string) internalversion.NIMCacheInterface {
+func (c *FakeAppsV1alpha1) NIMCaches(namespace string) v1alpha1.NIMCacheInterface {
 	return &FakeNIMCaches{c, namespace}
 }
 
-func (c *FakeV1alpha1) NIMPipelines(namespace string) internalversion.NIMPipelineInterface {
+func (c *FakeAppsV1alpha1) NIMPipelines(namespace string) v1alpha1.NIMPipelineInterface {
 	return &FakeNIMPipelines{c, namespace}
 }
 
-func (c *FakeV1alpha1) NIMServices(namespace string) internalversion.NIMServiceInterface {
+func (c *FakeAppsV1alpha1) NIMServices(namespace string) v1alpha1.NIMServiceInterface {
 	return &FakeNIMServices{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeV1alpha1) RESTClient() rest.Interface {
+func (c *FakeAppsV1alpha1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

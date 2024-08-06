@@ -19,7 +19,7 @@ package kserve
 import (
 	"context"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
 func (r *NIMServiceReconciler) cleanupNIMService(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
