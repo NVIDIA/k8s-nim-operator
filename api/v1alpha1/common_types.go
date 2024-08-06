@@ -82,3 +82,8 @@ type IngressPath struct {
 	PathType    networkingv1.PathType `json:"pathType,omitempty"`
 	ServiceType string                `json:"serviceType,omitempty"`
 }
+
+type Probe struct {
+	Enabled *bool         `json:"enabled,omitempty"`
+	Probe   *corev1.Probe `json:"probe,omitempty"`
+}

@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -68,9 +69,9 @@ type NIMServiceSpec struct {
 	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
 	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
 	Expose         Expose                       `json:"expose,omitempty"`
-	LivenessProbe  *corev1.Probe                `json:"livenessProbe,omitempty"`
-	ReadinessProbe *corev1.Probe                `json:"readinessProbe,omitempty"`
-	StartupProbe   *corev1.Probe                `json:"startupProbe,omitempty"`
+	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
+	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
+	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
 	Scale          Autoscaling                  `json:"scale,omitempty"`
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	Replicas       int                          `json:"replicas,omitempty"`
@@ -270,19 +271,101 @@ func (n *NIMService) GetResources() *corev1.ResourceRequirements {
 	return n.Spec.Resources
 }
 
+func IsProbeEnabled(probe Probe) bool {
+	if probe.Enabled == nil {
+		return true
+	}
+	return *probe.Enabled
+}
+
 // GetLivenessProbe returns liveness probe for the NIMService container
 func (n *NIMService) GetLivenessProbe() *corev1.Probe {
-	return n.Spec.LivenessProbe
+	if n.Spec.LivenessProbe.Probe == nil {
+		return GetDefaultLivenessProbe()
+	}
+	return n.Spec.LivenessProbe.Probe
+}
+
+// GetDefaultLivenessProbe returns the default liveness probe for the NIMService container
+func GetDefaultLivenessProbe() *corev1.Probe {
+	probe := corev1.Probe{
+		InitialDelaySeconds: 15,
+		TimeoutSeconds:      1,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/v1/health/live",
+				Port: intstr.IntOrString{
+					Type:   intstr.Type(0),
+					IntVal: 8000,
+				},
+			},
+		},
+	}
+
+	return &probe
 }
 
 // GetReadinessProbe returns readiness probe for the NIMService container
 func (n *NIMService) GetReadinessProbe() *corev1.Probe {
-	return n.Spec.ReadinessProbe
+	if n.Spec.ReadinessProbe.Probe == nil {
+		return GetDefaultReadinessProbe()
+	}
+	return n.Spec.ReadinessProbe.Probe
+}
+
+// GetDefaultReadinessProbe returns the default readiness probe for the NIMService container
+func GetDefaultReadinessProbe() *corev1.Probe {
+	probe := corev1.Probe{
+		InitialDelaySeconds: 15,
+		TimeoutSeconds:      1,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/v1/health/ready",
+				Port: intstr.IntOrString{
+					Type:   intstr.Type(0),
+					IntVal: 8000,
+				},
+			},
+		},
+	}
+
+	return &probe
 }
 
 // GetStartupProbe returns startup probe for the NIMService container
 func (n *NIMService) GetStartupProbe() *corev1.Probe {
-	return n.Spec.StartupProbe
+	if n.Spec.StartupProbe.Probe == nil {
+		return GetDefaultStartupProbe()
+	}
+	return n.Spec.StartupProbe.Probe
+}
+
+// GetDefaultStartupProbe returns the default startup probe for the NIMService container
+func GetDefaultStartupProbe() *corev1.Probe {
+	probe := corev1.Probe{
+		InitialDelaySeconds: 40,
+		TimeoutSeconds:      1,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    180,
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/v1/health/ready",
+				Port: intstr.IntOrString{
+					Type:   intstr.Type(0),
+					IntVal: 8000,
+				},
+			},
+		},
+	}
+
+	return &probe
 }
 
 // GetVolumesMounts returns volume mounts for the NIMService container
@@ -439,9 +522,15 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Image = n.GetImage()
 
 	// Set container probes
-	params.LivenessProbe = n.GetLivenessProbe()
-	params.ReadinessProbe = n.GetReadinessProbe()
-	params.StartupProbe = n.GetStartupProbe()
+	if IsProbeEnabled(n.Spec.LivenessProbe) {
+		params.LivenessProbe = n.GetLivenessProbe()
+	}
+	if IsProbeEnabled(n.Spec.ReadinessProbe) {
+		params.ReadinessProbe = n.GetReadinessProbe()
+	}
+	if IsProbeEnabled(n.Spec.StartupProbe) {
+		params.StartupProbe = n.GetStartupProbe()
+	}
 
 	// Set service account
 	params.ServiceAccountName = n.GetServiceAccountName()
