@@ -90,6 +90,7 @@ type NIMServiceStatus struct {
 	State             string             `json:"state,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0

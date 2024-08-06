@@ -34,7 +34,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"

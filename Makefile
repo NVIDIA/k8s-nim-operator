@@ -17,6 +17,9 @@ IMG ?= nvcr.io/nvidia/cloud-native/nim-operator:v0.1.0
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.30.0
 
+GO_CMD ?= go
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+
 # Import versions
 include $(CURDIR)/versions.mk
 
@@ -32,6 +35,8 @@ endif
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= docker
+
+CLIENT_GEN = $(shell pwd)/bin/client-gen
 
 # DEFAULT_CHANNEL defines the default channel used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
@@ -81,6 +86,19 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+.PHONY: generate-clientset
+generate-clientset: install-tools
+	$(CLIENT_GEN) --go-header-file=$(CURDIR)/hack/boilerplate.go.txt \
+		--clientset-name "versioned" \
+		--output-dir $(CURDIR)/api \
+		--output-pkg $(MODULE)/api \
+		--input-base $(CURDIR)/api \
+		--input "apps/v1alpha1"
+
+validate-generated-assets: manifests generate generate-clientset
+	@echo "- Verifying that the generated code and manifests are in-sync..."
+	@git diff --exit-code -- api config
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -170,6 +188,11 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+install-tools:
+	@echo Installing tools from tools.go
+	export GOBIN=$(PROJECT_DIR)/bin && \
+	grep '^\s*_' tools/tools.go | awk '{print $$2}' | xargs -tI % $(GO_CMD) install -mod=readonly -modfile=tools/go.mod %
 
 ##@ Dependencies
 

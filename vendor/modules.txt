@@ -893,6 +893,7 @@ k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/cached/disk
 k8s.io/client-go/discovery/cached/memory
+k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic
 k8s.io/client-go/features
 k8s.io/client-go/kubernetes
@@ -1039,7 +1040,7 @@ k8s.io/kubectl/pkg/util/openapi
 k8s.io/kubectl/pkg/util/templates
 k8s.io/kubectl/pkg/util/term
 k8s.io/kubectl/pkg/validation
-# k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0
+# k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 ## explicit; go 1.18
 k8s.io/utils/buffer
 k8s.io/utils/clock
