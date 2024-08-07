@@ -27,10 +27,10 @@ kubectl create ns nim-operator
 ```
 ### 3. Export NGC CLI API KEY
 
-Please refer to get [NGC API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#ngc-api-keys)
+Please refer to get [NGC CLI API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#ngc-api-keys)
 
 ```sh
-export NGC_CLI_API_KEY=<ngc-cli-api-key>
+export NGC_API_KEY=<ngc-cli-api-key>
 ```
 
 ### 4. Create an Image Pull Secret
@@ -39,7 +39,7 @@ export NGC_CLI_API_KEY=<ngc-cli-api-key>
 kubectl create secret -n nim-operator docker-registry ngc-secret \
     --docker-server=nvcr.io \
     --docker-username='$oauthtoken' \
-    --docker-password=$NGC_CLI_API_KEY
+    --docker-password=$NGC_API_KEY
 ```
 
 ### 5. Install the NIM Operator
