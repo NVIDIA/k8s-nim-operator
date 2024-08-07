@@ -72,6 +72,8 @@ meta-llama3-8b-instruct-job-xktnk          0/1     Completed   0          4m38s
 
 ### 3. Verify the Microservice is Running
 
+#### Example 1: OpenAI Chat Completion Request
+
 Create a file, `verify-pod.yaml`, with contents like the following example:
 
 ```yaml
@@ -129,6 +131,47 @@ Apply the manifest:
 kubectl create -f test-pod.yaml -n nim-service
 ```
 
+#### Example 2: OpenAI Completion Request
+
+Create a file, `verify-chat-completions`, with contents like the following example:
+
+```yaml
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: verify-chat-completions
+spec:
+  containers:
+    - name: curl
+      image: curlimages/curl:8.6.0
+      command: ['curl']
+      args:
+        - -s
+        - -X
+        - "POST"
+        - 'http://meta-llama3-8b-instruct:8000/v1/completions'
+        - -H
+        - 'accept: application/json'
+        - -H
+        - 'Content-Type: application/json'
+        - --fail-with-body
+        - -d
+        - |
+            {
+            "model": "meta/llama3-8b-instruct",
+            "prompt": "Once upon a time",
+            "max_tokens": 64
+            }
+  restartPolicy: Never
+```
+
+Apply the manifest:
+
+```sh
+kubectl create -f verify-chat-completions.yaml -n nim-service
+```
+
 Confirm the verification pod ran to completion:
 
 ```sh
@@ -140,4 +183,15 @@ NAME                                              READY   STATUS      RESTARTS  
 meta-llama3-8b-instruct-latest-db9d899fd-mfmq2    1/1     Running     0          112m
 meta-llama3-8b-instruct-latest-job-xktnk          0/1     Completed   0          8m8s
 verify-streaming-chat                             0/1     Completed   0          99m
+verify-chat-completions                           0/1     Completed   0          97m
 ```
+Verify the logs 
+
+```sh
+kubectl logs verify-streaming-chat
+```
+
+```sh
+kubectl logs verify-chat-completions 
+```
+For more information refer [Examples](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html#openai-completion-request)
