@@ -27,7 +27,7 @@ kubectl create ns nim-operator
 ```
 ### 3. Export NGC CLI API KEY
 
-Please refer to get [NGC CLI API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#ngc-api-keys)
+Refer to get [NGC CLI API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#ngc-api-keys).
 
 ```sh
 export NGC_API_KEY=<ngc-cli-api-key>
@@ -43,10 +43,11 @@ kubectl create secret -n nim-operator docker-registry ngc-secret \
 ```
 
 ### 5. Install the NIM Operator
-Install the NIM Operator using the Helm chart located in the helm/k8s-nim-operator directory.
+
+Install the NIM Operator using Helm.
 
 ```sh
-helm install nim-operator helm/k8s-nim-operator -n nim-operator
+helm install nim-operator deployments/helm/k8s-nim-operator -n nim-operator
 ```
 
 ### 6. Verify Installation
