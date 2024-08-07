@@ -30,7 +30,7 @@ kubectl create ns nim-service
 Refer to get a [NGC CLI API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#ngc-api-keys)
 
 ```sh
-export NGC_CLI_API_KEY=<ngc-cli-api-key>
+export NGC_API_KEY=<ngc-cli-api-key>
 ```
 
 ### 3. Create an Image Pull Secret for the NIM Container
@@ -39,10 +39,16 @@ export NGC_CLI_API_KEY=<ngc-cli-api-key>
 kubectl create secret -n nim-service docker-registry ngc-secret \
     --docker-server=nvcr.io \
     --docker-username='$oauthtoken' \
-    --docker-password=$NGC_CLI_API_KEY
+    --docker-password=$NGC_API_KEY
 ```
 
-## 4. Create the NIM Cache Instance and Enable Model Auto-Detection
+### 4. Create a NGC API Secret to pull the models
+
+```sh
+kubectl create secret -n nim-service generic ngc-api-secret --from-literal=NGC_API_KEY=$NGC_API_KEY
+```
+
+## 5. Create the NIM Cache Instance and Enable Model Auto-Detection
 
 Update the `NIMCache` custom resource (CR) with appropriate values for model selection.
 These include `model.precision`, `model.engine`, `model.qosProfile`, `model.gpu.product` and `model.gpu.ids`.
@@ -70,7 +76,7 @@ spec:
         precision: "fp8"
         engine: "tensorrt_llm"
         qosProfile: "throughput"
-        gpu:
+        gpus:
           product: "l40s"
           ids:
             - "26b5"
