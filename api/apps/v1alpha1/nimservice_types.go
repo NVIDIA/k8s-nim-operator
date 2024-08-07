@@ -376,7 +376,7 @@ func (n *NIMService) GetVolumesMounts() []corev1.Volume {
 }
 
 // GetVolumes returns volumes for the NIMService container
-func (n *NIMService) GetVolumes(modelPVC string) []corev1.Volume {
+func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume {
 	// TODO: Fetch actual PVC name from associated NIMCache obj
 	volumes := []corev1.Volume{
 		{
@@ -391,7 +391,7 @@ func (n *NIMService) GetVolumes(modelPVC string) []corev1.Volume {
 			Name: "model-store",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: modelPVC,
+					ClaimName: *modelPVC.Name,
 				},
 			},
 		},
@@ -401,11 +401,12 @@ func (n *NIMService) GetVolumes(modelPVC string) []corev1.Volume {
 }
 
 // GetVolumeMounts returns volumes for the NIMService container
-func (n *NIMService) GetVolumeMounts() []corev1.VolumeMount {
+func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "model-store",
 			MountPath: "/model-store",
+			SubPath:   modelPVC.SubPath,
 		},
 		{
 			Name:      "dshm",
@@ -432,8 +433,8 @@ func (n *NIMService) GetNIMCacheProfile() string {
 }
 
 // GetExternalPVC returns the external PVC name to use for the NIMService deployment
-func (n *NIMService) GetExternalPVC() *string {
-	return n.Spec.Storage.PVC.Name
+func (n *NIMService) GetExternalPVC() PersistentVolumeClaim {
+	return n.Spec.Storage.PVC
 }
 
 // GetHPASpec returns the HPA spec for the NIMService deployment

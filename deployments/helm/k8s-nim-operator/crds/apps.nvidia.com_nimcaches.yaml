@@ -220,6 +220,8 @@ spec:
                         description: StorageClass to be used for PVC creation. Leave
                           it as empty if the PVC is already created.
                         type: string
+                      subPath:
+                        type: string
                       volumeAccessMode:
                         description: VolumeAccessMode is the volume access mode of
                           the PVC
@@ -266,7 +268,6 @@ spec:
                   type: object
                 type: array
             required:
-            - resources
             - source
             - storage
             type: object
