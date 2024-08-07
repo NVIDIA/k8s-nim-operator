@@ -46,7 +46,7 @@ kubectl create secret -n nim-operator docker-registry ngc-secret \
 Install the NIM Operator using the Helm chart located in the helm/k8s-nim-operator directory.
 
 ```sh
-helm install nim-operator helm/k8s-nim-operator -n nim-operator
+helm install nim-operator deployments/helm/k8s-nim-operator -n nim-operator
 ```
 
 ### 6. Verify Installation

@@ -39,7 +39,7 @@ privileges or be logged in as admin.
 
 ### To Deploy a sample `NIMCache` and `NIMService` instance
 
-Follow the guides [here](https://github.com/NVIDIA/k8s-nim-operator/-/tree/main/docs?ref_type=heads) to deploy sample CR instances.
+Follow the guides [here](https://github.com/NVIDIA/k8s-nim-operator/tree/main/docs) to deploy sample CR instances.
 
 ### To Uninstall
 **Delete the instances (CRs) from the cluster:**
