@@ -25,7 +25,7 @@ Follow these steps to cache NIM models in a persistent volume.
 kubectl create ns nim-service
 ```
 ### 2.Export NGC CLI API KEY
-`NOTE:` Ignore this step if you already export the NGC_CLI_API_KEY
+`NOTE:` Ignore this step if you already export the NGC_API_KEY
 
 Refer to get a [NGC CLI API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#ngc-api-keys)
 
