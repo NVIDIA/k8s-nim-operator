@@ -23,6 +23,20 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	// NIMPipelineConditionReady indicates that the NIM pipeline is ready.
+	NIMPipelineConditionReady = "NIM_PIPELINE_READY"
+	// NIMPipelineConditionFailed indicates that the NIM pipeline has failed.
+	NIMPipelineConditionFailed = "NIM_PIPELINE_FAILED"
+
+	// NIMPipelinetatusNotReady indicates that one or more services in the NIM pipeline are not ready
+	NIMPipelinetatusNotReady = "not-ready"
+	// NIMPipelineStatusReady indicates that NIM pipeline is ready
+	NIMPipelineStatusReady = "ready"
+	// NIMPipelineStatusFailed indicates that one or more services in the NIM pipeline has failed
+	NIMPipelineStatusFailed = "failed"
+)
+
 // NIMPipelineSpec defines the desired state of NIMPipeline
 type NIMPipelineSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -44,12 +58,17 @@ type NIMPipelineStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
-	State      string             `json:"state,omitempty"`
+	// States indicate state of individual services in the pipeline
+	States map[string]string `json:"states,omitempty"`
+	// State indicates the overall state of the pipeline
+	State string `json:"state,omitempty"`
 }
 
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
+// +kubebuilder:printcolumn:name="Age",type=string,JSONPath=`.metadata.creationTimestamp`,priority=0
 
 // NIMPipeline is the Schema for the nimpipelines API
 type NIMPipeline struct {

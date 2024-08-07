@@ -288,6 +288,7 @@ func (n *NIMService) GetResources() *corev1.ResourceRequirements {
 	return n.Spec.Resources
 }
 
+// IsProbeEnabled returns true if a given liveness/readiness/startup probe is enabled
 func IsProbeEnabled(probe Probe) bool {
 	if probe.Enabled == nil {
 		return true

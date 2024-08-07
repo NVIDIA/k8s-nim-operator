@@ -18,67 +18,220 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("NIMPipeline Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+	var (
+		client     client.Client
+		reconciler *NIMPipelineReconciler
+		scheme     *runtime.Scheme
+	)
 
-		ctx := context.Background()
+	BeforeEach(func() {
+		scheme = runtime.NewScheme()
+		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
+		Expect(batchv1.AddToScheme(scheme)).To(Succeed())
+		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+		client = fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(&appsv1alpha1.NIMPipeline{}).
+			WithStatusSubresource(&appsv1alpha1.NIMService{}).
+			Build()
+		reconciler = &NIMPipelineReconciler{
+			Client: client,
+			Scheme: scheme,
 		}
-		nimpipeline := &appsv1alpha1.NIMPipeline{}
+	})
 
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind NIMPipeline")
-			err := k8sClient.Get(ctx, typeNamespacedName, nimpipeline)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &appsv1alpha1.NIMPipeline{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
+	AfterEach(func() {
+		// Clean up the NIMPipeline instance
+		nimPipeline := &appsv1alpha1.NIMPipeline{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pipeline",
+				Namespace: "default",
+			},
+		}
+		_ = client.Delete(context.TODO(), nimPipeline)
+	})
+
+	Context("When managing NIMServices", func() {
+		It("Should create NIMServices for enabled services in the pipeline", func() {
+			ctx := context.TODO()
+			nimPipeline := &appsv1alpha1.NIMPipeline{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pipeline",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMPipelineSpec{
+					Services: []appsv1alpha1.NIMServicePipelineSpec{
+						{
+							Name:    "nim-llm-service",
+							Enabled: BoolPtr(true),
+							Spec: appsv1alpha1.NIMServiceSpec{
+								Type: "llm",
+								Image: appsv1alpha1.Image{
+									Repository: "llm-nim-container",
+									Tag:        "latest",
+								},
+								Replicas: 1,
+								Resources: &corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("100m"),
+										corev1.ResourceMemory: resource.MustParse("128Mi"),
+									},
+									Limits: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("200m"),
+										corev1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+								},
+							},
+						},
+						{
+							Name:    "nim-embedding-service",
+							Enabled: BoolPtr(false),
+							Spec: appsv1alpha1.NIMServiceSpec{
+								Type: "embedding",
+								Image: appsv1alpha1.Image{
+									Repository: "llm-embedding-container",
+									Tag:        "latest",
+								},
+								Replicas: 2,
+							},
+						},
 					},
-					// TODO(user): Specify other spec details if needed.
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				},
 			}
+			Expect(client.Create(ctx, nimPipeline)).To(Succeed())
+
+			// Reconcile the resource
+			_, err := reconciler.reconcileNIMPipeline(ctx, nimPipeline)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Checking that the NIMService for the enabled service is created")
+			Eventually(func() bool {
+				namespacedName := types.NamespacedName{Name: "nim-llm-service", Namespace: nimPipeline.Namespace}
+				nimService := &appsv1alpha1.NIMService{}
+				err := client.Get(context.TODO(), namespacedName, nimService)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Ensuring the NIMService for the disabled service is not created")
+			Consistently(func() bool {
+				namespacedName := types.NamespacedName{Name: "nim-embedding-service", Namespace: nimPipeline.Namespace}
+				nimService := &appsv1alpha1.NIMService{}
+				err := client.Get(context.TODO(), namespacedName, nimService)
+				return errors.IsNotFound(err)
+			}, time.Second*2, time.Millisecond*500).Should(BeTrue())
 		})
 
-		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &appsv1alpha1.NIMPipeline{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Cleanup the specific resource instance NIMPipeline")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &NIMPipelineReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+		It("Should delete NIMServices when they are disabled", func() {
+			ctx := context.TODO()
+			nimPipeline := &appsv1alpha1.NIMPipeline{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pipeline",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMPipelineSpec{
+					Services: []appsv1alpha1.NIMServicePipelineSpec{
+						{
+							Name:    "nim-llm-service",
+							Enabled: BoolPtr(true),
+							Spec: appsv1alpha1.NIMServiceSpec{
+								Type: "llm",
+								Image: appsv1alpha1.Image{
+									Repository: "llm-nim-container",
+									Tag:        "latest",
+								},
+								Replicas: 1,
+								Resources: &corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("100m"),
+										corev1.ResourceMemory: resource.MustParse("128Mi"),
+									},
+									Limits: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("200m"),
+										corev1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+								},
+							},
+						},
+						{
+							Name:    "nim-embedding-service",
+							Enabled: BoolPtr(false),
+							Spec: appsv1alpha1.NIMServiceSpec{
+								Type: "embedding",
+								Image: appsv1alpha1.Image{
+									Repository: "llm-embedding-container",
+									Tag:        "latest",
+								},
+								Replicas: 2,
+							},
+						},
+					},
+				},
 			}
+			Expect(client.Create(ctx, nimPipeline)).To(Succeed())
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+			// Reconcile the resource
+			_, err := reconciler.reconcileNIMPipeline(ctx, nimPipeline)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Enable nim-embedding-service in the pipeline spec
+			updatePipeline := &appsv1alpha1.NIMPipeline{}
+			namespacedName := types.NamespacedName{Name: "test-pipeline", Namespace: "default"}
+			Expect(client.Get(context.TODO(), namespacedName, updatePipeline)).To(Succeed())
+
+			updatePipeline.Spec.Services[1].Enabled = BoolPtr(true)
+			Expect(client.Update(ctx, updatePipeline)).To(Succeed())
+
+			// Reconcile the resource
+			_, err = reconciler.reconcileNIMPipeline(ctx, updatePipeline)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Checking that the NIMService for the newly enabled service is created")
+			Eventually(func() bool {
+				namespacedName := types.NamespacedName{Name: "nim-embedding-service", Namespace: "default"}
+				nimService := &appsv1alpha1.NIMService{}
+				err := client.Get(context.TODO(), namespacedName, nimService)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			// Disable nim-llm-service in the pipeline spec
+			updatePipeline.Spec.Services[0].Enabled = BoolPtr(false)
+			Expect(client.Update(ctx, updatePipeline)).To(Succeed())
+
+			// Reconcile the resource
+			_, err = reconciler.reconcileNIMPipeline(ctx, updatePipeline)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Checking that the NIMService for the disabled service is deleted")
+			Eventually(func() bool {
+				namespacedName := types.NamespacedName{Name: "nim-llm-service", Namespace: "default"}
+				nimService := &appsv1alpha1.NIMService{}
+				err := client.Get(context.TODO(), namespacedName, nimService)
+				return errors.IsNotFound(err)
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 		})
 	})
 })
+
+// BoolPtr returns a pointer to the bool value passed in
+func BoolPtr(b bool) *bool {
+	return &b
+}

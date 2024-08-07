@@ -14,7 +14,14 @@ spec:
     singular: nimpipeline
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.state
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: NIMPipeline is the Schema for the nimpipelines API
@@ -2253,7 +2260,13 @@ spec:
                   type: object
                 type: array
               state:
+                description: State indicates the overall state of the pipeline
                 type: string
+              states:
+                additionalProperties:
+                  type: string
+                description: States indicate state of individual services in the pipeline
+                type: object
             type: object
         type: object
     served: true
