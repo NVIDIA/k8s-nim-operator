@@ -448,3 +448,37 @@ func TestIsSpecChanged(t *testing.T) {
 		})
 	}
 }
+
+// TestContainsElement tests the ContainsElement function
+func TestContainsElement(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		name     string
+		slice    interface{}
+		element  interface{}
+		expected bool
+	}{
+		{"IntExists", []int{1, 2, 3, 4, 5}, 3, true},
+		{"IntDoesNotExist", []int{1, 2, 3, 4, 5}, 6, false},
+		{"StringExists", []string{"llama", "mistral", "gemini"}, "llama", true},
+		{"StringDoesNotExist", []string{"llama", "mistral", "gemini"}, "arctic", false},
+		{"EmptySlice", []int{}, 1, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			switch slice := tt.slice.(type) {
+			case []int:
+				result := ContainsElement(slice, tt.element.(int))
+				if result != tt.expected {
+					t.Errorf("Contains(%v, %v) = %v; expected %v", slice, tt.element, result, tt.expected)
+				}
+			case []string:
+				result := ContainsElement(slice, tt.element.(string))
+				if result != tt.expected {
+					t.Errorf("Contains(%v, %v) = %v; expected %v", slice, tt.element, result, tt.expected)
+				}
+			}
+		})
+	}
+}
