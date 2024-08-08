@@ -217,7 +217,6 @@ func (s *NIMSource) EnvFromSecrets() []v1.EnvFromSource {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
 // +kubebuilder:printcolumn:name="PVC",type=string,JSONPath=`.status.pvc`,priority=0
-// +kubebuilder:printcolumn:name="Profiles",type=string,JSONPath=`.status.profiles`,priority=1
 // +kubebuilder:printcolumn:name="Age",type=string,JSONPath=`.metadata.creationTimestamp`,priority=0
 
 // NIMCache is the Schema for the nimcaches API

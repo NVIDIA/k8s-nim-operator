@@ -21,10 +21,6 @@ spec:
     - jsonPath: .status.pvc
       name: PVC
       type: string
-    - jsonPath: .status.profiles
-      name: Profiles
-      priority: 1
-      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: string

@@ -189,10 +189,17 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+.PHONY: install-tools
 install-tools:
 	@echo Installing tools from tools.go
 	export GOBIN=$(PROJECT_DIR)/bin && \
 	grep '^\s*_' tools/tools.go | awk '{print $$2}' | xargs -tI % $(GO_CMD) install -mod=readonly -modfile=tools/go.mod %
+
+.PHONY: sync-crds
+sync-crds:
+	@echo Syncing CRDs into Helm and OLM packages
+	cp $(PROJECT_DIR)/config/crd/bases/* deployments/helm/k8s-nim-operator/crds
+	cp $(PROJECT_DIR)/config/crd/bases/* bundle/manifests
 
 ##@ Dependencies
 
