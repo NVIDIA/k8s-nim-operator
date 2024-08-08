@@ -230,6 +230,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			{
 				Name:      "model-store",
 				MountPath: "/model-store",
+				SubPath:   "subPath",
 			},
 			{
 				Name:      "dshm",

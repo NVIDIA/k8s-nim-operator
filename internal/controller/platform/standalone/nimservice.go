@@ -133,7 +133,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	deploymentParams := nimService.GetDeploymentParams()
-	var modelPVC appsv1alpha1.PersistentVolumeClaim
+	var modelPVC *appsv1alpha1.PersistentVolumeClaim
 	modelProfile := ""
 
 	// If external PVC is provided, use that as model-store
@@ -151,7 +151,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			logger.Info("overriding model profile", "profile", profile)
 			modelProfile = profile
 		}
-	} else if externalPVC := nimService.GetExternalPVC(); externalPVC != (appsv1alpha1.PersistentVolumeClaim{}) {
+	} else if externalPVC := nimService.GetExternalPVC(); externalPVC != nil {
 		modelPVC = externalPVC
 	} else if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
 		modelPVC, err = r.reconcilePVC(ctx, nimService)
@@ -165,8 +165,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 	// Setup volume mounts with model store
-	deploymentParams.Volumes = nimService.GetVolumes(modelPVC)
-	deploymentParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
+	deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
+	deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
 
 	// Setup env for explicit override profile is specified
 	if modelProfile != "" {
@@ -312,43 +312,43 @@ func (r *NIMServiceReconciler) syncResource(ctx context.Context, obj client.Obje
 }
 
 // getNIMCachePVC returns PVC backing the NIM cache instance
-func (r *NIMServiceReconciler) getNIMCachePVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (appsv1alpha1.PersistentVolumeClaim, error) {
+func (r *NIMServiceReconciler) getNIMCachePVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (*appsv1alpha1.PersistentVolumeClaim, error) {
 	logger := log.FromContext(ctx)
 
 	if nimService.GetNIMCacheName() == "" {
 		// NIM cache PVC is not used
-		return appsv1alpha1.PersistentVolumeClaim{}, nil
+		return nil, nil
 	}
 	// Lookup NIMCache instance in the same namespace as the NIMService instance
 	nimCache := &appsv1alpha1.NIMCache{}
 	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetNIMCacheName(), Namespace: nimService.Namespace}, nimCache); err != nil {
 		logger.Error(err, "unable to fetch nimcache", "nimcache", nimService.GetNIMCacheName(), "nimservice", nimService.Name)
-		return appsv1alpha1.PersistentVolumeClaim{}, err
+		return nil, err
 	}
 	// Get the status of NIMCache
 	if nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
-		return appsv1alpha1.PersistentVolumeClaim{}, fmt.Errorf("nimcache %s is not ready, nimservice %s", nimCache.GetName(), nimService.GetName())
+		return nil, fmt.Errorf("nimcache %s is not ready, nimservice %s", nimCache.GetName(), nimService.GetName())
 	}
 
 	if nimCache.Status.PVC == "" {
-		return appsv1alpha1.PersistentVolumeClaim{}, fmt.Errorf("missing PVC for the nimcache instance %s, nimservice %s", nimCache.GetName(), nimService.GetName())
+		return nil, fmt.Errorf("missing PVC for the nimcache instance %s, nimservice %s", nimCache.GetName(), nimService.GetName())
 	}
 
 	if nimCache.Spec.Storage.PVC.Name == nil {
 		nimCache.Spec.Storage.PVC.Name = &nimCache.Status.PVC
 	}
 	// Get the underlying PVC for the NIMCache instance
-	return nimCache.Spec.Storage.PVC, nil
+	return &nimCache.Spec.Storage.PVC, nil
 }
 
-func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (appsv1alpha1.PersistentVolumeClaim, error) {
+func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (*appsv1alpha1.PersistentVolumeClaim, error) {
 	logger := r.GetLogger()
 	pvcName := nimService.GetPVCName(nimService.Spec.Storage.PVC)
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nimService.GetNamespace()}
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, pvcNamespacedName, pvc)
 	if err != nil && client.IgnoreNotFound(err) != nil {
-		return appsv1alpha1.PersistentVolumeClaim{}, err
+		return nil, err
 	}
 
 	// If PVC does not exist, create a new one if creation flag is enabled
@@ -357,15 +357,15 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace()})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvc.Name)
-				return appsv1alpha1.PersistentVolumeClaim{}, err
+				return nil, err
 			}
 			if err := controllerutil.SetControllerReference(nimService, pvc, r.GetScheme()); err != nil {
-				return appsv1alpha1.PersistentVolumeClaim{}, err
+				return nil, err
 			}
 			err = r.Create(ctx, pvc)
 			if err != nil {
 				logger.Error(err, "Failed to create pvc", "name", pvc.Name)
-				return appsv1alpha1.PersistentVolumeClaim{}, err
+				return nil, err
 			}
 			logger.Info("Created PVC for NIM Service", "pvc", pvcName)
 
@@ -373,12 +373,12 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 			nimService.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
 			if err := r.Status().Update(ctx, nimService); err != nil {
 				logger.Error(err, "Failed to update status", "NIMService", nimService.Name)
-				return appsv1alpha1.PersistentVolumeClaim{}, err
+				return nil, err
 			}
 		} else {
 			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
-			return appsv1alpha1.PersistentVolumeClaim{}, err
+			return nil, err
 		}
 	}
-	return nimService.Spec.Storage.PVC, nil
+	return &nimService.Spec.Storage.PVC, nil
 }
