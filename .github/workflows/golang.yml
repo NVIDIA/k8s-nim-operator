@@ -50,6 +50,8 @@ jobs:
         skip-cache: true
     - name: Check golang modules
       run: make check-vendor
+    - name: Check generated assets
+      run: make validate-generated-assets
   test:
     name: Unit test
     runs-on: ubuntu-latest
