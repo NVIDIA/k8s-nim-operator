@@ -32,8 +32,7 @@ spec:
   nimCache:
     name: meta-llama3-8b-instruct
     profile: ''
-  scale:
-    minReplicas: 1
+  replicas: 1
   resources:
     limits:
       nvidia.com/gpu: 1
