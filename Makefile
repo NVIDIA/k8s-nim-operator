@@ -196,7 +196,7 @@ install-tools:
 	grep '^\s*_' tools/tools.go | awk '{print $$2}' | xargs -tI % $(GO_CMD) install -mod=readonly -modfile=tools/go.mod %
 
 .PHONY: sync-crds
-sync-crds:
+sync-crds: manifests
 	@echo Syncing CRDs into Helm and OLM packages
 	cp $(PROJECT_DIR)/config/crd/bases/* deployments/helm/k8s-nim-operator/crds
 	cp $(PROJECT_DIR)/config/crd/bases/* bundle/manifests
