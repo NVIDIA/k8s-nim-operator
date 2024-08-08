@@ -96,7 +96,7 @@ generate-clientset: install-tools
 		--input-base $(CURDIR)/api \
 		--input "apps/v1alpha1"
 
-validate-generated-assets: manifests generate generate-clientset
+validate-generated-assets: manifests generate generate-clientset sync-crds
 	@echo "- Verifying that the generated code and manifests are in-sync..."
 	@git diff --exit-code -- api config
 
