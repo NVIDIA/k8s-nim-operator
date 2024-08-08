@@ -21,7 +21,7 @@ NVIDIA NIM microservices deliver AI foundation models as accelerated inference m
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-build docker-push IMG=nvcr.io/nvidia/cloud-native/k8s-nim-operator:v0.1.0
+make docker-build docker-push IMG=<your-private-registry>/k8s-nim-operator:<tag>
 ```
 
 > Publish the image to a personal registry.
@@ -37,7 +37,7 @@ make install
 **Deploy the manager to the cluster with the image specified by `IMG`:**
 
 ```sh
-make deploy IMG=nvcr.io/nvstaging/cloud-native/k8s-nim-operator:tag
+make deploy IMG=<your-private-registry>/k8s-nim-operator:<tag>
 ```
 
 > If you encounter RBAC errors, you might need to grant yourself cluster-admin
@@ -75,7 +75,7 @@ Perform the following steps to build the installation manifests and distribute t
 1. Build the manifests for the image built and published in the registry:
 
    ```sh
-   make build-installer IMG=nvcr.io/nvidia/cloud-native/k8s-nim-operator:v0.1.0
+   make build-installer IMG=<your-private-registry>/k8s-nim-operator:<tag>
    ```
 
    The preceding Makefile target generates a `dist/install.yaml` file.
