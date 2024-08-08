@@ -32,6 +32,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -463,7 +464,7 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 			return fmt.Errorf("failed to get selected profiles: %w", err)
 		}
 
-		if len(selectedProfiles) > 0 {
+		if len(selectedProfiles) > 0 && !utils.ContainsElement(selectedProfiles, "all") {
 			nimManifest, err := r.extractNIMManifest(ctx, getManifestConfigName(nimCache), nimCache.GetNamespace())
 			if err != nil {
 				return fmt.Errorf("failed to get model manifest config file: %w", err)
@@ -819,9 +820,14 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 		if err != nil {
 			return nil, err
 		}
-		if selectedProfiles != nil {
-			job.Spec.Template.Spec.Containers[0].Args = []string{"--profiles"}
-			job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
+
+		if len(selectedProfiles) > 0 {
+			if utils.ContainsElement(selectedProfiles, "all") {
+				job.Spec.Template.Spec.Containers[0].Args = []string{"--all"}
+			} else {
+				job.Spec.Template.Spec.Containers[0].Args = []string{"--profiles"}
+				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
+			}
 		}
 	}
 	return job, nil

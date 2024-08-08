@@ -305,6 +305,28 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(getPvcName(nimCache, nimCache.Spec.Storage.PVC)))
 		})
 
+		It("should construct a job set to download all profiles", func() {
+			profiles := []string{"all"}
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles, AutoDetect: ptr.To[bool](false)}}},
+				},
+			}
+
+			job, err := constructJob(nimCache)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(job.Name).To(Equal(getJobName(nimCache)))
+			Expect(job.Spec.Template.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
+			Expect(job.Spec.Template.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
+			Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElements("download-to-cache"))
+			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--all"))
+		})
+
 		It("should create a job with the correct specifications", func() {
 			ctx := context.TODO()
 			nimCache := &appsv1alpha1.NIMCache{
