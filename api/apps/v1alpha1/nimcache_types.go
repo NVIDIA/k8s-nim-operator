@@ -128,6 +128,7 @@ type PersistentVolumeClaim struct {
 	Size string `json:"size,omitempty"`
 	// VolumeAccessMode is the volume access mode of the PVC
 	VolumeAccessMode corev1.PersistentVolumeAccessMode `json:"volumeAccessMode,omitempty"`
+	SubPath          string                            `json:"subPath,omitempty"`
 }
 
 // NIMCacheStatus defines the observed state of NIMCache

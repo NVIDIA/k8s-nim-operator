@@ -36,6 +36,7 @@ spec:
         {{- range .VolumeMounts }}
         - name: {{ .Name }}
           mountPath: {{ .MountPath }}
+          subPath: {{ .SubPath }}
         {{- end }}
         env:
         {{- range .Env }}
