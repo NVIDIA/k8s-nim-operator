@@ -140,6 +140,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 					{
 						Name:      "test-volume",
 						MountPath: "/data",
+						SubPath:   "subPath",
 					},
 				},
 				Env: []corev1.EnvVar{
@@ -179,6 +180,9 @@ var _ = Describe("K8s Resources Rendering", func() {
 			Expect(*deployment.Spec.Replicas).To(Equal(int32(3)))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal("test-container"))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("nim-llm:latest"))
+			Expect(deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name).To(Equal("test-volume"))
+			Expect(deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath).To(Equal("/data"))
+			Expect(deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].SubPath).To(Equal("subPath"))
 		})
 
 		It("should render StatefulSet template correctly", func() {

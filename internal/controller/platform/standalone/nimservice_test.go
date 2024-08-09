@@ -17,7 +17,9 @@ limitations under the License.
 package standalone
 
 import (
+	"bytes"
 	"context"
+	"log"
 	"path"
 	"sort"
 	"strings"
@@ -110,6 +112,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					PVC: appsv1alpha1.PersistentVolumeClaim{
 						Name: &pvcName,
 					},
+				},
+				NIMCache: appsv1alpha1.NIMCacheVolSpec{
+					Name: "test-nimcache",
 				},
 				Env: []corev1.EnvVar{
 					{
@@ -230,12 +235,42 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			{
 				Name:      "model-store",
 				MountPath: "/model-store",
+				SubPath:   "subPath",
 			},
 			{
 				Name:      "dshm",
 				MountPath: "/dev/shm",
 			},
 		}
+		NIMCache := &appsv1alpha1.NIMCache{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-nimcache",
+				Namespace: "default",
+			},
+			Spec: appsv1alpha1.NIMCacheSpec{
+				Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+				Storage: appsv1alpha1.Storage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi", SubPath: "subPath"}},
+			},
+			Status: appsv1alpha1.NIMCacheStatus{
+				State: appsv1alpha1.NimCacheStatusReady,
+				PVC:   pvcName,
+			},
+		}
+		_ = client.Create(context.TODO(), NIMCache)
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pvcName,
+				Namespace: "default",
+			},
+		}
+		_ = client.Create(context.TODO(), pvc)
+
+		var buf bytes.Buffer
+		log.SetOutput(&buf)
+		defer func() {
+			log.SetOutput(os.Stderr)
+		}()
+
 	})
 
 	AfterEach(func() {

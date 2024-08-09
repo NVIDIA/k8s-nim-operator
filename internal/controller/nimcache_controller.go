@@ -735,6 +735,7 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 					{
 						Name:      "nim-cache-volume",
 						MountPath: "/output",
+						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
 				},
 				SecurityContext: &corev1.SecurityContext{
@@ -779,6 +780,7 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 					{
 						Name:      "nim-cache-volume",
 						MountPath: "/model-store",
+						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
 				},
 				Resources: corev1.ResourceRequirements{
