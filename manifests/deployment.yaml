@@ -103,3 +103,11 @@ spec:
         - name: {{ . }}
       {{- end }}
       {{- end }}
+      securityContext:
+        {{- if .UserId }}
+        runAsUser: {{ .UserId }}
+        {{- end }}
+        {{- if .GroupId }}
+        runAsGroup: {{ .GroupId }}
+        fsGroup: {{ .GroupId }}
+        {{- end }}

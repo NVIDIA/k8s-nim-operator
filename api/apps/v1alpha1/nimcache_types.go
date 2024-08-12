@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -40,6 +41,8 @@ type NIMCacheSpec struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// NodeSelectors are the node selector labels to schedule the caching job.
 	NodeSelectors map[string]string `json:"gpuSelectors,omitempty"`
+	UserId        *int64            `json:"userId,omitempty"`
+	GroupId       *int64            `json:"groupId,omitempty"`
 }
 
 // NIMSource defines the source for caching NIM model
@@ -237,6 +240,22 @@ func (n *NIMCache) GetPVCName(pvc PersistentVolumeClaim) string {
 		pvcName = *pvc.Name
 	}
 	return pvcName
+}
+
+// GetUserId returns user ID. Returns default value if not set on NimCache object.
+func (n *NIMCache) GetUserId() *int64 {
+	if n.Spec.UserId == nil {
+		return ptr.To[int64](1000)
+	}
+	return n.Spec.UserId
+}
+
+// GetGroupId returns group ID. Returns default value if not set on NimCache object.
+func (n *NIMCache) GetGroupId() *int64 {
+	if n.Spec.GroupId == nil {
+		return ptr.To[int64](2000)
+	}
+	return n.Spec.GroupId
 }
 
 // +kubebuilder:object:root=true
