@@ -39,13 +39,13 @@ const (
 	NIMServiceConditionFailed = "NIM_SERVICE_FAILED"
 
 	// NIMServiceStatusPending indicates that NIM deployment is in pending state
-	NIMServiceStatusPending = "pending"
+	NIMServiceStatusPending = "Pending"
 	// NIMServiceStatusNotReady indicates that NIM deployment is not ready
-	NIMServiceStatusNotReady = "not-ready"
+	NIMServiceStatusNotReady = "NotReady"
 	// NIMServiceStatusReady indicates that NIM deployment is ready
-	NIMServiceStatusReady = "ready"
+	NIMServiceStatusReady = "Ready"
 	// NIMServiceStatusFailed indicates that NIM deployment has failed
-	NIMServiceStatusFailed = "failed"
+	NIMServiceStatusFailed = "Failed"
 )
 
 // NIMServiceSpec defines the desired state of NIMService

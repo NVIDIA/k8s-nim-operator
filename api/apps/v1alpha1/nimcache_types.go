@@ -171,19 +171,19 @@ const (
 	NimCacheConditionPVCCreated = "NIM_CACHE_PVC_CREATED"
 
 	// NimCacheStatusNotReady indicates that cache is not ready
-	NimCacheStatusNotReady = "not-ready"
+	NimCacheStatusNotReady = "NotReady"
 	// NimCacheStatusPVCCreated indicates that the pvc is created for caching
-	NimCacheStatusPVCCreated = "pvc-created"
+	NimCacheStatusPVCCreated = "PVC-Created"
 	// NimCacheStatusStarted indicates that caching process is started
-	NimCacheStatusStarted = "started"
+	NimCacheStatusStarted = "Started"
 	// NimCacheStatusReady indicates that cache is ready
-	NimCacheStatusReady = "ready"
+	NimCacheStatusReady = "Ready"
 	// NimCacheStatusInProgress indicates that caching is in progress
-	NimCacheStatusInProgress = "in-progress"
+	NimCacheStatusInProgress = "InProgress"
 	// NimCacheStatusPending indicates that caching is not yet started
-	NimCacheStatusPending = "pending"
+	NimCacheStatusPending = "Pending"
 	// NimCacheStatusFailed indicates that caching is failed
-	NimCacheStatusFailed = "failed"
+	NimCacheStatusFailed = "Failed"
 )
 
 // EnvFromSecrets return the list of secrets that should be mounted as env vars
