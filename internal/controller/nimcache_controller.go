@@ -237,7 +237,7 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 		if nimCache.Spec.Storage.PVC.Create != nil && *nimCache.Spec.Storage.PVC.Create {
 			pvc, err = shared.ConstructPVC(nimCache.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimCache.GetNamespace()})
 			if err != nil {
-				logger.Error(err, "Failed to construct pvc", "name", pvc.Name)
+				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return err
 			}
 			if err := controllerutil.SetControllerReference(nimCache, pvc, r.GetScheme()); err != nil {
@@ -245,12 +245,12 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 			}
 			err = r.Create(ctx, pvc)
 			if err != nil {
-				logger.Error(err, "Failed to create pvc", "name", pvc.Name)
+				logger.Error(err, "Failed to create pvc", "name", pvcName)
 				return err
 			}
-			logger.Info("Created PVC for NIM Cache", "pvc", pvcName)
+			logger.Info("Created PVC for NIM Cache", "pvc", pvc.Name)
 
-			conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for caching NIM")
+			conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for caching NIM model")
 			nimCache.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
 			if err := r.Status().Update(ctx, nimCache); err != nil {
 				logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
