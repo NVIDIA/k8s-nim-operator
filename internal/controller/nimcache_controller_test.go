@@ -109,6 +109,29 @@ var _ = Describe("NIMCache Controller", func() {
 				return client.Get(ctx, pvcName, pvc)
 			}, time.Second*10).Should(Succeed())
 		})
+
+		It("should return an error if the PVC size is not specified", func() {
+			ctx := context.TODO()
+			NIMCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage: appsv1alpha1.Storage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard"}},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusNotReady,
+				},
+			}
+			Expect(client.Create(ctx, NIMCache)).To(Succeed())
+
+			// Reconcile the resource
+			_, err := reconciler.reconcileNIMCache(ctx, NIMCache)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to parse size for pvc creation"))
+		})
 	})
 
 	Context("When the Job completes", func() {
