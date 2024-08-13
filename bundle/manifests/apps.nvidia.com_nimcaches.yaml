@@ -55,6 +55,9 @@ spec:
                 description: NodeSelectors are the node selector labels to schedule
                   the caching job.
                 type: object
+              groupID:
+                format: int64
+                type: integer
               resources:
                 description: Resources defines the minimum resources required for
                   the caching job to run(cpu, memory, gpu).
@@ -263,6 +266,9 @@ spec:
                       type: string
                   type: object
                 type: array
+              userID:
+                format: int64
+                type: integer
             required:
             - source
             - storage

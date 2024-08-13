@@ -498,6 +498,9 @@ spec:
                               - openaiPort
                               type: object
                           type: object
+                        groupID:
+                          format: int64
+                          type: integer
                         image:
                           description: Image defines image attributes
                           properties:
@@ -2191,6 +2194,9 @@ spec:
                           - embedding
                           - reranking
                           type: string
+                        userID:
+                          format: int64
+                          type: integer
                       required:
                       - authSecret
                       type: object

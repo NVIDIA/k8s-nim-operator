@@ -75,6 +75,8 @@ type DeploymentParams struct {
 	StartupProbe       *corev1.Probe
 	ServiceAccountName string
 	NIMCachePVC        string
+	UserID             *int64
+	GroupID            *int64
 }
 
 // StatefulSetParams holds the parameters for rendering a StatefulSet template
