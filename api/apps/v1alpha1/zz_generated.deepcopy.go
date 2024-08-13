@@ -343,13 +343,13 @@ func (in *NIMCacheSpec) DeepCopyInto(out *NIMCacheSpec) {
 			(*out)[key] = val
 		}
 	}
-	if in.UserId != nil {
-		in, out := &in.UserId, &out.UserId
+	if in.UserID != nil {
+		in, out := &in.UserID, &out.UserID
 		*out = new(int64)
 		**out = **in
 	}
-	if in.GroupId != nil {
-		in, out := &in.GroupId, &out.GroupId
+	if in.GroupID != nil {
+		in, out := &in.GroupID, &out.GroupID
 		*out = new(int64)
 		**out = **in
 	}
@@ -681,13 +681,13 @@ func (in *NIMServiceSpec) DeepCopyInto(out *NIMServiceSpec) {
 	in.StartupProbe.DeepCopyInto(&out.StartupProbe)
 	in.Scale.DeepCopyInto(&out.Scale)
 	in.Metrics.DeepCopyInto(&out.Metrics)
-	if in.UserId != nil {
-		in, out := &in.UserId, &out.UserId
+	if in.UserID != nil {
+		in, out := &in.UserID, &out.UserID
 		*out = new(int64)
 		**out = **in
 	}
-	if in.GroupId != nil {
-		in, out := &in.GroupId, &out.GroupId
+	if in.GroupID != nil {
+		in, out := &in.GroupID, &out.GroupID
 		*out = new(int64)
 		**out = **in
 	}

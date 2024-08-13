@@ -104,10 +104,10 @@ spec:
       {{- end }}
       {{- end }}
       securityContext:
-        {{- if .UserId }}
-        runAsUser: {{ .UserId }}
+        {{- if .UserID }}
+        runAsUser: {{ .UserID }}
         {{- end }}
-        {{- if .GroupId }}
-        runAsGroup: {{ .GroupId }}
-        fsGroup: {{ .GroupId }}
+        {{- if .GroupID }}
+        runAsGroup: {{ .GroupID }}
+        fsGroup: {{ .GroupID }}
         {{- end }}

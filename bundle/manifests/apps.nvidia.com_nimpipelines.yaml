@@ -498,7 +498,7 @@ spec:
                               - openaiPort
                               type: object
                           type: object
-                        groupId:
+                        groupID:
                           format: int64
                           type: integer
                         image:
@@ -2194,7 +2194,7 @@ spec:
                           - embedding
                           - reranking
                           type: string
-                        userId:
+                        userID:
                           format: int64
                           type: integer
                       required:

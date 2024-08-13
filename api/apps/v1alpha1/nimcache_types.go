@@ -41,8 +41,8 @@ type NIMCacheSpec struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// NodeSelectors are the node selector labels to schedule the caching job.
 	NodeSelectors map[string]string `json:"gpuSelectors,omitempty"`
-	UserId        *int64            `json:"userId,omitempty"`
-	GroupId       *int64            `json:"groupId,omitempty"`
+	UserID        *int64            `json:"userID,omitempty"`
+	GroupID       *int64            `json:"groupID,omitempty"`
 }
 
 // NIMSource defines the source for caching NIM model
@@ -242,20 +242,20 @@ func (n *NIMCache) GetPVCName(pvc PersistentVolumeClaim) string {
 	return pvcName
 }
 
-// GetUserId returns user ID. Returns default value if not set on NimCache object.
-func (n *NIMCache) GetUserId() *int64 {
-	if n.Spec.UserId == nil {
+// GetUserID returns user ID. Returns default value if not set on NimCache object.
+func (n *NIMCache) GetUserID() *int64 {
+	if n.Spec.UserID == nil {
 		return ptr.To[int64](1000)
 	}
-	return n.Spec.UserId
+	return n.Spec.UserID
 }
 
-// GetGroupId returns group ID. Returns default value if not set on NimCache object.
-func (n *NIMCache) GetGroupId() *int64 {
-	if n.Spec.GroupId == nil {
+// GetGroupID returns group ID. Returns default value if not set on NimCache object.
+func (n *NIMCache) GetGroupID() *int64 {
+	if n.Spec.GroupID == nil {
 		return ptr.To[int64](2000)
 	}
-	return n.Spec.GroupId
+	return n.Spec.GroupID
 }
 
 // +kubebuilder:object:root=true

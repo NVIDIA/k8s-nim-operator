@@ -75,8 +75,8 @@ type NIMServiceSpec struct {
 	Scale          Autoscaling                  `json:"scale,omitempty"`
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	Replicas       int                          `json:"replicas,omitempty"`
-	UserId         *int64                       `json:"userId,omitempty"`
-	GroupId        *int64                       `json:"groupId,omitempty"`
+	UserID         *int64                       `json:"userID,omitempty"`
+	GroupID        *int64                       `json:"groupID,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume
@@ -482,15 +482,15 @@ func (n *NIMService) GetServicePort() int32 {
 	return n.Spec.Expose.Service.OpenAIPort
 }
 
-// GetUserId returns the user ID for the NIMService deployment
-func (n *NIMService) GetUserId() *int64 {
-	return n.Spec.UserId
+// GetUserID returns the user ID for the NIMService deployment
+func (n *NIMService) GetUserID() *int64 {
+	return n.Spec.UserID
 
 }
 
-// GetGroupId returns the group ID for the NIMService deployment
-func (n *NIMService) GetGroupId() *int64 {
-	return n.Spec.GroupId
+// GetGroupID returns the group ID for the NIMService deployment
+func (n *NIMService) GetGroupID() *int64 {
+	return n.Spec.GroupID
 
 }
 
@@ -547,8 +547,8 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	if IsProbeEnabled(n.Spec.StartupProbe) {
 		params.StartupProbe = n.GetStartupProbe()
 	}
-	params.UserId = n.GetUserId()
-	params.GroupId = n.GetGroupId()
+	params.UserID = n.GetUserID()
+	params.GroupID = n.GetGroupID()
 
 	// Set service account
 	params.ServiceAccountName = n.GetServiceAccountName()
