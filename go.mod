@@ -8,7 +8,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/NVIDIA/k8s-test-infra v0.0.0-20240806103558-2d7411125519
 	github.com/go-logr/logr v1.4.2
-	github.com/mittwald/go-helm-client v0.12.11
+	github.com/mittwald/go-helm-client v0.12.12
 	github.com/onsi/ginkgo/v2 v2.19.1
 	github.com/onsi/gomega v1.34.1
 	github.com/openshift/api v0.0.0-20240708071937-c9a91940bf0f
