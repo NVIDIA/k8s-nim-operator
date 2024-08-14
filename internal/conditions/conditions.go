@@ -19,6 +19,7 @@ package conditions
 import (
 	"context"
 
+	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,7 +83,7 @@ func (u *updater) SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NIMSe
 		Reason: Ready,
 	})
 
-	cr.Status.State = Ready
+	cr.Status.State = v1alpha1.NIMServiceStatusReady
 	return u.client.Status().Update(ctx, cr)
 }
 
@@ -101,7 +102,7 @@ func (u *updater) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NI
 		Message: message,
 	})
 
-	cr.Status.State = NotReady
+	cr.Status.State = v1alpha1.NIMServiceStatusNotReady
 	return u.client.Status().Update(ctx, cr)
 }
 
@@ -118,7 +119,7 @@ func (u *updater) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NIMS
 		Reason:  reason,
 		Message: message,
 	})
-	cr.Status.State = NotReady
+	cr.Status.State = v1alpha1.NIMServiceStatusNotReady
 	return u.client.Status().Update(ctx, cr)
 }
 
