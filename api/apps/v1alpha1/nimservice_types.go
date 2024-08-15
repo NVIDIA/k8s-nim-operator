@@ -434,11 +434,6 @@ func (n *NIMService) GetNIMCacheProfile() string {
 	return n.Spec.NIMCache.Profile
 }
 
-// GetExternalPVC returns the external PVC name to use for the NIMService deployment
-func (n *NIMService) GetExternalPVC() *PersistentVolumeClaim {
-	return &n.Spec.Storage.PVC
-}
-
 // GetHPA returns the HPA spec for the NIMService deployment
 func (n *NIMService) GetHPA() HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPA
