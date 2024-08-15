@@ -57,6 +57,9 @@ const (
 
 	// NIMCacheFinalizer is the finalizer annotation
 	NIMCacheFinalizer = "finalizer.nimcache.apps.nvidia.com"
+
+	// AllProfiles represents all profiles in the NIM manifest
+	AllProfiles = "all"
 )
 
 // NIMCacheReconciler reconciles a NIMCache object
@@ -464,7 +467,7 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 			return fmt.Errorf("failed to get selected profiles: %w", err)
 		}
 
-		if len(selectedProfiles) > 0 && !utils.ContainsElement(selectedProfiles, "all") {
+		if len(selectedProfiles) > 0 && !utils.ContainsElement(selectedProfiles, AllProfiles) {
 			nimManifest, err := r.extractNIMManifest(ctx, getManifestConfigName(nimCache), nimCache.GetNamespace())
 			if err != nil {
 				return fmt.Errorf("failed to get model manifest config file: %w", err)
@@ -822,7 +825,7 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 		}
 
 		if len(selectedProfiles) > 0 {
-			if utils.ContainsElement(selectedProfiles, "all") {
+			if utils.ContainsElement(selectedProfiles, AllProfiles) {
 				job.Spec.Template.Spec.Containers[0].Args = []string{"--all"}
 			} else {
 				job.Spec.Template.Spec.Containers[0].Args = []string{"--profiles"}
