@@ -120,8 +120,8 @@ type NIMServiceList struct {
 // Prefers pvc.Name if explicitly set by the user in the NIMService instance
 func (n *NIMService) GetPVCName(pvc PersistentVolumeClaim) string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
-	if pvc.Name != nil {
-		pvcName = *pvc.Name
+	if pvc.Name != "" {
+		pvcName = pvc.Name
 	}
 	return pvcName
 }
@@ -393,7 +393,7 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 			Name: "model-store",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: *modelPVC.Name,
+					ClaimName: modelPVC.Name,
 				},
 			},
 		},

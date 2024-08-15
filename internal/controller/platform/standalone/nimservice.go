@@ -136,7 +136,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	var modelPVC *appsv1alpha1.PersistentVolumeClaim
 	modelProfile := ""
 
-	// If external PVC is provided, use that as model-store
+	// Select PVC for model store
 	if nimService.GetNIMCacheName() != "" {
 		// Fetch PVC for the associated NIMCache instance and mount it
 		nimCachePVC, err := r.getNIMCachePVC(ctx, nimService)
@@ -151,16 +151,18 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			logger.Info("overriding model profile", "profile", profile)
 			modelProfile = profile
 		}
-	} else if externalPVC := nimService.GetExternalPVC(); externalPVC != nil {
-		modelPVC = externalPVC
 	} else if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
+		// Create a new PVC
 		modelPVC, err = r.reconcilePVC(ctx, nimService)
 		if err != nil {
 			logger.Error(err, "unable to create pvc")
 			return ctrl.Result{}, err
 		}
+	} else if nimService.Spec.Storage.PVC.Name != "" {
+		// Use an existing PVC
+		modelPVC = &nimService.Spec.Storage.PVC
 	} else {
-		err := fmt.Errorf("neither external PVC or NIMCache volume is provided")
+		err := fmt.Errorf("neither external PVC name or NIMCache volume is provided")
 		logger.Error(err, "failed to determine PVC for model-store")
 		return ctrl.Result{}, err
 	}
@@ -334,8 +336,8 @@ func (r *NIMServiceReconciler) getNIMCachePVC(ctx context.Context, nimService *a
 		return nil, fmt.Errorf("missing PVC for the nimcache instance %s, nimservice %s", nimCache.GetName(), nimService.GetName())
 	}
 
-	if nimCache.Spec.Storage.PVC.Name == nil {
-		nimCache.Spec.Storage.PVC.Name = &nimCache.Status.PVC
+	if nimCache.Spec.Storage.PVC.Name == "" {
+		nimCache.Spec.Storage.PVC.Name = nimCache.Status.PVC
 	}
 	// Get the underlying PVC for the NIMCache instance
 	return &nimCache.Spec.Storage.PVC, nil

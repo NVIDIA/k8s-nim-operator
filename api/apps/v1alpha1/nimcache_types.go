@@ -124,7 +124,7 @@ type PersistentVolumeClaim struct {
 	// Create indicates to create a new PVC
 	Create *bool `json:"create,omitempty"`
 	// Name is the name of the PVC
-	Name *string `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
 	// StorageClass to be used for PVC creation. Leave it as empty if the PVC is already created.
 	StorageClass string `json:"storageClass,omitempty"`
 	// Size of the NIM cache in Gi, used during PVC creation
@@ -236,8 +236,8 @@ type NIMCache struct {
 // Prefers pvc.Name if explicitly set by the user in the NIMCache instance
 func (n *NIMCache) GetPVCName(pvc PersistentVolumeClaim) string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
-	if pvc.Name != nil {
-		pvcName = *pvc.Name
+	if pvc.Name != "" {
+		pvcName = pvc.Name
 	}
 	return pvcName
 }
