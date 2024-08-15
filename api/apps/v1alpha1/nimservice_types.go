@@ -439,9 +439,9 @@ func (n *NIMService) GetExternalPVC() *PersistentVolumeClaim {
 	return &n.Spec.Storage.PVC
 }
 
-// GetHPASpec returns the HPA spec for the NIMService deployment
-func (n *NIMService) GetHPASpec() autoscalingv2.HorizontalPodAutoscalerSpec {
-	return n.Spec.Scale.HPASpec
+// GetHPA returns the HPA spec for the NIMService deployment
+func (n *NIMService) GetHPA() HorizontalPodAutoscalerSpec {
+	return n.Spec.Scale.HPA
 }
 
 // GetReplicas returns replicas for the NIMService deployment
@@ -668,10 +668,18 @@ func (n *NIMService) GetHPAParams() *rendertypes.HPAParams {
 	params.Annotations = n.GetServiceAnnotations()
 
 	// Set HPA spec
-	hpaSpec := n.GetHPASpec()
-	hpaSpec.ScaleTargetRef.Kind = n.GetDeploymentKind()
-	hpaSpec.ScaleTargetRef.Name = n.GetName()
-	hpaSpec.ScaleTargetRef.APIVersion = "apps/v1"
+	hpa := n.GetHPA()
+	hpaSpec := autoscalingv2.HorizontalPodAutoscalerSpec{
+		ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+			Kind:       n.GetDeploymentKind(),
+			Name:       n.GetName(),
+			APIVersion: "apps/v1",
+		},
+		MinReplicas: hpa.MinReplicas,
+		MaxReplicas: hpa.MaxReplicas,
+		Metrics:     hpa.Metrics,
+		Behavior:    hpa.Behavior,
+	}
 	params.HPASpec = hpaSpec
 	return params
 }
