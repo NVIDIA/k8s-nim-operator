@@ -1299,14 +1299,11 @@ spec:
                             enabled:
                               type: boolean
                             hpa:
-                              description: HorizontalPodAutoscalerSpec describes the
-                                desired functionality of the HorizontalPodAutoscaler.
                               properties:
                                 behavior:
                                   description: |-
-                                    behavior configures the scaling behavior of the target
+                                    HorizontalPodAutoscalerBehavior configures the scaling behavior of the target
                                     in both Up and Down directions (scaleUp and scaleDown fields respectively).
-                                    If not set, the default HPAScalingRules for scale up and scale down are used.
                                   properties:
                                     scaleDown:
                                       description: |-
@@ -1421,21 +1418,9 @@ spec:
                                       type: object
                                   type: object
                                 maxReplicas:
-                                  description: |-
-                                    maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
-                                    It cannot be less that minReplicas.
                                   format: int32
                                   type: integer
                                 metrics:
-                                  description: |-
-                                    metrics contains the specifications for which to use to calculate the
-                                    desired replica count (the maximum replica count across all metrics will
-                                    be used).  The desired replica count is calculated multiplying the
-                                    ratio between the target value and the current value by the current
-                                    number of pods.  Ergo, metrics used must decrease as the pod count is
-                                    increased, and vice-versa.  See the individual metric source types for
-                                    more information about how each type of metric must respond.
-                                    If not set, the default metric will be set to 80% average CPU utilization.
                                   items:
                                     description: |-
                                       MetricSpec specifies how to scale based on a single metric
@@ -1918,40 +1903,11 @@ spec:
                                     - type
                                     type: object
                                   type: array
-                                  x-kubernetes-list-type: atomic
                                 minReplicas:
-                                  description: |-
-                                    minReplicas is the lower limit for the number of replicas to which the autoscaler
-                                    can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the
-                                    alpha feature gate HPAScaleToZero is enabled and at least one Object or External
-                                    metric is configured.  Scaling is active as long as at least one metric value is
-                                    available.
                                   format: int32
                                   type: integer
-                                scaleTargetRef:
-                                  description: |-
-                                    scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
-                                    should be collected, as well as to actually change the replica count.
-                                  properties:
-                                    apiVersion:
-                                      description: apiVersion is the API version of
-                                        the referent
-                                      type: string
-                                    kind:
-                                      description: 'kind is the kind of the referent;
-                                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-                                      type: string
-                                    name:
-                                      description: 'name is the name of the referent;
-                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
-                                      type: string
-                                  required:
-                                  - kind
-                                  - name
-                                  type: object
                               required:
                               - maxReplicas
-                              - scaleTargetRef
                               type: object
                           type: object
                         startupProbe:
