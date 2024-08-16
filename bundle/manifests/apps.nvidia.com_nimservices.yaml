@@ -469,6 +469,7 @@ spec:
                         description: override the default service name
                         type: string
                       openaiPort:
+                        default: 8000
                         format: int32
                         type: integer
                       type:
