@@ -258,6 +258,16 @@ func (n *NIMCache) GetGroupID() *int64 {
 	return n.Spec.GroupID
 }
 
+// GetTolerations returns tolerations configured for the NIMCache Job
+func (n *NIMCache) GetTolerations() []corev1.Toleration {
+	return n.Spec.Tolerations
+}
+
+// GetNodeSelectors returns nodeselectors configured for the NIMCache Job
+func (n *NIMCache) GetNodeSelectors() map[string]string {
+	return n.Spec.NodeSelectors
+}
+
 // +kubebuilder:object:root=true
 
 // NIMCacheList contains a list of NIMCache

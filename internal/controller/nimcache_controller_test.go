@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,6 +49,7 @@ var _ = Describe("NIMCache Controller", func() {
 		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
 		Expect(batchv1.AddToScheme(scheme)).To(Succeed())
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
+		Expect(rbacv1.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMCache{}).
@@ -231,6 +233,71 @@ var _ = Describe("NIMCache Controller", func() {
 	})
 
 	Context("when creating a NIMCache resource", func() {
+		It("should create a Role with SCC rules", func() {
+			ctx := context.TODO()
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+				},
+			}
+
+			err := reconciler.reconcileRole(ctx, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Check if the Role was created
+			role := &rbacv1.Role{}
+			roleName := types.NamespacedName{Name: NIMCacheRole, Namespace: "default"}
+
+			err = client.Get(ctx, roleName, role)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(role.Rules).To(HaveLen(1))
+
+			// Check the Role has the expected SCC rules
+			expectedRule := rbacv1.PolicyRule{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"nonroot"},
+				Verbs:         []string{"use"},
+			}
+			Expect(role.Rules[0]).To(Equal(expectedRule))
+		})
+
+		It("should create a RoleBinding for the Role", func() {
+			ctx := context.TODO()
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+				},
+			}
+
+			err := reconciler.reconcileRole(ctx, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = reconciler.reconcileRoleBinding(ctx, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Check if the RoleBinding was created
+			rb := &rbacv1.RoleBinding{}
+			rbName := types.NamespacedName{Name: NIMCacheRoleBinding, Namespace: "default"}
+			err = client.Get(ctx, rbName, rb)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Check that the RoleBinding is bound to the correct Role
+			Expect(rb.RoleRef.Name).To(Equal(NIMCacheRole))
+			Expect(rb.Subjects).To(HaveLen(1))
+			Expect(rb.Subjects[0].Kind).To(Equal("ServiceAccount"))
+			Expect(rb.Subjects[0].Name).To(Equal(NIMCacheServiceAccount))
+			Expect(rb.Subjects[0].Namespace).To(Equal(nimCache.GetNamespace()))
+		})
+
 		It("should construct a pod with right specifications", func() {
 			nimCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{

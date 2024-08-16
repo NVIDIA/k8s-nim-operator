@@ -37,6 +37,7 @@ import (
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +61,15 @@ const (
 
 	// AllProfiles represents all profiles in the NIM manifest
 	AllProfiles = "all"
+
+	// NIMCacheRole is the name of the role for all NIMCache instances in the namespace
+	NIMCacheRole = "nim-cache-role"
+
+	// NIMCacheRoleBinding is the name of the rolebinding for all NIMCache instances in the namespace
+	NIMCacheRoleBinding = "nim-cache-rolebinding"
+
+	// NIMCacheServiceAccount is the name of the serviceaccount for all NIMCache instances in the namespace
+	NIMCacheServiceAccount = "nim-cache-sa"
 )
 
 // NIMCacheReconciler reconciles a NIMCache object
@@ -87,6 +97,7 @@ func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log log
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimcaches,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimcaches/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimcaches/finalizers,verbs=update
+// +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=use,resourceNames=nonroot
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
@@ -223,6 +234,182 @@ func (r *NIMCacheReconciler) cleanupNIMCache(ctx context.Context, nimCache *apps
 		return fmt.Errorf("failed to cleanup resources: %v", errList)
 	}
 
+	return nil
+}
+
+func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
+	logger := r.GetLogger()
+	roleName := NIMCacheRole
+	roleNamespacedName := types.NamespacedName{Name: roleName, Namespace: nimCache.GetNamespace()}
+
+	// Desired Role configuration
+	desiredRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleName,
+			Namespace: nimCache.GetNamespace(),
+			Labels: map[string]string{
+				"app": "k8s-nim-operator",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"nonroot"},
+				Verbs:         []string{"use"},
+			},
+		},
+	}
+
+	// Check if the Role already exists
+	existingRole := &rbacv1.Role{}
+	err := r.Get(ctx, roleNamespacedName, existingRole)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		logger.Error(err, "Failed to get Role", "Name", roleName)
+		return err
+	}
+
+	if err != nil {
+		// Role does not exist, create a new one
+		logger.Info("Creating a new Role", "Name", roleName)
+
+		err = r.Create(ctx, desiredRole)
+		if err != nil {
+			logger.Error(err, "Failed to create Role", "Name", roleName)
+			return err
+		}
+
+		logger.Info("Successfully created Role", "Name", roleName)
+	} else {
+		// Role exists, check if it needs to be updated
+		if !roleEqual(existingRole, desiredRole) {
+			logger.Info("Updating existing Role", "Name", roleName)
+			existingRole.Rules = desiredRole.Rules
+
+			err = r.Update(ctx, existingRole)
+			if err != nil {
+				logger.Error(err, "Failed to update Role", "Name", roleName)
+				return err
+			}
+
+			logger.Info("Successfully updated Role", "Name", roleName)
+		}
+	}
+
+	return nil
+}
+
+// Helper function to check if two Roles are equal
+func roleEqual(existing, desired *rbacv1.Role) bool {
+	return utils.IsEqual(existing, desired, "Rules")
+}
+
+func (r *NIMCacheReconciler) reconcileRoleBinding(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
+	logger := r.GetLogger()
+	rbName := NIMCacheRoleBinding
+	rbNamespacedName := types.NamespacedName{Name: rbName, Namespace: nimCache.GetNamespace()}
+
+	// Desired RoleBinding configuration
+	desiredRB := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbName,
+			Namespace: nimCache.GetNamespace(),
+			Labels: map[string]string{
+				"app": "k8s-nim-operator",
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     NIMCacheRole,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      NIMCacheServiceAccount,
+				Namespace: nimCache.GetNamespace(),
+			},
+		},
+	}
+
+	// Check if the RoleBinding already exists
+	existingRB := &rbacv1.RoleBinding{}
+	err := r.Get(ctx, rbNamespacedName, existingRB)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		logger.Error(err, "Failed to get RoleBinding", "Name", rbName)
+		return err
+	}
+
+	if err != nil {
+		// RoleBinding does not exist, create a new one
+		logger.Info("Creating a new RoleBinding", "Name", rbName)
+
+		err = r.Create(ctx, desiredRB)
+		if err != nil {
+			logger.Error(err, "Failed to create RoleBinding", "Name", rbName)
+			return err
+		}
+
+		logger.Info("Successfully created RoleBinding", "Name", rbName)
+	} else {
+		// RoleBinding exists, check if it needs to be updated
+		if !roleBindingEqual(existingRB, desiredRB) {
+			logger.Info("Updating existing RoleBinding", "Name", rbName)
+			existingRB.RoleRef = desiredRB.RoleRef
+			existingRB.Subjects = desiredRB.Subjects
+
+			err = r.Update(ctx, existingRB)
+			if err != nil {
+				logger.Error(err, "Failed to update RoleBinding", "Name", rbName)
+				return err
+			}
+
+			logger.Info("Successfully updated RoleBinding", "Name", rbName)
+		}
+	}
+
+	return nil
+}
+
+// Helper function to check if two RoleBindings are equal
+func roleBindingEqual(existing, desired *rbacv1.RoleBinding) bool {
+	return utils.IsEqual(existing, desired, "RoleRef", "Subjects")
+}
+
+func (r *NIMCacheReconciler) reconcileServiceAccount(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
+	logger := r.GetLogger()
+	saName := NIMCacheServiceAccount
+	saNamespacedName := types.NamespacedName{Name: saName, Namespace: nimCache.GetNamespace()}
+
+	sa := &corev1.ServiceAccount{}
+	err := r.Get(ctx, saNamespacedName, sa)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	// If ServiceAccount does not exist, create a new one
+	if err != nil {
+		logger.Info("Creating a new ServiceAccount", "Name", saName)
+
+		newSA := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      saName,
+				Namespace: nimCache.GetNamespace(),
+				Labels:    map[string]string{"app": "k8s-nim-operator"},
+			},
+		}
+
+		// Create the ServiceAccount
+		err = r.Create(ctx, newSA)
+		if err != nil {
+			logger.Error(err, "Failed to create ServiceAccount", "Name", saName)
+			return err
+		}
+
+		logger.Info("Successfully created ServiceAccount", "Name", saName)
+	}
+
+	// If the ServiceAccount already exists, no action is needed
 	return nil
 }
 
@@ -540,8 +727,29 @@ func (r *NIMCacheReconciler) createPod(ctx context.Context, pod *corev1.Pod) err
 func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (ctrl.Result, error) {
 	logger := r.GetLogger()
 
+	// Reconcile ServiceAccount
+	err := r.reconcileServiceAccount(ctx, nimCache)
+	if err != nil {
+		logger.Error(err, "reconciliation of serviceaccount failed")
+		return ctrl.Result{}, err
+	}
+
+	// Reconcile Role
+	err = r.reconcileRole(ctx, nimCache)
+	if err != nil {
+		logger.Error(err, "reconciliation of role failed")
+		return ctrl.Result{}, err
+	}
+
+	// Reconcile RoleBinding
+	err = r.reconcileRoleBinding(ctx, nimCache)
+	if err != nil {
+		logger.Error(err, "reconciliation of rolebinding failed")
+		return ctrl.Result{}, err
+	}
+
 	// Reconcile PVC
-	err := r.reconcilePVC(ctx, nimCache)
+	err = r.reconcilePVC(ctx, nimCache)
 	if err != nil {
 		logger.Error(err, "reconciliation of pvc failed", "pvc", getPvcName(nimCache, nimCache.Spec.Storage.PVC))
 		return ctrl.Result{}, err
@@ -597,7 +805,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 	}
 
 	annotations := map[string]string{
-		"openshift.io/scc": "anyuid",
+		"openshift.io/scc": "nonroot",
 	}
 
 	pod := &corev1.Pod{
@@ -629,6 +837,9 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 				FSGroup:      nimCache.GetGroupID(),
 				RunAsNonRoot: ptr.To[bool](true),
 			},
+			ServiceAccountName: nimCache.GetName(),
+			Tolerations:        nimCache.GetTolerations(),
+			NodeSelector:       nimCache.GetNodeSelectors(),
 		},
 	}
 
@@ -710,7 +921,10 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 							},
 						},
 					},
-					ImagePullSecrets: []corev1.LocalObjectReference{},
+					ImagePullSecrets:   []corev1.LocalObjectReference{},
+					ServiceAccountName: nimCache.GetName(),
+					Tolerations:        nimCache.GetTolerations(),
+					NodeSelector:       nimCache.GetNodeSelectors(),
 				},
 			},
 			BackoffLimit:            ptr.To[int32](5),   // retry max 5 times on failure
