@@ -82,8 +82,9 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage: appsv1alpha1.Storage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage:   appsv1alpha1.Storage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					Resources: appsv1alpha1.Resources{GPUs: 1},
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
 					State: appsv1alpha1.NimCacheStatusNotReady,
@@ -145,8 +146,9 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage: appsv1alpha1.Storage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage:   appsv1alpha1.Storage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					Resources: appsv1alpha1.Resources{GPUs: 1},
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
 					State: "Initializing",
@@ -194,8 +196,9 @@ var _ = Describe("NIMCache Controller", func() {
 					Finalizers:        []string{NIMCacheFinalizer},
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage: appsv1alpha1.Storage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage:   appsv1alpha1.Storage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					Resources: appsv1alpha1.Resources{GPUs: 1},
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
 					State: "Initializing",
@@ -433,7 +436,8 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+					Resources: appsv1alpha1.Resources{GPUs: 1},
 				},
 			}
 
