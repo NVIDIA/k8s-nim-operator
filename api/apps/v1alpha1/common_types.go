@@ -32,8 +32,9 @@ type Expose struct {
 type Service struct {
 	Type corev1.ServiceType `json:"type,omitempty"`
 	// override the default service name
-	Name       string `json:"name,omitempty"`
-	OpenAIPort int32  `json:"openaiPort"`
+	Name string `json:"name,omitempty"`
+	// +kubebuilder:default=8000
+	OpenAIPort int32 `json:"openaiPort"`
 }
 
 // Metrics defines attributes to setup metrics collection

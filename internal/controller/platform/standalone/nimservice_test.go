@@ -179,7 +179,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Path: "/ready",
-								Port: intstr.IntOrString{IntVal: 8080},
+								Port: intstr.IntOrString{IntVal: 8000},
 							},
 						},
 					},
@@ -190,7 +190,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Path: "/live",
-								Port: intstr.IntOrString{IntVal: 8080},
+								Port: intstr.IntOrString{IntVal: 8000},
 							},
 						},
 					},
@@ -201,7 +201,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Path: "/start",
-								Port: intstr.IntOrString{IntVal: 8080},
+								Port: intstr.IntOrString{IntVal: 8000},
 							},
 						},
 					},

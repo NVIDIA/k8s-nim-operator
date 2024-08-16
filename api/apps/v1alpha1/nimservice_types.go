@@ -285,13 +285,13 @@ func IsProbeEnabled(probe Probe) bool {
 // GetLivenessProbe returns liveness probe for the NIMService container
 func (n *NIMService) GetLivenessProbe() *corev1.Probe {
 	if n.Spec.LivenessProbe.Probe == nil {
-		return GetDefaultLivenessProbe()
+		return n.GetDefaultLivenessProbe()
 	}
 	return n.Spec.LivenessProbe.Probe
 }
 
 // GetDefaultLivenessProbe returns the default liveness probe for the NIMService container
-func GetDefaultLivenessProbe() *corev1.Probe {
+func (n *NIMService) GetDefaultLivenessProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 15,
 		TimeoutSeconds:      1,
@@ -303,7 +303,7 @@ func GetDefaultLivenessProbe() *corev1.Probe {
 				Path: "/v1/health/live",
 				Port: intstr.IntOrString{
 					Type:   intstr.Type(0),
-					IntVal: 8000,
+					IntVal: n.Spec.Expose.Service.OpenAIPort,
 				},
 			},
 		},
@@ -315,13 +315,13 @@ func GetDefaultLivenessProbe() *corev1.Probe {
 // GetReadinessProbe returns readiness probe for the NIMService container
 func (n *NIMService) GetReadinessProbe() *corev1.Probe {
 	if n.Spec.ReadinessProbe.Probe == nil {
-		return GetDefaultReadinessProbe()
+		return n.GetDefaultReadinessProbe()
 	}
 	return n.Spec.ReadinessProbe.Probe
 }
 
 // GetDefaultReadinessProbe returns the default readiness probe for the NIMService container
-func GetDefaultReadinessProbe() *corev1.Probe {
+func (n *NIMService) GetDefaultReadinessProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 15,
 		TimeoutSeconds:      1,
@@ -333,7 +333,7 @@ func GetDefaultReadinessProbe() *corev1.Probe {
 				Path: "/v1/health/ready",
 				Port: intstr.IntOrString{
 					Type:   intstr.Type(0),
-					IntVal: 8000,
+					IntVal: n.Spec.Expose.Service.OpenAIPort,
 				},
 			},
 		},
@@ -345,13 +345,13 @@ func GetDefaultReadinessProbe() *corev1.Probe {
 // GetStartupProbe returns startup probe for the NIMService container
 func (n *NIMService) GetStartupProbe() *corev1.Probe {
 	if n.Spec.StartupProbe.Probe == nil {
-		return GetDefaultStartupProbe()
+		return n.GetDefaultStartupProbe()
 	}
 	return n.Spec.StartupProbe.Probe
 }
 
 // GetDefaultStartupProbe returns the default startup probe for the NIMService container
-func GetDefaultStartupProbe() *corev1.Probe {
+func (n *NIMService) GetDefaultStartupProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 40,
 		TimeoutSeconds:      1,
@@ -363,7 +363,7 @@ func GetDefaultStartupProbe() *corev1.Probe {
 				Path: "/v1/health/ready",
 				Port: intstr.IntOrString{
 					Type:   intstr.Type(0),
-					IntVal: 8000,
+					IntVal: n.Spec.Expose.Service.OpenAIPort,
 				},
 			},
 		},
