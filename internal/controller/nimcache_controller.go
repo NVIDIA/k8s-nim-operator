@@ -574,8 +574,8 @@ func getJobName(nimCache *appsv1alpha1.NIMCache) string {
 
 func getPvcName(parent client.Object, pvc appsv1alpha1.PersistentVolumeClaim) string {
 	pvcName := fmt.Sprintf("%s-pvc", parent.GetName())
-	if pvc.Name != nil {
-		pvcName = *pvc.Name
+	if pvc.Name != "" {
+		pvcName = pvc.Name
 	}
 	return pvcName
 }

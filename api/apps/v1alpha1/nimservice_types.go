@@ -120,8 +120,8 @@ type NIMServiceList struct {
 // Prefers pvc.Name if explicitly set by the user in the NIMService instance
 func (n *NIMService) GetPVCName(pvc PersistentVolumeClaim) string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
-	if pvc.Name != nil {
-		pvcName = *pvc.Name
+	if pvc.Name != "" {
+		pvcName = pvc.Name
 	}
 	return pvcName
 }
@@ -393,7 +393,7 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 			Name: "model-store",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: *modelPVC.Name,
+					ClaimName: modelPVC.Name,
 				},
 			},
 		},
@@ -432,11 +432,6 @@ func (n *NIMService) GetNIMCacheName() string {
 // GetNIMCacheProfile returns the explicit profile to use for the NIMService deployment
 func (n *NIMService) GetNIMCacheProfile() string {
 	return n.Spec.NIMCache.Profile
-}
-
-// GetExternalPVC returns the external PVC name to use for the NIMService deployment
-func (n *NIMService) GetExternalPVC() *PersistentVolumeClaim {
-	return &n.Spec.Storage.PVC
 }
 
 // GetHPA returns the HPA spec for the NIMService deployment

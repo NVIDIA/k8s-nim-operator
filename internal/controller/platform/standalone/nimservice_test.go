@@ -110,7 +110,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Image:       appsv1alpha1.Image{Repository: "nvcr.io/nvidia/nim-llm", PullPolicy: "IfNotPresent", Tag: "v0.1.0", PullSecrets: []string{"ngc-secret"}},
 				Storage: appsv1alpha1.Storage{
 					PVC: appsv1alpha1.PersistentVolumeClaim{
-						Name: &pvcName,
+						Name: pvcName,
 					},
 				},
 				NIMCache: appsv1alpha1.NIMCacheVolSpec{
