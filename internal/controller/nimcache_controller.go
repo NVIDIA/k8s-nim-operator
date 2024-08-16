@@ -608,7 +608,7 @@ func (r *NIMCacheReconciler) reconcileJob(ctx context.Context, nimCache *appsv1a
 	if err != nil && nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
 		job, err := constructJob(nimCache)
 		if err != nil {
-			logger.Error(err, "Failed to construct job", "name", getPvcName(nimCache, nimCache.Spec.Storage.PVC))
+			logger.Error(err, "Failed to construct job")
 			return err
 		}
 		if err := controllerutil.SetControllerReference(nimCache, job, r.GetScheme()); err != nil {
@@ -616,7 +616,7 @@ func (r *NIMCacheReconciler) reconcileJob(ctx context.Context, nimCache *appsv1a
 		}
 		err = r.Create(ctx, job)
 		if err != nil {
-			logger.Error(err, "Failed to create job", "name", getPvcName(nimCache, nimCache.Spec.Storage.PVC))
+			logger.Error(err, "Failed to create job")
 			return err
 		}
 		logger.Info("Created Job for NIM Cache", "job", jobName)
@@ -888,7 +888,7 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 	}
 
 	annotations := map[string]string{
-		"openshift.io/scc":        "anyuid",
+		"openshift.io/scc":        "nonroot",
 		"sidecar.istio.io/inject": "false",
 	}
 
@@ -1036,6 +1036,10 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 		selectedProfiles, err := getSelectedProfiles(nimCache)
 		if err != nil {
 			return nil, err
+		}
+
+		if len(selectedProfiles) == 0 && nimCache.Spec.Resources.GPUs == 0 {
+			return nil, fmt.Errorf("No profiles are selected for caching and no GPUs are assigned to the pod for auto-selection")
 		}
 
 		if len(selectedProfiles) > 0 {
