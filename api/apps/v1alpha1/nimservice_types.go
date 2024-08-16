@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"maps"
 	"os"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
@@ -440,9 +441,9 @@ func (n *NIMService) GetHPA() HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPA
 }
 
-// GetServiceMonitorSpec returns the Service Monitor spec for the NIMService deployment
-func (n *NIMService) GetServiceMonitorSpec() monitoringv1.ServiceMonitorSpec {
-	return n.Spec.Metrics.ServiceMonitorSpec
+// GetServiceMonitor returns the Service Monitor details for the NIMService deployment
+func (n *NIMService) GetServiceMonitor() ServiceMonitor {
+	return n.Spec.Metrics.ServiceMonitor
 }
 
 // GetReplicas returns replicas for the NIMService deployment
@@ -614,6 +615,7 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 
 	// Set service ports
 	params.Port = n.GetServicePort()
+	params.PortName = "open-ai-port"
 	return params
 }
 
@@ -698,16 +700,22 @@ func (n *NIMService) GetSCCParams() *rendertypes.SCCParams {
 // GetServiceMonitorParams return params to render Service Monitor from templates
 func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams {
 	params := &rendertypes.ServiceMonitorParams{}
+	serviceMonitor := n.GetServiceMonitor()
 	params.Enabled = n.IsServiceMonitorEnabled()
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetServiceLabels()
+	svcLabels := n.GetServiceLabels()
+	maps.Copy(svcLabels, serviceMonitor.AdditionalLabels)
+	params.Labels = svcLabels
 	params.Annotations = n.GetServiceAnnotations()
 
 	// Set Service Monitor spec
-	spec := n.GetServiceMonitorSpec()
-	spec.NamespaceSelector = monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}}
-	params.SMSpec = spec
+	smSpec := monitoringv1.ServiceMonitorSpec{
+		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
+		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
+		Endpoints:         []monitoringv1.Endpoint{{Port: "open-ai-port", ScrapeTimeout: serviceMonitor.ScrapeTimeout, Interval: serviceMonitor.Interval}},
+	}
+	params.SMSpec = smSpec
 	return params
 }
 

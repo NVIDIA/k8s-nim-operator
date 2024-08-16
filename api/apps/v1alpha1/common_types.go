@@ -41,7 +41,14 @@ type Service struct {
 type Metrics struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// for use with the Prometheus Operator and the primary service object
-	ServiceMonitorSpec promv1.ServiceMonitorSpec `json:"serviceMonitorSpec,omitempty"`
+	ServiceMonitor ServiceMonitor `json:"serviceMonitor,omitempty"`
+}
+
+// ServiceMonitor defines attributes to create a service monitor
+type ServiceMonitor struct {
+	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
+	Interval         promv1.Duration   `json:"interval,omitempty"`
+	ScrapeTimeout    promv1.Duration   `json:"scrapeTimeout,omitempty"`
 }
 
 // Autoscaling defines attributes to automatically scale the service based on metrics
