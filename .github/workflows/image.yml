@@ -119,6 +119,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build image
         env:
+          IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/k8s-nim-operator
           BUNDLE_IMAGE: ghcr.io/${LOWERCASE_REPO_OWNER}/k8s-nim-operator:bundle-lastest-${{ github.ref }}
           VERSION: '' # Until we cut a release, Version will be null
         run: |
