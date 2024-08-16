@@ -274,7 +274,7 @@ var _ = Describe("NIMCache Controller", func() {
 			}, time.Second*10).Should(Succeed())
 		})
 
-		It("should construct a job with right specifications", func() {
+		It("should construct a job with a specific profile", func() {
 			profiles := []string{"36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"}
 			profilesJSON, err := json.Marshal(profiles)
 			Expect(err).ToNot(HaveOccurred())
@@ -303,6 +303,59 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
 			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(getPvcName(nimCache, nimCache.Spec.Storage.PVC)))
+		})
+
+		It("should construct a job with multiple profiles", func() {
+			profiles := []string{"36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff", "04fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc12345"}
+			profilesJSON, err := json.Marshal(profiles)
+			Expect(err).ToNot(HaveOccurred())
+
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-nimcache",
+					Namespace:   "default",
+					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{AutoDetect: ptr.To[bool](true)}}},
+				},
+			}
+
+			job, err := constructJob(nimCache)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(job.Name).To(Equal(getJobName(nimCache)))
+			Expect(job.Spec.Template.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
+			Expect(job.Spec.Template.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
+			Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElements("download-to-cache"))
+			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--profiles", "36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff", "04fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc12345"))
+			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
+			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
+			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
+			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
+			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(getPvcName(nimCache, nimCache.Spec.Storage.PVC)))
+		})
+
+		It("should construct a job set to download all profiles", func() {
+			profiles := []string{AllProfiles}
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles, AutoDetect: ptr.To[bool](false)}}},
+				},
+			}
+
+			job, err := constructJob(nimCache)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(job.Name).To(Equal(getJobName(nimCache)))
+			Expect(job.Spec.Template.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
+			Expect(job.Spec.Template.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
+			Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElements("download-to-cache"))
+			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--all"))
 		})
 
 		It("should create a job with the correct specifications", func() {
@@ -345,7 +398,7 @@ var _ = Describe("NIMCache Controller", func() {
 			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
 			manifestData, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(*manifestData).To(HaveLen(1))
+			Expect(*manifestData).To(HaveLen(2))
 
 			err = reconciler.createManifestConfigMap(ctx, nimCache, manifestData)
 			Expect(err).NotTo(HaveOccurred())
@@ -360,7 +413,7 @@ var _ = Describe("NIMCache Controller", func() {
 			extractedManifest, err := reconciler.extractNIMManifest(ctx, createdConfigMap.Name, createdConfigMap.Namespace)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(extractedManifest).NotTo(BeNil())
-			Expect(*extractedManifest).To(HaveLen(1))
+			Expect(*extractedManifest).To(HaveLen(2))
 			profile, exists := (*extractedManifest)["03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61"]
 			Expect(exists).To(BeTrue())
 			Expect(profile.Model).To(Equal("meta/llama3-70b-instruct"))

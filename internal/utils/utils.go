@@ -217,3 +217,13 @@ func IsSpecChanged(current client.Object, desired client.Object) bool {
 
 	return false
 }
+
+// ContainsElement checks if an element exists in a slice
+func ContainsElement[T comparable](slice []T, element T) bool {
+	for _, value := range slice {
+		if value == element {
+			return true
+		}
+	}
+	return false
+}
