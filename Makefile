@@ -48,10 +48,6 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-# BUNDLE_IMAGE defines the image:tag used for the bundle.
-# You can use it as an arg. (E.g make bundle-build BUNDLE_IMAGE=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMAGE ?= nvcr.io/nvidia/cloud-native/nim-operator-bundle:$(VERSION)
-
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
@@ -150,21 +146,13 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
 # Generate bundle manifests and metadata, then validate generated files.
-.PHONY: bundle
+.PHONY: bundle bundle-validate
+bundle: manifests install-tools
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(vVERSION) $(BUNDLE_METADATA_OPTS)
+
 bundle-validate:
 	operator-sdk bundle validate ./bundle
-
-# Build the bundle image.
-build-bundle-image:
-	$(CONTAINER_TOOL) build \
-	--build-arg VERSION="" \
-	--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
-	--build-arg GIT_COMMIT=$(GIT_COMMIT) \
-	-f bundle.Dockerfile -t $(BUNDLE_IMAGE) .
-
-# Push the bundle image.
-push-bundle-image: build-bundle-image
-	$(CONTAINER_TOOL) push $(BUNDLE_IMAGE)
 
 ##@ Deployment
 
