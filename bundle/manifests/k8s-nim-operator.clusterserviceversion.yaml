@@ -471,6 +471,14 @@ spec:
                 - list
                 - watch
             - apiGroups:
+              - security.openshift.io
+              resourceNames:
+              - nonroot
+              resources:
+              - securitycontextconstraints
+              verbs:
+              - use
+            - apiGroups:
                 - security.openshift.io
               resources:
                 - securitycontextconstraints

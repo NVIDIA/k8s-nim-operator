@@ -4,6 +4,6 @@ metadata:
   name: {{ .Name }}
   namespace: {{ .Namespace }}
 rules:
-  {{- range .Rules }}
-  - {{ . | yaml | nindent 2 }}
+  {{- if .Rules }}
+    {{- .Rules | yaml | nindent 2 }}
   {{- end }}

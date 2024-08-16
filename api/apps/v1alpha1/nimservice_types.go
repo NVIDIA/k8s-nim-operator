@@ -25,6 +25,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -187,7 +188,7 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 // GetStandardAnnotations returns default annotations to apply to the NIMService instance
 func (n *NIMService) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc": "anyuid",
+		"openshift.io/scc": "nonroot",
 	}
 	return standardAnnotations
 }
@@ -633,7 +634,16 @@ func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 
-	// TODO: set rules
+	// Set rules to use SCC
+	params.Rules = []rbacv1.PolicyRule{
+		{
+			APIGroups:     []string{"security.openshift.io"},
+			Resources:     []string{"securitycontextconstraints"},
+			ResourceNames: []string{"nonroot"},
+			Verbs:         []string{"use"},
+		},
+	}
+
 	return params
 }
 

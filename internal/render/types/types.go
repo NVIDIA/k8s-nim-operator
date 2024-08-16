@@ -20,6 +20,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
 // DaemonsetParams holds the parameters for rendering a Daemonset template
@@ -134,7 +135,7 @@ type ServiceAccountParams struct {
 type RoleParams struct {
 	Name      string
 	Namespace string
-	Rules     []string
+	Rules     []rbacv1.PolicyRule
 }
 
 // RoleBindingParams holds the parameters for rendering a RoleBinding template
