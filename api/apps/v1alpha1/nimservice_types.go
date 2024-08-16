@@ -18,10 +18,12 @@ package v1alpha1
 
 import (
 	"fmt"
+	"maps"
 	"os"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -440,6 +442,11 @@ func (n *NIMService) GetHPA() HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPA
 }
 
+// GetServiceMonitor returns the Service Monitor details for the NIMService deployment
+func (n *NIMService) GetServiceMonitor() ServiceMonitor {
+	return n.Spec.Metrics.ServiceMonitor
+}
+
 // GetReplicas returns replicas for the NIMService deployment
 func (n *NIMService) GetReplicas() int {
 	if n.IsAutoScalingEnabled() {
@@ -609,6 +616,7 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 
 	// Set service ports
 	params.Port = n.GetServicePort()
+	params.PortName = "open-ai-port"
 	return params
 }
 
@@ -696,6 +704,28 @@ func (n *NIMService) GetSCCParams() *rendertypes.SCCParams {
 	params.Name = "nim-service-scc"
 
 	params.ServiceAccountName = n.GetServiceAccountName()
+	return params
+}
+
+// GetServiceMonitorParams return params to render Service Monitor from templates
+func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams {
+	params := &rendertypes.ServiceMonitorParams{}
+	serviceMonitor := n.GetServiceMonitor()
+	params.Enabled = n.IsServiceMonitorEnabled()
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	svcLabels := n.GetServiceLabels()
+	maps.Copy(svcLabels, serviceMonitor.AdditionalLabels)
+	params.Labels = svcLabels
+	params.Annotations = n.GetServiceAnnotations()
+
+	// Set Service Monitor spec
+	smSpec := monitoringv1.ServiceMonitorSpec{
+		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
+		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
+		Endpoints:         []monitoringv1.Endpoint{{Port: "open-ai-port", ScrapeTimeout: serviceMonitor.ScrapeTimeout, Interval: serviceMonitor.Interval}},
+	}
+	params.SMSpec = smSpec
 	return params
 }
 
