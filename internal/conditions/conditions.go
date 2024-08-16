@@ -47,6 +47,8 @@ const (
 	ReasonHPAFailed = "HPAFailed"
 	// ReasonSCCFailed indicates that the creation of scc has failed
 	ReasonSCCFailed = "SCCFailed"
+	// ReasonServiceMonitorFailed indicates that the creation of Service Monitor has failed
+	ReasonServiceMonitorFailed = "ServiceMonitorFailed"
 	// ReasonDeploymentFailed indicates that the creation of deployment has failed
 	ReasonDeploymentFailed = "DeploymentFailed"
 	// ReasonStatefulSetFailed indicates that the creation of statefulset has failed

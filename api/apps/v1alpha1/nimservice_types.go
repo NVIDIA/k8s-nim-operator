@@ -22,6 +22,7 @@ import (
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -439,6 +440,11 @@ func (n *NIMService) GetHPA() HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPA
 }
 
+// GetServiceMonitorSpec returns the Service Monitor spec for the NIMService deployment
+func (n *NIMService) GetServiceMonitorSpec() monitoringv1.ServiceMonitorSpec {
+	return n.Spec.Metrics.ServiceMonitorSpec
+}
+
 // GetReplicas returns replicas for the NIMService deployment
 func (n *NIMService) GetReplicas() int {
 	if n.IsAutoScalingEnabled() {
@@ -686,6 +692,22 @@ func (n *NIMService) GetSCCParams() *rendertypes.SCCParams {
 	params.Name = "nim-service-scc"
 
 	params.ServiceAccountName = n.GetServiceAccountName()
+	return params
+}
+
+// GetServiceMonitorParams return params to render Service Monitor from templates
+func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams {
+	params := &rendertypes.ServiceMonitorParams{}
+	params.Enabled = n.IsServiceMonitorEnabled()
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetServiceAnnotations()
+
+	// Set Service Monitor spec
+	spec := n.GetServiceMonitorSpec()
+	spec.NamespaceSelector = monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}}
+	params.SMSpec = spec
 	return params
 }
 

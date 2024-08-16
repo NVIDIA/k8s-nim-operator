@@ -21,6 +21,7 @@ import (
 	"flag"
 	"os"
 
+	monitoring "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -51,8 +52,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(monitoring.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

@@ -26,6 +26,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -127,6 +128,16 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		err = r.renderAndSyncResource(ctx, nimService, &renderer, &autoscalingv1.HorizontalPodAutoscaler{}, func() (client.Object, error) {
 			return renderer.HPA(nimService.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Sync Service Monitor
+	if nimService.IsServiceMonitorEnabled() {
+		err = r.renderAndSyncResource(ctx, nimService, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
+			return renderer.ServiceMonitor(nimService.GetServiceMonitorParams())
+		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

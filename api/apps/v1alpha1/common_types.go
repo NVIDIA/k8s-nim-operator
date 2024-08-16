@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -40,13 +41,7 @@ type Service struct {
 type Metrics struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// for use with the Prometheus Operator and the primary service object
-	ServiceMonitor ServiceMonitor `json:"serviceMonitor,omitempty"`
-}
-
-// ServiceMonitor defines attributes to create a service monitor
-type ServiceMonitor struct {
-	Create           *bool             `json:"enabled,omitempty"`
-	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
+	ServiceMonitorSpec promv1.ServiceMonitorSpec `json:"serviceMonitorSpec,omitempty"`
 }
 
 // Autoscaling defines attributes to automatically scale the service based on metrics

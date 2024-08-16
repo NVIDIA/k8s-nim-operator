@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -196,4 +197,5 @@ type ServiceMonitorParams struct {
 	Path          string
 	Interval      int32
 	ScrapeTimeout int32
+	SMSpec        monitoringv1.ServiceMonitorSpec
 }
