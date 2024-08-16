@@ -27,7 +27,9 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -226,4 +228,18 @@ func ContainsElement[T comparable](slice []T, element T) bool {
 		}
 	}
 	return false
+}
+
+// IsEqual compares two Kubernetes objects based on their relevant fields.
+func IsEqual[T client.Object](existing, desired T, fieldsToCompare ...string) bool {
+	for _, field := range fieldsToCompare {
+		existingValue := reflect.ValueOf(existing).Elem().FieldByName(field)
+		desiredValue := reflect.ValueOf(desired).Elem().FieldByName(field)
+
+		if !reflect.DeepEqual(existingValue.Interface(), desiredValue.Interface()) {
+			return false
+		}
+	}
+
+	return true
 }

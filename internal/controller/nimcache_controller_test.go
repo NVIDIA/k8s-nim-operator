@@ -250,7 +250,7 @@ var _ = Describe("NIMCache Controller", func() {
 
 			// Check if the Role was created
 			role := &rbacv1.Role{}
-			roleName := types.NamespacedName{Name: "test-nimcache-role", Namespace: "default"}
+			roleName := types.NamespacedName{Name: NIMCacheRole, Namespace: "default"}
 
 			err = client.Get(ctx, roleName, role)
 			Expect(err).NotTo(HaveOccurred())
@@ -286,15 +286,15 @@ var _ = Describe("NIMCache Controller", func() {
 
 			// Check if the RoleBinding was created
 			rb := &rbacv1.RoleBinding{}
-			rbName := types.NamespacedName{Name: "test-nimcache-rolebinding", Namespace: "default"}
+			rbName := types.NamespacedName{Name: NIMCacheRoleBinding, Namespace: "default"}
 			err = client.Get(ctx, rbName, rb)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check that the RoleBinding is bound to the correct Role
-			Expect(rb.RoleRef.Name).To(Equal("test-nimcache-role"))
+			Expect(rb.RoleRef.Name).To(Equal(NIMCacheRole))
 			Expect(rb.Subjects).To(HaveLen(1))
 			Expect(rb.Subjects[0].Kind).To(Equal("ServiceAccount"))
-			Expect(rb.Subjects[0].Name).To(Equal(nimCache.GetName()))
+			Expect(rb.Subjects[0].Name).To(Equal(NIMCacheServiceAccount))
 			Expect(rb.Subjects[0].Namespace).To(Equal(nimCache.GetNamespace()))
 		})
 

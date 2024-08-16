@@ -61,6 +61,15 @@ const (
 
 	// AllProfiles represents all profiles in the NIM manifest
 	AllProfiles = "all"
+
+	// NIMCacheRole is the name of the role for all NIMCache instances in the namespace
+	NIMCacheRole = "nim-cache-role"
+
+	// NIMCacheRoleBinding is the name of the rolebinding for all NIMCache instances in the namespace
+	NIMCacheRoleBinding = "nim-cache-rolebinding"
+
+	// NIMCacheServiceAccount is the name of the serviceaccount for all NIMCache instances in the namespace
+	NIMCacheServiceAccount = "nim-cache-sa"
 )
 
 // NIMCacheReconciler reconciles a NIMCache object
@@ -230,121 +239,146 @@ func (r *NIMCacheReconciler) cleanupNIMCache(ctx context.Context, nimCache *apps
 
 func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
-	roleName := fmt.Sprintf("%s-role", nimCache.GetName())
+	roleName := NIMCacheRole
 	roleNamespacedName := types.NamespacedName{Name: roleName, Namespace: nimCache.GetNamespace()}
 
+	// Desired Role configuration
+	desiredRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleName,
+			Namespace: nimCache.GetNamespace(),
+			Labels: map[string]string{
+				"app": "k8s-nim-operator",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"nonroot"},
+				Verbs:         []string{"use"},
+			},
+		},
+	}
+
 	// Check if the Role already exists
-	role := &rbacv1.Role{}
-	err := r.Get(ctx, roleNamespacedName, role)
+	existingRole := &rbacv1.Role{}
+	err := r.Get(ctx, roleNamespacedName, existingRole)
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to get Role", "Name", roleName)
 		return err
 	}
 
-	// If Role does not exist, create a new one
 	if err != nil {
+		// Role does not exist, create a new one
 		logger.Info("Creating a new Role", "Name", roleName)
 
-		newRole := &rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      roleName,
-				Namespace: nimCache.GetNamespace(),
-				Labels: map[string]string{
-					"app": nimCache.GetName(),
-				},
-			},
-			Rules: []rbacv1.PolicyRule{
-				{
-					APIGroups:     []string{"security.openshift.io"},
-					Resources:     []string{"securitycontextconstraints"},
-					ResourceNames: []string{"nonroot"},
-					Verbs:         []string{"use"},
-				},
-			},
-		}
-
-		// Set the NIMCache instance as the owner and controller of the Role
-		if err := controllerutil.SetControllerReference(nimCache, newRole, r.GetScheme()); err != nil {
-			logger.Error(err, "Failed to set owner reference on Role", "Name", roleName)
-			return err
-		}
-
-		// Create the Role
-		err = r.Create(ctx, newRole)
+		err = r.Create(ctx, desiredRole)
 		if err != nil {
 			logger.Error(err, "Failed to create Role", "Name", roleName)
 			return err
 		}
 
 		logger.Info("Successfully created Role", "Name", roleName)
+	} else {
+		// Role exists, check if it needs to be updated
+		if !roleEqual(existingRole, desiredRole) {
+			logger.Info("Updating existing Role", "Name", roleName)
+			existingRole.Rules = desiredRole.Rules
+
+			err = r.Update(ctx, existingRole)
+			if err != nil {
+				logger.Error(err, "Failed to update Role", "Name", roleName)
+				return err
+			}
+
+			logger.Info("Successfully updated Role", "Name", roleName)
+		}
 	}
 
-	// If the Role already exists, no action is needed
 	return nil
+}
+
+// Helper function to check if two Roles are equal
+func roleEqual(existing, desired *rbacv1.Role) bool {
+	return utils.IsEqual(existing, desired, "Rules")
 }
 
 func (r *NIMCacheReconciler) reconcileRoleBinding(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
-	rbName := fmt.Sprintf("%s-rolebinding", nimCache.GetName())
+	rbName := NIMCacheRoleBinding
 	rbNamespacedName := types.NamespacedName{Name: rbName, Namespace: nimCache.GetNamespace()}
 
+	// Desired RoleBinding configuration
+	desiredRB := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbName,
+			Namespace: nimCache.GetNamespace(),
+			Labels: map[string]string{
+				"app": "k8s-nim-operator",
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     NIMCacheRole,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      NIMCacheServiceAccount,
+				Namespace: nimCache.GetNamespace(),
+			},
+		},
+	}
+
 	// Check if the RoleBinding already exists
-	rb := &rbacv1.RoleBinding{}
-	err := r.Get(ctx, rbNamespacedName, rb)
+	existingRB := &rbacv1.RoleBinding{}
+	err := r.Get(ctx, rbNamespacedName, existingRB)
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to get RoleBinding", "Name", rbName)
 		return err
 	}
 
-	// If RoleBinding does not exist, create a new one
 	if err != nil {
+		// RoleBinding does not exist, create a new one
 		logger.Info("Creating a new RoleBinding", "Name", rbName)
 
-		newRB := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      rbName,
-				Namespace: nimCache.GetNamespace(),
-				Labels: map[string]string{
-					"app": nimCache.GetName(),
-				},
-			},
-			RoleRef: rbacv1.RoleRef{
-				APIGroup: "rbac.authorization.k8s.io",
-				Kind:     "Role",
-				Name:     fmt.Sprintf("%s-role", nimCache.GetName()),
-			},
-			Subjects: []rbacv1.Subject{
-				{
-					Kind:      "ServiceAccount",
-					Name:      nimCache.GetName(),
-					Namespace: nimCache.GetNamespace(),
-				},
-			},
-		}
-
-		// Set the NIMCache instance as the owner and controller of the RoleBinding
-		if err := controllerutil.SetControllerReference(nimCache, newRB, r.GetScheme()); err != nil {
-			logger.Error(err, "Failed to set owner reference on RoleBinding", "Name", rbName)
-			return err
-		}
-
-		// Create the RoleBinding
-		err = r.Create(ctx, newRB)
+		err = r.Create(ctx, desiredRB)
 		if err != nil {
 			logger.Error(err, "Failed to create RoleBinding", "Name", rbName)
 			return err
 		}
 
 		logger.Info("Successfully created RoleBinding", "Name", rbName)
+	} else {
+		// RoleBinding exists, check if it needs to be updated
+		if !roleBindingEqual(existingRB, desiredRB) {
+			logger.Info("Updating existing RoleBinding", "Name", rbName)
+			existingRB.RoleRef = desiredRB.RoleRef
+			existingRB.Subjects = desiredRB.Subjects
+
+			err = r.Update(ctx, existingRB)
+			if err != nil {
+				logger.Error(err, "Failed to update RoleBinding", "Name", rbName)
+				return err
+			}
+
+			logger.Info("Successfully updated RoleBinding", "Name", rbName)
+		}
 	}
 
-	// If the RoleBinding already exists, no action is needed
 	return nil
+}
+
+// Helper function to check if two RoleBindings are equal
+func roleBindingEqual(existing, desired *rbacv1.RoleBinding) bool {
+	return utils.IsEqual(existing, desired, "RoleRef", "Subjects")
 }
 
 func (r *NIMCacheReconciler) reconcileServiceAccount(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
-	saName := nimCache.GetName()
+	saName := NIMCacheServiceAccount
 	saNamespacedName := types.NamespacedName{Name: saName, Namespace: nimCache.GetNamespace()}
 
 	sa := &corev1.ServiceAccount{}
@@ -361,14 +395,8 @@ func (r *NIMCacheReconciler) reconcileServiceAccount(ctx context.Context, nimCac
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      saName,
 				Namespace: nimCache.GetNamespace(),
-				Labels:    map[string]string{"app": nimCache.GetName()},
+				Labels:    map[string]string{"app": "k8s-nim-operator"},
 			},
-		}
-
-		// Set the NIMCache instance as the owner and controller of the ServiceAccount
-		if err := controllerutil.SetControllerReference(nimCache, newSA, r.GetScheme()); err != nil {
-			logger.Error(err, "Failed to set owner reference on ServiceAccount", "Name", saName)
-			return err
 		}
 
 		// Create the ServiceAccount
