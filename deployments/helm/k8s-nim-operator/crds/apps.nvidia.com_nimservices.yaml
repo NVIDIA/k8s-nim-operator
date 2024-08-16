@@ -1204,6 +1204,7 @@ spec:
                     type: object
                 type: object
               replicas:
+                minimum: 1
                 type: integer
               resources:
                 description: ResourceRequirements describes the compute resource requirements.

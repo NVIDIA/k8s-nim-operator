@@ -74,9 +74,10 @@ type NIMServiceSpec struct {
 	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
 	Scale          Autoscaling                  `json:"scale,omitempty"`
 	Metrics        Metrics                      `json:"metrics,omitempty"`
-	Replicas       int                          `json:"replicas,omitempty"`
-	UserID         *int64                       `json:"userID,omitempty"`
-	GroupID        *int64                       `json:"groupID,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	Replicas int    `json:"replicas,omitempty"`
+	UserID   *int64 `json:"userID,omitempty"`
+	GroupID  *int64 `json:"groupID,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume
