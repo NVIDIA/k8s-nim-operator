@@ -40,7 +40,7 @@ jobs:
           vsphere_username: ${{ secrets.VSPHERE_USERNAME }}
           vsphere_password: ${{ secrets.VSPHERE_PASSWORD }}
           vsphere_ssh_key: ${{ secrets.VSPHERE_SSH_KEY }}
-          holodeck_config: "tests/e2e/infra/aws.yaml"
+          holodeck_config: "test/e2e/infra/vsphere.yml"
       - name: Run e2e tests
         env:
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
