@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.2
+        uses: NVIDIA/holodeck@v0.2.3
         with:
           vsphere_username: ${{ secrets.VSPHERE_USERNAME }}
           vsphere_password: ${{ secrets.VSPHERE_PASSWORD }}
