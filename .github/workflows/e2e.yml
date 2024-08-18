@@ -1,0 +1,59 @@
+# Copyright 2024 NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: End-to-end Tests
+
+on:
+  workflow_run:
+    workflows: [Image]
+    types:
+      - completed
+    branches:
+      - main
+      - release-*
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
+    steps:
+      - uses: actions/checkout@v4
+        name: Check out code
+      - name: Calculate build vars
+        id: vars
+        run: |
+          echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+      - name: Set up Holodeck
+        uses: NVIDIA/holodeck@v0.2.2
+        with:
+          vsphere_username: ${{ secrets.VSPHERE_USERNAME }}
+          vsphere_password: ${{ secrets.VSPHERE_PASSWORD }}
+          vsphere_ssh_key: ${{ secrets.VSPHERE_SSH_KEY }}
+          holodeck_config: "tests/e2e/infra/aws.yaml"
+      - name: Run e2e tests
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+          E2E_IMAGE_REPO: ghcr.io/nvidia/k8s-nim-operator
+          E2E_IMAGE_TAG: ${COMMIT_SHORT_SHA}
+          LOG_ARTIFACTS: ${{ github.workspace }}/e2e_logs
+          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+        run: |
+          ./hack/e2e_tests.sh
+      - name: Archive test logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-logs
+          path: ./e2e_logs/
+          retention-days: 15
