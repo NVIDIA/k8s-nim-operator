@@ -26,6 +26,8 @@ stages:
   - package-build
   - image-build
   - test
+  - lint
+  - helm-lint
   - scan
   - release
   - sign
