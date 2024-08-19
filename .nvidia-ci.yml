@@ -65,10 +65,9 @@ variables:
     - regctl registry login "${OUT_REGISTRY}" -u "${OUT_REGISTRY_USER}" -p "${OUT_REGISTRY_TOKEN}"
     - make -f deployments/container/Makefile IMAGE=${IN_REGISTRY}/${IN_IMAGE_NAME}:${IN_VERSION} OUT_IMAGE=${OUT_IMAGE_NAME}:${CI_COMMIT_SHORT_SHA} push
 
-image:
+image-pull:
   extends:
     - .image-pull
-    - .dist
 
 # We skip the integration tests for the internal CI:
 .integration:
