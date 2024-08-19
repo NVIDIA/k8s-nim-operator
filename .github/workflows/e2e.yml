@@ -61,7 +61,7 @@ jobs:
         env:
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
           E2E_IMAGE_REPO: ghcr.io/nvidia/k8s-nim-operator
-          E2E_IMAGE_TAG: ${COMMIT_SHORT_SHA}
+          E2E_IMAGE_TAG: ${{ env.COMMIT_SHORT_SHA }}
           LOG_ARTIFACTS: ${{ github.workspace }}/e2e_logs
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
