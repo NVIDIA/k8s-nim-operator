@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 default:
-  image: docker:24.0.6
+  image: docker:dind
   services:
-    - name: docker:24.0.6-dind
+    - name: docker:dind
       command: ["--experimental"]
 
 variables:
@@ -70,11 +70,6 @@ trigger-pipeline:
       allow_failure: false
     - when: always
 
-# The .dist- dummy steps set the DIST variable for the targeted distribution.
-.dist:
-  variables:
-    DIST: "distroless"
-
 # Define the platform targets
 .platform-amd64:
   variables:
@@ -124,18 +119,16 @@ trigger-pipeline:
 scan-amd64:
   extends:
     - .scan
-    - .dist
     - .platform-amd64
   needs:
-    - image
+    - image-pull
 
 scan-arm64:
   extends:
     - .scan
-    - .dist
     - .platform-arm64
   needs:
-    - image
+    - image-pull
     - scan-amd64
 
 # Download the regctl binary for use in the release steps
@@ -208,6 +201,5 @@ scan-arm64:
 release:staging:
   extends:
     - .release:staging
-    - .dist
   needs:
-    - image
+    - image-pull
