@@ -27,4 +27,4 @@ spec:
   kubernetes:
     install: true
     installer: kubeadm
-    version: v1.20.3
+    version: v1.30.3
