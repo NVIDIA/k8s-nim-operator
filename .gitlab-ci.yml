@@ -12,24 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+include:
+  - local: '.common-ci.yml'
+
 default:
-  image: docker:dind
   tags:
     - cnt
     - container-dev
+    - docker/multi-arch
     - docker/privileged
     - os/linux
     - type/docker
-  services:
-    - name: docker:dind
-      command: ["--experimental"]
-
-stages:
-  - lint
-  - test
-  - helm-lint
-  - image-build
-  - release
 
 golang:lint:
   stage: lint
