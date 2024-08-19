@@ -75,7 +75,7 @@ push-$(DEFAULT_PUSH_TARGET): push-short
 endif
 
 # Use a generic build target to build the relevant images
-.PHONY: build build-bundle
+.PHONY: build build-bundle push push-short build-bundle-image push-bundle
 build:
 	DOCKER_BUILDKIT=1 \
 		$(DOCKER) $(BUILDX) build --pull \
@@ -88,7 +88,7 @@ build:
 		$(CURDIR)
 
 REGCTL ?= regctl
-$(PUSH_TARGETS): push-%:
+push:
 	$(REGCTL) \
 	        image copy \
 	        $(IMAGE) $(OUT_IMAGE)
