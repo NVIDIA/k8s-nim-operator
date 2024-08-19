@@ -70,11 +70,6 @@ trigger-pipeline:
       allow_failure: false
     - when: always
 
-# The .dist- dummy steps set the DIST variable for the targeted distribution.
-.dist:
-  variables:
-    DIST: "distroless"
-
 # Define the platform targets
 .platform-amd64:
   variables:
@@ -124,7 +119,6 @@ trigger-pipeline:
 scan-amd64:
   extends:
     - .scan
-    - .dist
     - .platform-amd64
   needs:
     - image
@@ -132,7 +126,6 @@ scan-amd64:
 scan-arm64:
   extends:
     - .scan
-    - .dist
     - .platform-arm64
   needs:
     - image
@@ -208,6 +201,5 @@ scan-arm64:
 release:staging:
   extends:
     - .release:staging
-    - .dist
   needs:
     - image
