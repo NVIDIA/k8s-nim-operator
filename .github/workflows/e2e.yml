@@ -46,16 +46,16 @@ jobs:
           vsphere_ssh_key: ${{ secrets.VSPHERE_SSH_KEY }}
           holodeck_config: "test/e2e/infra/vsphere.yml"
 
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
       - name: Intall dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y make
           make ginkgo
-
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
 
       - name: Run e2e tests
         env:
