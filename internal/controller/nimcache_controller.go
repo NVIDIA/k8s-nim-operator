@@ -495,56 +495,57 @@ func getSelectedProfiles(nimCache *appsv1alpha1.NIMCache) ([]string, error) {
 	return nil, nil
 }
 
-func (r *NIMCacheReconciler) reconcileModelSelection(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (requeue bool, err error) {
+func (r *NIMCacheReconciler) reconcileModelManifestAndModelSelection(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (requeue bool, err error) {
 	logger := r.GetLogger()
+
+	// Create a temporary pod for parsing model manifest
+	pod := constructPodSpec(nimCache)
+	// Add nimCache as owner for watching on status change
+	if err := controllerutil.SetControllerReference(nimCache, pod, r.GetScheme()); err != nil {
+		return false, err
+	}
+	err = r.createPod(ctx, pod)
+	if err != nil {
+		logger.Error(err, "failed to create", "pod", pod.Name)
+		return false, err
+	}
+
+	existingPod := &corev1.Pod{}
+	err = r.Get(ctx, client.ObjectKey{Name: pod.Name, Namespace: nimCache.Namespace}, existingPod)
+	if err != nil {
+		logger.Error(err, "failed to get pod for model selection", "pod", pod.Name)
+		return false, err
+	}
+
+	if existingPod.Status.Phase != corev1.PodRunning {
+		// requeue request with delay until the pod is ready
+		return true, nil
+	}
+
+	// Extract manifest file
+	output, err := r.getPodLogs(ctx, existingPod)
+	if err != nil {
+		logger.Error(err, "failed to get pod logs for parsing model manifest file", "pod", pod.Name)
+		return false, err
+	}
+
+	// Parse the file
+	manifest, err := nimparser.ParseModelManifestFromRawOutput([]byte(output))
+	if err != nil {
+		logger.Error(err, "Failed to parse model manifest from the pod")
+		return false, err
+	}
+	logger.V(2).Info("manifest file", "nimcache", nimCache.Name, "manifest", manifest)
+
+	// Create a ConfigMap with the model manifest file for re-use
+	err = r.createManifestConfigMap(ctx, nimCache, manifest)
+	if err != nil {
+		logger.Error(err, "Failed to create model manifest config map")
+		return false, err
+	}
 
 	// reconcile model selection pod
 	if isModelSelectionRequired(nimCache) && !isModelSelectionDone(nimCache) {
-		// Create a temporary pod for parsing model manifest
-		pod := constructPodSpec(nimCache)
-		// Add nimCache as owner for watching on status change
-		if err := controllerutil.SetControllerReference(nimCache, pod, r.GetScheme()); err != nil {
-			return false, err
-		}
-		err := r.createPod(ctx, pod)
-		if err != nil {
-			logger.Error(err, "failed to create", "pod", pod.Name)
-			return false, err
-		}
-
-		existingPod := &corev1.Pod{}
-		err = r.Get(ctx, client.ObjectKey{Name: pod.Name, Namespace: nimCache.Namespace}, existingPod)
-		if err != nil {
-			logger.Error(err, "failed to get pod for model selection", "pod", pod.Name)
-			return false, err
-		}
-
-		if existingPod.Status.Phase != corev1.PodRunning {
-			// requeue request with delay until the pod is ready
-			return true, nil
-		}
-
-		// Extract manifest file
-		output, err := r.getPodLogs(ctx, existingPod)
-		if err != nil {
-			logger.Error(err, "failed to get pod logs for parsing model manifest file", "pod", pod.Name)
-			return false, err
-		}
-
-		// Parse the file
-		manifest, err := nimparser.ParseModelManifestFromRawOutput([]byte(output))
-		if err != nil {
-			logger.Error(err, "Failed to parse model manifest from the pod")
-			return false, err
-		}
-		logger.V(2).Info("manifest file", "nimcache", nimCache.Name, "manifest", manifest)
-
-		// Create a ConfigMap with the model manifest file for re-use
-		err = r.createManifestConfigMap(ctx, nimCache, manifest)
-		if err != nil {
-			logger.Error(err, "Failed to create model manifest config map")
-			return false, err
-		}
 
 		var discoveredGPUs []string
 		// If no specific GPUs are provided, then auto-detect GPUs in the cluster for profile selection
@@ -580,16 +581,17 @@ func (r *NIMCacheReconciler) reconcileModelSelection(ctx context.Context, nimCac
 			logger.Error(err, "unable to update NIMCache with selected profiles annotation")
 			return false, err
 		}
-
-		// Selected profiles updated, cleanup temporary pod
-		err = r.Delete(ctx, existingPod)
-		if err != nil && !errors.IsNotFound(err) {
-			logger.Error(err, "failed to delete", "pod", pod.Name)
-			// requeue request with delay until the pod is cleaned up
-			// this is required as NIM containers are resource heavy
-			return true, err
-		}
 	}
+
+	// Selected profiles updated, cleanup temporary pod
+	err = r.Delete(ctx, existingPod)
+	if err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, "failed to delete", "pod", pod.Name)
+		// requeue request with delay until the pod is cleaned up
+		// this is required as NIM containers are resource heavy
+		return true, err
+	}
+
 	return false, nil
 }
 
@@ -756,7 +758,7 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 	}
 
 	// Reconcile NIM model selection
-	requeue, err := r.reconcileModelSelection(ctx, nimCache)
+	requeue, err := r.reconcileModelManifestAndModelSelection(ctx, nimCache)
 	if err != nil {
 		logger.Error(err, "reconciliation of model selection failed", "pod", getPodName(nimCache))
 		return ctrl.Result{}, err
