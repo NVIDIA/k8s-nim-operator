@@ -498,6 +498,11 @@ func getSelectedProfiles(nimCache *appsv1alpha1.NIMCache) ([]string, error) {
 func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (requeue bool, err error) {
 	logger := r.GetLogger()
 
+	// Model manifest is available only for NGC model pullers
+	if nimCache.Spec.Source.NGC == nil {
+		return false, nil
+	}
+
 	existingConfig := &corev1.ConfigMap{}
 	cmName := getManifestConfigName(nimCache)
 	err = r.Get(ctx, client.ObjectKey{Name: cmName, Namespace: nimCache.Namespace}, existingConfig)
