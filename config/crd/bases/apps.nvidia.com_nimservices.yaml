@@ -2067,6 +2067,8 @@ spec:
                         type: string
                     type: object
                   readOnly:
+                    description: ReadOnly mode indicates if the volume should be mounted
+                      as read-only
                     type: boolean
                 type: object
               tolerations:

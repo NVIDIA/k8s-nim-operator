@@ -126,7 +126,8 @@ type NIMServiceStorage struct {
 	PVC PersistentVolumeClaim `json:"pvc,omitempty"`
 	// HostPath is the host path volume for caching NIM
 	HostPath *string `json:"hostPath,omitempty"`
-	ReadOnly *bool   `json:"readOnly,omitempty"`
+	// ReadOnly mode indicates if the volume should be mounted as read-only
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
