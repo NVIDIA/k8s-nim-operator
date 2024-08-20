@@ -360,5 +360,50 @@ var _ = Describe("K8s Resources Rendering", func() {
 			Expect(*hpa.Spec.MinReplicas).To(Equal(int32(1)))
 			Expect(hpa.Spec.MaxReplicas).To(Equal(int32(10)))
 		})
+
+		It("should render HPA template and sort metrics spec correctly", func() {
+			minRep := int32(1)
+			params := types.HPAParams{
+				Enabled:   true,
+				Name:      "test-hpa",
+				Namespace: "default",
+				HPASpec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						Name:       "test-deployment",
+						Kind:       "Deployment",
+						APIVersion: "apps/v1",
+					},
+					MinReplicas: &minRep,
+					MaxReplicas: 10,
+					Metrics: []autoscalingv2.MetricSpec{
+						{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								Target: autoscalingv2.MetricTarget{
+									Type: autoscalingv2.UtilizationMetricType,
+								},
+							},
+						},
+						{
+							Type: autoscalingv2.PodsMetricSourceType,
+							Pods: &autoscalingv2.PodsMetricSource{
+								Target: autoscalingv2.MetricTarget{
+									Type: autoscalingv2.UtilizationMetricType,
+								},
+							},
+						},
+					},
+				},
+			}
+			r := render.NewRenderer(templatesDir)
+			hpa, err := r.HPA(&params)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(hpa.Name).To(Equal("test-hpa"))
+			Expect(hpa.Namespace).To(Equal("default"))
+			Expect(*hpa.Spec.MinReplicas).To(Equal(int32(1)))
+			Expect(hpa.Spec.MaxReplicas).To(Equal(int32(10)))
+			Expect(hpa.Spec.Metrics[0].Type).To(Equal(autoscalingv2.PodsMetricSourceType))
+			Expect(hpa.Spec.Metrics[1].Type).To(Equal(autoscalingv2.ResourceMetricSourceType))
+		})
 	})
 })

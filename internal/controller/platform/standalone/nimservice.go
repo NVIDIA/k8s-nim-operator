@@ -28,7 +28,7 @@ import (
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -125,7 +125,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	// Sync HPA
 	if nimService.IsAutoScalingEnabled() {
-		err = r.renderAndSyncResource(ctx, nimService, &renderer, &autoscalingv1.HorizontalPodAutoscaler{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nimService, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
 			return renderer.HPA(nimService.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
 		if err != nil {

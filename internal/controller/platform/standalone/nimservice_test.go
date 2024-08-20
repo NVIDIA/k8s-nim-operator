@@ -32,7 +32,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -79,7 +79,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
 		Expect(appsv1.AddToScheme(scheme)).To(Succeed())
 		Expect(rbacv1.AddToScheme(scheme)).To(Succeed())
-		Expect(autoscalingv1.AddToScheme(scheme)).To(Succeed())
+		Expect(autoscalingv2.AddToScheme(scheme)).To(Succeed())
 		Expect(networkingv1.AddToScheme(scheme)).To(Succeed())
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
@@ -99,6 +99,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			renderer: render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/standalone"), "manifests")),
 		}
 		pvcName := "test-pvc"
+		minReplicas := int32(1)
 		nimService = &appsv1alpha1.NIMService{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-nimservice",
@@ -172,7 +173,31 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
-				Scale: appsv1alpha1.Autoscaling{Enabled: ptr.To[bool](false)},
+				Scale: appsv1alpha1.Autoscaling{
+					Enabled: ptr.To[bool](true),
+					HPA: appsv1alpha1.HorizontalPodAutoscalerSpec{
+						MinReplicas: &minReplicas,
+						MaxReplicas: 10,
+						Metrics: []autoscalingv2.MetricSpec{
+							{
+								Type: autoscalingv2.ResourceMetricSourceType,
+								Resource: &autoscalingv2.ResourceMetricSource{
+									Target: autoscalingv2.MetricTarget{
+										Type: autoscalingv2.UtilizationMetricType,
+									},
+								},
+							},
+							{
+								Type: autoscalingv2.PodsMetricSourceType,
+								Pods: &autoscalingv2.PodsMetricSource{
+									Target: autoscalingv2.MetricTarget{
+										Type: autoscalingv2.UtilizationMetricType,
+									},
+								},
+							},
+						},
+					},
+				},
 				ReadinessProbe: appsv1alpha1.Probe{
 					Enabled: &boolTrue,
 					Probe: &corev1.Probe{
@@ -322,6 +347,15 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(service.Name).To(Equal(nimService.GetName()))
 			Expect(service.Namespace).To(Equal(nimService.GetNamespace()))
+
+			// HPA should be deployed
+			hpa := &autoscalingv2.HorizontalPodAutoscaler{}
+			err = client.Get(context.TODO(), namespacedName, hpa)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(hpa.Name).To(Equal(nimService.GetName()))
+			Expect(hpa.Namespace).To(Equal(nimService.GetNamespace()))
+			Expect(*hpa.Spec.MinReplicas).To(Equal(int32(1)))
+			Expect(hpa.Spec.MaxReplicas).To(Equal(int32(10)))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
