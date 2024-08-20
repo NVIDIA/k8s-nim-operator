@@ -34,7 +34,7 @@ type NIMCacheSpec struct {
 	// Source is the NIM model source to cache
 	Source NIMSource `json:"source"`
 	// Storage is the target storage for caching NIM model
-	Storage Storage `json:"storage"`
+	Storage NIMCacheStorage `json:"storage"`
 	// Resources defines the minimum resources required for the caching job to run(cpu, memory, gpu).
 	Resources Resources `json:"resources,omitempty"`
 	// Tolerations for running the job to cache the NIM model
@@ -111,8 +111,8 @@ type DataStoreSource struct {
 	PullSecret string `json:"pullSecret,omitempty"`
 }
 
-// Storage defines the attributes of various storage targets used to store the model
-type Storage struct {
+// NIMCacheStorage defines the attributes of various storage targets used to store the model
+type NIMCacheStorage struct {
 	// PersistentVolumeClaim is the pvc volume used for caching NIM
 	PVC PersistentVolumeClaim `json:"pvc,omitempty"`
 	// HostPath is the host path volume for caching NIM
