@@ -80,21 +80,31 @@ image-pull:
 # The .scan step forms the base of the image scan operation performed before releasing
 # images.
 .scan:
-  extends:
-    - .scan-base
   stage: scan
   image: "${PULSE_IMAGE}"
-  script:
+  variables:
+    IMAGE: "${CI_REGISTRY_IMAGE}/k8s-nim-operator:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_ARCHIVE: "k8s-nim-operator.tar"
+  except:
+    variables:
+    - $CI_COMMIT_MESSAGE =~ /\[skip[ _-]scans?\]/i
+    - $SKIP_SCANS && $SKIP_SCANS == "yes"
+  before_script:
+    - echo "${PLATFORM} ${IMAGE}"
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+    - docker pull --platform="${PLATFORM}" "${IMAGE}"
+    - docker save "${IMAGE}" -o "${IMAGE_ARCHIVE}"
     - AuthHeader=$(echo -n $SSA_CLIENT_ID:$SSA_CLIENT_SECRET | base64 -w0)
     - >
       export SSA_TOKEN=$(curl --request POST --header "Authorization: Basic $AuthHeader" --header "Content-Type: application/x-www-form-urlencoded" ${SSA_ISSUER_URL} | jq ".access_token" |  tr -d '"')
     - if [ -z "$SSA_TOKEN" ]; then exit 1; else echo "SSA_TOKEN set!"; fi
+  script:
     - pulse-cli -n $NSPECT_ID --ssa $SSA_TOKEN scan -i $IMAGE_ARCHIVE -p $CONTAINER_POLICY -o
   artifacts:
     when: always
     expire_in: 1 week
     paths:
-      - pulse-cli.logs
+      - pulse-cli.log
       - licenses.json
       - sbom.json
       - vulns.json
@@ -115,7 +125,6 @@ image-pull:
 release:ngc:
   extends:
     - .release:ngc
-    - .dist
 
 # Define the external image signing steps for NGC
 # Download the ngc cli binary for use in the sign steps
@@ -143,7 +152,7 @@ release:ngc:
   variables:
     NGC_CLI_API_KEY: "${NGC_REGISTRY_TOKEN}"
     IMAGE_NAME: "${NGC_REGISTRY_IMAGE}"
-    IMAGE_TAG: "${CI_COMMIT_TAG}-${DIST}"
+    IMAGE_TAG: "${CI_COMMIT_TAG}"
   retry:
     max: 2
   before_script:
@@ -165,7 +174,6 @@ sign:ngc-short-tag:
 
 sign:ngc:
   extends:
-    - .dist
     - .sign:ngc
   needs:
     - release:ngc

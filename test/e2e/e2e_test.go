@@ -307,6 +307,7 @@ func getTestEnv() {
 	Expect(helmChart).NotTo(BeEmpty(), "HELM_CHART must be set")
 
 	LogArtifactDir = os.Getenv("LOG_ARTIFACT_DIR")
+
 	ImageRepo = os.Getenv("E2E_IMAGE_REPO")
 	Expect(ImageRepo).NotTo(BeEmpty(), "IMAGE_REPO must be set")
 

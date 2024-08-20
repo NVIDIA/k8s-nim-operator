@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 default:
-  image: docker:24.0.6
+  image: docker:dind
   services:
-    - name: docker:24.0.6-dind
+    - name: docker:dind
       command: ["--experimental"]
 
 variables:
@@ -121,14 +121,14 @@ scan-amd64:
     - .scan
     - .platform-amd64
   needs:
-    - image
+    - image-pull
 
 scan-arm64:
   extends:
     - .scan
     - .platform-arm64
   needs:
-    - image
+    - image-pull
     - scan-amd64
 
 # Download the regctl binary for use in the release steps
@@ -202,4 +202,4 @@ release:staging:
   extends:
     - .release:staging
   needs:
-    - image
+    - image-pull
