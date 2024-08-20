@@ -76,6 +76,7 @@ spec:
         {{- if .PersistentVolumeClaim }}
         persistentVolumeClaim:
           claimName: {{ .PersistentVolumeClaim.ClaimName }}
+          readOnly: {{ .PersistentVolumeClaim.ReadOnly }}
         {{- end }}
         {{- if .HostPath }}
         hostPath:
