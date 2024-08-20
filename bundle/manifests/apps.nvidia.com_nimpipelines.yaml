@@ -711,15 +711,6 @@ spec:
                                   type: string
                               type: object
                           type: object
-                        nimCache:
-                          description: NIMCacheVolSpec defines the spec to use NIMCache
-                            volume
-                          properties:
-                            name:
-                              type: string
-                            profile:
-                              type: string
-                          type: object
                         nodeSelector:
                           additionalProperties:
                             type: string
@@ -2093,6 +2084,15 @@ spec:
                               description: HostPath is the host path volume for caching
                                 NIM
                               type: string
+                            nimCache:
+                              description: NIMCacheVolSpec defines the spec to use
+                                NIMCache volume
+                              properties:
+                                name:
+                                  type: string
+                                profile:
+                                  type: string
+                              type: object
                             pvc:
                               description: PersistentVolumeClaim is the pvc volume
                                 used for caching NIM
@@ -2118,6 +2118,8 @@ spec:
                                     mode of the PVC
                                   type: string
                               type: object
+                            readOnly:
+                              type: boolean
                           type: object
                         tolerations:
                           items:

@@ -61,10 +61,9 @@ type NIMServiceSpec struct {
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
 	// The name of an existing pull secret containing the NGC_API_KEY
-	AuthSecret string          `json:"authSecret"`
-	NIMCache   NIMCacheVolSpec `json:"nimCache,omitempty"`
+	AuthSecret string `json:"authSecret"`
 	// Storage is the target storage for caching NIM model if NIMCache is not provided
-	Storage        Storage                      `json:"storage,omitempty"`
+	Storage        NIMServiceStorage            `json:"storage,omitempty"`
 	Labels         map[string]string            `json:"labels,omitempty"`
 	Annotations    map[string]string            `json:"annotations,omitempty"`
 	NodeSelector   map[string]string            `json:"nodeSelector,omitempty"`
@@ -118,6 +117,16 @@ type NIMServiceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NIMService `json:"items"`
+}
+
+// NIMServiceStorage defines the attributes of various storage targets used to store the model
+type NIMServiceStorage struct {
+	NIMCache NIMCacheVolSpec `json:"nimCache,omitempty"`
+	// PersistentVolumeClaim is the pvc volume used for caching NIM
+	PVC PersistentVolumeClaim `json:"pvc,omitempty"`
+	// HostPath is the host path volume for caching NIM
+	HostPath *string `json:"hostPath,omitempty"`
+	ReadOnly *bool   `json:"readOnly,omitempty"`
 }
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
@@ -430,12 +439,12 @@ func (n *NIMService) GetServiceAccountName() string {
 
 // GetNIMCacheName returns the NIMCache name to use for the NIMService deployment
 func (n *NIMService) GetNIMCacheName() string {
-	return n.Spec.NIMCache.Name
+	return n.Spec.Storage.NIMCache.Name
 }
 
 // GetNIMCacheProfile returns the explicit profile to use for the NIMService deployment
 func (n *NIMService) GetNIMCacheProfile() string {
-	return n.Spec.NIMCache.Profile
+	return n.Spec.Storage.NIMCache.Profile
 }
 
 // GetHPA returns the HPA spec for the NIMService deployment

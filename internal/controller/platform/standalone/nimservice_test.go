@@ -108,13 +108,13 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Labels:      map[string]string{"app": "test-app"},
 				Annotations: map[string]string{"annotation-key": "annotation-value"},
 				Image:       appsv1alpha1.Image{Repository: "nvcr.io/nvidia/nim-llm", PullPolicy: "IfNotPresent", Tag: "v0.1.0", PullSecrets: []string{"ngc-secret"}},
-				Storage: appsv1alpha1.Storage{
+				Storage: appsv1alpha1.NIMServiceStorage{
 					PVC: appsv1alpha1.PersistentVolumeClaim{
 						Name: pvcName,
 					},
-				},
-				NIMCache: appsv1alpha1.NIMCacheVolSpec{
-					Name: "test-nimcache",
+					NIMCache: appsv1alpha1.NIMCacheVolSpec{
+						Name: "test-nimcache",
+					},
 				},
 				Env: []corev1.EnvVar{
 					{
@@ -249,7 +249,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			},
 			Spec: appsv1alpha1.NIMCacheSpec{
 				Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-				Storage: appsv1alpha1.Storage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi", SubPath: "subPath"}},
+				Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi", SubPath: "subPath"}},
 			},
 			Status: appsv1alpha1.NIMCacheStatus{
 				State: appsv1alpha1.NimCacheStatusReady,
