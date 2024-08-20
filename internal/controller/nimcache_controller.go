@@ -782,7 +782,7 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 
 	requeue, err := r.reconcileModelManifest(ctx, nimCache)
 	if err != nil {
-		logger.Error(err, "reconciliation of model manifest failed", "pod", getPodName(nimCache))
+		logger.Error(err, "reconciliation to extract model manifest failed", "pod", getPodName(nimCache))
 		return ctrl.Result{}, err
 	}
 
@@ -794,7 +794,7 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 	// Reconcile NIM model selection
 	err = r.reconcileModelSelection(ctx, nimCache)
 	if err != nil {
-		logger.Error(err, "reconciliation of model selection failed", "pod", getPodName(nimCache))
+		logger.Error(err, "reconciliation of model selection failed")
 		return ctrl.Result{}, err
 	}
 
