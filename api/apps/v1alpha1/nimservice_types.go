@@ -408,6 +408,7 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: modelPVC.Name,
+					ReadOnly:  n.GetStorageReadOnly(),
 				},
 			},
 		},
@@ -506,6 +507,14 @@ func (n *NIMService) GetUserID() *int64 {
 func (n *NIMService) GetGroupID() *int64 {
 	return n.Spec.GroupID
 
+}
+
+// GetGroupID returns the group ID for the NIMService deployment
+func (n *NIMService) GetStorageReadOnly() bool {
+	if n.Spec.Storage.ReadOnly == nil {
+		return false
+	}
+	return *n.Spec.Storage.ReadOnly
 }
 
 // GetServiceAccountParams return params to render ServiceAccount from templates

@@ -226,6 +226,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "test-pvc",
+						ReadOnly:  false,
 					},
 				},
 			},
