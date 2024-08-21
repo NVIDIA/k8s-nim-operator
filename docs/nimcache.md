@@ -60,9 +60,6 @@ Alternatively, if you specify `model.profiles`, then the model puller downloads 
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  labels:
-    app.kubernetes.io/name: k8s-nim-operator
-    app.kubernetes.io/managed-by: kustomize
   name: meta-llama3-8b-instruct
 spec:
   source:
@@ -124,9 +121,6 @@ metadata:
   finalizers:
   - finalizer.nimcache.apps.nvidia.com
   generation: 2
-  labels:
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/name: k8s-nim-operator
   name: meta-llama3-8b-instruct
   namespace: nim-cache
   resourceVersion: "16539047"

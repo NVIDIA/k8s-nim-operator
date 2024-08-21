@@ -17,9 +17,6 @@ Create a file, such as `nimservice.yaml`, with contents like the following examp
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  labels:
-    app.kubernetes.io/name: k8s-nim-operator
-    app.kubernetes.io/managed-by: kustomize
   name: meta-llama3-8b-instruct
 spec:
   image:
