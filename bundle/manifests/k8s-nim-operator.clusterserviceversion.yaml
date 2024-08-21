@@ -10,10 +10,6 @@ metadata:
           "apiVersion": "apps.nvidia.com/v1alpha1",
           "kind": "NIMCache",
           "metadata": {
-            "labels": {
-              "app.kubernetes.io/name": "k8s-nim-operator",
-              "app.kubernetes.io/managed-by": "kustomize"
-            },
             "name": "meta-llama3-8b-instruct",
             "namespace": "nim-service"
           },
@@ -38,10 +34,6 @@ metadata:
                 }
               }
             },
-            "resources": {
-              "gpus": 0,
-              "cpu": "500m"
-            },
             "storage": {
               "pvc": {
                 "create": true,
@@ -56,10 +48,6 @@ metadata:
           "apiVersion": "apps.nvidia.com/v1alpha1",
           "kind": "NIMService",
           "metadata": {
-            "labels": {
-              "app.kubernetes.io/name": "k8s-nim-operator",
-              "app.kubernetes.io/managed-by": "kustomize"
-            },
             "name": "meta-llama3-8b-instruct",
             "namespace": "nim-service"
           },
@@ -73,13 +61,18 @@ metadata:
               ]
             },
             "authSecret": "ngc-api-secret",
-            "externalPVC": "",
-            "nimCache": {
-              "name": "meta-llama3-8b-instruct",
-              "profile": ""
+            "storage": {
+              "nimCache": {
+                "name": "meta-llama3-8b-instruct",
+                "profile": ""
+              }
             },
             "scale": {
-              "minReplicas": 1
+              "enabled": false,
+              "hpa": {
+                "minReplicas": 1,
+                "maxReplicas": 10
+              }
             },
             "resources": {
               "limits": {
