@@ -60,6 +60,31 @@ var _ = Describe("NIMCache Controller", func() {
 			Client: client,
 			scheme: scheme,
 		}
+
+		nimCache := &appsv1alpha1.NIMCache{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-nimcache",
+				Namespace: "default",
+			},
+			Spec: appsv1alpha1.NIMCacheSpec{
+				Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+			},
+		}
+
+		// Create a model manifest configmap, as we cannot run a sample NIM container to extract for tests
+		filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+		manifestData, err := nimparser.ParseModelManifest(filePath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(*manifestData).To(HaveLen(2))
+
+		err = reconciler.createManifestConfigMap(context.TODO(), nimCache, manifestData)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Verify that the ConfigMap was created
+		createdConfigMap := &corev1.ConfigMap{}
+		err = client.Get(context.TODO(), types.NamespacedName{Name: getManifestConfigName(nimCache), Namespace: "default"}, createdConfigMap)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(createdConfigMap.Data).To(HaveKey("model_manifest.yaml"))
 	})
 
 	AfterEach(func() {
