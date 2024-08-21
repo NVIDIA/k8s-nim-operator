@@ -23,12 +23,13 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -131,13 +132,30 @@ func SortKeys(obj interface{}) interface{} {
 		}
 		return sortedMap
 	case []interface{}:
-		// Check if the slice contains maps and sort them if so
+		// Check if the slice contains maps and sort them by the "name" field or the first available field
 		if len(obj) > 0 {
+
 			if _, ok := obj[0].(map[string]interface{}); ok {
-				sort.Slice(obj, func(i, j int) bool {
-					iName := obj[i].(map[string]interface{})["name"].(string)
-					jName := obj[j].(map[string]interface{})["name"].(string)
-					return iName < jName
+				sort.SliceStable(obj, func(i, j int) bool {
+					iMap, iOk := obj[i].(map[string]interface{})
+					jMap, jOk := obj[j].(map[string]interface{})
+					if iOk && jOk {
+						// Try to sort by "name" if present
+						iName, iNameOk := iMap["name"].(string)
+						jName, jNameOk := jMap["name"].(string)
+						if iNameOk && jNameOk {
+							return iName < jName
+						}
+
+						// If "name" is not available, sort by the first key in each map
+						if len(iMap) > 0 && len(jMap) > 0 {
+							iFirstKey := firstKey(iMap)
+							jFirstKey := firstKey(jMap)
+							return iFirstKey < jFirstKey
+						}
+					}
+					// If no valid comparison is possible, maintain the original order
+					return false
 				})
 			}
 		}
@@ -146,6 +164,16 @@ func SortKeys(obj interface{}) interface{} {
 		}
 	}
 	return obj
+}
+
+// Helper function to get the first key of a map (alphabetically sorted)
+func firstKey(m map[string]interface{}) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys[0]
 }
 
 // GetResourceHash returns a consistent hash for the given object spec
@@ -241,4 +269,13 @@ func IsEqual[T client.Object](existing, desired T, fieldsToCompare ...string) bo
 	}
 
 	return true
+}
+
+func SortHPAMetricsSpec(metrics []autoscalingv2.MetricSpec) []autoscalingv2.MetricSpec {
+	sort.Slice(metrics, func(i, j int) bool {
+		iMetricsType := metrics[i].Type
+		jMetricsType := metrics[j].Type
+		return iMetricsType < jMetricsType
+	})
+	return metrics
 }

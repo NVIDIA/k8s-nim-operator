@@ -348,6 +348,8 @@ func (r *textTemplateRenderer) HPA(params *types.HPAParams) (*autoscalingv2.Hori
 	if err != nil {
 		return nil, fmt.Errorf("error converting unstructured object to HPA: %w", err)
 	}
+	// Sorting to avoid unnecessary object updates
+	hpa.Spec.Metrics = utils.SortHPAMetricsSpec(hpa.Spec.Metrics)
 	return hpa, nil
 }
 
