@@ -101,7 +101,15 @@ func (s *Standalone) Sync(ctx context.Context, r shared.Reconciler, resource cli
 		reconciler := NewNIMServiceReconciler(r)
 		reconciler.renderer = render.NewRenderer(ManifestsDir)
 		logger.Info("Reconciling NIMService instance")
-		return reconciler.reconcileNIMService(ctx, nimService)
+		result, err := reconciler.reconcileNIMService(ctx, nimService)
+		if err != nil {
+			errConditionUpdate := reconciler.updater.SetConditionsFailed(ctx, nimService, conditions.Failed, err.Error())
+			if errConditionUpdate != nil {
+				logger.Error(err, "Unable to update status")
+				return result, errConditionUpdate
+			}
+		}
+		return result, err
 	}
 	return ctrl.Result{}, errors.NewBadRequest("invalid resource type")
 }

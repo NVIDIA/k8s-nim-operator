@@ -121,7 +121,7 @@ func (u *updater) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NIMS
 		Reason:  reason,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NIMServiceStatusNotReady
+	cr.Status.State = v1alpha1.NIMServiceStatusFailed
 	return u.client.Status().Update(ctx, cr)
 }
 
