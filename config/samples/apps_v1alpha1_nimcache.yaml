@@ -6,4 +6,25 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: nimcache-sample
 spec:
-  # TODO(user): Add fields here
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama3-8b-instruct:1.0.0
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        profiles: []
+        autoDetect: true
+        precision: "fp8"
+        engine: "tensorrt_llm"
+        qosProfile: "throughput"
+        gpus:
+          product: "l40s"
+          ids:
+            - "26b5"
+        tensorParallelism: "1"
+  storage:
+    pvc:
+      create: true
+      storageClass: "local-path"
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
