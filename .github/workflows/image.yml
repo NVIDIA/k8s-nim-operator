@@ -105,6 +105,8 @@ jobs:
         id: extract_branch
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
           BRANCH="bundle-latest"
           if [[ "$BRANCH_NAME" == "main" || "$BRANCH_NAME" == "release-"* ]]; then
             BRANCH="bundle-latest-${BRANCH_NAME}"
@@ -123,9 +125,8 @@ jobs:
       - name: Build image
         env:
           BUNDLE_IMAGE_NAME: ghcr.io/nvidia/k8s-nim-operator
-          BUNDLE_IMAGE: ghcr.io/nvidia/k8s-nim-operator:${BRANCH}
+          BUNDLE_IMAGE: ghcr.io/nvidia/k8s-nim-operator:${{ env.BRANCH_NAME }}
           VERSION: '' # Until we cut a release, Version will be null
         run: |
-          echo "${VERSION}"
           sed -i "s|nvcr.io/nvidia/cloud-native/k8s-nim-operator:v0.1.0|${BUNDLE_IMAGE}|g" bundle/manifests/k8s-nim-operator.clusterserviceversion.yaml
           make -f deployments/container/Makefile build-bundle
