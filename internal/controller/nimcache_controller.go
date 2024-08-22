@@ -155,12 +155,13 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Handle nim-cache reconciliation
-	if result, err := r.reconcileNIMCache(ctx, nimCache); err != nil {
+	result, err := r.reconcileNIMCache(ctx, nimCache)
+	if err != nil {
 		logger.Error(err, "error reconciling NIMCache", "name", nimCache.Name)
 		return result, err
 	}
 
-	return ctrl.Result{}, nil
+	return result, nil
 }
 
 // GetScheme returns the scheme of the reconciler
@@ -548,6 +549,11 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 		return false, err
 	}
 
+	if output == "" {
+		logger.Info("Requeuing to wait for the manifest to be copied from the container")
+		return true, nil
+	}
+
 	// Parse the file
 	manifest, err := nimparser.ParseModelManifestFromRawOutput([]byte(output))
 	if err != nil {
@@ -792,7 +798,7 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 	}
 
 	if requeue {
-		logger.Info("requeueing for reconciliation for model selection", "pod", getPodName(nimCache))
+		logger.V(2).Info("requeueing for reconciliation for model selection", "pod", getPodName(nimCache))
 		return ctrl.Result{RequeueAfter: time.Second * 30}, err
 	}
 

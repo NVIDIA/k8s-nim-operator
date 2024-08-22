@@ -71,6 +71,34 @@ var _ = Describe("NIMParser", func() {
 			Expect(profile.Tags["precision"]).To(Equal("fp16"))
 			Expect(profile.ContainerURL).To(Equal("nvcr.io/nim/meta/llama3-70b-instruct:1.0.0"))
 		})
+		It("should parse a model profiles of reranking NIM correctly", func() {
+
+			filePath := filepath.Join("testdata", "manifest_reranking.yaml")
+			config, err := ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*config).To(HaveLen(2))
+
+			profile, exists := (*config)["f5cfb1a2c2f00bff7f504e78bcce237903a4d257cbb0086ea7856c2df3458a5f"]
+			Expect(exists).To(BeTrue())
+			Expect(profile.Tags["backend"]).To(Equal("tensorrt"))
+			Expect(profile.Tags["key"]).To(Equal("NVIDIA-H100_10.0.1_12"))
+			Expect(profile.Tags["precision"]).To(Equal("fp16"))
+			Expect(profile.Tags["product_name_regex"]).To(Equal("^NVIDIA-H100.*"))
+		})
+		It("should parse a model profiles of embedding NIM correctly", func() {
+
+			filePath := filepath.Join("testdata", "manifest_embedding.yaml")
+			config, err := ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*config).To(HaveLen(2))
+
+			profile, exists := (*config)["2ad8fe56fc5c2cd108b4d177286fbd6c6ea5dcd3de3995cb9aeb83f80ddd5c9e"]
+			Expect(exists).To(BeTrue())
+			Expect(profile.Tags["backend"]).To(Equal("tensorrt"))
+			Expect(profile.Tags["key"]).To(Equal("NVIDIA-L4_10.0.1_12"))
+			Expect(profile.Tags["precision"]).To(Equal("fp16"))
+			Expect(profile.Tags["product_name_regex"]).To(Equal("^NVIDIA-L4(?!0S).*"))
+		})
 		It("should match model profiles with given parameters", func() {
 
 			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
