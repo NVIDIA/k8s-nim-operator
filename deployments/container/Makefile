@@ -38,7 +38,7 @@ BUNDLE_IMAGE_NAME ?= nvcr.io/nvidia/cloud-native/nim-operator-bundle
 BUNDLE_DOCKERFILE = $(CURDIR)/deployments/container/bundle.Dockerfile
 
 IMAGE_EXTRA_TAG_NAMES ?= ${BRANCH} $(VERSION)
-BUNDLE_EXTRA_TAG_NAMES ?= bundle-latest-${BRANCH} $(VERSION)
+BUNDLE_EXTRA_TAG_NAMES ?= ${BRANCH} $(VERSION)
 IMAGE_EXTRA_TAGS := $(foreach tag,$(IMAGE_EXTRA_TAG_NAMES),$(IMAGE_NAME):$(tag))
 BUNDLE_EXTRA_TAGS := $(foreach tag,$(BUNDLE_EXTRA_TAG_NAMES),$(BUNDLE_IMAGE_NAME):$(tag))
 
