@@ -21,6 +21,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -71,36 +72,7 @@ var _ = Describe("NIMParser", func() {
 			Expect(profile.Tags["precision"]).To(Equal("fp16"))
 			Expect(profile.ContainerURL).To(Equal("nvcr.io/nim/meta/llama3-70b-instruct:1.0.0"))
 		})
-		It("should parse a model profiles of reranking NIM correctly", func() {
-
-			filePath := filepath.Join("testdata", "manifest_reranking.yaml")
-			config, err := ParseModelManifest(filePath)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(*config).To(HaveLen(2))
-
-			profile, exists := (*config)["f5cfb1a2c2f00bff7f504e78bcce237903a4d257cbb0086ea7856c2df3458a5f"]
-			Expect(exists).To(BeTrue())
-			Expect(profile.Tags["backend"]).To(Equal("tensorrt"))
-			Expect(profile.Tags["key"]).To(Equal("NVIDIA-H100_10.0.1_12"))
-			Expect(profile.Tags["precision"]).To(Equal("fp16"))
-			Expect(profile.Tags["product_name_regex"]).To(Equal("^NVIDIA-H100.*"))
-		})
-		It("should parse a model profiles of embedding NIM correctly", func() {
-
-			filePath := filepath.Join("testdata", "manifest_embedding.yaml")
-			config, err := ParseModelManifest(filePath)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(*config).To(HaveLen(2))
-
-			profile, exists := (*config)["2ad8fe56fc5c2cd108b4d177286fbd6c6ea5dcd3de3995cb9aeb83f80ddd5c9e"]
-			Expect(exists).To(BeTrue())
-			Expect(profile.Tags["backend"]).To(Equal("tensorrt"))
-			Expect(profile.Tags["key"]).To(Equal("NVIDIA-L4_10.0.1_12"))
-			Expect(profile.Tags["precision"]).To(Equal("fp16"))
-			Expect(profile.Tags["product_name_regex"]).To(Equal("^NVIDIA-L4(?!0S).*"))
-		})
-		It("should match model profiles with given parameters", func() {
-
+		It("should match model profiles with valid parameters", func() {
 			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
 			config, err := ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
@@ -121,33 +93,100 @@ var _ = Describe("NIMParser", func() {
 					IDs: []string{"26b5"}},
 				},
 			}
-			matchedProfiles, err := MatchProfiles(modelSpec, *config, []string{""})
+			matchedProfiles, err := MatchProfiles(modelSpec, *config, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(matchedProfiles).NotTo(BeEmpty())
 			Expect(matchedProfiles).To(HaveLen(1))
+		})
+		It("should not match model profiles with invalid parameters", func() {
+			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+			config, err := ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*config).To(HaveLen(1))
 
-			// Add invalid spec
-			modelSpec = appsv1alpha1.ModelSpec{Precision: "fp16",
+			modelSpec := appsv1alpha1.ModelSpec{Precision: "fp16",
 				Engine:            "tensorrt_llm",
 				QoSProfile:        "throughput",
 				TensorParallelism: "8",
 				GPUs: []appsv1alpha1.GPUSpec{{Product: "l40s",
-					IDs: []string{"abcd"}},
+					IDs: []string{"abcd"}}, // invalid entry
 				},
 			}
-			matchedProfiles, err = MatchProfiles(modelSpec, *config, []string{""})
+			matchedProfiles, err := MatchProfiles(modelSpec, *config, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(matchedProfiles).To(BeEmpty())
+		})
+		It("should match model profiles using automatically discovered GPUs", func() {
+			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+			config, err := ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*config).To(HaveLen(1))
 
 			// Match using discovered GPUs
-			modelSpec = appsv1alpha1.ModelSpec{Precision: "fp16",
+			modelSpec := appsv1alpha1.ModelSpec{Precision: "fp16",
 				Engine:            "tensorrt_llm",
 				QoSProfile:        "throughput",
 				TensorParallelism: "8",
 			}
-			matchedProfiles, err = MatchProfiles(modelSpec, *config, []string{"l40s"})
+			matchedProfiles, err := MatchProfiles(modelSpec, *config, []string{"l40s"})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(matchedProfiles).NotTo(BeEmpty())
+			Expect(matchedProfiles).To(HaveLen(1))
+		})
+		It("should match model profiles when lora is enabled", func() {
+			filePath := filepath.Join("testdata", "manifest_lora.yaml")
+			config, err := ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*config).To(HaveLen(1))
+
+			// Match using Lora
+			modelSpec := appsv1alpha1.ModelSpec{
+				Lora: utils.BoolPtr(true),
+			}
+			matchedProfiles, err := MatchProfiles(modelSpec, *config, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(matchedProfiles).To(HaveLen(1))
+		})
+		It("should not match model profiles when lora is not provided and profile has lora enabled", func() {
+			filePath := filepath.Join("testdata", "manifest_lora.yaml")
+			config, err := ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*config).To(HaveLen(1))
+
+			modelSpec := appsv1alpha1.ModelSpec{
+				Engine: "tensorrt_llm",
+			}
+			matchedProfiles, err := MatchProfiles(modelSpec, *config, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(matchedProfiles).To(BeEmpty())
+		})
+
+		It("should match model profiles with different engine parameters for non-llm manifest", func() {
+			filePath := filepath.Join("testdata", "manifest_non_llm.yaml")
+			config, err := ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*config).To(HaveLen(2))
+
+			// Match using backend
+			modelSpec := appsv1alpha1.ModelSpec{
+				Engine: "tensorrt", // instead of tensorrt_llm for llm nims
+			}
+			matchedProfiles, err := MatchProfiles(modelSpec, *config, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(matchedProfiles).To(HaveLen(1))
+		})
+		It("should match model profiles with different gpu parameters for non-llm manifest", func() {
+			filePath := filepath.Join("testdata", "manifest_non_llm.yaml")
+			config, err := ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*config).To(HaveLen(2))
+
+			// Match using GPU product name
+			modelSpec := appsv1alpha1.ModelSpec{
+				GPUs: []appsv1alpha1.GPUSpec{{Product: "A10G"}},
+			}
+			matchedProfiles, err := MatchProfiles(modelSpec, *config, nil)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(matchedProfiles).To(HaveLen(1))
 		})
 	})
