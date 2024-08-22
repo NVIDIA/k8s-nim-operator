@@ -203,17 +203,17 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	// Wait for deployment
-	ready, err := r.isDeploymentReady(ctx, &namespacedName)
+	msg, ready, err := r.isDeploymentReady(ctx, &namespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	if !ready {
 		// Update status as NotReady
-		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, "Deployment is not ready")
+		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
 	} else {
 		// Update status as ready
-		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, "Deployment is ready")
+		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
 	}
 
 	if err != nil {
@@ -278,22 +278,40 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 }
 
 // CheckDeploymentReadiness checks if the Deployment is ready
-func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespacedName *types.NamespacedName) (bool, error) {
-	dep := &appsv1.Deployment{}
-	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, dep)
+func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespacedName *types.NamespacedName) (string, bool, error) {
+	deployment := &appsv1.Deployment{}
+	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, deployment)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return false, nil
+			return "", false, nil
 		}
-		return false, err
+		return "", false, err
 	}
 
-	for _, cond := range dep.Status.Conditions {
-		if cond.Type == appsv1.DeploymentAvailable && cond.Status == corev1.ConditionTrue {
-			return true, nil
+	cond := getDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
+	if cond != nil && cond.Reason == "ProgressDeadlineExceeded" {
+		return fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name), false, fmt.Errorf("deployment %q exceeded its progress deadline", deployment.Name)
+	}
+	if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
+		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil
+	}
+	if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
+		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\n", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil
+	}
+	if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
+		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
+	}
+	return fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name), true, nil
+}
+
+func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.DeploymentConditionType) *appsv1.DeploymentCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
 		}
 	}
-	return false, nil
+	return nil
 }
 
 func (r *NIMServiceReconciler) syncResource(ctx context.Context, obj client.Object, desired client.Object, namespacedName types.NamespacedName) error {
