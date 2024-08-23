@@ -127,75 +127,92 @@ func MatchProfiles(modelSpec appsv1alpha1.ModelSpec, manifest NIMManifest, disco
 	var selectedProfiles []string
 
 	for hash, profile := range manifest {
-		if modelSpec.Precision != "" && profile.Tags["precision"] != modelSpec.Precision {
-			// continue with the next profile in the manifest
+		// Check precision, tensor parallelism, and QoS profile
+		if (modelSpec.Precision != "" && profile.Tags["precision"] != modelSpec.Precision) ||
+			(modelSpec.TensorParallelism != "" && profile.Tags["tp"] != modelSpec.TensorParallelism) ||
+			(modelSpec.QoSProfile != "" && profile.Tags["profile"] != modelSpec.QoSProfile) {
 			continue
 		}
-		if modelSpec.TensorParallelism != "" && profile.Tags["tp"] != modelSpec.TensorParallelism {
-			// continue with the next profile in the manifest
-			continue
-		}
-		if modelSpec.QoSProfile != "" && profile.Tags["profile"] != modelSpec.QoSProfile {
-			// continue with the next profile in the manifest
+
+		// Check LoRA configuration
+		if modelSpec.Lora == nil && profile.Tags["feat_lora"] == "true" {
 			continue
 		}
 		if modelSpec.Lora != nil && profile.Tags["feat_lora"] != strconv.FormatBool(*modelSpec.Lora) {
-			// continue with the next profile in the manifest
-			continue
-		}
-		if modelSpec.Engine != "" && profile.Tags["llm_engine"] != modelSpec.Engine {
-			// continue with the next profile in the manifest
 			continue
 		}
 
-		foundGPU := false
-		foundID := false
+		// Determine backend type
+		backend := profile.Tags["llm_engine"]
+		if backend == "" {
+			backend = profile.Tags["backend"]
+		}
 
-		for _, gpu := range modelSpec.GPUs {
-			if gpu.Product != "" && strings.Contains(strings.ToLower(gpu.Product), strings.ToLower(profile.Tags["gpu"])) {
+		if modelSpec.Engine != "" && !strings.Contains(backend, strings.TrimSuffix(modelSpec.Engine, "_llm")) {
+			continue
+		}
+
+		// GPU matching logic
+		if len(modelSpec.GPUs) > 0 || len(discoveredGPUs) > 0 {
+			if !matchGPUProfile(modelSpec, profile, discoveredGPUs) {
+				continue
+			}
+		}
+
+		// Profile matched the given model parameters, add hash to the selected profiles
+		selectedProfiles = append(selectedProfiles, hash)
+	}
+
+	return selectedProfiles, nil
+}
+
+func matchGPUProfile(modelSpec appsv1alpha1.ModelSpec, profile NIMProfile, discoveredGPUs []string) bool {
+	foundGPU := false
+
+	for _, gpu := range modelSpec.GPUs {
+		// Check for GPU product match
+		if gpu.Product != "" {
+			// Check if the product matches the "gpu" tag
+			if strings.Contains(strings.ToLower(profile.Tags["gpu"]), strings.ToLower(gpu.Product)) {
 				foundGPU = true
 			}
 
-			if len(gpu.IDs) > 0 {
+			// Check if the product matches the "key" tag
+			if strings.Contains(strings.ToLower(profile.Tags["key"]), strings.ToLower(gpu.Product)) {
+				foundGPU = true
+			}
+
+			// If the GPU product matches, check the GPU IDs
+			if foundGPU && len(gpu.IDs) > 0 {
+				foundID := false
 				for _, id := range gpu.IDs {
 					if id == strings.TrimSuffix(profile.Tags["gpu_device"], ":10de") {
 						foundID = true
 						break
 					}
 				}
-				if foundID {
-					break
+
+				// If the GPU product matches but no IDs match, return false
+				if !foundID {
+					return false
 				}
 			}
-
-			if foundGPU && (len(gpu.IDs) == 0 || foundID) {
-				break
-			} else {
-				// toggle flag as none of the specified ID's match with the profile
-				foundGPU = false
-			}
 		}
-
-		if !foundGPU {
-			// didn't match any GPUs from the model spec, match using discovered GPUs
-			if len(discoveredGPUs) > 0 {
-				foundGPU = false
-				for _, product := range discoveredGPUs {
-					if strings.Contains(strings.ToLower(product), strings.ToLower(profile.Tags["gpu"])) {
-						foundGPU = true
-						break
-					}
-				}
-			}
-			if !foundGPU {
-				// continue with next profile
-				continue
-			}
-		}
-
-		// profile matched with the given model parameters, add hash to the selected profiles
-		selectedProfiles = append(selectedProfiles, hash)
-		// contine with next profile in the manifest
 	}
-	return selectedProfiles, nil
+
+	// If a GPU product was matched and IDs (if any) also matched, return true
+	if foundGPU {
+		return true
+	}
+
+	// If no match was found in the specified GPUs, check the discovered GPUs
+	for _, product := range discoveredGPUs {
+		if product != "" && (strings.Contains(strings.ToLower(profile.Tags["gpu"]), strings.ToLower(product)) ||
+			strings.Contains(strings.ToLower(profile.Tags["key"]), strings.ToLower(product))) {
+			return true
+		}
+	}
+
+	// If no match found in both specified and discovered GPUs, return false
+	return false
 }

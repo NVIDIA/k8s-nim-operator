@@ -2,7 +2,6 @@
   model: meta/llama3-70b-instruct
   release: '1.0.0'
   tags:
-    feat_lora: 'true'
     feat_lora_max_rank: '32'
     gpu: L40S
     gpu_device: 26b5:10de
