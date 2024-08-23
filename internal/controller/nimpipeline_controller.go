@@ -234,6 +234,19 @@ func (r *NIMPipelineReconciler) cleanupDisabledNIMs(ctx context.Context, nimPipe
 	var allErrors []error
 
 	for _, svc := range serviceList.Items {
+		owned := false
+		for _, ownerRef := range svc.GetOwnerReferences() {
+			if ownerRef.Kind == "NIMPipeline" && ownerRef.UID == nimPipeline.UID {
+				owned = true
+				break
+			}
+		}
+
+		// Ignore NIM services not owned by the NIM pipeline
+		if !owned {
+			continue
+		}
+
 		// Cleanup any stale NIM services if they are part of the pipeline but are disabled
 		if enabled, exists := enabledServices[svc.Name]; exists && !enabled {
 			if err := r.deleteService(ctx, &svc); err != nil {
