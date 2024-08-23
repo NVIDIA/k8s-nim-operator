@@ -30,11 +30,11 @@ const (
 	NIMPipelineConditionFailed = "NIM_PIPELINE_FAILED"
 
 	// NIMPipelinetatusNotReady indicates that one or more services in the NIM pipeline are not ready
-	NIMPipelinetatusNotReady = "not-ready"
+	NIMPipelinetatusNotReady = "NotReady"
 	// NIMPipelineStatusReady indicates that NIM pipeline is ready
-	NIMPipelineStatusReady = "ready"
+	NIMPipelineStatusReady = "Ready"
 	// NIMPipelineStatusFailed indicates that one or more services in the NIM pipeline has failed
-	NIMPipelineStatusFailed = "failed"
+	NIMPipelineStatusFailed = "Failed"
 )
 
 // NIMPipelineSpec defines the desired state of NIMPipeline

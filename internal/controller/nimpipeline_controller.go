@@ -209,26 +209,39 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 		return err
 	}
 
-	overallState := appsv1alpha1.NIMServiceStatusReady
+	// Default overall state to "NotReady"
+	overallState := appsv1alpha1.NIMServiceStatusNotReady
 	serviceStates := make(map[string]string)
+	allServicesReady := true
 
 	for _, svc := range serviceList.Items {
 		if enabled, exists := enabledServices[svc.Name]; !exists || !enabled {
 			continue
 		}
 
-		// Update service states and overall state
+		// Update service states
 		serviceStates[svc.Name] = svc.Status.State
+
 		switch svc.Status.State {
 		case appsv1alpha1.NIMServiceStatusFailed:
+			// If any service has failed, the overall state should be "Failed"
 			overallState = appsv1alpha1.NIMServiceStatusFailed
+			allServicesReady = false
+			break
 		case appsv1alpha1.NIMServiceStatusNotReady:
-			if overallState == appsv1alpha1.NIMServiceStatusReady {
-				overallState = appsv1alpha1.NIMServiceStatusNotReady
-			}
+			fallthrough
+		case appsv1alpha1.NIMServiceStatusPending:
+			// If any service is not ready, mark overall readiness as false
+			allServicesReady = false
 		}
 	}
 
+	// If all services are ready and no failures were detected, set overall state to "Ready"
+	if allServicesReady && overallState != appsv1alpha1.NIMServiceStatusFailed {
+		overallState = appsv1alpha1.NIMServiceStatusReady
+	}
+
+	// Update the NIMPipeline status
 	nimPipeline.Status.State = overallState
 	nimPipeline.Status.States = serviceStates
 
