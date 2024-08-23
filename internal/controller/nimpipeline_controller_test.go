@@ -228,6 +228,71 @@ var _ = Describe("NIMPipeline Controller", func() {
 				return errors.IsNotFound(err)
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 		})
+
+		It("Should update NIMServices with dependencies, including service environment variables", func() {
+			ctx := context.TODO()
+			nimPipeline := &appsv1alpha1.NIMPipeline{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pipeline",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMPipelineSpec{
+					Services: []appsv1alpha1.NIMServicePipelineSpec{
+						{
+							Name:    "nim-llm-service",
+							Enabled: BoolPtr(true),
+							Spec: appsv1alpha1.NIMServiceSpec{
+								Type: "llm",
+								Image: appsv1alpha1.Image{
+									Repository: "llm-nim-container",
+									Tag:        "latest",
+								},
+								Replicas: 1,
+								Resources: &corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("100m"),
+										corev1.ResourceMemory: resource.MustParse("128Mi"),
+									},
+									Limits: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("200m"),
+										corev1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+								},
+							},
+							Dependencies: []appsv1alpha1.ServiceDependency{
+								{Name: "dependency-service", Port: 9090, EnvName: "CUSTOM_DEPENDENCY_SERVICE", EnvValue: "dependency-service-2.default.svc.local:9090"},
+							},
+						},
+					},
+				},
+			}
+			Expect(client.Create(ctx, nimPipeline)).To(Succeed())
+
+			// Reconcile the resource
+			_, err := reconciler.reconcileNIMPipeline(ctx, nimPipeline)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Helper function to validate environment variables
+			validateEnvVars := func(serviceName string, expectedEnvVars []corev1.EnvVar) {
+				namespacedName := types.NamespacedName{Name: serviceName, Namespace: "default"}
+				nimService := &appsv1alpha1.NIMService{}
+				err := client.Get(context.TODO(), namespacedName, nimService)
+				Expect(err).ToNot(HaveOccurred())
+
+				for _, expectedEnvVar := range expectedEnvVars {
+					Expect(nimService.Spec.Env).To(ContainElement(expectedEnvVar))
+				}
+			}
+
+			// Validate environment variables for LLM service
+			expectedEnvVarsForLLM := []corev1.EnvVar{
+				{
+					Name:  "CUSTOM_DEPENDENCY_SERVICE",
+					Value: "dependency-service-2.default.svc.local:9090",
+				},
+			}
+			validateEnvVars("nim-llm-service", expectedEnvVarsForLLM)
+		})
 	})
 })
 

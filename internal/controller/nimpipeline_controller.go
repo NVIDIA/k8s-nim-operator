@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 
+	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -139,6 +141,25 @@ func (r *NIMPipelineReconciler) reconcileNIMPipeline(ctx context.Context, nimPip
 	return ctrl.Result{}, nil
 }
 
+func (r *NIMPipelineReconciler) injectDependencies(nimService *appsv1alpha1.NIMService, dependencies []appsv1alpha1.ServiceDependency) {
+	for _, dep := range dependencies {
+		var serviceEnvVars []corev1.EnvVar
+
+		// Check if custom environment variable names and values are provided and inject them
+		if dep.EnvName != "" && dep.EnvValue != "" {
+			// Use custom environment variables
+			serviceEnvVars = []corev1.EnvVar{
+				{
+					Name:  dep.EnvName,
+					Value: dep.EnvValue,
+				},
+			}
+			// Merge and inject the environment variables
+			nimService.Spec.Env = utils.MergeEnvVars(nimService.Spec.Env, serviceEnvVars)
+		}
+	}
+}
+
 func (r *NIMPipelineReconciler) reconcileNIMService(ctx context.Context, nimPipeline *appsv1alpha1.NIMPipeline, service appsv1alpha1.NIMServicePipelineSpec) error {
 	logger := log.FromContext(ctx)
 
@@ -149,6 +170,9 @@ func (r *NIMPipelineReconciler) reconcileNIMService(ctx context.Context, nimPipe
 		},
 		Spec: service.Spec,
 	}
+
+	// Inject service dependencies
+	r.injectDependencies(nimService, service.Dependencies)
 
 	// Set NIMPipeline as the owner and controller of the NIMService
 	if err := controllerutil.SetControllerReference(nimPipeline, nimService, r.Scheme); err != nil {
@@ -227,7 +251,6 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 			// If any service has failed, the overall state should be "Failed"
 			overallState = appsv1alpha1.NIMServiceStatusFailed
 			allServicesReady = false
-			break
 		case appsv1alpha1.NIMServiceStatusNotReady:
 			fallthrough
 		case appsv1alpha1.NIMServiceStatusPending:

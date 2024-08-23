@@ -48,9 +48,22 @@ type NIMPipelineSpec struct {
 
 // NIMServicePipelineSpec defines the desired state of NIMService as part of the NIMPipeline
 type NIMServicePipelineSpec struct {
-	Name    string         `json:"name,omitempty"`
-	Enabled *bool          `json:"enabled,omitempty"`
-	Spec    NIMServiceSpec `json:"spec,omitempty"`
+	Name         string              `json:"name,omitempty"`
+	Enabled      *bool               `json:"enabled,omitempty"`
+	Spec         NIMServiceSpec      `json:"spec,omitempty"`
+	Dependencies []ServiceDependency `json:"dependencies,omitempty"`
+}
+
+// ServiceDependency defines service dependencies
+type ServiceDependency struct {
+	// Name is the dependent service name
+	Name string `json:"name"`
+	// Port is the dependent service port
+	Port int32 `json:"port"`
+	// EnvName is the dependent service endpoint environment variable name
+	EnvName string `json:"envName,omitempty"`
+	// EnvValue is the dependent service endpoint environment variable value
+	EnvValue string `json:"envValue,omitempty"`
 }
 
 // NIMPipelineStatus defines the observed state of NIMPipeline

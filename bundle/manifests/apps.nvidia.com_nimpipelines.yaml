@@ -53,6 +53,30 @@ spec:
                   description: NIMServicePipelineSpec defines the desired state of
                     NIMService as part of the NIMPipeline
                   properties:
+                    dependencies:
+                      items:
+                        description: ServiceDependency defines service dependencies
+                        properties:
+                          envName:
+                            description: EnvName is the dependent service endpoint
+                              environment variable name
+                            type: string
+                          envValue:
+                            description: EnvValue is the dependent service endpoint
+                              environment variable value
+                            type: string
+                          name:
+                            description: Name is the dependent service name
+                            type: string
+                          port:
+                            description: Port is the dependent service port
+                            format: int32
+                            type: integer
+                        required:
+                        - name
+                        - port
+                        type: object
+                      type: array
                     enabled:
                       type: boolean
                     name:
