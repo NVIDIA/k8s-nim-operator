@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
@@ -82,7 +83,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 					Services: []appsv1alpha1.NIMServicePipelineSpec{
 						{
 							Name:    "nim-llm-service",
-							Enabled: BoolPtr(true),
+							Enabled: utils.BoolPtr(true),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Type: "llm",
 								Image: appsv1alpha1.Image{
@@ -104,7 +105,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 						},
 						{
 							Name:    "nim-embedding-service",
-							Enabled: BoolPtr(false),
+							Enabled: utils.BoolPtr(false),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Type: "embedding",
 								Image: appsv1alpha1.Image{
@@ -151,7 +152,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 					Services: []appsv1alpha1.NIMServicePipelineSpec{
 						{
 							Name:    "nim-llm-service",
-							Enabled: BoolPtr(true),
+							Enabled: utils.BoolPtr(true),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Type: "llm",
 								Image: appsv1alpha1.Image{
@@ -173,7 +174,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 						},
 						{
 							Name:    "nim-embedding-service",
-							Enabled: BoolPtr(false),
+							Enabled: utils.BoolPtr(false),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Type: "embedding",
 								Image: appsv1alpha1.Image{
@@ -197,7 +198,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 			namespacedName := types.NamespacedName{Name: "test-pipeline", Namespace: "default"}
 			Expect(client.Get(context.TODO(), namespacedName, updatePipeline)).To(Succeed())
 
-			updatePipeline.Spec.Services[1].Enabled = BoolPtr(true)
+			updatePipeline.Spec.Services[1].Enabled = utils.BoolPtr(true)
 			Expect(client.Update(ctx, updatePipeline)).To(Succeed())
 
 			// Reconcile the resource
@@ -213,7 +214,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 
 			// Disable nim-llm-service in the pipeline spec
-			updatePipeline.Spec.Services[0].Enabled = BoolPtr(false)
+			updatePipeline.Spec.Services[0].Enabled = utils.BoolPtr(false)
 			Expect(client.Update(ctx, updatePipeline)).To(Succeed())
 
 			// Reconcile the resource
@@ -240,7 +241,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 					Services: []appsv1alpha1.NIMServicePipelineSpec{
 						{
 							Name:    "nim-llm-service",
-							Enabled: BoolPtr(true),
+							Enabled: utils.BoolPtr(true),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Type: "llm",
 								Image: appsv1alpha1.Image{
@@ -295,8 +296,3 @@ var _ = Describe("NIMPipeline Controller", func() {
 		})
 	})
 })
-
-// BoolPtr returns a pointer to the bool value passed in
-func BoolPtr(b bool) *bool {
-	return &b
-}

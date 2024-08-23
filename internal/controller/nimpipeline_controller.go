@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	corev1 "k8s.io/api/core/v1"
@@ -111,6 +112,7 @@ func (r *NIMPipelineReconciler) cleanupNIMPipeline(ctx context.Context, nimPipel
 }
 
 func (r *NIMPipelineReconciler) reconcileNIMPipeline(ctx context.Context, nimPipeline *appsv1alpha1.NIMPipeline) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 	// Track enabled NIMServices
 	enabledServices := make(map[string]bool)
 
@@ -124,17 +126,18 @@ func (r *NIMPipelineReconciler) reconcileNIMPipeline(ctx context.Context, nimPip
 		}
 
 		if err := r.reconcileNIMService(ctx, nimPipeline, service); err != nil {
-			return ctrl.Result{}, err
+			logger.Error(err, "Failed to reconcile NIMService", "name", service.Name)
+			continue
 		}
+	}
+
+	// Update status of NIMPipeline based on the status of related NIMServices
+	if err := r.updateStatus(ctx, nimPipeline, enabledServices); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Clean up disabled NIMServices
 	if err := r.cleanupDisabledNIMs(ctx, nimPipeline, enabledServices); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Update status of NIMServices
-	if err := r.updateStatus(ctx, nimPipeline, enabledServices); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -179,26 +182,43 @@ func (r *NIMPipelineReconciler) reconcileNIMService(ctx context.Context, nimPipe
 		return err
 	}
 
-	// Check if the NIMService already exists and create or update as necessary
-	existingService := &appsv1alpha1.NIMService{}
-	err := r.Get(ctx, types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}, existingService)
+	// Sync NIMService with the desired spec
+	namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+	err := r.syncResource(ctx, namespacedName, nimService)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			logger.Info("Creating new NIMService", "name", nimService.Name)
-			return r.Create(ctx, nimService)
+		logger.Error(err, "Failed to sync NIMService", "name", nimService.Name)
+		return err
+	}
+
+	return nil
+}
+
+func (r *NIMPipelineReconciler) syncResource(ctx context.Context, currentNamespacedName types.NamespacedName, desired *appsv1alpha1.NIMService) error {
+	logger := log.FromContext(ctx)
+
+	current := &appsv1alpha1.NIMService{}
+	err := r.Get(ctx, currentNamespacedName, current)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	if !utils.IsSpecChanged(current, desired) {
+		logger.V(2).Info("NIMService spec has not changed, skipping update", "obj", current)
+		return nil
+	}
+	logger.V(2).Info("NIMService spec has changed, updating")
+
+	if errors.IsNotFound(err) {
+		err = r.Create(ctx, desired)
+		if err != nil {
+			return err
 		}
-		logger.Error(err, "Failed to get NIMService", "name", nimService.Name)
-		return err
+	} else {
+		err = r.Update(ctx, desired)
+		if err != nil {
+			return err
+		}
 	}
-
-	// Update the existing NIMService's spec if needed
-	logger.Info("Updating existing NIMService", "name", nimService.Name)
-	existingService.Spec = nimService.Spec
-	if err := r.Update(ctx, existingService); err != nil {
-		logger.Error(err, "Failed to update NIMService", "name", nimService.Name)
-		return err
-	}
-
 	return nil
 }
 
@@ -211,22 +231,30 @@ func (r *NIMPipelineReconciler) cleanupDisabledNIMs(ctx context.Context, nimPipe
 		return err
 	}
 
+	var allErrors []error
+
 	for _, svc := range serviceList.Items {
 		// Cleanup any stale NIM services if they are part of the pipeline but are disabled
 		if enabled, exists := enabledServices[svc.Name]; exists && !enabled {
 			if err := r.deleteService(ctx, &svc); err != nil {
 				logger.Error(err, "Unable to delete disabled NIM service", "Name", svc.Name)
-				return err
+				allErrors = append(allErrors, fmt.Errorf("failed to delete service %s: %w", svc.Name, err))
 			}
-			continue
 		}
 	}
+
+	// If there were any errors during the cleanup process, return the overall error
+	if len(allErrors) > 0 {
+		return fmt.Errorf("errors during cleanup: %v", allErrors)
+	}
+
 	return nil
 }
 
 func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *appsv1alpha1.NIMPipeline, enabledServices map[string]bool) error {
 	logger := log.FromContext(ctx)
 
+	// List NIMServices in the pipeline's namespace
 	serviceList := &appsv1alpha1.NIMServiceList{}
 	if err := r.List(ctx, serviceList, client.InNamespace(nimPipeline.Namespace)); err != nil {
 		logger.Error(err, "Failed to list NIMServices")
@@ -238,28 +266,49 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 	serviceStates := make(map[string]string)
 	allServicesReady := true
 
+	// Track which enabled services are found
+	foundServices := make(map[string]bool)
+
 	for _, svc := range serviceList.Items {
-		if enabled, exists := enabledServices[svc.Name]; !exists || !enabled {
+		owned := false
+		for _, ownerRef := range svc.GetOwnerReferences() {
+			if ownerRef.Kind == "NIMPipeline" && ownerRef.UID == nimPipeline.UID {
+				owned = true
+				break
+			}
+		}
+
+		if enabled, exists := enabledServices[svc.Name]; !owned || !exists || !enabled {
 			continue
 		}
+
+		// Mark the service as found
+		foundServices[svc.Name] = true
 
 		// Update service states
 		serviceStates[svc.Name] = svc.Status.State
 
 		switch svc.Status.State {
 		case appsv1alpha1.NIMServiceStatusFailed:
-			// If any service has failed, the overall state should be "Failed"
+			// If any service has failed, set the overall state to "Failed"
 			overallState = appsv1alpha1.NIMServiceStatusFailed
 			allServicesReady = false
-		case appsv1alpha1.NIMServiceStatusNotReady:
-			fallthrough
-		case appsv1alpha1.NIMServiceStatusPending:
-			// If any service is not ready, mark overall readiness as false
+		case appsv1alpha1.NIMServiceStatusNotReady, appsv1alpha1.NIMServiceStatusPending:
+			// If any service is not ready or pending, set overall readiness to false
 			allServicesReady = false
 		}
 	}
 
-	// If all services are ready and no failures were detected, set overall state to "Ready"
+	// Check if any enabled services are missing
+	for serviceName := range enabledServices {
+		if !foundServices[serviceName] {
+			// A required service is missing, mark as "NotReady"
+			allServicesReady = false
+			serviceStates[serviceName] = appsv1alpha1.NIMServiceStatusNotReady
+		}
+	}
+
+	// If all services are ready and no failures were detected, set the overall state to "Ready"
 	if allServicesReady && overallState != appsv1alpha1.NIMServiceStatusFailed {
 		overallState = appsv1alpha1.NIMServiceStatusReady
 	}
