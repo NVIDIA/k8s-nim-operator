@@ -1,6 +1,6 @@
 apiVersion: v2
 name: k8s-nim-operator
-description: NVIDIA NIM Operator creates/configures/manages NVIDIA NIMs atop Kubernetes
+description: NVIDIA NIM Operator creates/configures/manages NVIDIA NIM microservices in Kubernetes
 # A chart can be either an 'application' or a 'library' chart.
 #
 # Application charts are a collection of templates that can be packaged into versioned archives
@@ -23,11 +23,10 @@ appVersion: "0.1.0"
 icon: https://assets.nvidiagrid.net/ngc/logos/NIMOperator.png
 sources:
 - https://github.com/NVIDIA/k8s-nim-operator
-home: https://docs.nvidia.com/datacenter/cloud-native/k8s-nim-operator/overview.html
+home: https://docs.nvidia.com/nim-operator/latest/index.html
 keywords:
   - gpu
   - nim
   - nemo
   - operator
   - ai
-
