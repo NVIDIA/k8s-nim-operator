@@ -14,7 +14,14 @@ spec:
     singular: nimpipeline
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.state
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: NIMPipeline is the Schema for the nimpipelines API
@@ -46,6 +53,30 @@ spec:
                   description: NIMServicePipelineSpec defines the desired state of
                     NIMService as part of the NIMPipeline
                   properties:
+                    dependencies:
+                      items:
+                        description: ServiceDependency defines service dependencies
+                        properties:
+                          envName:
+                            description: EnvName is the dependent service endpoint
+                              environment variable name
+                            type: string
+                          envValue:
+                            description: EnvValue is the dependent service endpoint
+                              environment variable value
+                            type: string
+                          name:
+                            description: Name is the dependent service name
+                            type: string
+                          port:
+                            description: Port is the dependent service port
+                            format: int32
+                            type: integer
+                        required:
+                        - name
+                        - port
+                        type: object
+                      type: array
                     enabled:
                       type: boolean
                     name:
@@ -2253,7 +2284,13 @@ spec:
                   type: object
                 type: array
               state:
+                description: State indicates the overall state of the pipeline
                 type: string
+              states:
+                additionalProperties:
+                  type: string
+                description: States indicate state of individual services in the pipeline
+                type: object
             type: object
         type: object
     served: true
