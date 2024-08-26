@@ -125,7 +125,6 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
 	logger.Info("Reconciling", "NIMCache", nimCache.Name)
 
 	// Check if the instance is marked for deletion
@@ -153,11 +152,16 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, nil
 		}
 	}
-
 	// Handle nim-cache reconciliation
 	result, err := r.reconcileNIMCache(ctx, nimCache)
 	if err != nil {
 		logger.Error(err, "error reconciling NIMCache", "name", nimCache.Name)
+		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionFalse, "NIMCache reconcile failed", err.Error())
+		nimCache.Status.State = appsv1alpha1.NimCacheStatusFailed
+		if err := r.Status().Update(ctx, nimCache); err != nil {
+			logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
+			return result, err
+		}
 		return result, err
 	}
 
