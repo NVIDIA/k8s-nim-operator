@@ -1026,15 +1026,15 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 				Env: []corev1.EnvVar{
 					{
 						Name:  "HF_HOME",
-						Value: "/model-store", // Need to be set to a writable directory by non-root user
+						Value: "/model-store/huggingface",
 					},
 					{
-						Name:  "NIM_CACHE_PATH", // Note: in the download mode, NIM_CACHE_PATH is not used
+						Name:  "NIM_CACHE_PATH",
 						Value: "/model-store",
 					},
 					{
-						Name:  "NGC_HOME", // Note: NGC_HOME is required and handled as NIM_CACHE_PATH in the download mode
-						Value: "/model-store",
+						Name:  "NGC_HOME",
+						Value: "/model-store/ngc",
 					},
 				},
 				VolumeMounts: []corev1.VolumeMount{
