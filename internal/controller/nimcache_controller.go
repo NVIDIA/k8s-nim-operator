@@ -462,8 +462,6 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 // Explicit model profiles are not provided by the user
 func isModelSelectionRequired(nimCache *appsv1alpha1.NIMCache) bool {
 	if nimCache.Spec.Source.NGC != nil &&
-		nimCache.Spec.Source.NGC.Model.AutoDetect != nil &&
-		*nimCache.Spec.Source.NGC.Model.AutoDetect &&
 		len(nimCache.Spec.Source.NGC.Model.Profiles) == 0 {
 		return true
 	}
@@ -1047,14 +1045,12 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 				},
 				Resources: corev1.ResourceRequirements{
 					Limits: map[corev1.ResourceName]apiResource.Quantity{
-						"cpu":            nimCache.Spec.Resources.CPU,
-						"memory":         nimCache.Spec.Resources.Memory,
-						"nvidia.com/gpu": *apiResource.NewQuantity(int64(nimCache.Spec.Resources.GPUs), apiResource.DecimalExponent),
+						"cpu":    nimCache.Spec.Resources.CPU,
+						"memory": nimCache.Spec.Resources.Memory,
 					},
 					Requests: map[corev1.ResourceName]apiResource.Quantity{
-						"cpu":            nimCache.Spec.Resources.CPU,
-						"memory":         nimCache.Spec.Resources.Memory,
-						"nvidia.com/gpu": *apiResource.NewQuantity(int64(nimCache.Spec.Resources.GPUs), apiResource.DecimalExponent),
+						"cpu":    nimCache.Spec.Resources.CPU,
+						"memory": nimCache.Spec.Resources.Memory,
 					},
 				},
 				TerminationMessagePath:   "/dev/termination-log",
@@ -1081,8 +1077,8 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 			return nil, err
 		}
 
-		if len(selectedProfiles) == 0 && nimCache.Spec.Resources.GPUs == 0 {
-			return nil, fmt.Errorf("No profiles are selected for caching and no GPUs are assigned to the pod for auto-selection")
+		if len(selectedProfiles) == 0 {
+			return nil, fmt.Errorf("no profiles are selected for caching")
 		}
 
 		if len(selectedProfiles) > 0 {

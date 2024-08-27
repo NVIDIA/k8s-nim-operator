@@ -70,11 +70,6 @@ spec:
                       caching NIM
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
-                  gpus:
-                    description: GPUs specifies the number of GPUs to assign to the
-                      caching job.
-                    minimum: 0
-                    type: integer
                   memory:
                     anyOf:
                     - type: integer
@@ -129,10 +124,6 @@ spec:
                       model:
                         description: Model spec for caching
                         properties:
-                          autoDetect:
-                            description: AutoDetect enables auto-detection of model
-                              profiles with specified model parameters
-                            type: boolean
                           engine:
                             description: Engine is the backend engine (tensort_llm,
                               vllm)

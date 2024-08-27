@@ -71,8 +71,6 @@ type NGCSource struct {
 type ModelSpec struct {
 	// Profiles are the specific model profiles to cache
 	Profiles []string `json:"profiles,omitempty"`
-	// AutoDetect enables auto-detection of model profiles with specified model parameters
-	AutoDetect *bool `json:"autoDetect,omitempty"`
 	// Precision is the precision for model quantization
 	Precision string `json:"precision,omitempty"`
 	// Engine is the backend engine (tensort_llm, vllm)
@@ -153,9 +151,6 @@ type NIMProfile struct {
 // Resources defines the minimum resources required for caching NIM.
 // +kubebuilder:validation:Required
 type Resources struct {
-	// GPUs specifies the number of GPUs to assign to the caching job.
-	// +kubebuilder:validation:Minimum=0
-	GPUs int `json:"gpus,omitempty"`
 	// CPU indicates the minimum number of CPUs to use while caching NIM
 	CPU resource.Quantity `json:"cpu,omitempty"`
 	// Memory indicates the minimum amount of memory to use while caching NIM

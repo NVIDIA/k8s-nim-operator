@@ -110,9 +110,8 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage:   appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
-					Resources: appsv1alpha1.Resources{GPUs: 1},
+					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
 					State: appsv1alpha1.NimCacheStatusNotReady,
@@ -174,9 +173,8 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage:   appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
-					Resources: appsv1alpha1.Resources{GPUs: 1},
+					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
 					State: "Initializing",
@@ -224,9 +222,8 @@ var _ = Describe("NIMCache Controller", func() {
 					Finalizers:        []string{NIMCacheFinalizer},
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage:   appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
-					Resources: appsv1alpha1.Resources{GPUs: 1},
+					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
 					State: "Initializing",
@@ -384,7 +381,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{AutoDetect: ptr.To[bool](true)}}},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
 				},
 			}
 
@@ -415,7 +412,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{AutoDetect: ptr.To[bool](true)}}},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
 				},
 			}
 
@@ -442,7 +439,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles, AutoDetect: ptr.To[bool](false)}}},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles}}},
 				},
 			}
 
@@ -457,15 +454,18 @@ var _ = Describe("NIMCache Controller", func() {
 		})
 
 		It("should create a job with the correct specifications", func() {
+			profiles := []string{"36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"}
+			profilesJSON, err := json.Marshal(profiles)
+			Expect(err).ToNot(HaveOccurred())
 			ctx := context.TODO()
 			nimCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-nimcache",
-					Namespace: "default",
+					Name:        "test-nimcache",
+					Namespace:   "default",
+					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
-					Resources: appsv1alpha1.Resources{GPUs: 1},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{GPUs: []appsv1alpha1.GPUSpec{{IDs: []string{"26b5"}}}}}},
 				},
 			}
 
