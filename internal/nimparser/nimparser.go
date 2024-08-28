@@ -25,6 +25,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	// BackendTypeTensorRT indicates tensortt backend
+	BackendTypeTensorRT = "tensorrt"
+)
+
 // File represents the model files
 type File struct {
 	Name string `yaml:"name" json:"name,omitempty"`
@@ -152,10 +157,16 @@ func MatchProfiles(modelSpec appsv1alpha1.ModelSpec, manifest NIMManifest, disco
 			continue
 		}
 
-		// GPU matching logic
-		if len(modelSpec.GPUs) > 0 || len(discoveredGPUs) > 0 {
-			if !matchGPUProfile(modelSpec, profile, discoveredGPUs) {
+		// Perform GPU match only when optimized engine is selected or GPU filters are provided
+		if isOptimizedEngine(modelSpec.Engine) || len(modelSpec.GPUs) > 0 {
+			// Skip non optimized profiles
+			if !isOptimizedEngine(backend) {
 				continue
+			}
+			if len(modelSpec.GPUs) > 0 || len(discoveredGPUs) > 0 {
+				if !matchGPUProfile(modelSpec, profile, discoveredGPUs) {
+					continue
+				}
 			}
 		}
 
@@ -164,6 +175,10 @@ func MatchProfiles(modelSpec appsv1alpha1.ModelSpec, manifest NIMManifest, disco
 	}
 
 	return selectedProfiles, nil
+}
+
+func isOptimizedEngine(engine string) bool {
+	return engine != "" && strings.Contains(strings.ToLower(engine), BackendTypeTensorRT)
 }
 
 func matchGPUProfile(modelSpec appsv1alpha1.ModelSpec, profile NIMProfile, discoveredGPUs []string) bool {
