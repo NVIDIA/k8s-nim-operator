@@ -593,8 +593,8 @@ var _ = Describe("NIMCache Controller", func() {
 
 			Expect(cli.Get(ctx, types.NamespacedName{Name: "test-nimcache", Namespace: "default"}, NIMCache)).To(Succeed())
 			Expect(NIMCache.Status.State).To(Equal(appsv1alpha1.NimCacheStatusNotReady))
-			Expect(NIMCache.Status.Conditions[0].Type).To(Equal(appsv1alpha1.NimCacheConditionPVCCreated))
-			Expect(NIMCache.Status.Conditions[0].Status).To(Equal(metav1.ConditionFalse))
+			Expect(NIMCache.Status.Conditions[0].Type).To(Equal(appsv1alpha1.NimCacheConditionReconcileFailed))
+			Expect(NIMCache.Status.Conditions[0].Status).To(Equal(metav1.ConditionTrue))
 			Expect(NIMCache.Status.Conditions[0].Message).To(Equal("error getting SA for NIMCache"))
 
 		})

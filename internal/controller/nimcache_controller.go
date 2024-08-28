@@ -162,7 +162,7 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return result, errGet
 		}
 		logger.Error(err, "error reconciling NIMCache", "name", nimCache.Name)
-		conditions.UpdateCondition(&obj.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionFalse, "Failed", err.Error())
+		conditions.UpdateCondition(&obj.Status.Conditions, appsv1alpha1.NimCacheConditionReconcileFailed, metav1.ConditionTrue, "Error", err.Error())
 		obj.Status.State = appsv1alpha1.NimCacheStatusNotReady
 		if err := r.Status().Update(ctx, obj); err != nil {
 			logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
