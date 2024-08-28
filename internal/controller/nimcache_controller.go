@@ -155,22 +155,16 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Handle nim-cache reconciliation
 	result, err := r.reconcileNIMCache(ctx, nimCache)
 	if err != nil {
-		obj := &appsv1alpha1.NIMCache{}
-		errGet := r.Get(ctx, types.NamespacedName{Name: nimCache.Name, Namespace: nimCache.GetNamespace()}, obj)
-		if errGet != nil {
-			logger.Error(errGet, "error getting NIMCache", "name", nimCache.Name)
-			return result, errGet
-		}
 		logger.Error(err, "error reconciling NIMCache", "name", nimCache.Name)
-		conditions.UpdateCondition(&obj.Status.Conditions, appsv1alpha1.NimCacheConditionReconcileFailed, metav1.ConditionTrue, "Error", err.Error())
-		obj.Status.State = appsv1alpha1.NimCacheStatusNotReady
-		if err := r.Status().Update(ctx, obj); err != nil {
-			logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
-			return result, err
+		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionReconcileFailed, metav1.ConditionTrue, "Error", err.Error())
+		nimCache.Status.State = appsv1alpha1.NimCacheStatusNotReady
+		errUpdate := r.updateNIMCacheStatus(ctx, nimCache)
+		if errUpdate != nil {
+			logger.Error(err, "Failed to update NIMCache status", "NIMCache", nimCache.Name)
+			return result, errUpdate
 		}
 		return result, err
 	}
-
 	return result, nil
 }
 
@@ -799,19 +793,28 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 		return ctrl.Result{}, err
 	}
 
+	err = r.updateNIMCacheStatus(ctx, nimCache)
+	if err != nil {
+		logger.Error(err, "Failed to update NIMCache status", "NIMCache", nimCache.Name)
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *NIMCacheReconciler) updateNIMCacheStatus(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
+	logger := r.GetLogger()
 	obj := &appsv1alpha1.NIMCache{}
 	errGet := r.Get(ctx, types.NamespacedName{Name: nimCache.Name, Namespace: nimCache.GetNamespace()}, obj)
 	if errGet != nil {
 		logger.Error(errGet, "error getting NIMCache", "name", nimCache.Name)
-		return ctrl.Result{}, errGet
+		return errGet
 	}
 	obj.Status = nimCache.Status
 	if err := r.Status().Update(ctx, obj); err != nil {
 		logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
-		return ctrl.Result{}, err
+		return err
 	}
-
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func getJobName(nimCache *appsv1alpha1.NIMCache) string {
