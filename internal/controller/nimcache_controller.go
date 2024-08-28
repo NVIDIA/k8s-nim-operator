@@ -155,10 +155,16 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Handle nim-cache reconciliation
 	result, err := r.reconcileNIMCache(ctx, nimCache)
 	if err != nil {
+		obj := &appsv1alpha1.NIMCache{}
+		errGet := r.Get(ctx, types.NamespacedName{Name: nimCache.Name, Namespace: nimCache.GetNamespace()}, obj)
+		if errGet != nil {
+			logger.Error(errGet, "error getting NIMCache", "name", nimCache.Name)
+			return result, errGet
+		}
 		logger.Error(err, "error reconciling NIMCache", "name", nimCache.Name)
-		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionFalse, "NIMCache reconcile failed", err.Error())
-		nimCache.Status.State = appsv1alpha1.NimCacheStatusNotReady
-		if err := r.Status().Update(ctx, nimCache); err != nil {
+		conditions.UpdateCondition(&obj.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionFalse, "Failed", err.Error())
+		obj.Status.State = appsv1alpha1.NimCacheStatusNotReady
+		if err := r.Status().Update(ctx, obj); err != nil {
 			logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
 			return result, err
 		}
@@ -448,10 +454,6 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 
 			conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for caching NIM model")
 			nimCache.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
-			if err := r.Status().Update(ctx, nimCache); err != nil {
-				logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
-				return err
-			}
 		} else {
 			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
 			return err
@@ -625,10 +627,6 @@ func (r *NIMCacheReconciler) reconcileModelSelection(ctx context.Context, nimCac
 		}
 
 		nimCache.Annotations[SelectedNIMProfilesAnnotationKey] = string(profilesJSON)
-		if err := r.Update(ctx, nimCache); err != nil {
-			logger.Error(err, "unable to update NIMCache with selected profiles annotation")
-			return err
-		}
 	}
 	return nil
 }
@@ -663,10 +661,6 @@ func (r *NIMCacheReconciler) reconcileJob(ctx context.Context, nimCache *appsv1a
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionJobCreated, metav1.ConditionTrue, "JobCreated", "The Job to cache NIM has been created")
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusStarted
 		nimCache.Status.Profiles = []v1alpha1.NIMProfile{}
-		if err := r.Status().Update(ctx, nimCache); err != nil {
-			return err
-		}
-		// return to reconcile later on job status update
 		return nil
 	}
 
@@ -717,19 +711,11 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 			}
 		}
 
-		if err := r.Status().Update(ctx, nimCache); err != nil {
-			return fmt.Errorf("failed to update status: %w", err)
-		}
-
 	case job.Status.Failed > 0 && nimCache.Status.State != appsv1alpha1.NimCacheStatusFailed:
 		logger.Info("Failed to cache NIM, job failed", "job", jobName)
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionJobCompleted, metav1.ConditionFalse, "JobFailed", "The Job to cache NIM has failed")
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusFailed
 		nimCache.Status.Profiles = []v1alpha1.NIMProfile{}
-
-		if err := r.Status().Update(ctx, nimCache); err != nil {
-			return fmt.Errorf("failed to update status: %w", err)
-		}
 
 	case job.Status.Active > 0 && nimCache.Status.State != appsv1alpha1.NimCacheStatusInProgress:
 		logger.Info("Caching NIM is in progress, job running", "job", jobName)
@@ -737,19 +723,12 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusInProgress
 		nimCache.Status.Profiles = []v1alpha1.NIMProfile{}
 
-		if err := r.Status().Update(ctx, nimCache); err != nil {
-			return fmt.Errorf("failed to update status: %w", err)
-		}
-
 	case job.Status.Active == 0 && nimCache.Status.State != appsv1alpha1.NimCacheStatusReady && nimCache.Status.State != appsv1alpha1.NimCacheStatusPending:
 		logger.Info("Caching NIM is in progress, job pending", "job", jobName)
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionJobPending, metav1.ConditionTrue, "JobPending", "The Job to cache NIM is in pending state")
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusPending
 		nimCache.Status.Profiles = []v1alpha1.NIMProfile{}
 
-		if err := r.Status().Update(ctx, nimCache); err != nil {
-			return fmt.Errorf("failed to update status: %w", err)
-		}
 	}
 
 	return nil
@@ -819,6 +798,19 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 		logger.Error(err, "reconciliation of caching job failed", "job", getJobName(nimCache))
 		return ctrl.Result{}, err
 	}
+
+	obj := &appsv1alpha1.NIMCache{}
+	errGet := r.Get(ctx, types.NamespacedName{Name: nimCache.Name, Namespace: nimCache.GetNamespace()}, obj)
+	if errGet != nil {
+		logger.Error(errGet, "error getting NIMCache", "name", nimCache.Name)
+		return ctrl.Result{}, errGet
+	}
+	obj.Status = nimCache.Status
+	if err := r.Status().Update(ctx, obj); err != nil {
+		logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
