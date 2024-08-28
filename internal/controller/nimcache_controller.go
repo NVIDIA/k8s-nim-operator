@@ -793,6 +793,8 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 		return ctrl.Result{}, err
 	}
 
+	conditions.IfPresentUpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionReconcileFailed, metav1.ConditionTrue, "Succeed", "")
+
 	err = r.updateNIMCacheStatus(ctx, nimCache)
 	if err != nil {
 		logger.Error(err, "Failed to update NIMCache status", "NIMCache", nimCache.Name)
