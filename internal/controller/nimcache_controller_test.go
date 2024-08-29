@@ -579,9 +579,8 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage:   appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
-					Resources: appsv1alpha1.Resources{GPUs: 1},
+					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
 				},
 			}
 			Expect(cli.Create(ctx, NIMCache)).To(Succeed())
