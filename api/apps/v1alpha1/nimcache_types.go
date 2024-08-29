@@ -172,6 +172,8 @@ const (
 	NimCacheConditionJobPending = "NIM_CACHE_JOB_PENDING"
 	// NimCacheConditionPVCCreated indicates that the caching pvc is created.
 	NimCacheConditionPVCCreated = "NIM_CACHE_PVC_CREATED"
+	// NimCacheConditionReconcileFailed indicated that error occured while reconciling NIMCache object
+	NimCacheConditionReconcileFailed = "NIM_CACHE_RECONCILE_FAILED"
 
 	// NimCacheStatusNotReady indicates that cache is not ready
 	NimCacheStatusNotReady = "NotReady"

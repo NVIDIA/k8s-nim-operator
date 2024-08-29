@@ -27,12 +27,15 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
@@ -40,7 +43,7 @@ import (
 
 var _ = Describe("NIMCache Controller", func() {
 	var (
-		client     client.Client
+		cli        client.Client
 		reconciler *NIMCacheReconciler
 		scheme     *runtime.Scheme
 	)
@@ -51,13 +54,13 @@ var _ = Describe("NIMCache Controller", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(rbacv1.AddToScheme(scheme)).To(Succeed())
 
-		client = fake.NewClientBuilder().WithScheme(scheme).
+		cli = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMCache{}).
 			WithStatusSubresource(&batchv1.Job{}).
 			WithStatusSubresource(&corev1.ConfigMap{}).
 			Build()
 		reconciler = &NIMCacheReconciler{
-			Client: client,
+			Client: cli,
 			scheme: scheme,
 		}
 
@@ -82,7 +85,7 @@ var _ = Describe("NIMCache Controller", func() {
 
 		// Verify that the ConfigMap was created
 		createdConfigMap := &corev1.ConfigMap{}
-		err = client.Get(context.TODO(), types.NamespacedName{Name: getManifestConfigName(nimCache), Namespace: "default"}, createdConfigMap)
+		err = cli.Get(context.TODO(), types.NamespacedName{Name: getManifestConfigName(nimCache), Namespace: "default"}, createdConfigMap)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(createdConfigMap.Data).To(HaveKey("model_manifest.yaml"))
 	})
@@ -95,7 +98,7 @@ var _ = Describe("NIMCache Controller", func() {
 				Namespace: "default",
 			},
 		}
-		_ = client.Delete(context.TODO(), nimCache)
+		_ = cli.Delete(context.TODO(), nimCache)
 	})
 
 	Context("When creating a NIMCache", func() {
@@ -115,7 +118,7 @@ var _ = Describe("NIMCache Controller", func() {
 					State: appsv1alpha1.NimCacheStatusNotReady,
 				},
 			}
-			Expect(client.Create(ctx, NIMCache)).To(Succeed())
+			Expect(cli.Create(ctx, NIMCache)).To(Succeed())
 
 			// Reconcile the resource
 			_, err := reconciler.reconcileNIMCache(ctx, NIMCache)
@@ -126,7 +129,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Eventually(func() error {
 				job := &batchv1.Job{}
 				jobName := types.NamespacedName{Name: "test-nimcache-job", Namespace: "default"}
-				return client.Get(ctx, jobName, job)
+				return cli.Get(ctx, jobName, job)
 			}, time.Second*10).Should(Succeed())
 
 			// Check if the PVC was created
@@ -134,7 +137,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Eventually(func() error {
 				pvc := &corev1.PersistentVolumeClaim{}
 				pvcName := types.NamespacedName{Name: "test-nimcache-pvc", Namespace: "default"}
-				return client.Get(ctx, pvcName, pvc)
+				return cli.Get(ctx, pvcName, pvc)
 			}, time.Second*10).Should(Succeed())
 		})
 
@@ -153,7 +156,7 @@ var _ = Describe("NIMCache Controller", func() {
 					State: appsv1alpha1.NimCacheStatusNotReady,
 				},
 			}
-			Expect(client.Create(ctx, NIMCache)).To(Succeed())
+			Expect(cli.Create(ctx, NIMCache)).To(Succeed())
 
 			// Reconcile the resource
 			_, err := reconciler.reconcileNIMCache(ctx, NIMCache)
@@ -179,7 +182,7 @@ var _ = Describe("NIMCache Controller", func() {
 					State: "Initializing",
 				},
 			}
-			Expect(client.Create(ctx, NIMCache)).To(Succeed())
+			Expect(cli.Create(ctx, NIMCache)).To(Succeed())
 
 			// Reconcile the resource
 			_, err := reconciler.reconcileNIMCache(ctx, NIMCache)
@@ -190,22 +193,22 @@ var _ = Describe("NIMCache Controller", func() {
 			Eventually(func() error {
 				job := &batchv1.Job{}
 				jobName := types.NamespacedName{Name: "test-nimcache-job", Namespace: "default"}
-				return client.Get(ctx, jobName, job)
+				return cli.Get(ctx, jobName, job)
 			}, time.Second*10).Should(Succeed())
 
 			// Set the Job as completed
 			job := &batchv1.Job{}
 			jobName := types.NamespacedName{Name: "test-nimcache-job", Namespace: "default"}
-			Expect(client.Get(ctx, jobName, job)).To(Succeed())
+			Expect(cli.Get(ctx, jobName, job)).To(Succeed())
 			job.Status.Succeeded = 1
-			Expect(client.Status().Update(ctx, job)).To(Succeed())
+			Expect(cli.Status().Update(ctx, job)).To(Succeed())
 
 			// Reconcile the resource again
 			_, err = reconciler.reconcileNIMCache(ctx, NIMCache)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Check if the NIMCache status was updated
-			Expect(client.Get(ctx, types.NamespacedName{Name: "test-nimcache", Namespace: "default"}, NIMCache)).To(Succeed())
+			Expect(cli.Get(ctx, types.NamespacedName{Name: "test-nimcache", Namespace: "default"}, NIMCache)).To(Succeed())
 			Expect(NIMCache.Status.State).To(Equal(appsv1alpha1.NimCacheStatusReady))
 		})
 	})
@@ -229,7 +232,7 @@ var _ = Describe("NIMCache Controller", func() {
 					State: "Initializing",
 				},
 			}
-			Expect(client.Create(ctx, NIMCache)).To(Succeed())
+			Expect(cli.Create(ctx, NIMCache)).To(Succeed())
 
 			// Reconcile the resource
 			_, err := reconciler.reconcileNIMCache(ctx, NIMCache)
@@ -240,7 +243,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Eventually(func() error {
 				job := &batchv1.Job{}
 				jobName := types.NamespacedName{Name: "test-nimcache-job", Namespace: "default"}
-				return client.Get(ctx, jobName, job)
+				return cli.Get(ctx, jobName, job)
 			}, time.Second*10).Should(Succeed())
 
 			// Check if the PVC was created
@@ -248,11 +251,11 @@ var _ = Describe("NIMCache Controller", func() {
 			Eventually(func() error {
 				pvc := &corev1.PersistentVolumeClaim{}
 				pvcName := types.NamespacedName{Name: "test-nimcache-pvc", Namespace: "default"}
-				return client.Get(ctx, pvcName, pvc)
+				return cli.Get(ctx, pvcName, pvc)
 			}, time.Second*10).Should(Succeed())
 
 			// Delete the NIMCache instance
-			Expect(client.Delete(ctx, NIMCache)).To(Succeed())
+			Expect(cli.Delete(ctx, NIMCache)).To(Succeed())
 
 			// Reconcile the resource again
 			err = reconciler.cleanupNIMCache(ctx, NIMCache)
@@ -280,7 +283,7 @@ var _ = Describe("NIMCache Controller", func() {
 			role := &rbacv1.Role{}
 			roleName := types.NamespacedName{Name: NIMCacheRole, Namespace: "default"}
 
-			err = client.Get(ctx, roleName, role)
+			err = cli.Get(ctx, roleName, role)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(role.Rules).To(HaveLen(1))
 
@@ -315,7 +318,7 @@ var _ = Describe("NIMCache Controller", func() {
 			// Check if the RoleBinding was created
 			rb := &rbacv1.RoleBinding{}
 			rbName := types.NamespacedName{Name: NIMCacheRoleBinding, Namespace: "default"}
-			err = client.Get(ctx, rbName, rb)
+			err = cli.Get(ctx, rbName, rb)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check that the RoleBinding is bound to the correct Role
@@ -359,13 +362,13 @@ var _ = Describe("NIMCache Controller", func() {
 
 			pod := constructPodSpec(nimCache)
 
-			err := client.Create(context.TODO(), pod)
+			err := cli.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
 				pod := &corev1.Pod{}
 				podName := types.NamespacedName{Name: getPodName(nimCache), Namespace: "default"}
-				return client.Get(ctx, podName, pod)
+				return cli.Get(ctx, podName, pod)
 			}, time.Second*10).Should(Succeed())
 		})
 
@@ -469,13 +472,13 @@ var _ = Describe("NIMCache Controller", func() {
 			job, err := constructJob(nimCache)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = client.Create(context.TODO(), job)
+			err = cli.Create(context.TODO(), job)
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
 				job := &batchv1.Job{}
 				jobName := types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}
-				return client.Get(ctx, jobName, job)
+				return cli.Get(ctx, jobName, job)
 			}, time.Second*10).Should(Succeed())
 		})
 
@@ -501,7 +504,7 @@ var _ = Describe("NIMCache Controller", func() {
 
 			// Verify that the ConfigMap was created
 			createdConfigMap := &corev1.ConfigMap{}
-			err = client.Get(ctx, types.NamespacedName{Name: getManifestConfigName(nimCache), Namespace: "default"}, createdConfigMap)
+			err = cli.Get(ctx, types.NamespacedName{Name: getManifestConfigName(nimCache), Namespace: "default"}, createdConfigMap)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(createdConfigMap.Data).To(HaveKey("model_manifest.yaml"))
 
@@ -535,5 +538,66 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("model_manifest.yaml not found in ConfigMap"))
 		})
+	})
+
+	Context("when error reconciling NIMCache resource", func() {
+		BeforeEach(func() {
+			scheme = runtime.NewScheme()
+			Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
+			Expect(batchv1.AddToScheme(scheme)).To(Succeed())
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+			Expect(rbacv1.AddToScheme(scheme)).To(Succeed())
+
+			cli = fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(&appsv1alpha1.NIMCache{}).
+				WithStatusSubresource(&appsv1alpha1.NIMCache{}).
+				WithStatusSubresource(&batchv1.Job{}).
+				WithStatusSubresource(&corev1.ConfigMap{}).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if key.Name == NIMCacheServiceAccount {
+							return errors.NewBadRequest("error getting SA for NIMCache")
+						}
+						return client.Get(ctx, key, obj, opts...)
+					},
+				}).
+				Build()
+
+			reconciler = &NIMCacheReconciler{
+				Client: cli,
+				scheme: scheme,
+			}
+
+		})
+
+		It("should update the status on NIMCache object", func() {
+			ctx := context.TODO()
+			NIMCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source:    appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage:   appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					Resources: appsv1alpha1.Resources{GPUs: 1},
+				},
+			}
+			Expect(cli.Create(ctx, NIMCache)).To(Succeed())
+			Expect(cli.Get(ctx, types.NamespacedName{Name: "test-nimcache", Namespace: "default"}, NIMCache)).To(Succeed())
+
+			// Reconcile the resource
+			_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "test-nimcache", Namespace: "default"}})
+			Expect(err).To(HaveOccurred())
+
+			Expect(cli.Get(ctx, types.NamespacedName{Name: "test-nimcache", Namespace: "default"}, NIMCache)).To(Succeed())
+			Expect(NIMCache.Status.State).To(Equal(appsv1alpha1.NimCacheStatusNotReady))
+			Expect(NIMCache.Status.Conditions[0].Type).To(Equal(appsv1alpha1.NimCacheConditionReconcileFailed))
+			Expect(NIMCache.Status.Conditions[0].Status).To(Equal(metav1.ConditionTrue))
+			Expect(NIMCache.Status.Conditions[0].Message).To(Equal("error getting SA for NIMCache"))
+
+		})
+
 	})
 })

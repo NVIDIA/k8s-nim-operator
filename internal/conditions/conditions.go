@@ -148,3 +148,17 @@ func UpdateCondition(conditions *[]metav1.Condition, conditionType string, statu
 	})
 	// condition updated
 }
+
+func IfPresentUpdateCondition(conditions *[]metav1.Condition, conditionType string, status metav1.ConditionStatus, reason, message string) {
+	for i := range *conditions {
+		if (*conditions)[i].Type == conditionType {
+			// existing condition
+			(*conditions)[i].Status = status
+			(*conditions)[i].LastTransitionTime = metav1.Now()
+			(*conditions)[i].Reason = reason
+			(*conditions)[i].Message = message
+			// condition updated
+			return
+		}
+	}
+}
