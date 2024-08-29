@@ -156,7 +156,8 @@ spec:
                             type: string
                           profiles:
                             description: Profiles are the specific model profiles
-                              to cache
+                              to cache. When these are provided, rest of the model
+                              parameters for profile selection are ignored
                             items:
                               type: string
                             type: array

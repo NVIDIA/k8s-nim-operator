@@ -69,7 +69,7 @@ type NGCSource struct {
 
 // ModelSpec is the spec required to cache selected models
 type ModelSpec struct {
-	// Profiles are the specific model profiles to cache
+	// Profiles are the specific model profiles to cache. When these are provided, rest of the model parameters for profile selection are ignored
 	Profiles []string `json:"profiles,omitempty"`
 	// Precision is the precision for model quantization
 	Precision string `json:"precision,omitempty"`
