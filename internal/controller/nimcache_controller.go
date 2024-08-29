@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"time"
 
@@ -49,7 +50,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 const (
@@ -200,6 +203,19 @@ func (r *NIMCacheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Pod{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				// Type assert to NIMCache
+				if oldNIMCache, ok := e.ObjectOld.(*appsv1alpha1.NIMCache); ok {
+					newNIMCache := e.ObjectNew.(*appsv1alpha1.NIMCache)
+
+					// Handle only spec updates
+					return !reflect.DeepEqual(oldNIMCache.Spec, newNIMCache.Spec)
+				}
+				// For other types we watch, reconcile them
+				return true
+			},
+		}).
 		Complete(r)
 }
 

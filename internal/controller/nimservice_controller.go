@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"reflect"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -35,7 +36,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // NIMServiceFinalizer is the finalizer annotation
@@ -185,5 +188,18 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&networkingv1.Ingress{}).
 		Owns(&autoscalingv2.HorizontalPodAutoscaler{}).
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				// Type assert to NIMService
+				if oldNIMService, ok := e.ObjectOld.(*appsv1alpha1.NIMService); ok {
+					newNIMService := e.ObjectNew.(*appsv1alpha1.NIMService)
+
+					// Handle only spec updates
+					return !reflect.DeepEqual(oldNIMService.Spec, newNIMService.Spec)
+				}
+				// For other types we watch, reconcile them
+				return true
+			},
+		}).
 		Complete(r)
 }
