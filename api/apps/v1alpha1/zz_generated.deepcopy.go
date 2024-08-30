@@ -252,11 +252,6 @@ func (in *ModelSpec) DeepCopyInto(out *ModelSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.AutoDetect != nil {
-		in, out := &in.AutoDetect, &out.AutoDetect
-		*out = new(bool)
-		**out = **in
-	}
 	if in.GPUs != nil {
 		in, out := &in.GPUs, &out.GPUs
 		*out = make([]GPUSpec, len(*in))
