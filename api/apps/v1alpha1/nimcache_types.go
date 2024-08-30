@@ -41,8 +41,13 @@ type NIMCacheSpec struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// NodeSelectors are the node selector labels to schedule the caching job.
 	NodeSelectors map[string]string `json:"gpuSelectors,omitempty"`
-	UserID        *int64            `json:"userID,omitempty"`
-	GroupID       *int64            `json:"groupID,omitempty"`
+	// UserID is the user ID for the caching job
+	UserID *int64 `json:"userID,omitempty"`
+	// GroupID is the group ID for the caching job
+	GroupID *int64 `json:"groupID,omitempty"`
+	// CertConfig is the name of the ConfigMap containing the custom certificates.
+	// for secure communication.
+	CertConfig *CertConfig `json:"certConfig,omitempty"`
 }
 
 // NIMSource defines the source for caching NIM model

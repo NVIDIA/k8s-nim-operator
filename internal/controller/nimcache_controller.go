@@ -652,7 +652,7 @@ func (r *NIMCacheReconciler) reconcileJob(ctx context.Context, nimCache *appsv1a
 
 	// If Job does not exist and caching is not complete, create a new one
 	if err != nil && nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
-		job, err := constructJob(nimCache)
+		job, err := r.constructJob(ctx, nimCache)
 		if err != nil {
 			logger.Error(err, "Failed to construct job")
 			return err
@@ -936,7 +936,8 @@ func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (s
 	return buf.String(), nil
 }
 
-func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
+func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
+	logger := r.GetLogger()
 	pvcName := getPvcName(nimCache, nimCache.Spec.Storage.PVC)
 	labels := map[string]string{
 		"app":                          "k8s-nim-operator",
@@ -1090,6 +1091,7 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 		// Pass specific profiles to download based on user selection or auto-selection
 		selectedProfiles, err := getSelectedProfiles(nimCache)
 		if err != nil {
+			logger.Error(err, "failed to get selected profiles for caching")
 			return nil, err
 		}
 
@@ -1104,6 +1106,40 @@ func constructJob(nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
 				job.Spec.Template.Spec.Containers[0].Args = []string{"--profiles"}
 				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
 			}
+		}
+
+		// Inject custom CA certificates when running in a proxy envronment
+		if nimCache.Spec.CertConfig != nil {
+			certConfig, err := r.getConfigMap(ctx, nimCache.Spec.CertConfig.Name, nimCache.Namespace)
+			if err != nil {
+				logger.Error(err, "Failed to get configmap for custom certificates")
+				return nil, err
+			}
+
+			// Prepare the volume that references the ConfigMap
+			volume := corev1.Volume{
+				Name: "cert-volume",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: nimCache.Spec.CertConfig.Name,
+						},
+					},
+				},
+			}
+
+			// Create individual volume mounts for each key in the ConfigMap
+			volumeMounts := []corev1.VolumeMount{}
+			for key := range certConfig.Data {
+				volumeMounts = append(volumeMounts, corev1.VolumeMount{
+					Name:      "cert-volume",
+					MountPath: fmt.Sprintf("%s/%s", nimCache.Spec.CertConfig.MountPath, key),
+					SubPath:   key,
+				})
+			}
+
+			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volume)
+			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
 		}
 	}
 	return job, nil
