@@ -290,7 +290,7 @@ func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespaced
 
 	cond := getDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
 	if cond != nil && cond.Reason == "ProgressDeadlineExceeded" {
-		return fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name), false, fmt.Errorf("deployment %q exceeded its progress deadline", deployment.Name)
+		return fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name), false, nil
 	}
 	if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
 		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil
