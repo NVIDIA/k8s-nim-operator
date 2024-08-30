@@ -49,6 +49,23 @@ spec:
           spec:
             description: NIMCacheSpec defines the desired state of NIMCache
             properties:
+              certConfig:
+                description: |-
+                  CertConfig is the name of the ConfigMap containing the custom certificates.
+                  for secure communication.
+                properties:
+                  mountPath:
+                    description: MountPath is the path where the certificates should
+                      be mounted in the container.
+                    type: string
+                  name:
+                    description: Name of the ConfigMap containing the certificate
+                      data.
+                    type: string
+                required:
+                - mountPath
+                - name
+                type: object
               gpuSelectors:
                 additionalProperties:
                   type: string
@@ -56,6 +73,7 @@ spec:
                   the caching job.
                 type: object
               groupID:
+                description: GroupID is the group ID for the caching job
                 format: int64
                 type: integer
               resources:
@@ -259,6 +277,7 @@ spec:
                   type: object
                 type: array
               userID:
+                description: UserID is the user ID for the caching job
                 format: int64
                 type: integer
             required:

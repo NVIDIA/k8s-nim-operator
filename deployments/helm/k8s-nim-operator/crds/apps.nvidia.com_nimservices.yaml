@@ -502,6 +502,8 @@ spec:
                   type: string
                 type: object
               livenessProbe:
+                description: Probe defines attributes for startup/liveness/readiness
+                  probes
                 properties:
                   enabled:
                     type: boolean
@@ -1050,6 +1052,8 @@ spec:
                     x-kubernetes-list-type: atomic
                 type: object
               readinessProbe:
+                description: Probe defines attributes for startup/liveness/readiness
+                  probes
                 properties:
                   enabled:
                     type: boolean
@@ -1273,6 +1277,8 @@ spec:
                   enabled:
                     type: boolean
                   hpa:
+                    description: HorizontalPodAutoscalerSpec defines the parameters
+                      required to setup HPA
                     properties:
                       behavior:
                         description: |-
@@ -1867,6 +1873,8 @@ spec:
                     type: object
                 type: object
               startupProbe:
+                description: Probe defines attributes for startup/liveness/readiness
+                  probes
                 properties:
                   enabled:
                     type: boolean

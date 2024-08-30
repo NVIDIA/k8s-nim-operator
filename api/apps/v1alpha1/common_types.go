@@ -58,6 +58,7 @@ type Autoscaling struct {
 	HPA     HorizontalPodAutoscalerSpec `json:"hpa,omitempty"`
 }
 
+// HorizontalPodAutoscalerSpec defines the parameters required to setup HPA
 type HorizontalPodAutoscalerSpec struct {
 	MinReplicas *int32                                         `json:"minReplicas,omitempty"`
 	MaxReplicas int32                                          `json:"maxReplicas"`
@@ -93,7 +94,16 @@ type IngressPath struct {
 	ServiceType string                `json:"serviceType,omitempty"`
 }
 
+// Probe defines attributes for startup/liveness/readiness probes
 type Probe struct {
 	Enabled *bool         `json:"enabled,omitempty"`
 	Probe   *corev1.Probe `json:"probe,omitempty"`
+}
+
+// CertConfig defines the configuration for custom certificates.
+type CertConfig struct {
+	// Name of the ConfigMap containing the certificate data.
+	Name string `json:"name"`
+	// MountPath is the path where the certificates should be mounted in the container.
+	MountPath string `json:"mountPath"`
 }
