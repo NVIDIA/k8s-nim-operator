@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	corev1 "k8s.io/api/core/v1"
@@ -28,7 +29,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -209,11 +212,16 @@ func (r *NIMPipelineReconciler) syncResource(ctx context.Context, currentNamespa
 	logger.V(2).Info("NIMService spec has changed, updating")
 
 	if errors.IsNotFound(err) {
+		// Resource doesn't exist, so create it
 		err = r.Create(ctx, desired)
 		if err != nil {
 			return err
 		}
 	} else {
+		// Resource exists, so update it
+		// Ensure the resource version is carried over to the desired object
+		desired.ResourceVersion = current.ResourceVersion
+
 		err = r.Update(ctx, desired)
 		if err != nil {
 			return err
@@ -353,5 +361,18 @@ func (r *NIMPipelineReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMPipeline{}).
 		Owns(&appsv1alpha1.NIMService{}).
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				// Type assert to NIMPipeline
+				if oldNIMPipeline, ok := e.ObjectOld.(*appsv1alpha1.NIMPipeline); ok {
+					newNIMPipeline := e.ObjectNew.(*appsv1alpha1.NIMPipeline)
+
+					// Handle only spec updates
+					return !reflect.DeepEqual(oldNIMPipeline.Spec, newNIMPipeline.Spec)
+				}
+				// For other types we watch, reconcile them
+				return true
+			},
+		}).
 		Complete(r)
 }
