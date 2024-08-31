@@ -69,7 +69,6 @@ spec:
       authSecret: ngc-api-secret
       model:
         profiles: []
-        autoDetect: true
         precision: "fp8"
         engine: "tensorrt_llm"
         qosProfile: "throughput"
