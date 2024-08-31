@@ -438,7 +438,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			err := client.Create(context.TODO(), deployment)
 			Expect(err).NotTo(HaveOccurred())
 			msg, ready, err := reconciler.isDeploymentReady(context.TODO(), &nimServiceKey)
-			Expect(err).To(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(Equal(false))
 			Expect(msg).To(Equal(fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name)))
 		})

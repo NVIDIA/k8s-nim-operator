@@ -23,6 +23,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -86,7 +87,7 @@ func (u *updater) SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NIMSe
 	})
 
 	cr.Status.State = v1alpha1.NIMServiceStatusReady
-	return u.client.Status().Update(ctx, cr)
+	return u.updateNIMServiceStatus(ctx, cr)
 }
 
 func (u *updater) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error {
@@ -105,7 +106,7 @@ func (u *updater) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NI
 	})
 
 	cr.Status.State = v1alpha1.NIMServiceStatusNotReady
-	return u.client.Status().Update(ctx, cr)
+	return u.updateNIMServiceStatus(ctx, cr)
 }
 
 func (u *updater) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error {
@@ -122,7 +123,21 @@ func (u *updater) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NIMS
 		Message: message,
 	})
 	cr.Status.State = v1alpha1.NIMServiceStatusFailed
-	return u.client.Status().Update(ctx, cr)
+	return u.updateNIMServiceStatus(ctx, cr)
+}
+
+func (u *updater) updateNIMServiceStatus(ctx context.Context, cr *appsv1alpha1.NIMService) error {
+
+	obj := &appsv1alpha1.NIMService{}
+	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
+	if errGet != nil {
+		return errGet
+	}
+	obj.Status = cr.Status
+	if err := u.client.Status().Update(ctx, obj); err != nil {
+		return err
+	}
+	return nil
 }
 
 // UpdateCondition updates the given condition into the conditions list
