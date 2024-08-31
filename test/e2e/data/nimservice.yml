@@ -12,9 +12,10 @@ spec:
     pullSecrets:
       - ngc-secret
   authSecret: ngc-api-secret
-  nimCache:
-    name: meta-llama3-8b-instruct
-    profile: ''
+  storage:
+    nimCache:
+      name: meta-llama3-8b-instruct
+      profile: ''
   replicas: 1
   resources:
     limits:
