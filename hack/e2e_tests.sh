@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2022 The Kubernetes Authors.
+# Copyright 2024 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,9 +58,9 @@ if [ -z "${KUBECONFIG:-}" ]; then
 fi
 
 # Set all ENV variables for e2e tests
-export ENABLE_NFD ENABLE_GPU_OPERATOR ENABLE_LOCAL_PATH_PROVISIONER
-export COLLECT_LOGS_FROM LOG_ARTIFACT_DIR HELM_CHART
-export E2E_IMAGE_REPO E2E_IMAGE_TAG E2E_IMAGE_PULL_POLICY
+export ENABLE_NFD ENABLE_GPU_OPERATOR ENABLE_LOCAL_PATH_PROVISIONER \
+  COLLECT_LOGS_FROM LOG_ARTIFACT_DIR HELM_CHART \
+  E2E_IMAGE_REPO E2E_IMAGE_TAG E2E_IMAGE_PULL_POLICY
 
 # shellcheck disable=SC2086
 $GINKGO $GINKGO_ARGS -v ./test/e2e/...
