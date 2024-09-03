@@ -209,6 +209,11 @@ func (r *NIMCacheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				if oldNIMCache, ok := e.ObjectOld.(*appsv1alpha1.NIMCache); ok {
 					newNIMCache := e.ObjectNew.(*appsv1alpha1.NIMCache)
 
+					// Handle case where object is marked for deletion
+					if !newNIMCache.ObjectMeta.DeletionTimestamp.IsZero() {
+						return true
+					}
+
 					// Handle only spec updates
 					return !reflect.DeepEqual(oldNIMCache.Spec, newNIMCache.Spec)
 				}

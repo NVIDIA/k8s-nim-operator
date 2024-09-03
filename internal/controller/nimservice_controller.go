@@ -194,6 +194,11 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				if oldNIMService, ok := e.ObjectOld.(*appsv1alpha1.NIMService); ok {
 					newNIMService := e.ObjectNew.(*appsv1alpha1.NIMService)
 
+					// Handle case where object is marked for deletion
+					if !newNIMService.ObjectMeta.DeletionTimestamp.IsZero() {
+						return true
+					}
+
 					// Handle only spec updates
 					return !reflect.DeepEqual(oldNIMService.Spec, newNIMService.Spec)
 				}
