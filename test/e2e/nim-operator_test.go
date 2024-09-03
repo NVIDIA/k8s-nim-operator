@@ -85,7 +85,7 @@ var _ = Describe("NIM Operator", func() {
 			cleanup()
 		}
 		// Clean up
-		cleanUpCRs()
+		cleanupCRs()
 		cleanup()
 	})
 
@@ -162,7 +162,7 @@ func cleanup() {
 	}
 }
 
-func cleanUpCRs() {
+func cleanupCRs() {
 	cli, err := versioned.NewForConfig(clientConfig)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -206,7 +206,7 @@ func cleanUpCRs() {
 	}
 }
 
-func cleanuoCRDs() {
+func cleanupCRDs() {
 	crds := []string{
 		"nimcaches.apps.nvidia.com",
 		"nimservices.apps.nvidia.com",

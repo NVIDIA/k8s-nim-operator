@@ -146,11 +146,11 @@ var _ = BeforeSuite(func() {
 // AfterSuite runs after the test suite
 var _ = AfterSuite(func() {
 	// Clean up CRs so they are garbage collected by their controllers
-	cleanUpCRs()
+	cleanupCRs()
 	// Clean up Helm deployments
 	cleanup()
 	// Remove CRDs
-	cleanuoCRDs()
+	cleanupCRDs()
 	// Delete Test Namespace
 	DeleteNamespace()
 })
