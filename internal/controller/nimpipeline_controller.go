@@ -367,6 +367,11 @@ func (r *NIMPipelineReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				if oldNIMPipeline, ok := e.ObjectOld.(*appsv1alpha1.NIMPipeline); ok {
 					newNIMPipeline := e.ObjectNew.(*appsv1alpha1.NIMPipeline)
 
+					// Handle case where object is marked for deletion
+					if !newNIMPipeline.ObjectMeta.DeletionTimestamp.IsZero() {
+						return true
+					}
+
 					// Handle only spec updates
 					return !reflect.DeepEqual(oldNIMPipeline.Spec, newNIMPipeline.Spec)
 				}
