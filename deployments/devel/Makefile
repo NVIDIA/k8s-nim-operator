@@ -20,7 +20,6 @@ install-tools: download
 	@echo Installing tools from tools.go
 	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -tI % go install %
 
-
 DOCKER ?= docker
 -include $(CURDIR)/versions.mk
 
