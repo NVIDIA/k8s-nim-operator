@@ -8,22 +8,11 @@ rules:
   - ""
   resources:
   - configmaps
-  - persistentvolumeclaims
-  - secrets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - endpoints
+  - persistentvolumeclaims
   - pods
   - pods/eviction
+  - secrets
   - serviceaccounts
   - services
   - services/finalizers
@@ -40,16 +29,6 @@ rules:
   resources:
   - nodes
   verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - create
-  - delete
   - get
   - list
   - watch
@@ -76,57 +55,7 @@ rules:
   - apps.nvidia.com
   resources:
   - nimcaches
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.nvidia.com
-  resources:
-  - nimcaches/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.nvidia.com
-  resources:
-  - nimcaches/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.nvidia.com
-  resources:
   - nimpipelines
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.nvidia.com
-  resources:
-  - nimpipelines/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.nvidia.com
-  resources:
-  - nimpipelines/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.nvidia.com
-  resources:
   - nimservices
   verbs:
   - create
@@ -139,12 +68,16 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nimcaches/finalizers
+  - nimpipelines/finalizers
   - nimservices/finalizers
   verbs:
   - update
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nimcaches/status
+  - nimpipelines/status
   - nimservices/status
   verbs:
   - get
@@ -183,15 +116,6 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - create
-  - delete
-  - get
-  - list
 - apiGroups:
   - monitoring.coreos.com
   resources:
