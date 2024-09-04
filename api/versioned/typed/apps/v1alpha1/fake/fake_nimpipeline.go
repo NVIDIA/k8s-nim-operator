@@ -40,22 +40,24 @@ var nimpipelinesKind = v1alpha1.SchemeGroupVersion.WithKind("NIMPipeline")
 
 // Get takes name of the nIMPipeline, and returns the corresponding nIMPipeline object, and an error if there is any.
 func (c *FakeNIMPipelines) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NIMPipeline, err error) {
+	emptyResult := &v1alpha1.NIMPipeline{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(nimpipelinesResource, c.ns, name), &v1alpha1.NIMPipeline{})
+		Invokes(testing.NewGetActionWithOptions(nimpipelinesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMPipeline), err
 }
 
 // List takes label and field selectors, and returns the list of NIMPipelines that match those selectors.
 func (c *FakeNIMPipelines) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NIMPipelineList, err error) {
+	emptyResult := &v1alpha1.NIMPipelineList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(nimpipelinesResource, nimpipelinesKind, c.ns, opts), &v1alpha1.NIMPipelineList{})
+		Invokes(testing.NewListActionWithOptions(nimpipelinesResource, nimpipelinesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -74,40 +76,43 @@ func (c *FakeNIMPipelines) List(ctx context.Context, opts v1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested nIMPipelines.
 func (c *FakeNIMPipelines) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(nimpipelinesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(nimpipelinesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a nIMPipeline and creates it.  Returns the server's representation of the nIMPipeline, and an error, if there is any.
 func (c *FakeNIMPipelines) Create(ctx context.Context, nIMPipeline *v1alpha1.NIMPipeline, opts v1.CreateOptions) (result *v1alpha1.NIMPipeline, err error) {
+	emptyResult := &v1alpha1.NIMPipeline{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(nimpipelinesResource, c.ns, nIMPipeline), &v1alpha1.NIMPipeline{})
+		Invokes(testing.NewCreateActionWithOptions(nimpipelinesResource, c.ns, nIMPipeline, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMPipeline), err
 }
 
 // Update takes the representation of a nIMPipeline and updates it. Returns the server's representation of the nIMPipeline, and an error, if there is any.
 func (c *FakeNIMPipelines) Update(ctx context.Context, nIMPipeline *v1alpha1.NIMPipeline, opts v1.UpdateOptions) (result *v1alpha1.NIMPipeline, err error) {
+	emptyResult := &v1alpha1.NIMPipeline{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(nimpipelinesResource, c.ns, nIMPipeline), &v1alpha1.NIMPipeline{})
+		Invokes(testing.NewUpdateActionWithOptions(nimpipelinesResource, c.ns, nIMPipeline, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMPipeline), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNIMPipelines) UpdateStatus(ctx context.Context, nIMPipeline *v1alpha1.NIMPipeline, opts v1.UpdateOptions) (*v1alpha1.NIMPipeline, error) {
+func (c *FakeNIMPipelines) UpdateStatus(ctx context.Context, nIMPipeline *v1alpha1.NIMPipeline, opts v1.UpdateOptions) (result *v1alpha1.NIMPipeline, err error) {
+	emptyResult := &v1alpha1.NIMPipeline{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(nimpipelinesResource, "status", c.ns, nIMPipeline), &v1alpha1.NIMPipeline{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(nimpipelinesResource, "status", c.ns, nIMPipeline, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMPipeline), err
 }
@@ -122,7 +127,7 @@ func (c *FakeNIMPipelines) Delete(ctx context.Context, name string, opts v1.Dele
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeNIMPipelines) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(nimpipelinesResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(nimpipelinesResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.NIMPipelineList{})
 	return err
@@ -130,11 +135,12 @@ func (c *FakeNIMPipelines) DeleteCollection(ctx context.Context, opts v1.DeleteO
 
 // Patch applies the patch and returns the patched nIMPipeline.
 func (c *FakeNIMPipelines) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NIMPipeline, err error) {
+	emptyResult := &v1alpha1.NIMPipeline{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(nimpipelinesResource, c.ns, name, pt, data, subresources...), &v1alpha1.NIMPipeline{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(nimpipelinesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMPipeline), err
 }
