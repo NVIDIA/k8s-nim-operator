@@ -41,6 +41,8 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/kserve"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/standalone"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	nfdv1alpha1 "sigs.k8s.io/node-feature-discovery/api/nfd/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -53,6 +55,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(monitoring.AddToScheme(scheme))
+	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+	utilruntime.Must(nfdv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

@@ -19,10 +19,13 @@ package standalone
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nfdutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
@@ -33,6 +36,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,18 +79,21 @@ func (r *NIMServiceReconciler) cleanupNIMService(ctx context.Context, nimService
 
 func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimService *appsv1alpha1.NIMService) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	// Generate annotation for the current operator-version and apply to all resources
-	// Get generic name for all resources
 	namespacedName := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
-
 	renderer := r.GetRenderer()
+
+	// Reusable error handler to log and return errors
+	handleError := func(err error, reason string, resource string) (ctrl.Result, error) {
+		logger.Error(err, fmt.Sprintf("Failed to reconcile %s", resource), "resource", resource)
+		return ctrl.Result{}, err
+	}
 
 	// Sync serviceaccount
 	err := r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
 		return renderer.ServiceAccount(nimService.GetServiceAccountParams())
 	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
 	if err != nil {
-		return ctrl.Result{}, err
+		return handleError(err, "Failed to sync", "serviceaccount")
 	}
 
 	// Sync role
@@ -94,7 +101,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return renderer.Role(nimService.GetRoleParams())
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
-		return ctrl.Result{}, err
+		return handleError(err, "Failed to sync", "role")
 	}
 
 	// Sync rolebinding
@@ -102,7 +109,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return renderer.RoleBinding(nimService.GetRoleBindingParams())
 	}, "rolebinding", conditions.ReasonRoleBindingFailed)
 	if err != nil {
-		return ctrl.Result{}, err
+		return handleError(err, "Failed to sync", "rolebinding")
 	}
 
 	// Sync service
@@ -110,7 +117,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return renderer.Service(nimService.GetServiceParams())
 	}, "service", conditions.ReasonServiceFailed)
 	if err != nil {
-		return ctrl.Result{}, err
+		return handleError(err, "Failed to sync", "service")
 	}
 
 	// Sync ingress
@@ -119,7 +126,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			return renderer.Ingress(nimService.GetIngressParams())
 		}, "ingress", conditions.ReasonIngressFailed)
 		if err != nil {
-			return ctrl.Result{}, err
+			return handleError(err, "Failed to sync", "ingress")
 		}
 	}
 
@@ -129,7 +136,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			return renderer.HPA(nimService.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
 		if err != nil {
-			return ctrl.Result{}, err
+			return handleError(err, "Failed to sync", "hpa")
 		}
 	}
 
@@ -139,59 +146,20 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			return renderer.ServiceMonitor(nimService.GetServiceMonitorParams())
 		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
 		if err != nil {
-			return ctrl.Result{}, err
+			return handleError(err, "Failed to sync", "servicemonitor")
 		}
 	}
 
+	// Setup PVC for model store
+	modelPVC, err := r.setupPVC(ctx, nimService)
+	if err != nil {
+		return handleError(err, "Failed to setup PVC", "PVC")
+	}
+
+	// Setup deployment parameters
 	deploymentParams := nimService.GetDeploymentParams()
-	var modelPVC *appsv1alpha1.PersistentVolumeClaim
-	modelProfile := ""
-
-	// Select PVC for model store
-	if nimService.GetNIMCacheName() != "" {
-		// Fetch PVC for the associated NIMCache instance and mount it
-		nimCachePVC, err := r.getNIMCachePVC(ctx, nimService)
-		if err != nil {
-			logger.Error(err, "unable to obtain pvc backing the nimcache instance")
-			return ctrl.Result{}, err
-		}
-		logger.V(2).Info("obtained the backing pvc for nimcache instance", "pvc", nimCachePVC)
-		modelPVC = nimCachePVC
-
-		if profile := nimService.GetNIMCacheProfile(); profile != "" {
-			logger.Info("overriding model profile", "profile", profile)
-			modelProfile = profile
-		}
-	} else if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
-		// Create a new PVC
-		modelPVC, err = r.reconcilePVC(ctx, nimService)
-		if err != nil {
-			logger.Error(err, "unable to create pvc")
-			return ctrl.Result{}, err
-		}
-	} else if nimService.Spec.Storage.PVC.Name != "" {
-		// Use an existing PVC
-		modelPVC = &nimService.Spec.Storage.PVC
-	} else {
-		err := fmt.Errorf("neither external PVC name or NIMCache volume is provided")
-		logger.Error(err, "failed to determine PVC for model-store")
-		return ctrl.Result{}, err
-	}
-	// Setup volume mounts with model store
-	deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
-	deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
-
-	// Setup env for explicit override profile is specified
-	if modelProfile != "" {
-		profileEnv := corev1.EnvVar{
-			Name:  "NIM_MODEL_PROFILE",
-			Value: modelProfile,
-		}
-		deploymentParams.Env = append(deploymentParams.Env, profileEnv)
-
-		// TODO: assign GPU resources and node selector that is required for the selected profile
-		// TODO: assign GPU resources
-		// TODO: update the node selector
+	if err := r.setupDeploymentParams(ctx, nimService, modelPVC, deploymentParams); err != nil {
+		return handleError(err, "Failed to setup deployment parameters", "DeploymentParams")
 	}
 
 	// Sync deployment
@@ -202,26 +170,147 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	// Wait for deployment
+	// Wait for deployment readiness
 	msg, ready, err := r.isDeploymentReady(ctx, &namespacedName)
 	if err != nil {
-		return ctrl.Result{}, err
+		return handleError(err, "Failed to check deployment readiness", "Deployment")
 	}
 
+	// Update status
 	if !ready {
-		// Update status as NotReady
-		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
+		if err := r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg); err != nil {
+			return handleError(err, "Failed to update NotReady status", "Status")
+		}
 	} else {
-		// Update status as ready
-		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
-	}
-
-	if err != nil {
-		logger.Error(err, "Unable to update status")
-		return ctrl.Result{}, err
+		if err := r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg); err != nil {
+			return handleError(err, "Failed to update Ready status", "Status")
+		}
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NIMServiceReconciler) setupPVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (*appsv1alpha1.PersistentVolumeClaim, error) {
+	logger := log.FromContext(ctx)
+
+	// Initialize variable for the PVC
+	var modelPVC *appsv1alpha1.PersistentVolumeClaim
+
+	switch {
+	case nimService.GetNIMCacheName() != "":
+		// Fetch PVC for NIMCache
+		nimCachePVC, err := r.getNIMCachePVC(ctx, nimService)
+		if err != nil {
+			logger.Error(err, "Unable to obtain PVC for NIMCache")
+			return nil, err
+		}
+		modelPVC = nimCachePVC
+
+	case nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create:
+		// Create new PVC
+		pvc, err := r.reconcilePVC(ctx, nimService)
+		if err != nil {
+			logger.Error(err, "Unable to create PVC")
+			return nil, err
+		}
+		modelPVC = pvc
+
+	case nimService.Spec.Storage.PVC.Name != "":
+		// Use existing PVC
+		modelPVC = &nimService.Spec.Storage.PVC
+
+	default:
+		err := fmt.Errorf("no PVC or NIMCache volume provided")
+		logger.Error(err, "Failed to determine PVC for model store")
+		return nil, err
+	}
+
+	return modelPVC, nil
+}
+
+func (r *NIMServiceReconciler) setupDeploymentParams(ctx context.Context, nimService *appsv1alpha1.NIMService, modelPVC *appsv1alpha1.PersistentVolumeClaim, deploymentParams *rendertypes.DeploymentParams) error {
+	logger := log.FromContext(ctx)
+
+	// Set volumes and volume mounts for the model store
+	deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
+	deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
+
+	// Check if a model profile is specified and set the environment variables
+	modelProfile := nimService.GetNIMCacheProfile()
+	if modelProfile != "" {
+		// Set environment variable for model profile
+		profileEnv := corev1.EnvVar{
+			Name:  "NIM_MODEL_PROFILE",
+			Value: modelProfile,
+		}
+		deploymentParams.Env = append(deploymentParams.Env, profileEnv)
+
+		// Retrieve and set profile details from NIMCache
+		profile, err := r.getNIMCacheProfile(ctx, nimService, modelProfile)
+		if err != nil {
+			logger.Error(err, "Specified profile not found in NIMCache")
+			return err
+		}
+
+		// Assign GPU resources and update node selector based on the profile
+		if err := r.assignResourcesAndNodeSelector(ctx, nimService, profile, deploymentParams); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *NIMServiceReconciler) assignResourcesAndNodeSelector(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile, deploymentParams *rendertypes.DeploymentParams) error {
+	logger := log.FromContext(ctx)
+
+	// Assign GPU resources
+	tensorParallelism, err := r.getTensorParallelismByProfile(ctx, profile)
+	if err != nil {
+		logger.Error(err, "Failed to retrieve tensorParallelism")
+		return err
+	}
+
+	// Ensure that the Resources field is initialized
+	if deploymentParams.Resources == nil {
+		deploymentParams.Resources = &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{},
+			Limits:   corev1.ResourceList{},
+		}
+	}
+
+	// Check if tensorParallelism is provided and assign GPU resources
+	if tensorParallelism != "" {
+		gpuQuantity, err := apiResource.ParseQuantity(tensorParallelism)
+		if err != nil {
+			return fmt.Errorf("failed to parse tensorParallelism: %w", err)
+		}
+
+		deploymentParams.Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = gpuQuantity
+		deploymentParams.Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = gpuQuantity
+	}
+
+	// Apply node selector based on the device ID from the profile
+	deviceID, err := r.getDeviceIDByProfile(ctx, profile)
+	if err != nil {
+		logger.Error(err, "Failed to retrieve device ID for profile")
+		return err
+	}
+	if deviceID != "" {
+		deviceIDRuleExists, err := nfdutil.CheckNodeFeatureRule(ctx, r.GetClient())
+		if err != nil {
+			return err
+		}
+		if deviceIDRuleExists {
+			pciDeviceIDLabelKey := fmt.Sprintf("feature.node.kubernetes.io/pci-10de-%s.present", deviceID)
+			if deploymentParams.NodeSelector == nil {
+				deploymentParams.NodeSelector = make(map[string]string)
+			}
+			deploymentParams.NodeSelector[pciDeviceIDLabelKey] = "true"
+		}
+	}
+
+	return nil
 }
 
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
@@ -370,6 +459,55 @@ func (r *NIMServiceReconciler) getNIMCachePVC(ctx context.Context, nimService *a
 	}
 	// Get the underlying PVC for the NIMCache instance
 	return &nimCache.Spec.Storage.PVC, nil
+}
+
+func (r *NIMServiceReconciler) getTensorParallelismByProfile(ctx context.Context, profile *appsv1alpha1.NIMProfile) (string, error) {
+	tensorParallelism := ""
+	if tp, exists := profile.Config["tp"]; exists {
+		tensorParallelism = tp
+	}
+
+	return tensorParallelism, nil
+}
+
+func (r *NIMServiceReconciler) getDeviceIDByProfile(ctx context.Context, profile *appsv1alpha1.NIMProfile) (string, error) {
+	deviceID := ""
+	if device, exists := profile.Config["gpu_device"]; exists {
+		deviceID = strings.TrimSuffix(device, ":10de")
+	}
+
+	return deviceID, nil
+}
+
+// getNIMCacheProfile returns model profile info from the NIM cache instance
+func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimService *appsv1alpha1.NIMService, profile string) (*appsv1alpha1.NIMProfile, error) {
+	logger := log.FromContext(ctx)
+
+	if nimService.GetNIMCacheName() == "" {
+		// NIM cache is not used
+		return nil, nil
+	}
+
+	// Lookup NIMCache instance in the same namespace as the NIMService instance
+	nimCache := &appsv1alpha1.NIMCache{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetNIMCacheName(), Namespace: nimService.Namespace}, nimCache); err != nil {
+		logger.Error(err, "unable to fetch nimcache", "nimcache", nimService.GetNIMCacheName(), "nimservice", nimService.Name)
+		return nil, err
+	}
+
+	// Get the status of NIMCache
+	if nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
+		return nil, fmt.Errorf("nimcache %s is not ready, nimservice %s", nimCache.GetName(), nimService.GetName())
+	}
+
+	for _, cachedProfile := range nimCache.Status.Profiles {
+		if cachedProfile.Name == profile {
+			return &cachedProfile, nil
+		}
+	}
+
+	// If the specified profile is not cached, return nil
+	return nil, nil
 }
 
 func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (*appsv1alpha1.PersistentVolumeClaim, error) {

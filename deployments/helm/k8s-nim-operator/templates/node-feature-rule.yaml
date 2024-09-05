@@ -3,6 +3,8 @@ kind: NodeFeatureRule
 apiVersion: nfd.k8s-sigs.io/v1alpha1
 metadata:
   name: nfd-pci-device-rule
+  labels:
+    app.kubernetes.io/managed-by: k8s-nim-operator
 spec:
   rules:
     - name: "NVIDIA PCIe Device Label"

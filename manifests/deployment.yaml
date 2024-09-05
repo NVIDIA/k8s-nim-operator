@@ -87,7 +87,7 @@ spec:
       {{- if .NodeSelector }}
       nodeSelector:
         {{- range $key, $value := .NodeSelector }}
-        {{ $key }}: {{ $value }}
+        {{ $key }}: {{ $value | quote }}
         {{- end }}
       {{- end }}
       {{- if .Tolerations }}
