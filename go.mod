@@ -9,7 +9,7 @@ require (
 	github.com/NVIDIA/k8s-test-infra v0.0.0-20240806103558-2d7411125519
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-logr/logr v1.4.2
-	github.com/mittwald/go-helm-client v0.12.12
+	github.com/mittwald/go-helm-client v0.12.13
 	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.2
 	github.com/openshift/api v0.0.0-20240708071937-c9a91940bf0f
