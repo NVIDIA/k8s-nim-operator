@@ -271,14 +271,6 @@ func (r *NIMServiceReconciler) assignResourcesAndNodeSelector(ctx context.Contex
 		return err
 	}
 
-	// Ensure that the Resources field is initialized
-	if deploymentParams.Resources == nil {
-		deploymentParams.Resources = &corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{},
-			Limits:   corev1.ResourceList{},
-		}
-	}
-
 	// Check if tensorParallelism is provided and assign GPU resources
 	if tensorParallelism != "" {
 		gpuQuantity, err := apiResource.ParseQuantity(tensorParallelism)
@@ -286,11 +278,23 @@ func (r *NIMServiceReconciler) assignResourcesAndNodeSelector(ctx context.Contex
 			return fmt.Errorf("failed to parse tensorParallelism: %w", err)
 		}
 
-		deploymentParams.Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = gpuQuantity
-		deploymentParams.Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = gpuQuantity
+		// Ensure that the Resources field is initialized
+		if deploymentParams.Resources == nil {
+			deploymentParams.Resources = &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{},
+				Limits:   corev1.ResourceList{},
+			}
+		}
+
+		// TODO: Make the resource name configurable
+		const gpuResourceName = corev1.ResourceName("nvidia.com/gpu")
+
+		deploymentParams.Resources.Requests[corev1.ResourceName(gpuResourceName)] = gpuQuantity
+		deploymentParams.Resources.Limits[corev1.ResourceName(gpuResourceName)] = gpuQuantity
 	}
 
 	// Apply node selector based on the device ID from the profile
+	// TODO: handle OCP specific logic for NFD API group
 	deviceID, err := r.getDeviceIDByProfile(ctx, profile)
 	if err != nil {
 		logger.Error(err, "Failed to retrieve device ID for profile")
