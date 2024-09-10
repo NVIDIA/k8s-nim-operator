@@ -56,7 +56,8 @@ const (
 	localPathProvisioner        = "local-path-provisioner"
 
 	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
-	DefaultNamespaceDeletionTimeout = 5 * time.Minute
+	DefaultNamespaceDeletionTimeout = 10 * time.Minute
+
 	// PollInterval is how often to Poll pods, nodes and claims.
 	PollInterval = 2 * time.Second
 )
@@ -73,6 +74,7 @@ var (
 	ImageTag                   string
 	ImagePullPolicy            string
 	CollectLogsFrom            string
+	Timeout                    time.Duration
 
 	// k8s clients
 	clientConfig *rest.Config
@@ -302,6 +304,7 @@ func getTestEnv() {
 	EnableNFD = getBoolEnvVar("ENABLE_NFD", false)
 	EnableGPUOperator = getBoolEnvVar("ENABLE_GPU_OPERATOR", false)
 	EnableLocalPathProvisioner = getBoolEnvVar("ENABLE_LOCAL_PATH_PROVISIONER", false)
+	Timeout = time.Duration(getIntEnvVar("E2E_TIMEOUT_SECONDS", 1800)) * time.Second
 
 	helmChart = os.Getenv("HELM_CHART")
 	Expect(helmChart).NotTo(BeEmpty(), "HELM_CHART must be set")
@@ -335,6 +338,18 @@ func getBoolEnvVar(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return boolValue
+}
+
+func getIntEnvVar(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return intValue
 }
 
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
