@@ -145,6 +145,11 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
+# Short version of hack/package-helm-charts.sh
+.PHONY: helm-charts
+helm-charts:
+	helm package deployments/helm/k8s-nim-operator/ --version ${VERSION} --app-version ${VERSION}
+
 # Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle bundle-validate
 bundle: manifests install-tools
