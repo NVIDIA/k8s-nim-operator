@@ -213,7 +213,7 @@ GINKGO_VERSION ?= $(shell $(GO_CMD) list -m -f '{{.Version}}' github.com/onsi/gi
 KUSTOMIZE_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' sigs.k8s.io/kustomize/kustomize/v5)
 CONTROLLER_TOOLS_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' sigs.k8s.io/controller-tools)
 ENVTEST_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' sigs.k8s.io/controller-runtime/tools/setup-envtest)
-GOLANGCI_LINT_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' github.com/golangci/golangci-lint/cmd/golangci-lint)
+GOLANGCI_LINT_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' github.com/golangci/golangci-lint)
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.

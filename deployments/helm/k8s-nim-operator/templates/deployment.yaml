@@ -32,8 +32,11 @@ spec:
           protocol: TCP
         resources: {{- toYaml .Values.kubeProxy.resources | nindent
           10 }}
-        securityContext: {{- toYaml .Values.kubeProxy.containerSecurityContext
-          | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
       - args: {{- toYaml .Values.operator.args | nindent 8 }}
         command:
         - /manager
@@ -60,12 +63,18 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.operator.resources | nindent 10 }}
-        securityContext: {{- toYaml .Values.operator.containerSecurityContext | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
       imagePullSecrets:
       {{- range .Values.operator.image.pullSecrets }}
         - name: {{ . }}
       {{- end }}
       securityContext:
+        seccompProfile:
+          type: RuntimeDefault
         runAsNonRoot: true
       serviceAccountName: k8s-nim-operator
       terminationGracePeriodSeconds: 10

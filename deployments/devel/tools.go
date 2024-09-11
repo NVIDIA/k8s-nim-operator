@@ -19,7 +19,7 @@
 
 package main
 
-// Define the tooling required to build the device plugin.
+// Define the tooling required to build the nim operator
 import (
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
 	_ "sigs.k8s.io/controller-runtime/tools/setup-envtest"
