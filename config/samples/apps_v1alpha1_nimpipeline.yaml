@@ -3,7 +3,7 @@ kind: NIMPipeline
 metadata:
   labels:
     app.kubernetes.io/name: k8s-nim-operator
-    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/managed-by: k8s-nim-operator
   name: nimpipeline-sample
 spec:
   # TODO(user): Add fields here
