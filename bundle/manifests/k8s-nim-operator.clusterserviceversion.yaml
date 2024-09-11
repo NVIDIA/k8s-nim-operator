@@ -16,13 +16,12 @@ metadata:
           "spec": {
             "source": {
               "ngc": {
-                "modelPuller": "nvcr.io/nvidian/nim-llm-dev/meta-llama3-8b-instruct:1.1.0.rc5",
+                "modelPuller": "nvcr.io/nim/meta/llama3-8b-instruct:1.0.3",
                 "pullSecret": "ngc-secret",
                 "authSecret": "ngc-api-secret",
                 "model": {
                   "lora": false,
                   "precision": "fp16",
-                  "autoDetect": true,
                   "engine": "tensorrt_llm",
                   "qosProfile": "throughput",
                   "gpus": [
@@ -53,8 +52,8 @@ metadata:
           },
           "spec": {
             "image": {
-              "repository": "nvcr.io/nvidian/nim-llm-dev/meta-llama3-8b-instruct",
-              "tag": "1.1.0.rc5",
+              "repository": "nvcr.io/nim/meta/llama3-8b-instruct",
+              "tag": "1.0.3",
               "pullPolicy": "IfNotPresent",
               "pullSecrets": [
                 "ngc-secret"
@@ -95,7 +94,7 @@ metadata:
     description: >-
       The NVIDIA NIM Operator manages the life cycle of optimized NIM models and
       NeMo Microservices in a K8s environment
-    containerImage: 'nvcr.io/nvstaging/cloud-native/k8s-nim-operator:v0.1.0'
+    containerImage: 'ghcr.io/nvidia/k8s-nim-operator:main'
     support: NVIDIA
     capabilities: Basic Install
     repository: github.com/NVIDIA/k8s-nim-operator
@@ -583,7 +582,7 @@ spec:
                           fieldRef:
                             apiVersion: v1
                             fieldPath: metadata.namespace
-                    image: 'nvcr.io/nvidia/cloud-native/k8s-nim-operator:v0.1.0'
+                    image: 'ghcr.io/nvidia/k8s-nim-operator:main'
                     imagePullPolicy: Always
                     livenessProbe:
                       failureThreshold: 3
