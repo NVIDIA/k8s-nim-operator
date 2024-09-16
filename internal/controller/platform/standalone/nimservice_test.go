@@ -607,11 +607,37 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 	})
 
 	Describe("assignGPUResources", func() {
+		It("should retain user-provided GPU resources and not override them", func() {
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{"tp": "4"},
+			}
+
+			// Initialize deployment params with user-provided GPU resources
+			deploymentParams := &rendertypes.DeploymentParams{
+				Resources: &corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceName("nvidia.com/gpu"): apiResource.MustParse("8"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceName("nvidia.com/gpu"): apiResource.MustParse("8"),
+					},
+				},
+			}
+
+			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
+
+			// Ensure the user-provided GPU resources (8) are retained and not overridden
+			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("8")))
+			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("8")))
+		})
+
 		It("should assign GPU resources when tensor parallelism is provided", func() {
 			profile := &appsv1alpha1.NIMProfile{
 				Name:   "test-profile",
 				Config: map[string]string{"tp": "4"},
 			}
+			// Initialize deployment params with no user-provided GPU resources
 			deploymentParams := &rendertypes.DeploymentParams{}
 
 			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
@@ -619,16 +645,17 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("4")))
 		})
 
-		It("should not assign GPU resources if tensor parallelism is not provided", func() {
+		It("should assign 1 GPU resource if tensor parallelism is not provided", func() {
 			profile := &appsv1alpha1.NIMProfile{
 				Name:   "test-profile",
 				Config: map[string]string{},
 			}
+			// Initialize deployment params with no user-provided GPU resources
 			deploymentParams := &rendertypes.DeploymentParams{}
 
 			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
-			Expect(deploymentParams.Resources).To(BeNil())
-			Expect(deploymentParams.Resources).To(BeNil())
+			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("1")))
+			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("1")))
 		})
 
 		It("should return an error if tensor parallelism cannot be parsed", func() {
@@ -636,6 +663,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Name:   "test-profile",
 				Config: map[string]string{"tp": "invalid"},
 			}
+			// Initialize deployment params with no user-provided GPU resources
 			deploymentParams := &rendertypes.DeploymentParams{}
 
 			err := reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)

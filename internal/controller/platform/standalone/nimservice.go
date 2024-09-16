@@ -459,50 +459,82 @@ func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimServic
 	return nil, nil
 }
 
+// getTensorParallelismByProfile returns the value of tensor parallelism parameter in the given NIM profile
 func (r *NIMServiceReconciler) getTensorParallelismByProfile(ctx context.Context, profile *appsv1alpha1.NIMProfile) (string, error) {
+	// List of possible keys for tensor parallelism
+	possibleKeys := []string{"tensorParallelism", "tp"}
+
 	tensorParallelism := ""
-	if tp, exists := profile.Config["tp"]; exists {
-		tensorParallelism = tp
+
+	// Iterate through possible keys and return the first valid value
+	for _, key := range possibleKeys {
+		if value, exists := profile.Config[key]; exists {
+			tensorParallelism = value
+			break
+		}
 	}
 
 	return tensorParallelism, nil
 }
 
+// assignGPUResources automatically assigns GPU resources to the NIMService based on the provided profile,
+// but retains any user-specified GPU resources if they are explicitly provided.
+//
+// This function retrieves the tensor parallelism (TP) value from the provided profile config to determine
+// the number of GPUs to be allocated. If the TP value is defined and no GPU resources have been
+// explicitly provided by the user, the function allocates GPUs according to the TP value.
+// If the TP value is not present, the function defaults to allocating 1 GPU.
 func (r *NIMServiceReconciler) assignGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile, deploymentParams *rendertypes.DeploymentParams) error {
 	logger := log.FromContext(ctx)
 
-	// Assign GPU resources
+	// TODO: Make the resource name configurable
+	const gpuResourceName = corev1.ResourceName("nvidia.com/gpu")
+
+	// Check if the user has already provided a GPU resource quantity in the requests or limits
+	if deploymentParams.Resources != nil {
+		if _, gpuRequested := deploymentParams.Resources.Requests[gpuResourceName]; gpuRequested {
+			logger.V(2).Info("User has provided GPU resource requests, skipping auto-assignment", "gpuResource", gpuResourceName)
+			return nil
+		}
+		if _, gpuLimit := deploymentParams.Resources.Limits[gpuResourceName]; gpuLimit {
+			logger.V(2).Info("User has provided GPU resource limits, skipping auto-assignment", "gpuResource", gpuResourceName)
+			return nil
+		}
+	}
+
+	// If no user-provided GPU resource is found, proceed with auto-assignment
+	// Get tensorParallelism from the profile
 	tensorParallelism, err := r.getTensorParallelismByProfile(ctx, profile)
 	if err != nil {
 		logger.Error(err, "Failed to retrieve tensorParallelism")
 		return err
 	}
 
-	// Check if tensorParallelism is defined in the profile, and automatically assign GPU resources.
-	// Note: This will override any manual GPU assignments made by the user.
-	// The number of GPUs for an optimized profile is fixed.
-	// Allocating more GPUs than required may result in underutilization,
-	// while allocating fewer GPUs will likely cause failures.
+	// Initialize the Resources field if not already initialized
+	if deploymentParams.Resources == nil {
+		deploymentParams.Resources = &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{},
+			Limits:   corev1.ResourceList{},
+		}
+	}
+
+	// Assign GPU resources based on tensorParallelism, or default to 1 GPU if tensorParallelism is not available
+	gpuQuantity := apiResource.MustParse("1") // Default to 1 GPU
+
 	if tensorParallelism != "" {
-		gpuQuantity, err := apiResource.ParseQuantity(tensorParallelism)
+		gpuQuantity, err = apiResource.ParseQuantity(tensorParallelism)
 		if err != nil {
 			return fmt.Errorf("failed to parse tensorParallelism: %w", err)
 		}
 
-		// Ensure that the Resources field is initialized
-		if deploymentParams.Resources == nil {
-			deploymentParams.Resources = &corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{},
-				Limits:   corev1.ResourceList{},
-			}
-		}
-
-		// TODO: Make the resource name configurable
-		const gpuResourceName = corev1.ResourceName("nvidia.com/gpu")
-
-		deploymentParams.Resources.Requests[corev1.ResourceName(gpuResourceName)] = gpuQuantity
-		deploymentParams.Resources.Limits[corev1.ResourceName(gpuResourceName)] = gpuQuantity
+		logger.V(2).Info("Auto-assigning GPU resources based on tensorParallelism", "tensorParallelism", tensorParallelism, "gpuQuantity", gpuQuantity.String())
+	} else {
+		logger.V(2).Info("tensorParallelism not found, assigning 1 GPU by default", "Profile", profile.Name)
 	}
+
+	// Assign the GPU quantity for both requests and limits
+	deploymentParams.Resources.Requests[gpuResourceName] = gpuQuantity
+	deploymentParams.Resources.Limits[gpuResourceName] = gpuQuantity
 
 	return nil
 }
