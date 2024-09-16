@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,6 +39,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -72,6 +74,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		reconciler   *NIMServiceReconciler
 		scheme       *runtime.Scheme
 		nimService   *appsv1alpha1.NIMService
+		nimCache     *appsv1alpha1.NIMCache
 		volumeMounts []corev1.VolumeMount
 		volumes      []corev1.Volume
 	)
@@ -86,6 +89,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
+			WithStatusSubresource(&appsv1alpha1.NIMCache{}).
 			Build()
 		boolTrue := true
 		cwd, err := os.Getwd()
@@ -269,7 +273,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				MountPath: "/dev/shm",
 			},
 		}
-		NIMCache := &appsv1alpha1.NIMCache{
+		nimCache = &appsv1alpha1.NIMCache{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-nimcache",
 				Namespace: "default",
@@ -281,9 +285,13 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Status: appsv1alpha1.NIMCacheStatus{
 				State: appsv1alpha1.NimCacheStatusReady,
 				PVC:   pvcName,
+				Profiles: []appsv1alpha1.NIMProfile{{
+					Name:   "test-profile",
+					Config: map[string]string{"tp": "4"}},
+				},
 			},
 		}
-		_ = client.Create(context.TODO(), NIMCache)
+		_ = client.Create(context.TODO(), nimCache)
 		pvc := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvcName,
@@ -309,6 +317,14 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			},
 		}
 		_ = client.Delete(context.TODO(), nimService)
+
+		// Ensure that nimCache status is ready before each test
+		nimCache.Status = appsv1alpha1.NIMCacheStatus{
+			State: appsv1alpha1.NimCacheStatusReady,
+		}
+
+		// Update nimCache status
+		Expect(client.Status().Update(context.TODO(), nimCache)).To(Succeed())
 	})
 
 	Describe("Reconcile", func() {
@@ -523,6 +539,135 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(Equal(true))
 			Expect(msg).To(Equal(fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name)))
+		})
+	})
+
+	Describe("getNIMCacheProfile", func() {
+		It("should return nil when NIMCache is not used", func() {
+			nimService.Spec.Storage.NIMCache.Name = ""
+			profile, err := reconciler.getNIMCacheProfile(context.TODO(), nimService, "some-profile")
+			Expect(err).To(BeNil())
+			Expect(profile).To(BeNil())
+		})
+
+		It("should return an error when NIMCache is not found", func() {
+			nimService.Spec.Storage.NIMCache.Name = "non-existent-cache"
+			_, err := reconciler.getNIMCacheProfile(context.TODO(), nimService, "some-profile")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should return an error when NIMCache is not ready", func() {
+			nimService.Spec.Storage.NIMCache.Name = "test-nimcache"
+			nimCache.Status = appsv1alpha1.NIMCacheStatus{
+				State: appsv1alpha1.NimCacheStatusPending,
+			}
+
+			// Update nimCache status
+			Expect(reconciler.Client.Status().Update(context.TODO(), nimCache)).To(Succeed())
+			_, err := reconciler.getNIMCacheProfile(context.TODO(), nimService, "test-profile")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should return nil when NIMCache profile is not found", func() {
+			nimService.Spec.Storage.NIMCache.Name = "test-nimcache"
+			profile, err := reconciler.getNIMCacheProfile(context.TODO(), nimService, "non-existent-profile")
+			Expect(err).To(BeNil())
+			Expect(profile).To(BeNil())
+		})
+
+		It("should return the profile if found in NIMCache", func() {
+			nimService.Spec.Storage.NIMCache.Name = "test-nimcache"
+			profile, err := reconciler.getNIMCacheProfile(context.TODO(), nimService, "test-profile")
+			Expect(err).To(BeNil())
+			Expect(profile.Name).To(Equal("test-profile"))
+		})
+	})
+
+	Describe("getTensorParallelismByProfile", func() {
+		It("should return tensor parallelism value if exists", func() {
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{"tp": "4"},
+			}
+
+			tensorParallelism, err := reconciler.getTensorParallelismByProfile(context.TODO(), profile)
+			Expect(err).To(BeNil())
+			Expect(tensorParallelism).To(Equal("4"))
+		})
+
+		It("should return empty string if tensor parallelism does not exist", func() {
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{},
+			}
+			tensorParallelism, err := reconciler.getTensorParallelismByProfile(context.TODO(), profile)
+			Expect(err).To(BeNil())
+			Expect(tensorParallelism).To(BeEmpty())
+		})
+	})
+
+	Describe("assignGPUResources", func() {
+		It("should retain user-provided GPU resources and not override them", func() {
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{"tp": "4"},
+			}
+
+			// Initialize deployment params with user-provided GPU resources
+			deploymentParams := &rendertypes.DeploymentParams{
+				Resources: &corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceName("nvidia.com/gpu"): apiResource.MustParse("8"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceName("nvidia.com/gpu"): apiResource.MustParse("8"),
+					},
+				},
+			}
+
+			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
+
+			// Ensure the user-provided GPU resources (8) are retained and not overridden
+			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("8")))
+			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("8")))
+		})
+
+		It("should assign GPU resources when tensor parallelism is provided", func() {
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{"tp": "4"},
+			}
+			// Initialize deployment params with no user-provided GPU resources
+			deploymentParams := &rendertypes.DeploymentParams{}
+
+			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
+			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("4")))
+			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("4")))
+		})
+
+		It("should assign 1 GPU resource if tensor parallelism is not provided", func() {
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{},
+			}
+			// Initialize deployment params with no user-provided GPU resources
+			deploymentParams := &rendertypes.DeploymentParams{}
+
+			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
+			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("1")))
+			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("1")))
+		})
+
+		It("should return an error if tensor parallelism cannot be parsed", func() {
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{"tp": "invalid"},
+			}
+			// Initialize deployment params with no user-provided GPU resources
+			deploymentParams := &rendertypes.DeploymentParams{}
+
+			err := reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })
