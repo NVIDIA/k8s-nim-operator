@@ -23,6 +23,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
@@ -33,6 +34,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -189,9 +191,21 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 		deploymentParams.Env = append(deploymentParams.Env, profileEnv)
 
+		// Retrieve and set profile details from NIMCache
+		profile, err := r.getNIMCacheProfile(ctx, nimService, modelProfile)
+		if err != nil {
+			logger.Error(err, "Failed to get cached NIM profile")
+			return ctrl.Result{}, err
+		}
+
+		// Auto assign GPU resources in case of the optimized profile
+		if profile != nil {
+			if err := r.assignGPUResources(ctx, nimService, profile, deploymentParams); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
 		// TODO: assign GPU resources and node selector that is required for the selected profile
-		// TODO: assign GPU resources
-		// TODO: update the node selector
 	}
 
 	// Sync deployment
@@ -412,4 +426,83 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 		}
 	}
 	return &nimService.Spec.Storage.PVC, nil
+}
+
+// getNIMCacheProfile returns model profile info from the NIM cache instance
+func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimService *appsv1alpha1.NIMService, profile string) (*appsv1alpha1.NIMProfile, error) {
+	logger := log.FromContext(ctx)
+
+	if nimService.GetNIMCacheName() == "" {
+		// NIM cache is not used
+		return nil, nil
+	}
+
+	// Lookup NIMCache instance in the same namespace as the NIMService instance
+	nimCache := &appsv1alpha1.NIMCache{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetNIMCacheName(), Namespace: nimService.Namespace}, nimCache); err != nil {
+		logger.Error(err, "unable to fetch nimcache", "nimcache", nimService.GetNIMCacheName(), "nimservice", nimService.Name)
+		return nil, err
+	}
+
+	// Get the status of NIMCache
+	if nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
+		return nil, fmt.Errorf("nimcache %s is not ready, nimservice %s", nimCache.GetName(), nimService.GetName())
+	}
+
+	for _, cachedProfile := range nimCache.Status.Profiles {
+		if cachedProfile.Name == profile {
+			return &cachedProfile, nil
+		}
+	}
+
+	// If the specified profile is not cached, return nil
+	return nil, nil
+}
+
+func (r *NIMServiceReconciler) getTensorParallelismByProfile(ctx context.Context, profile *appsv1alpha1.NIMProfile) (string, error) {
+	tensorParallelism := ""
+	if tp, exists := profile.Config["tp"]; exists {
+		tensorParallelism = tp
+	}
+
+	return tensorParallelism, nil
+}
+
+func (r *NIMServiceReconciler) assignGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile, deploymentParams *rendertypes.DeploymentParams) error {
+	logger := log.FromContext(ctx)
+
+	// Assign GPU resources
+	tensorParallelism, err := r.getTensorParallelismByProfile(ctx, profile)
+	if err != nil {
+		logger.Error(err, "Failed to retrieve tensorParallelism")
+		return err
+	}
+
+	// Check if tensorParallelism is defined in the profile, and automatically assign GPU resources.
+	// Note: This will override any manual GPU assignments made by the user.
+	// The number of GPUs for an optimized profile is fixed.
+	// Allocating more GPUs than required may result in underutilization,
+	// while allocating fewer GPUs will likely cause failures.
+	if tensorParallelism != "" {
+		gpuQuantity, err := apiResource.ParseQuantity(tensorParallelism)
+		if err != nil {
+			return fmt.Errorf("failed to parse tensorParallelism: %w", err)
+		}
+
+		// Ensure that the Resources field is initialized
+		if deploymentParams.Resources == nil {
+			deploymentParams.Resources = &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{},
+				Limits:   corev1.ResourceList{},
+			}
+		}
+
+		// TODO: Make the resource name configurable
+		const gpuResourceName = corev1.ResourceName("nvidia.com/gpu")
+
+		deploymentParams.Resources.Requests[corev1.ResourceName(gpuResourceName)] = gpuQuantity
+		deploymentParams.Resources.Limits[corev1.ResourceName(gpuResourceName)] = gpuQuantity
+	}
+
+	return nil
 }
