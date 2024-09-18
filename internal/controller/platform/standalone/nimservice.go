@@ -123,6 +123,11 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+	} else {
+		err = r.cleanupResource(ctx, &networkingv1.Ingress{}, namespacedName)
+		if err != nil && !errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Sync HPA
@@ -130,6 +135,12 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		err = r.renderAndSyncResource(ctx, nimService, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
 			return renderer.HPA(nimService.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		// If autoscaling is disabled, ensure the HPA is deleted
+		err = r.cleanupResource(ctx, &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -353,6 +364,37 @@ func (r *NIMServiceReconciler) syncResource(ctx context.Context, obj client.Obje
 			return err
 		}
 	}
+	return nil
+}
+
+// cleanupResource deletes the given Kubernetes resource if it exists.
+// If the resource does not exist or an error occurs during deletion, the function returns nil or the error.
+//
+// Parameters:
+// ctx (context.Context): The context for the operation.
+// obj (client.Object): The Kubernetes resource to delete.
+// namespacedName (types.NamespacedName): The namespaced name of the resource.
+//
+// Returns:
+// error: An error if the resource deletion fails, or nil if the resource is not found or deletion is successful.
+func (r *NIMServiceReconciler) cleanupResource(ctx context.Context, obj client.Object, namespacedName types.NamespacedName) error {
+
+	logger := log.FromContext(ctx)
+
+	err := r.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	if errors.IsNotFound(err) {
+		return nil
+	}
+
+	err = r.Delete(ctx, obj)
+	if err != nil {
+		return err
+	}
+	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
 	return nil
 }
 
