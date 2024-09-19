@@ -38,6 +38,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -176,6 +177,36 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Operator: corev1.TolerationOpEqual,
 						Value:    "value1",
 						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				},
+
+				Expose: appsv1alpha1.Expose{
+					Ingress: appsv1alpha1.Ingress{
+						Enabled: ptr.To[bool](true),
+						Spec: networkingv1.IngressSpec{
+							Rules: []networkingv1.IngressRule{
+								{
+									Host: "test-nimservice.default.example.com",
+									IngressRuleValue: networkingv1.IngressRuleValue{
+										HTTP: &networkingv1.HTTPIngressRuleValue{
+											Paths: []networkingv1.HTTPIngressPath{
+												{
+													Path: "/",
+													Backend: networkingv1.IngressBackend{
+														Service: &networkingv1.IngressServiceBackend{
+															Name: "test-nimservice",
+															Port: networkingv1.ServiceBackendPort{
+																Number: 8080,
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 				Scale: appsv1alpha1.Autoscaling{
@@ -421,6 +452,46 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			err = reconciler.cleanupNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
 		})
+
+		It("should delete HPA when NIMService is updated", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// HPA should be deployed
+			hpa := &autoscalingv2.HorizontalPodAutoscaler{}
+			err = client.Get(context.TODO(), namespacedName, hpa)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(hpa.Name).To(Equal(nimService.GetName()))
+			Expect(hpa.Namespace).To(Equal(nimService.GetNamespace()))
+			Expect(*hpa.Spec.MinReplicas).To(Equal(int32(1)))
+			Expect(hpa.Spec.MaxReplicas).To(Equal(int32(10)))
+
+			nimService := &appsv1alpha1.NIMService{}
+			err = client.Get(context.TODO(), namespacedName, nimService)
+			Expect(err).NotTo(HaveOccurred())
+			nimService.Spec.Scale.Enabled = ptr.To[bool](false)
+			nimService.Spec.Expose.Ingress.Enabled = ptr.To[bool](false)
+			err = client.Update(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+			hpa = &autoscalingv2.HorizontalPodAutoscaler{}
+			err = client.Get(context.TODO(), namespacedName, hpa)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsNotFound(err)).To(Equal(true))
+			ingress := &networkingv1.Ingress{}
+			err = client.Get(context.TODO(), namespacedName, ingress)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsNotFound(err)).To(Equal(true))
+		})
+
 	})
 
 	Describe("isDeploymentReady for setting status on NIMService", func() {
