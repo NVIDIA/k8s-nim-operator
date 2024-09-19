@@ -1272,6 +1272,7 @@ spec:
                               type: object
                           type: object
                         replicas:
+                          default: 1
                           minimum: 1
                           type: integer
                         resources:
