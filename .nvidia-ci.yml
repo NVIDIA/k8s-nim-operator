@@ -142,6 +142,13 @@ release:ngc:
     - unzip ngccli_linux.zip
     - chmod u+x ngc-cli/ngc
 
+.helmcli-setup:
+  before_script:
+    - curl -sSLo helm.tar.gz https://get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz
+    - tar -xvf helm.tar.gz
+    - mv linux-amd64/helm /usr/local/bin/helm
+    - chmod +x /usr/local/bin/helm
+
 # .sign forms the base of the deployment jobs which signs images in the CI registry.
 # This is extended with the image name and version to be deployed.
 .sign:ngc:
@@ -163,6 +170,28 @@ release:ngc:
   script:
     - 'echo "Signing the image ${IMAGE_NAME}:${IMAGE_TAG}"'
     - ngc-cli/ngc registry image publish --source ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:${IMAGE_TAG} --public --discoverable --allow-guest --sign --org nvidia
+
+helm:ngc:
+  image: ubuntu:latest
+  stage: release
+  needs:
+    - sign:ngc
+  rules:
+    - if: $CI_COMMIT_TAG
+  variables:
+    NGC_CLI_API_KEY: "${NGC_REGISTRY_TOKEN}"
+  retry:
+    max: 2
+  before_script:
+    - !reference [.ngccli-setup, before_script]
+    - !reference [.helmcli-setup, before_script]
+    - apt-get update && apt-get install -y make
+  script:
+    - 'echo "Pushing the helm chart to NGC"'
+    - helm lint deployments/helm/*
+    - make helm-chart
+    - export VERSION=$(awk -F= '/^VERSION/ { print $2 }' versions.mk | tr -d '[:space:]')
+    - ngc-cli/ngc registry chart push --source k8s-nim-operator-${VERSION}.tgz --org nvidia --team no-team nvidia/k8s-nim-operator:${VERSION}
 
 sign:ngc-short-tag:
   extends:
