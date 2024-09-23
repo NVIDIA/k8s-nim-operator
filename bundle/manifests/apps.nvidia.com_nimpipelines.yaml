@@ -2220,13 +2220,6 @@ spec:
                                 type: string
                             type: object
                           type: array
-                        type:
-                          default: llm
-                          enum:
-                          - llm
-                          - embedding
-                          - reranking
-                          type: string
                         userID:
                           format: int64
                           type: integer
