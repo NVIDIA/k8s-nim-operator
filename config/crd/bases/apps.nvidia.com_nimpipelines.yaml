@@ -227,13 +227,13 @@ spec:
                               description: Ingress defines attributes to enable ingress
                                 for the service
                               properties:
-                                enabled:
-                                  description: ingress, or virtualService - not both
-                                  type: boolean
-                                ingressAnnotations:
+                                annotations:
                                   additionalProperties:
                                     type: string
                                   type: object
+                                enabled:
+                                  description: ingress, or virtualService - not both
+                                  type: boolean
                                 spec:
                                   description: IngressSpec describes the Ingress the
                                     user wishes to exist.
@@ -518,6 +518,10 @@ spec:
                               description: Service defines attributes to create a
                                 service
                               properties:
+                                annotations:
+                                  additionalProperties:
+                                    type: string
+                                  type: object
                                 name:
                                   description: override the default service name
                                   type: string
@@ -525,10 +529,6 @@ spec:
                                   default: 8000
                                   format: int32
                                   type: integer
-                                serviceAnnotations:
-                                  additionalProperties:
-                                    type: string
-                                  type: object
                                 type:
                                   description: Service Type string describes ingress
                                     methods for a service
@@ -731,11 +731,11 @@ spec:
                               description: for use with the Prometheus Operator and
                                 the primary service object
                               properties:
-                                additionalAnnotations:
+                                additionalLabels:
                                   additionalProperties:
                                     type: string
                                   type: object
-                                additionalLabels:
+                                annotations:
                                   additionalProperties:
                                     type: string
                                   type: object

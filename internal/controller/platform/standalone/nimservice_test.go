@@ -181,8 +181,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 				Expose: appsv1alpha1.Expose{
 					Ingress: appsv1alpha1.Ingress{
-						Enabled:            ptr.To[bool](true),
-						IngressAnnotations: map[string]string{"kubernetes.io/ingress.class": "nginx"},
+						Enabled:     ptr.To[bool](true),
+						Annotations: map[string]string{"kubernetes.io/ingress.class": "nginx"},
 						Spec: networkingv1.IngressSpec{
 							Rules: []networkingv1.IngressRule{
 								{

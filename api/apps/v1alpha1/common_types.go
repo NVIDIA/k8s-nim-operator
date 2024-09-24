@@ -35,8 +35,8 @@ type Service struct {
 	// override the default service name
 	Name string `json:"name,omitempty"`
 	// +kubebuilder:default=8000
-	OpenAIPort         int32             `json:"openaiPort"`
-	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
+	OpenAIPort  int32             `json:"openaiPort"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // Metrics defines attributes to setup metrics collection
@@ -48,10 +48,10 @@ type Metrics struct {
 
 // ServiceMonitor defines attributes to create a service monitor
 type ServiceMonitor struct {
-	AdditionalLabels      map[string]string `json:"additionalLabels,omitempty"`
-	AdditionalAnnotations map[string]string `json:"additionalAnnotations,omitempty"`
-	Interval              promv1.Duration   `json:"interval,omitempty"`
-	ScrapeTimeout         promv1.Duration   `json:"scrapeTimeout,omitempty"`
+	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
+	Annotations      map[string]string `json:"annotations,omitempty"`
+	Interval         promv1.Duration   `json:"interval,omitempty"`
+	ScrapeTimeout    promv1.Duration   `json:"scrapeTimeout,omitempty"`
 }
 
 // Autoscaling defines attributes to automatically scale the service based on metrics
@@ -79,9 +79,9 @@ type Image struct {
 // Ingress defines attributes to enable ingress for the service
 type Ingress struct {
 	// ingress, or virtualService - not both
-	Enabled            *bool                    `json:"enabled,omitempty"`
-	IngressAnnotations map[string]string        `json:"ingressAnnotations,omitempty"`
-	Spec               networkingv1.IngressSpec `json:"spec,omitempty"`
+	Enabled     *bool                    `json:"enabled,omitempty"`
+	Annotations map[string]string        `json:"annotations,omitempty"`
+	Spec        networkingv1.IngressSpec `json:"spec,omitempty"`
 }
 
 // IngressHost defines attributes for ingress host

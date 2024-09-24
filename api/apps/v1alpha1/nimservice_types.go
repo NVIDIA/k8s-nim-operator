@@ -753,8 +753,8 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 func (n *NIMService) GetIngressAnnotations() map[string]string {
 	nimServiceAnnotations := n.GetNIMServiceAnnotations()
 
-	if n.Spec.Expose.Ingress.IngressAnnotations != nil {
-		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Ingress.IngressAnnotations)
+	if n.Spec.Expose.Ingress.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Ingress.Annotations)
 	}
 	return nimServiceAnnotations
 }
@@ -762,8 +762,8 @@ func (n *NIMService) GetIngressAnnotations() map[string]string {
 func (n *NIMService) GetServiceAnnotations() map[string]string {
 	nimServiceAnnotations := n.GetNIMServiceAnnotations()
 
-	if n.Spec.Expose.Service.ServiceAnnotations != nil {
-		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Service.ServiceAnnotations)
+	if n.Spec.Expose.Service.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Service.Annotations)
 	}
 	return nimServiceAnnotations
 }
@@ -771,8 +771,8 @@ func (n *NIMService) GetServiceAnnotations() map[string]string {
 func (n *NIMService) GetHPAAnnotations() map[string]string {
 	nimServiceAnnotations := n.GetNIMServiceAnnotations()
 
-	if n.Spec.Metrics.ServiceMonitor.AdditionalAnnotations != nil {
-		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Metrics.ServiceMonitor.AdditionalAnnotations)
+	if n.Spec.Metrics.ServiceMonitor.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
 	return nimServiceAnnotations
 }
