@@ -180,6 +180,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 				},
 				Expose: appsv1alpha1.Expose{
+					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeClusterIP, Port: 8123},
 					Ingress: appsv1alpha1.Ingress{
 						Enabled:     ptr.To[bool](true),
 						Annotations: map[string]string{"kubernetes.io/ingress.class": "nginx"},
@@ -406,6 +407,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(ingress.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(ingress.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(ingress.Annotations["kubernetes.io/ingress.class"]).To(Equal("nginx"))
+			Expect(service.Spec.Ports[0].Name).To(Equal("service-port"))
+			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8123)))
 
 			// HPA should be deployed
 			hpa := &autoscalingv2.HorizontalPodAutoscaler{}

@@ -184,7 +184,7 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_SERVER_PORT",
-			Value: fmt.Sprint(n.Spec.Expose.Service.OpenAIPort),
+			Value: fmt.Sprint(n.Spec.Expose.Service.Port),
 		},
 		{
 			Name:  "NIM_JSONL_LOGGING",
@@ -318,7 +318,7 @@ func (n *NIMService) GetDefaultLivenessProbe() *corev1.Probe {
 				Path: "/v1/health/live",
 				Port: intstr.IntOrString{
 					Type:   intstr.Type(0),
-					IntVal: n.Spec.Expose.Service.OpenAIPort,
+					IntVal: n.Spec.Expose.Service.Port,
 				},
 			},
 		},
@@ -348,7 +348,7 @@ func (n *NIMService) GetDefaultReadinessProbe() *corev1.Probe {
 				Path: "/v1/health/ready",
 				Port: intstr.IntOrString{
 					Type:   intstr.Type(0),
-					IntVal: n.Spec.Expose.Service.OpenAIPort,
+					IntVal: n.Spec.Expose.Service.Port,
 				},
 			},
 		},
@@ -378,7 +378,7 @@ func (n *NIMService) GetDefaultStartupProbe() *corev1.Probe {
 				Path: "/v1/health/ready",
 				Port: intstr.IntOrString{
 					Type:   intstr.Type(0),
-					IntVal: n.Spec.Expose.Service.OpenAIPort,
+					IntVal: n.Spec.Expose.Service.Port,
 				},
 			},
 		},
@@ -496,7 +496,7 @@ func (n *NIMService) IsServiceMonitorEnabled() bool {
 
 // GetServicePort returns the service port for the NIMService deployment
 func (n *NIMService) GetServicePort() int32 {
-	return n.Spec.Expose.Service.OpenAIPort
+	return n.Spec.Expose.Service.Port
 }
 
 // GetUserID returns the user ID for the NIMService deployment
@@ -637,7 +637,7 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 
 	// Set service ports
 	params.Port = n.GetServicePort()
-	params.PortName = "open-ai-port"
+	params.PortName = "service-port"
 	return params
 }
 
