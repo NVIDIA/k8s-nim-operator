@@ -179,10 +179,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
-
 				Expose: appsv1alpha1.Expose{
 					Ingress: appsv1alpha1.Ingress{
-						Enabled: ptr.To[bool](true),
+						Enabled:            ptr.To[bool](true),
+						IngressAnnotations: map[string]string{"kubernetes.io/ingress.class": "nginx"},
 						Spec: networkingv1.IngressSpec{
 							Rules: []networkingv1.IngressRule{
 								{
@@ -211,6 +211,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 				Scale: appsv1alpha1.Autoscaling{
 					Enabled: ptr.To[bool](true),
+
 					HPA: appsv1alpha1.HorizontalPodAutoscalerSpec{
 						MinReplicas: &minReplicas,
 						MaxReplicas: 10,
@@ -395,6 +396,16 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(service.Name).To(Equal(nimService.GetName()))
 			Expect(service.Namespace).To(Equal(nimService.GetNamespace()))
+			Expect(service.Annotations["annotation-key"]).To(Equal("annotation-value"))
+
+			// Ingress should be created
+			ingress := &networkingv1.Ingress{}
+			err = client.Get(context.TODO(), namespacedName, ingress)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ingress.Name).To(Equal(nimService.GetName()))
+			Expect(ingress.Namespace).To(Equal(nimService.GetNamespace()))
+			Expect(ingress.Annotations["annotation-key"]).To(Equal("annotation-value"))
+			Expect(ingress.Annotations["kubernetes.io/ingress.class"]).To(Equal("nginx"))
 
 			// HPA should be deployed
 			hpa := &autoscalingv2.HorizontalPodAutoscaler{}
@@ -402,6 +413,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(hpa.Name).To(Equal(nimService.GetName()))
 			Expect(hpa.Namespace).To(Equal(nimService.GetNamespace()))
+			Expect(hpa.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(*hpa.Spec.MinReplicas).To(Equal(int32(1)))
 			Expect(hpa.Spec.MaxReplicas).To(Equal(int32(10)))
 
@@ -411,6 +423,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(deployment.Name).To(Equal(nimService.GetName()))
 			Expect(deployment.Namespace).To(Equal(nimService.GetNamespace()))
+			Expect(deployment.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal(nimService.GetContainerName()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(nimService.GetImage()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(Equal(nimService.Spec.ReadinessProbe.Probe))

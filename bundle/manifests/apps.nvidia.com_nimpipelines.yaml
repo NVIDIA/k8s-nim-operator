@@ -230,6 +230,10 @@ spec:
                                 enabled:
                                   description: ingress, or virtualService - not both
                                   type: boolean
+                                ingressAnnotations:
+                                  additionalProperties:
+                                    type: string
+                                  type: object
                                 spec:
                                   description: IngressSpec describes the Ingress the
                                     user wishes to exist.
@@ -521,6 +525,10 @@ spec:
                                   default: 8000
                                   format: int32
                                   type: integer
+                                serviceAnnotations:
+                                  additionalProperties:
+                                    type: string
+                                  type: object
                                 type:
                                   description: Service Type string describes ingress
                                     methods for a service
@@ -723,6 +731,10 @@ spec:
                               description: for use with the Prometheus Operator and
                                 the primary service object
                               properties:
+                                additionalAnnotations:
+                                  additionalProperties:
+                                    type: string
+                                  type: object
                                 additionalLabels:
                                   additionalProperties:
                                     type: string
