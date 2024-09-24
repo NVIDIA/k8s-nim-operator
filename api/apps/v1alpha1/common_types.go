@@ -35,8 +35,8 @@ type Service struct {
 	// override the default service name
 	Name string `json:"name,omitempty"`
 	// +kubebuilder:default=8000
-	Annotations map[string]string `json:"annotations,omitempty"`
 	Port        int32             `json:"port"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // Metrics defines attributes to setup metrics collection
