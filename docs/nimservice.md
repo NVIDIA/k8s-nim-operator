@@ -37,7 +37,7 @@ spec:
   expose:
     service:
       type: ClusterIP
-      openaiPort: 8000
+      port: 8000
 ```
 
 Apply the manifest:

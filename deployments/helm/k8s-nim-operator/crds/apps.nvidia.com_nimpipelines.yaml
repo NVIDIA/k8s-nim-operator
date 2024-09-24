@@ -517,7 +517,7 @@ spec:
                                 name:
                                   description: override the default service name
                                   type: string
-                                openaiPort:
+                                port:
                                   default: 8000
                                   format: int32
                                   type: integer
@@ -526,7 +526,7 @@ spec:
                                     methods for a service
                                   type: string
                               required:
-                              - openaiPort
+                              - port
                               type: object
                           type: object
                         groupID:
