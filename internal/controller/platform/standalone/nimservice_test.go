@@ -180,10 +180,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 				},
 				Expose: appsv1alpha1.Expose{
-					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeClusterIP, Port: 8123},
+					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeClusterIP, Port: 8123, Annotations: map[string]string{"annotation-key-specific": "service"}},
 					Ingress: appsv1alpha1.Ingress{
 						Enabled:     ptr.To[bool](true),
-						Annotations: map[string]string{"kubernetes.io/ingress.class": "nginx"},
+						Annotations: map[string]string{"annotation-key-specific": "ingress"},
 						Spec: networkingv1.IngressSpec{
 							Rules: []networkingv1.IngressRule{
 								{
@@ -211,8 +211,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 				},
 				Scale: appsv1alpha1.Autoscaling{
-					Enabled: ptr.To[bool](true),
-
+					Enabled:     ptr.To[bool](true),
+					Annotations: map[string]string{"annotation-key-specific": "HPA"},
 					HPA: appsv1alpha1.HorizontalPodAutoscalerSpec{
 						MinReplicas: &minReplicas,
 						MaxReplicas: 10,
@@ -398,6 +398,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(service.Name).To(Equal(nimService.GetName()))
 			Expect(service.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(service.Annotations["annotation-key"]).To(Equal("annotation-value"))
+			Expect(service.Annotations["annotation-key-specific"]).To(Equal("service"))
 
 			// Ingress should be created
 			ingress := &networkingv1.Ingress{}
@@ -406,7 +407,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(ingress.Name).To(Equal(nimService.GetName()))
 			Expect(ingress.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(ingress.Annotations["annotation-key"]).To(Equal("annotation-value"))
-			Expect(ingress.Annotations["kubernetes.io/ingress.class"]).To(Equal("nginx"))
+			Expect(ingress.Annotations["annotation-key-specific"]).To(Equal("ingress"))
 			Expect(service.Spec.Ports[0].Name).To(Equal("service-port"))
 			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8123)))
 
@@ -417,6 +418,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(hpa.Name).To(Equal(nimService.GetName()))
 			Expect(hpa.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(hpa.Annotations["annotation-key"]).To(Equal("annotation-value"))
+			Expect(hpa.Annotations["annotation-key-specific"]).To(Equal("HPA"))
 			Expect(*hpa.Spec.MinReplicas).To(Equal(int32(1)))
 			Expect(hpa.Spec.MaxReplicas).To(Equal(int32(10)))
 

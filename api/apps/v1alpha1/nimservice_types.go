@@ -771,6 +771,15 @@ func (n *NIMService) GetServiceAnnotations() map[string]string {
 func (n *NIMService) GetHPAAnnotations() map[string]string {
 	nimServiceAnnotations := n.GetNIMServiceAnnotations()
 
+	if n.Spec.Scale.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Scale.Annotations)
+	}
+	return nimServiceAnnotations
+}
+
+func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
 	if n.Spec.Metrics.ServiceMonitor.Annotations != nil {
 		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}

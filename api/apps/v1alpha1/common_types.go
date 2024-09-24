@@ -56,8 +56,9 @@ type ServiceMonitor struct {
 
 // Autoscaling defines attributes to automatically scale the service based on metrics
 type Autoscaling struct {
-	Enabled *bool                       `json:"enabled,omitempty"`
-	HPA     HorizontalPodAutoscalerSpec `json:"hpa,omitempty"`
+	Enabled     *bool                       `json:"enabled,omitempty"`
+	HPA         HorizontalPodAutoscalerSpec `json:"hpa,omitempty"`
+	Annotations map[string]string           `json:"annotations,omitempty"`
 }
 
 // HorizontalPodAutoscalerSpec defines the parameters required to setup HPA

@@ -1352,6 +1352,10 @@ spec:
                           description: Autoscaling defines attributes to automatically
                             scale the service based on metrics
                           properties:
+                            annotations:
+                              additionalProperties:
+                                type: string
+                              type: object
                             enabled:
                               type: boolean
                             hpa:
