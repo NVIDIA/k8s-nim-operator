@@ -143,6 +143,7 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return result, err
 	}
 
+	r.refreshMetrics(ctx)
 	return ctrl.Result{}, nil
 }
 
@@ -207,4 +208,16 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		}).
 		Complete(r)
+}
+
+func (r *NIMServiceReconciler) refreshMetrics(ctx context.Context) {
+	logger := log.FromContext(ctx)
+	// List all nodes
+	nimServiceList := &appsv1alpha1.NIMServiceList{}
+	err := r.Client.List(ctx, nimServiceList)
+	if err != nil {
+		logger.Error(err, "unable to list nimServices in the cluster")
+		return
+	}
+	refreshNIMServiceMetrics(nimServiceList)
 }

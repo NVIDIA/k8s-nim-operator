@@ -819,6 +819,7 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 		logger.Error(err, "Failed to update NIMCache status", "NIMCache", nimCache.Name)
 		return ctrl.Result{}, err
 	}
+	r.refreshMetrics(ctx)
 	return ctrl.Result{}, nil
 }
 
@@ -1257,6 +1258,19 @@ func (r *NIMCacheReconciler) GetNodeGPUProducts(ctx context.Context) (map[string
 	}
 
 	return nodeGPUProducts, nil
+}
+
+func (r *NIMCacheReconciler) refreshMetrics(ctx context.Context) {
+	logger := r.GetLogger()
+
+	// List all nodes
+	nimCacheList := &appsv1alpha1.NIMCacheList{}
+	err := r.Client.List(ctx, nimCacheList)
+	if err != nil {
+		logger.Error(err, "unable to list nim caches in the cluster")
+		return
+	}
+	refreshNIMCacheMetrics(nimCacheList)
 }
 
 // getUniqueGPUProducts extracts unique GPU product values from the map of node GPU products.
