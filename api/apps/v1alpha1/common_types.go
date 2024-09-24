@@ -36,7 +36,7 @@ type Service struct {
 	Name string `json:"name,omitempty"`
 	// +kubebuilder:default=8000
 	Annotations map[string]string `json:"annotations,omitempty"`
-	Port int32 `json:"port"`
+	Port        int32             `json:"port"`
 }
 
 // Metrics defines attributes to setup metrics collection

@@ -521,12 +521,12 @@ spec:
                                 annotations:
                                   additionalProperties:
                                     type: string
+                                  default: 8000
                                   type: object
                                 name:
                                   description: override the default service name
                                   type: string
                                 port:
-                                  default: 8000
                                   format: int32
                                   type: integer
                                 type:
