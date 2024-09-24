@@ -35,7 +35,7 @@ type Service struct {
 	// override the default service name
 	Name string `json:"name,omitempty"`
 	// +kubebuilder:default=8000
-	OpenAIPort int32 `json:"openaiPort"`
+	Port int32 `json:"port"`
 }
 
 // Metrics defines attributes to setup metrics collection

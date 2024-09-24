@@ -181,6 +181,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 
 				Expose: appsv1alpha1.Expose{
+					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeClusterIP, Port: 8123},
 					Ingress: appsv1alpha1.Ingress{
 						Enabled: ptr.To[bool](true),
 						Spec: networkingv1.IngressSpec{
@@ -395,6 +396,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(service.Name).To(Equal(nimService.GetName()))
 			Expect(service.Namespace).To(Equal(nimService.GetNamespace()))
+			Expect(service.Spec.Ports[0].Name).To(Equal("service-port"))
+			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8123)))
 
 			// HPA should be deployed
 			hpa := &autoscalingv2.HorizontalPodAutoscaler{}
