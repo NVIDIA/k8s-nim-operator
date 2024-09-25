@@ -5,6 +5,8 @@
 
 # Installing NIM Operator for Kubernetes using Helm
 
+> TIP: For customer-facing documentation, go to <https://docs.nvidia.com/nim-operator/latest>.
+
 ### Pre-requisites
 
 * A Kubernetes cluster with supported GPUs (H100, A100, L40S)
