@@ -190,7 +190,8 @@ helm:ngc:
     - 'echo "Pushing the helm chart to NGC"'
     - helm lint deployments/helm/*
     - make helm-chart
-    - export VERSION=$(awk -F= '/^VERSION/ { print $2 }' versions.mk | tr -d '[:space:]')
+    # Ensure that VERSION is not prefixed by "v" to follow strict semantic versioning for Helm
+    - export VERSION=$(awk -F= '/^VERSION/ { print $2 }' versions.mk | tr -d '[:space:]' | sed 's/^v//')
     - ngc-cli/ngc registry chart push --source k8s-nim-operator-${VERSION}.tgz --org nvidia --team no-team nvidia/k8s-nim-operator:${VERSION}
 
 sign:ngc-short-tag:

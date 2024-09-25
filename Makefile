@@ -145,10 +145,12 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
-# Short version of hack/package-helm-charts.sh
+# Generate helm chart with the specified chart version
+# CHART_VERSION is stripped from "v" prefix to adhere to strict semantic versioning required by Helm.
+CHART_VERSION := $(shell echo ${VERSION} | sed 's/^v//')
 .PHONY: helm-charts
 helm-charts:
-	helm package deployments/helm/k8s-nim-operator/ --version ${VERSION} --app-version ${VERSION}
+	helm package deployments/helm/k8s-nim-operator/ --version $(CHART_VERSION) --app-version $(CHART_VERSION)
 
 # Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle bundle-validate
