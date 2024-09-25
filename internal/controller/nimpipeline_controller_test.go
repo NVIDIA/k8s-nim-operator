@@ -85,7 +85,6 @@ var _ = Describe("NIMPipeline Controller", func() {
 							Name:    "nim-llm-service",
 							Enabled: utils.BoolPtr(true),
 							Spec: appsv1alpha1.NIMServiceSpec{
-								Type: "llm",
 								Image: appsv1alpha1.Image{
 									Repository: "llm-nim-container",
 									Tag:        "latest",
@@ -107,7 +106,6 @@ var _ = Describe("NIMPipeline Controller", func() {
 							Name:    "nim-embedding-service",
 							Enabled: utils.BoolPtr(false),
 							Spec: appsv1alpha1.NIMServiceSpec{
-								Type: "embedding",
 								Image: appsv1alpha1.Image{
 									Repository: "llm-embedding-container",
 									Tag:        "latest",
@@ -154,7 +152,6 @@ var _ = Describe("NIMPipeline Controller", func() {
 							Name:    "nim-llm-service",
 							Enabled: utils.BoolPtr(true),
 							Spec: appsv1alpha1.NIMServiceSpec{
-								Type: "llm",
 								Image: appsv1alpha1.Image{
 									Repository: "llm-nim-container",
 									Tag:        "latest",
@@ -176,7 +173,6 @@ var _ = Describe("NIMPipeline Controller", func() {
 							Name:    "nim-embedding-service",
 							Enabled: utils.BoolPtr(false),
 							Spec: appsv1alpha1.NIMServiceSpec{
-								Type: "embedding",
 								Image: appsv1alpha1.Image{
 									Repository: "llm-embedding-container",
 									Tag:        "latest",
@@ -243,7 +239,6 @@ var _ = Describe("NIMPipeline Controller", func() {
 							Name:    "nim-llm-service",
 							Enabled: utils.BoolPtr(true),
 							Spec: appsv1alpha1.NIMServiceSpec{
-								Type: "llm",
 								Image: appsv1alpha1.Image{
 									Repository: "llm-nim-container",
 									Tag:        "latest",
