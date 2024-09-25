@@ -99,6 +99,7 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.2/pkg/reconcile
 func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	defer r.refreshMetrics(ctx)
 
 	// Fetch the NIMService instance
 	nimService := &appsv1alpha1.NIMService{}
@@ -143,7 +144,6 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return result, err
 	}
 
-	r.refreshMetrics(ctx)
 	return ctrl.Result{}, nil
 }
 
@@ -214,7 +214,7 @@ func (r *NIMServiceReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
 	// List all nodes
 	nimServiceList := &appsv1alpha1.NIMServiceList{}
-	err := r.Client.List(ctx, nimServiceList)
+	err := r.Client.List(ctx, nimServiceList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list nimServices in the cluster")
 		return

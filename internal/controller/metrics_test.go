@@ -61,22 +61,22 @@ var _ = Describe("Test nim operator metrics", func() {
 			refreshNIMCacheMetrics(nimCaches)
 			g := nimCacheStatusMetric.WithLabelValues("all")
 			metric := &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(3)))
 
 			g = nimCacheStatusMetric.WithLabelValues(statusUnknown)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(1)))
 
 			g = nimCacheStatusMetric.WithLabelValues(appsv1alpha1.NimCacheStatusNotReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(1)))
 
 			g = nimCacheStatusMetric.WithLabelValues(appsv1alpha1.NimCacheStatusReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(1)))
 
 			// Update metrics
@@ -86,22 +86,22 @@ var _ = Describe("Test nim operator metrics", func() {
 			refreshNIMCacheMetrics(nimCaches)
 			g = nimCacheStatusMetric.WithLabelValues("all")
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(3)))
 
 			g = nimCacheStatusMetric.WithLabelValues(statusUnknown)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(0)))
 
 			g = nimCacheStatusMetric.WithLabelValues(appsv1alpha1.NimCacheStatusNotReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(0)))
 
 			g = nimCacheStatusMetric.WithLabelValues(appsv1alpha1.NimCacheStatusReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(3)))
 		})
 	})
@@ -143,22 +143,22 @@ var _ = Describe("Test nim operator metrics", func() {
 			refreshNIMServiceMetrics(nimServices)
 			g := nimServiceStatusMetric.WithLabelValues("all")
 			metric := &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(3)))
 
 			g = nimServiceStatusMetric.WithLabelValues(appsv1alpha1.NIMServiceStatusNotReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(1)))
 
 			g = nimServiceStatusMetric.WithLabelValues(appsv1alpha1.NIMServiceStatusFailed)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(1)))
 
 			g = nimServiceStatusMetric.WithLabelValues(appsv1alpha1.NIMServiceStatusReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(1)))
 
 			// Update metrics
@@ -168,27 +168,27 @@ var _ = Describe("Test nim operator metrics", func() {
 			refreshNIMServiceMetrics(nimServices)
 			g = nimServiceStatusMetric.WithLabelValues("all")
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(3)))
 
 			g = nimServiceStatusMetric.WithLabelValues(statusUnknown)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(0)))
 
 			g = nimServiceStatusMetric.WithLabelValues(appsv1alpha1.NIMServiceStatusNotReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(0)))
 
 			g = nimServiceStatusMetric.WithLabelValues(appsv1alpha1.NIMServiceStatusReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(0)))
 
 			g = nimServiceStatusMetric.WithLabelValues(appsv1alpha1.NIMServiceStatusFailed)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(3)))
 		})
 	})
@@ -230,22 +230,22 @@ var _ = Describe("Test nim operator metrics", func() {
 			refreshNIMPipelineMetrics(nimPipelines)
 			g := nimPipelineStatusMetric.WithLabelValues("all")
 			metric := &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(3)))
 
 			g = nimPipelineStatusMetric.WithLabelValues(appsv1alpha1.NIMPipelineStatusReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(1)))
 
 			g = nimPipelineStatusMetric.WithLabelValues(appsv1alpha1.NIMPipelineStatusNotReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(1)))
 
 			g = nimPipelineStatusMetric.WithLabelValues(appsv1alpha1.NIMPipelineStatusFailed)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(1)))
 
 			// Update metrics
@@ -255,27 +255,27 @@ var _ = Describe("Test nim operator metrics", func() {
 			refreshNIMPipelineMetrics(nimPipelines)
 			g = nimPipelineStatusMetric.WithLabelValues("all")
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(3)))
 
 			g = nimPipelineStatusMetric.WithLabelValues(statusUnknown)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(0)))
 
 			g = nimPipelineStatusMetric.WithLabelValues(appsv1alpha1.NIMPipelineStatusReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(0)))
 
 			g = nimPipelineStatusMetric.WithLabelValues(appsv1alpha1.NIMPipelineStatusNotReady)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(3)))
 
 			g = nimPipelineStatusMetric.WithLabelValues(appsv1alpha1.NIMPipelineStatusFailed)
 			metric = &io_prometheus_client.Metric{}
-			g.Write(metric)
+			Expect(g.Write(metric)).To(Succeed())
 			Expect(metric.GetGauge().GetValue()).To(Equal(float64(0)))
 		})
 	})

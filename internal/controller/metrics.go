@@ -17,11 +17,9 @@ limitations under the License.
 package controller
 
 import (
-	"fmt"
-
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
+	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var (
@@ -37,8 +35,8 @@ var (
 		statusUnknown,
 	}
 
-	nimCacheStatusMetric = metrics.NewGaugeVec(
-		&metrics.GaugeOpts{
+	nimCacheStatusMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Name: "nimCache_status_total",
 			Help: "Total number of NimCaches with specific status value.",
 		},
@@ -52,8 +50,8 @@ var (
 		appsv1alpha1.NIMServiceStatusNotReady,
 		statusUnknown,
 	}
-	nimServiceStatusMetric = metrics.NewGaugeVec(
-		&metrics.GaugeOpts{
+	nimServiceStatusMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Name: "nimService_status_total",
 			Help: "Total number of NimServices with specific status value.",
 		},
@@ -66,8 +64,8 @@ var (
 		appsv1alpha1.NIMPipelineStatusNotReady,
 		statusUnknown,
 	}
-	nimPipelineStatusMetric = metrics.NewGaugeVec(
-		&metrics.GaugeOpts{
+	nimPipelineStatusMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Name: "nimPipeline_status_total",
 			Help: "Total number of NimPipelines with specific status value.",
 		},
@@ -77,9 +75,9 @@ var (
 
 func init() {
 	// Register the custom metric with the legacyregistry
-	legacyregistry.MustRegister(nimCacheStatusMetric)
-	legacyregistry.MustRegister(nimServiceStatusMetric)
-	legacyregistry.MustRegister(nimPipelineStatusMetric)
+	metrics.Registry.MustRegister(nimCacheStatusMetric)
+	metrics.Registry.MustRegister(nimServiceStatusMetric)
+	metrics.Registry.MustRegister(nimPipelineStatusMetric)
 }
 
 func refreshNIMCacheMetrics(nimCacheList *appsv1alpha1.NIMCacheList) {
@@ -97,18 +95,14 @@ func refreshNIMCacheMetrics(nimCacheList *appsv1alpha1.NIMCacheList) {
 			counts[status] = counts[status] + 1
 		}
 	}
-	fmt.Println(counts)
 	for _, status := range nimCacheStatusValues {
 		if _, ok := counts[status]; !ok {
 			nimCacheStatusMetric.WithLabelValues(status).Set(float64(0))
-			fmt.Println(status)
 		}
 	}
 	for status, val := range counts {
 		nimCacheStatusMetric.WithLabelValues(status).Set(float64(val))
 	}
-
-	fmt.Println()
 }
 
 func refreshNIMServiceMetrics(nimServiceList *appsv1alpha1.NIMServiceList) {

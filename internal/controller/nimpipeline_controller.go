@@ -60,6 +60,7 @@ const (
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.2/pkg/reconcile
 func (r *NIMPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	defer r.refreshMetrics(ctx)
 
 	// Fetch the NIMPipeline instance
 	nimPipeline := &appsv1alpha1.NIMPipeline{}
@@ -143,7 +144,6 @@ func (r *NIMPipelineReconciler) reconcileNIMPipeline(ctx context.Context, nimPip
 	if err := r.cleanupDisabledNIMs(ctx, nimPipeline, enabledServices); err != nil {
 		return ctrl.Result{}, err
 	}
-	r.refreshMetrics(ctx)
 
 	return ctrl.Result{}, nil
 }
@@ -387,7 +387,7 @@ func (r *NIMPipelineReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
 	// List all nodes
 	nimPipelineList := &appsv1alpha1.NIMPipelineList{}
-	err := r.Client.List(ctx, nimPipelineList)
+	err := r.Client.List(ctx, nimPipelineList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list nim pipelines in the cluster")
 		return
