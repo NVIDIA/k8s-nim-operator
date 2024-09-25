@@ -758,6 +758,7 @@ func (r *NIMCacheReconciler) createPod(ctx context.Context, pod *corev1.Pod) err
 
 func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (ctrl.Result, error) {
 	logger := r.GetLogger()
+	defer r.refreshMetrics(ctx)
 
 	// Reconcile ServiceAccount
 	err := r.reconcileServiceAccount(ctx, nimCache)
@@ -1257,6 +1258,20 @@ func (r *NIMCacheReconciler) GetNodeGPUProducts(ctx context.Context) (map[string
 	}
 
 	return nodeGPUProducts, nil
+}
+
+func (r *NIMCacheReconciler) refreshMetrics(ctx context.Context) {
+	logger := r.GetLogger()
+
+	// List all nodes
+	nimCacheList := &appsv1alpha1.NIMCacheList{}
+	err := r.Client.List(ctx, nimCacheList, &client.ListOptions{})
+	if err != nil {
+		logger.Error(err, "unable to list nim caches in the cluster")
+		return
+	}
+	logger.Info("caches found, refreshing metrics", "cacheNo", len(nimCacheList.Items))
+	refreshNIMCacheMetrics(nimCacheList)
 }
 
 // getUniqueGPUProducts extracts unique GPU product values from the map of node GPU products.
