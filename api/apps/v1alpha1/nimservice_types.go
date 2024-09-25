@@ -207,8 +207,8 @@ func (n *NIMService) GetStandardAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetServiceAnnotations returns annotations to apply to the NIMService instance
-func (n *NIMService) GetServiceAnnotations() map[string]string {
+// GetNIMServiceAnnotations returns annotations to apply to the NIMService instance
+func (n *NIMService) GetNIMServiceAnnotations() map[string]string {
 	standardAnnotations := n.GetStandardAnnotations()
 
 	if n.Spec.Annotations != nil {
@@ -527,7 +527,7 @@ func (n *NIMService) GetServiceAccountParams() *rendertypes.ServiceAccountParams
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetNIMServiceAnnotations()
 	return params
 }
 
@@ -539,7 +539,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetNIMServiceAnnotations()
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {
@@ -589,7 +589,7 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetNIMServiceAnnotations()
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {
@@ -632,7 +632,6 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetServiceAnnotations()
-
 	// Set service selector labels
 	params.SelectorLabels = n.GetSelectorLabels()
 
@@ -651,7 +650,7 @@ func (n *NIMService) GetIngressParams() *rendertypes.IngressParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetIngressAnnotations()
 	params.Spec = n.GetIngressSpec()
 	return params
 }
@@ -700,7 +699,7 @@ func (n *NIMService) GetHPAParams() *rendertypes.HPAParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetHPAAnnotations()
 
 	// Set HPA spec
 	hpa := n.GetHPA()
@@ -739,7 +738,7 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 	svcLabels := n.GetServiceLabels()
 	maps.Copy(svcLabels, serviceMonitor.AdditionalLabels)
 	params.Labels = svcLabels
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetNIMServiceAnnotations()
 
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
@@ -749,6 +748,42 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 	}
 	params.SMSpec = smSpec
 	return params
+}
+
+func (n *NIMService) GetIngressAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
+	if n.Spec.Expose.Ingress.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Ingress.Annotations)
+	}
+	return nimServiceAnnotations
+}
+
+func (n *NIMService) GetServiceAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
+	if n.Spec.Expose.Service.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Service.Annotations)
+	}
+	return nimServiceAnnotations
+}
+
+func (n *NIMService) GetHPAAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
+	if n.Spec.Scale.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Scale.Annotations)
+	}
+	return nimServiceAnnotations
+}
+
+func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
+	if n.Spec.Metrics.ServiceMonitor.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
+	}
+	return nimServiceAnnotations
 }
 
 func init() {
