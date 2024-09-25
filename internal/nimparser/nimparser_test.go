@@ -122,13 +122,13 @@ var _ = Describe("NIMParser", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(*config).To(HaveLen(1))
 
-			// Match using discovered GPUs
+			// Match using discovered GPUs (node product labels)
 			modelSpec := appsv1alpha1.ModelSpec{Precision: "fp16",
 				Engine:            "tensorrt_llm",
 				QoSProfile:        "throughput",
 				TensorParallelism: "8",
 			}
-			matchedProfiles, err := MatchProfiles(modelSpec, *config, []string{"l40s"})
+			matchedProfiles, err := MatchProfiles(modelSpec, *config, []string{"NVIDIA-L40S-48C"})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(matchedProfiles).NotTo(BeEmpty())
 			Expect(matchedProfiles).To(HaveLen(1))
@@ -171,7 +171,7 @@ var _ = Describe("NIMParser", func() {
 			modelSpec := appsv1alpha1.ModelSpec{
 				Engine: "tensorrt", // instead of tensorrt_llm for llm nims
 			}
-			matchedProfiles, err := MatchProfiles(modelSpec, *config, nil)
+			matchedProfiles, err := MatchProfiles(modelSpec, *config, []string{"NVIDIA-A10G"})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(matchedProfiles).To(HaveLen(1))
 		})

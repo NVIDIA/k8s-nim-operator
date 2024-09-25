@@ -18,6 +18,7 @@ package nimparser
 
 import (
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -221,13 +222,35 @@ func matchGPUProfile(modelSpec appsv1alpha1.ModelSpec, profile NIMProfile, disco
 	}
 
 	// If no match was found in the specified GPUs, check the discovered GPUs
-	for _, product := range discoveredGPUs {
-		if product != "" && (strings.Contains(strings.ToLower(profile.Tags["gpu"]), strings.ToLower(product)) ||
-			strings.Contains(strings.ToLower(profile.Tags["key"]), strings.ToLower(product))) {
-			return true
+	for _, productLabel := range discoveredGPUs {
+		if productLabel != "" {
+			// match for llm nim format
+			if strings.Contains(strings.ToLower(productLabel), strings.ToLower(profile.Tags["gpu"])) {
+				return true
+			}
+			// match for non-llm nim format
+			if matches, _ := matchesRegex(productLabel, profile.Tags["product_name_regex"]); matches {
+				return true
+			}
 		}
 	}
 
 	// If no match found in both specified and discovered GPUs, return false
 	return false
+}
+
+func matchesRegex(productLabel, regexPattern string) (bool, error) {
+	// If regexPattern is empty, return false
+	if regexPattern == "" {
+		return false, nil
+	}
+
+	// Compile the regex pattern
+	regex, err := regexp.Compile(regexPattern)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if the productLabel matches the regex
+	return regex.MatchString(productLabel), nil
 }
