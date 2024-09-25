@@ -24,8 +24,10 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -43,9 +45,10 @@ type Standalone struct{}
 // NIMCacheReconciler represents the NIMCache reconciler instance for standalone mode
 type NIMCacheReconciler struct {
 	client.Client
-	scheme  *runtime.Scheme
-	log     logr.Logger
-	updater conditions.Updater
+	scheme   *runtime.Scheme
+	log      logr.Logger
+	updater  conditions.Updater
+	recorder record.EventRecorder
 }
 
 // NIMServiceReconciler represents the NIMService reconciler instance for standalone mode
@@ -55,25 +58,28 @@ type NIMServiceReconciler struct {
 	log      logr.Logger
 	updater  conditions.Updater
 	renderer render.Renderer
+	recorder record.EventRecorder
 }
 
 // NewNIMCacheReconciler returns NIMCacheReconciler for standalone mode
 func NewNIMCacheReconciler(r shared.Reconciler) *NIMCacheReconciler {
 	return &NIMCacheReconciler{
-		Client:  r.GetClient(),
-		scheme:  r.GetScheme(),
-		log:     r.GetLogger(),
-		updater: r.GetUpdater(),
+		Client:   r.GetClient(),
+		scheme:   r.GetScheme(),
+		log:      r.GetLogger(),
+		updater:  r.GetUpdater(),
+		recorder: r.GetEventRecorder(),
 	}
 }
 
 // NewNIMServiceReconciler returns NIMServiceReconciler for standalone mode
 func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
-		Client:  r.GetClient(),
-		scheme:  r.GetScheme(),
-		log:     r.GetLogger(),
-		updater: r.GetUpdater(),
+		Client:   r.GetClient(),
+		scheme:   r.GetScheme(),
+		log:      r.GetLogger(),
+		updater:  r.GetUpdater(),
+		recorder: r.GetEventRecorder(),
 	}
 }
 
@@ -103,6 +109,8 @@ func (s *Standalone) Sync(ctx context.Context, r shared.Reconciler, resource cli
 		logger.Info("Reconciling NIMService instance")
 		result, err := reconciler.reconcileNIMService(ctx, nimService)
 		if err != nil {
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed,
+				"NIMService %s in namespace %s failed, msg: %s", nimService.Name, nimService.Namespace, err.Error())
 			errConditionUpdate := reconciler.updater.SetConditionsFailed(ctx, nimService, conditions.Failed, err.Error())
 			if errConditionUpdate != nil {
 				logger.Error(err, "Unable to update status")

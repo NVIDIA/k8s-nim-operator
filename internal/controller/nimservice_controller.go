@@ -33,6 +33,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -53,6 +54,7 @@ type NIMServiceReconciler struct {
 	renderer render.Renderer
 	Config   *rest.Config
 	Platform platform.Platform
+	recorder record.EventRecorder
 }
 
 // Ensure NIMServiceReconciler implements the Reconciler interface
@@ -126,12 +128,16 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
 			// Perform platform specific cleanup of resources
 			if err := r.Platform.Delete(ctx, r, nimService); err != nil {
+				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
+					"NIMService %s in namespace %s deleted", nimService.Name, nimService.Namespace)
 				return ctrl.Result{}, err
 			}
 
 			// Remove finalizer to allow for deletion
 			controllerutil.RemoveFinalizer(nimService, NIMServiceFinalizer)
 			if err := r.Update(ctx, nimService); err != nil {
+				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
+					"NIMService %s in namespace %s finalizer removed", nimService.Name, nimService.Namespace)
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil
@@ -177,8 +183,14 @@ func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 	return r.renderer
 }
 
+// GetEventRecorder returns the event recorder
+func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
+	return r.recorder
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.recorder = mgr.GetEventRecorderFor("nimservice-controller")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMService{}).
 		Owns(&appsv1.Deployment{}).
