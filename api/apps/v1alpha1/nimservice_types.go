@@ -735,13 +735,13 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 	svcLabels := n.GetServiceLabels()
 	maps.Copy(svcLabels, serviceMonitor.AdditionalLabels)
 	params.Labels = svcLabels
-	params.Annotations = n.GetNIMServiceAnnotations()
+	params.Annotations = n.GetServiceMonitorAnnotations()
 
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
 		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
 		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
-		Endpoints:         []monitoringv1.Endpoint{{Port: "open-ai-port", ScrapeTimeout: serviceMonitor.ScrapeTimeout, Interval: serviceMonitor.Interval}},
+		Endpoints:         []monitoringv1.Endpoint{{Port: "service-port", ScrapeTimeout: serviceMonitor.ScrapeTimeout, Interval: serviceMonitor.Interval}},
 	}
 	params.SMSpec = smSpec
 	return params

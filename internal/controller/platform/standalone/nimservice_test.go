@@ -33,6 +33,7 @@ import (
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -87,6 +88,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(autoscalingv2.AddToScheme(scheme)).To(Succeed())
 		Expect(networkingv1.AddToScheme(scheme)).To(Succeed())
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
+		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -234,6 +236,14 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 								},
 							},
 						},
+					},
+				},
+				Metrics: appsv1alpha1.Metrics{
+					Enabled: &boolTrue,
+					ServiceMonitor: appsv1alpha1.ServiceMonitor{
+						Annotations:   map[string]string{"annotation-key-specific": "service-monitor"},
+						Interval:      "1m",
+						ScrapeTimeout: "30s",
 					},
 				},
 				ReadinessProbe: appsv1alpha1.Probe{
@@ -421,6 +431,18 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(hpa.Annotations["annotation-key-specific"]).To(Equal("HPA"))
 			Expect(*hpa.Spec.MinReplicas).To(Equal(int32(1)))
 			Expect(hpa.Spec.MaxReplicas).To(Equal(int32(10)))
+
+			// Service Monitor should be created
+			sm := &monitoringv1.ServiceMonitor{}
+			err = client.Get(context.TODO(), namespacedName, sm)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(sm.Name).To(Equal(nimService.GetName()))
+			Expect(sm.Namespace).To(Equal(nimService.GetNamespace()))
+			Expect(sm.Annotations["annotation-key"]).To(Equal("annotation-value"))
+			Expect(sm.Annotations["annotation-key-specific"]).To(Equal("service-monitor"))
+			Expect(sm.Spec.Endpoints[0].Port).To(Equal("service-port"))
+			Expect(sm.Spec.Endpoints[0].ScrapeTimeout).To(Equal(monitoringv1.Duration("30s")))
+			Expect(sm.Spec.Endpoints[0].Interval).To(Equal(monitoringv1.Duration("1m")))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
