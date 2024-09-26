@@ -139,7 +139,7 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	defer func() {
 		if err != nil {
-			r.GetEventRecorder().Eventf(nimCache, corev1.EventTypeWarning, appsv1alpha1.NimCacheConditionReconcileFailed,
+			r.GetEventRecorder().Eventf(nimCache, corev1.EventTypeWarning, "ReconcileFailed",
 				"NIMCache %s reconcile failed, msg: %s", nimCache.Name, err.Error())
 		} else if previousStatusState != nimCache.Status.State {
 			r.GetEventRecorder().Eventf(nimCache, corev1.EventTypeNormal, nimCache.Status.State,
