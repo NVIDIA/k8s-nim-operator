@@ -218,6 +218,7 @@ spec:
               verbs:
               - create
               - patch
+              - update
       clusterPermissions:
         - serviceAccountName: k8s-nim-operator
           rules:
@@ -229,6 +230,14 @@ spec:
                 - get
                 - list
                 - watch
+            - apiGroups:
+              - ""
+              resources:
+              - events
+              verbs:
+              - create
+              - patch
+              - update
             - apiGroups:
                 - ''
               resources:
