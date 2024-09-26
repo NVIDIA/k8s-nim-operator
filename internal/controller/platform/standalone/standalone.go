@@ -109,7 +109,7 @@ func (s *Standalone) Sync(ctx context.Context, r shared.Reconciler, resource cli
 		logger.Info("Reconciling NIMService instance")
 		result, err := reconciler.reconcileNIMService(ctx, nimService)
 		if err != nil {
-			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed,
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, "ReconcileFailed",
 				"NIMService %s failed, msg: %s", nimService.Name, err.Error())
 			errConditionUpdate := reconciler.updater.SetConditionsFailed(ctx, nimService, conditions.Failed, err.Error())
 			if errConditionUpdate != nil {
