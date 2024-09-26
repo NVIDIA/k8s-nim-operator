@@ -38,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -69,6 +70,11 @@ func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 	return r.renderer
 }
 
+// GetEventRecorder returns the event recorder
+func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
+	return r.recorder
+}
+
 func (r *NIMServiceReconciler) cleanupNIMService(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
 	// All dependent (owned) objects will be automatically garbage collected.
 	// TODO: Handle any custom cleanup logic for the NIM microservice
@@ -77,6 +83,13 @@ func (r *NIMServiceReconciler) cleanupNIMService(ctx context.Context, nimService
 
 func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimService *appsv1alpha1.NIMService) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	var err error
+	defer func() {
+		if err != nil {
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed,
+				"NIMService %s failed, msg: %s", nimService.Name, err.Error())
+		}
+	}()
 	// Generate annotation for the current operator-version and apply to all resources
 	// Get generic name for all resources
 	namespacedName := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
@@ -84,7 +97,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	renderer := r.GetRenderer()
 
 	// Sync serviceaccount
-	err := r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
 		return renderer.ServiceAccount(nimService.GetServiceAccountParams())
 	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
 	if err != nil {
@@ -186,7 +199,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		// Use an existing PVC
 		modelPVC = &nimService.Spec.Storage.PVC
 	} else {
-		err := fmt.Errorf("neither external PVC name or NIMCache volume is provided")
+		err = fmt.Errorf("neither external PVC name or NIMCache volume is provided")
 		logger.Error(err, "failed to determine PVC for model-store")
 		return ctrl.Result{}, err
 	}
@@ -203,7 +216,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		deploymentParams.Env = append(deploymentParams.Env, profileEnv)
 
 		// Retrieve and set profile details from NIMCache
-		profile, err := r.getNIMCacheProfile(ctx, nimService, modelProfile)
+		var profile *appsv1alpha1.NIMProfile
+		profile, err = r.getNIMCacheProfile(ctx, nimService, modelProfile)
 		if err != nil {
 			logger.Error(err, "Failed to get cached NIM profile")
 			return ctrl.Result{}, err
@@ -211,7 +225,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 		// Auto assign GPU resources in case of the optimized profile
 		if profile != nil {
-			if err := r.assignGPUResources(ctx, nimService, profile, deploymentParams); err != nil {
+			if err = r.assignGPUResources(ctx, nimService, profile, deploymentParams); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -236,9 +250,13 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	if !ready {
 		// Update status as NotReady
 		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
+		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
+			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
 	} else {
 		// Update status as ready
 		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
+		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
+			"NIMService %s ready, msg: %s", nimService.Name, msg)
 	}
 
 	if err != nil {

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -40,7 +41,8 @@ import (
 // NIMPipelineReconciler reconciles a NIMPipeline object
 type NIMPipelineReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	recorder record.EventRecorder
 }
 
 const (
@@ -52,6 +54,7 @@ const (
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimpipelines/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimpipelines/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimservices,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -339,6 +342,9 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 	nimPipeline.Status.State = overallState
 	nimPipeline.Status.States = serviceStates
 
+	r.GetEventRecorder().Eventf(nimPipeline, corev1.EventTypeNormal, overallState,
+		"NIMPipeline %s status %s, service states %v", nimPipeline.Name, overallState, serviceStates)
+
 	if err := r.Status().Update(ctx, nimPipeline); err != nil {
 		logger.Error(err, "Failed to update NIMPipeline status")
 		return err
@@ -357,8 +363,14 @@ func (r *NIMPipelineReconciler) deleteService(ctx context.Context, svc *appsv1al
 	return nil
 }
 
+// GetEventRecorder returns the event recorder
+func (r *NIMPipelineReconciler) GetEventRecorder() record.EventRecorder {
+	return r.recorder
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMPipelineReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.recorder = mgr.GetEventRecorderFor("nimpipeline-controller")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMPipeline{}).
 		Owns(&appsv1alpha1.NIMService{}).

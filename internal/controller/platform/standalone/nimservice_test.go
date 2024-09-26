@@ -46,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -105,6 +106,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			scheme:   scheme,
 			updater:  conditions.NewUpdater(client),
 			renderer: render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/standalone"), "manifests")),
+			recorder: record.NewFakeRecorder(1000),
 		}
 		pvcName := "test-pvc"
 		minReplicas := int32(1)
