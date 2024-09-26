@@ -87,7 +87,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	defer func() {
 		if err != nil {
 			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed,
-				"NIMService %s in namespace %s failed, msg: %s", nimService.Name, nimService.Namespace, err.Error())
+				"NIMService %s failed, msg: %s", nimService.Name, err.Error())
 		}
 	}()
 	// Generate annotation for the current operator-version and apply to all resources
@@ -251,12 +251,12 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		// Update status as NotReady
 		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
-			"NIMService %s in namespace %s not ready yet, msg: %s", nimService.Name, nimService.Namespace, msg)
+			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
 	} else {
 		// Update status as ready
 		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
 		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
-			"NIMService %s in namespace %s ready, msg: %s", nimService.Name, nimService.Namespace, msg)
+			"NIMService %s ready, msg: %s", nimService.Name, msg)
 	}
 
 	if err != nil {

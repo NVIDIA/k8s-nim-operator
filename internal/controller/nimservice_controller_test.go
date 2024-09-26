@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -57,6 +58,7 @@ var _ = Describe("NIMService Controller", func() {
 			Client:   client,
 			scheme:   scheme,
 			Platform: &standalone.Standalone{},
+			recorder: record.NewFakeRecorder(1000),
 		}
 	})
 

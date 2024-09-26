@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,8 +61,9 @@ var _ = Describe("NIMCache Controller", func() {
 			WithStatusSubresource(&corev1.ConfigMap{}).
 			Build()
 		reconciler = &NIMCacheReconciler{
-			Client: cli,
-			scheme: scheme,
+			Client:   cli,
+			scheme:   scheme,
+			recorder: record.NewFakeRecorder(1000),
 		}
 
 		nimCache := &appsv1alpha1.NIMCache{
@@ -639,8 +641,9 @@ var _ = Describe("NIMCache Controller", func() {
 				Build()
 
 			reconciler = &NIMCacheReconciler{
-				Client: cli,
-				scheme: scheme,
+				Client:   cli,
+				scheme:   scheme,
+				recorder: record.NewFakeRecorder(1000),
 			}
 
 		})

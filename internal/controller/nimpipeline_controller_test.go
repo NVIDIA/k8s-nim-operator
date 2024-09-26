@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -55,8 +56,9 @@ var _ = Describe("NIMPipeline Controller", func() {
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
 			Build()
 		reconciler = &NIMPipelineReconciler{
-			Client: client,
-			Scheme: scheme,
+			Client:   client,
+			Scheme:   scheme,
+			recorder: record.NewFakeRecorder(1000),
 		}
 	})
 

@@ -129,7 +129,7 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			// Perform platform specific cleanup of resources
 			if err := r.Platform.Delete(ctx, r, nimService); err != nil {
 				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
-					"NIMService %s in namespace %s deleted", nimService.Name, nimService.Namespace)
+					"NIMService %s in deleted", nimService.Name)
 				return ctrl.Result{}, err
 			}
 
@@ -137,7 +137,7 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			controllerutil.RemoveFinalizer(nimService, NIMServiceFinalizer)
 			if err := r.Update(ctx, nimService); err != nil {
 				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
-					"NIMService %s in namespace %s finalizer removed", nimService.Name, nimService.Namespace)
+					"NIMService %s finalizer removed", nimService.Name)
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil

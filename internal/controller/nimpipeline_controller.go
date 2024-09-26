@@ -342,7 +342,7 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 	nimPipeline.Status.States = serviceStates
 
 	r.GetEventRecorder().Eventf(nimPipeline, corev1.EventTypeNormal, overallState,
-		"nimPipeline %s in namespace %s status %s, service states %v", nimPipeline.Name, nimPipeline.Namespace, overallState, serviceStates)
+		"NIMPipeline %s status %s, service states %v", nimPipeline.Name, overallState, serviceStates)
 
 	if err := r.Status().Update(ctx, nimPipeline); err != nil {
 		logger.Error(err, "Failed to update NIMPipeline status")

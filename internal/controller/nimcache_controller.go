@@ -139,10 +139,10 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	defer func() {
 		if err != nil {
 			r.GetEventRecorder().Eventf(nimCache, corev1.EventTypeWarning, appsv1alpha1.NimCacheConditionReconcileFailed,
-				"NIMCache %s in namespace %s reconcile failed, msg: %s", nimCache.Name, nimCache.Namespace, err.Error())
+				"NIMCache %s reconcile failed, msg: %s", nimCache.Name, err.Error())
 		} else if previousStatusState != nimCache.Status.State {
 			r.GetEventRecorder().Eventf(nimCache, corev1.EventTypeNormal, nimCache.Status.State,
-				"NIMCache %s in namespace %s reconcile success, new state: %s", nimCache.Name, nimCache.Namespace, nimCache.Status.State)
+				"NIMCache %s reconcile success, new state: %s", nimCache.Name, nimCache.Status.State)
 		}
 	}()
 	// Check if the instance is marked for deletion
