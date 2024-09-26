@@ -467,6 +467,12 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 			return nil, err
 		}
 	}
+
+	// If explicit name is not provided in the spec, update it with the one created
+	if nimService.Spec.Storage.PVC.Name == "" {
+		nimService.Spec.Storage.PVC.Name = pvc.Name
+	}
+
 	return &nimService.Spec.Storage.PVC, nil
 }
 
