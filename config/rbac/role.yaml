@@ -29,7 +29,7 @@ rules:
   resources:
   - events
   verbs:
-  - get
+  - create
   - patch
   - update
 - apiGroups:
