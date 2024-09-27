@@ -922,6 +922,9 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 				RunAsUser:    nimCache.GetUserID(),
 				FSGroup:      nimCache.GetGroupID(),
 				RunAsNonRoot: ptr.To[bool](true),
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
 			},
 			ServiceAccountName: NIMCacheServiceAccount,
 			Tolerations:        nimCache.GetTolerations(),
@@ -995,6 +998,9 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						RunAsUser:    nimCache.GetUserID(),
 						FSGroup:      nimCache.GetGroupID(),
 						RunAsNonRoot: ptr.To[bool](true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
 					},
 					Containers:    []corev1.Container{},
 					RestartPolicy: corev1.RestartPolicyNever,
