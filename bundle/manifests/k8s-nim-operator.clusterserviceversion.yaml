@@ -85,6 +85,53 @@ metadata:
               }
             }
           }
+        },
+        {
+          "kind": "NIMPipeline",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/name": "k8s-nim-operator",
+              "app.kubernetes.io/managed-by": "k8s-nim-operator"
+            },
+            "name": "nimpipeline-sample"
+          },
+          "spec": {
+            "services": [
+              {
+                "name": "meta-llama3-8b-instruct",
+                "enabled": true,
+                "spec": {
+                  "image": {
+                    "repository": "nvcr.io/nim/meta/llama3-8b-instruct",
+                    "tag": "1.0.3",
+                    "pullPolicy": "IfNotPresent",
+                    "pullSecrets": [
+                      "ngc-secret"
+                    ]
+                  },
+                  "authSecret": "ngc-api-secret",
+                  "storage": {
+                    "nimCache": {
+                      "name": "meta-llama3-8b-instruct",
+                      "profile": ""
+                    }
+                  },
+                  "replicas": 1,
+                  "resources": {
+                    "limits": {
+                      "nvidia.com/gpu": 1
+                    }
+                  },
+                  "expose": {
+                    "service": {
+                      "type": "ClusterIP",
+                      "port": 8000
+                    }
+                  }
+                }
+              }
+            ]
+          }
         }
       ]
     k8sMinVersion: 1.26.0
