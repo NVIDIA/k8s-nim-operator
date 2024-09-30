@@ -2,7 +2,7 @@ operator:
   replicas: 1
   image:
     repository: nvcr.io/nvidia/cloud-native/k8s-nim-operator
-    tag: v0.1.0
+    tag: v1.0.0
     pullSecrets: []
     pullPolicy: Always
   args:
