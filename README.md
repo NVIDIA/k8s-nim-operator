@@ -21,7 +21,7 @@ NVIDIA NIM microservices deliver AI foundation models as accelerated inference m
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-build docker-push IMG=<your-private-registry>/k8s-nim-operator:<tag>
+make build IMAGE_NAME=<your-private-registry>/k8s-nim-operator VERSION=<tag> -f deployments/container/Makefile
 ```
 
 > Publish the image to a personal registry.
