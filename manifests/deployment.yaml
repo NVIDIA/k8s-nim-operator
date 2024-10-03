@@ -4,13 +4,13 @@ metadata:
   name: {{ .Name }}
   namespace: {{ .Namespace }}
   labels:
-    {{- range $key, $value := .Labels }}
-    {{ $key }}: {{ $value }}
-    {{- end }}
+  {{- if .Labels }}
+    {{- .Labels | yaml | nindent 4 }}
+  {{- end }}
   annotations:
-    {{- range $key, $value := .Annotations }}
-    {{ $key }}: {{ $value }}
-    {{- end }}
+  {{- if .Annotations }}
+    {{- .Annotations | yaml | nindent 4 }}
+  {{- end }}
 spec:
   {{- if .Replicas }}
   replicas: {{ .Replicas }}
@@ -27,6 +27,13 @@ spec:
     metadata:
       labels:
         app: {{ .Name }}
+      {{- if .Labels }}
+        {{- .Labels | yaml | nindent 8 }}
+      {{- end }}
+      annotations:
+      {{- if .Annotations }}
+        {{- .Annotations | yaml | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: {{ .ServiceAccountName }}
       containers:
