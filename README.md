@@ -9,7 +9,11 @@ NVIDIA NIM Operator is a Kubernetes Operator that is designed to facilitate the 
 
 NVIDIA NIM microservices deliver AI foundation models as accelerated inference microservices that are portable across data center, workstation, and cloud, accelerating flexible generative AI development, deployment and time to value.
 
-## Getting Started
+To use the Operator in your cluster, refer to
+<https://docs.nvidia.com/nim-operator/latest>
+for installation and configuration information.
+
+## Developing the Operator
 
 ### Prerequisites
 
