@@ -75,6 +75,9 @@ const (
 
 	// NIMCacheServiceAccount is the name of the serviceaccount for all NIMCache instances in the namespace
 	NIMCacheServiceAccount = "nim-cache-sa"
+
+	// NIMCacheContainerName returns the name of the container used for NIM Cache operations.
+	NIMCacheContainerName = "nim-cache-ctr"
 )
 
 // NIMCacheReconciler reconciles a NIMCache object
@@ -904,7 +907,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:    "nim-cache",
+					Name:    NIMCacheContainerName,
 					Image:   nimCache.Spec.Source.NGC.ModelPuller,
 					Command: []string{"sh", "-c", "cat /etc/nim/config/model_manifest.yaml; sleep infinity"},
 					SecurityContext: &corev1.SecurityContext{
@@ -942,7 +945,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 }
 
 func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (string, error) {
-	podLogOpts := corev1.PodLogOptions{}
+	podLogOpts := corev1.PodLogOptions{Container: NIMCacheContainerName}
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return "", err
@@ -1039,7 +1042,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
-				Name:    "nim-cache",
+				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.DataStore.ModelPuller,
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
 				Env:     []corev1.EnvVar{},
@@ -1070,7 +1073,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	} else if nimCache.Spec.Source.NGC != nil {
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
-				Name:    "nim-cache",
+				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.NGC.ModelPuller,
 				Command: []string{"download-to-cache"},
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
