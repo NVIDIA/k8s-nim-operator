@@ -57,9 +57,9 @@ type NemoGuardrailSpec struct {
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
-	// The name of an existing pull secret containing the NGC_API_KEY
+	// The name of an secret that contains authn for the NGC NIM service API
 	AuthSecret string `json:"authSecret"`
-	// Storage is the target storage for caching NIM model if NIMCache is not provided
+	// ConfigStore stores the config of the guardrail service
 	ConfigStore    GuardrailConfig              `json:"configStore,omitempty"`
 	Labels         map[string]string            `json:"labels,omitempty"`
 	Annotations    map[string]string            `json:"annotations,omitempty"`
