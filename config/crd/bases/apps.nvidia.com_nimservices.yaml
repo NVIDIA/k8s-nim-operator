@@ -18,9 +18,10 @@ spec:
     - jsonPath: .status.state
       name: Status
       type: string
-    - jsonPath: .metadata.creationTimestamp
+    - format: date-time
+      jsonPath: .metadata.creationTimestamp
       name: Age
-      type: string
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -185,6 +186,10 @@ spec:
                     description: Ingress defines attributes to enable ingress for
                       the service
                     properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        type: object
                       enabled:
                         description: ingress, or virtualService - not both
                         type: boolean
@@ -463,10 +468,14 @@ spec:
                   service:
                     description: Service defines attributes to create a service
                     properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        type: object
                       name:
                         description: override the default service name
                         type: string
-                      openaiPort:
+                      port:
                         default: 8000
                         format: int32
                         type: integer
@@ -475,7 +484,7 @@ spec:
                           for a service
                         type: string
                     required:
-                    - openaiPort
+                    - port
                     type: object
                 type: object
               groupID:
@@ -670,6 +679,10 @@ spec:
                       service object
                     properties:
                       additionalLabels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      annotations:
                         additionalProperties:
                           type: string
                         type: object
@@ -1211,6 +1224,7 @@ spec:
                     type: object
                 type: object
               replicas:
+                default: 1
                 minimum: 1
                 type: integer
               resources:
@@ -1276,6 +1290,10 @@ spec:
                 description: Autoscaling defines attributes to automatically scale
                   the service based on metrics
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
                   enabled:
                     type: boolean
                   hpa:
@@ -2119,13 +2137,6 @@ spec:
                       type: string
                   type: object
                 type: array
-              type:
-                default: llm
-                enum:
-                - llm
-                - embedding
-                - reranking
-                type: string
               userID:
                 format: int64
                 type: integer

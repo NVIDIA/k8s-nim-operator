@@ -46,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,6 +54,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -73,6 +75,9 @@ const (
 
 	// NIMCacheServiceAccount is the name of the serviceaccount for all NIMCache instances in the namespace
 	NIMCacheServiceAccount = "nim-cache-sa"
+
+	// NIMCacheContainerName returns the name of the container used for NIM Cache operations.
+	NIMCacheContainerName = "nim-cache-ctr"
 )
 
 // NIMCacheReconciler reconciles a NIMCache object
@@ -82,6 +87,7 @@ type NIMCacheReconciler struct {
 	log      logr.Logger
 	Platform platform.Platform
 	updater  conditions.Updater
+	recorder record.EventRecorder
 }
 
 // Ensure NIMCacheReconciler implements the Reconciler interface
@@ -106,6 +112,7 @@ func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log log
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;create;delete
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -119,23 +126,35 @@ func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log log
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.2/pkg/reconcile
 func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	var err error
+	var result reconcile.Result
 
 	// Fetch the NIMCache instance
 	nimCache := &appsv1alpha1.NIMCache{}
-	if err := r.Get(ctx, req.NamespacedName, nimCache); err != nil {
+	if err = r.Get(ctx, req.NamespacedName, nimCache); err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "unable to fetch NIMCache", "name", req.NamespacedName)
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	logger.Info("Reconciling", "NIMCache", nimCache.Name)
+	previousStatusState := nimCache.Status.State
 
+	defer func() {
+		if err != nil {
+			r.GetEventRecorder().Eventf(nimCache, corev1.EventTypeWarning, "ReconcileFailed",
+				"NIMCache %s reconcile failed, msg: %s", nimCache.Name, err.Error())
+		} else if previousStatusState != nimCache.Status.State {
+			r.GetEventRecorder().Eventf(nimCache, corev1.EventTypeNormal, nimCache.Status.State,
+				"NIMCache %s reconcile success, new state: %s", nimCache.Name, nimCache.Status.State)
+		}
+	}()
 	// Check if the instance is marked for deletion
 	if nimCache.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimCache, NIMCacheFinalizer) {
 			controllerutil.AddFinalizer(nimCache, NIMCacheFinalizer)
-			if err := r.Update(ctx, nimCache); err != nil {
+			if err = r.Update(ctx, nimCache); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -143,7 +162,7 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		// The instance is being deleted
 		if controllerutil.ContainsFinalizer(nimCache, NIMCacheFinalizer) {
 			// Perform cleanup of resources
-			if err := r.cleanupNIMCache(ctx, nimCache); err != nil {
+			if err = r.cleanupNIMCache(ctx, nimCache); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -156,11 +175,12 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 	// Handle nim-cache reconciliation
-	result, err := r.reconcileNIMCache(ctx, nimCache)
+	result, err = r.reconcileNIMCache(ctx, nimCache)
 	if err != nil {
 		logger.Error(err, "error reconciling NIMCache", "name", nimCache.Name)
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionReconcileFailed, metav1.ConditionTrue, "ReconcileFailed", err.Error())
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusNotReady
+
 		errUpdate := r.updateNIMCacheStatus(ctx, nimCache)
 		if errUpdate != nil {
 			logger.Error(err, "Failed to update NIMCache status", "NIMCache", nimCache.Name)
@@ -196,8 +216,14 @@ func (r *NIMCacheReconciler) GetRenderer() render.Renderer {
 	return nil
 }
 
+// GetEventRecorder returns the event recorder
+func (r *NIMCacheReconciler) GetEventRecorder() record.EventRecorder {
+	return r.recorder
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMCacheReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.recorder = mgr.GetEventRecorderFor("nimcache-controller")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMCache{}).
 		Owns(&batchv1.Job{}).
@@ -758,6 +784,7 @@ func (r *NIMCacheReconciler) createPod(ctx context.Context, pod *corev1.Pod) err
 
 func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (ctrl.Result, error) {
 	logger := r.GetLogger()
+	defer r.refreshMetrics(ctx)
 
 	// Reconcile ServiceAccount
 	err := r.reconcileServiceAccount(ctx, nimCache)
@@ -880,7 +907,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:    "nim-cache",
+					Name:    NIMCacheContainerName,
 					Image:   nimCache.Spec.Source.NGC.ModelPuller,
 					Command: []string{"sh", "-c", "cat /etc/nim/config/model_manifest.yaml; sleep infinity"},
 					SecurityContext: &corev1.SecurityContext{
@@ -898,6 +925,9 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 				RunAsUser:    nimCache.GetUserID(),
 				FSGroup:      nimCache.GetGroupID(),
 				RunAsNonRoot: ptr.To[bool](true),
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
 			},
 			ServiceAccountName: NIMCacheServiceAccount,
 			Tolerations:        nimCache.GetTolerations(),
@@ -915,7 +945,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 }
 
 func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (string, error) {
-	podLogOpts := corev1.PodLogOptions{}
+	podLogOpts := corev1.PodLogOptions{Container: NIMCacheContainerName}
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return "", err
@@ -971,6 +1001,9 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						RunAsUser:    nimCache.GetUserID(),
 						FSGroup:      nimCache.GetGroupID(),
 						RunAsNonRoot: ptr.To[bool](true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
 					},
 					Containers:    []corev1.Container{},
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -1009,7 +1042,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
-				Name:    "nim-cache",
+				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.DataStore.ModelPuller,
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
 				Env:     []corev1.EnvVar{},
@@ -1040,7 +1073,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	} else if nimCache.Spec.Source.NGC != nil {
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
-				Name:    "nim-cache",
+				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.NGC.ModelPuller,
 				Command: []string{"download-to-cache"},
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
@@ -1257,6 +1290,20 @@ func (r *NIMCacheReconciler) GetNodeGPUProducts(ctx context.Context) (map[string
 	}
 
 	return nodeGPUProducts, nil
+}
+
+func (r *NIMCacheReconciler) refreshMetrics(ctx context.Context) {
+	logger := r.GetLogger()
+
+	// List all nodes
+	nimCacheList := &appsv1alpha1.NIMCacheList{}
+	err := r.Client.List(ctx, nimCacheList, &client.ListOptions{})
+	if err != nil {
+		logger.Error(err, "unable to list nim caches in the cluster")
+		return
+	}
+	logger.Info("caches found, refreshing metrics", "cacheNo", len(nimCacheList.Items))
+	refreshNIMCacheMetrics(nimCacheList)
 }
 
 // getUniqueGPUProducts extracts unique GPU product values from the map of node GPU products.

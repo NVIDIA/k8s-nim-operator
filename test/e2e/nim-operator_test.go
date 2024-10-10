@@ -113,7 +113,7 @@ var _ = Describe("NIM Operator", func() {
 			Eventually(func() bool {
 				nimCacheObject, _ := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, nimCache.Name, metav1.GetOptions{})
 				return nimCacheObject.Status.State == v1alpha1.NimCacheStatusReady
-			}, /*10 minutes*/ 10*time.Minute, 5*time.Second).Should(BeTrue())
+			}, Timeout, 5*time.Second).Should(BeTrue())
 
 			// Create a NIMService object
 			By("Creating a NIMService object")
@@ -131,8 +131,7 @@ var _ = Describe("NIM Operator", func() {
 			Eventually(func() bool {
 				nimServiceObject, _ := cli.AppsV1alpha1().NIMServices(testNamespace.Name).Get(ctx, nimService.Name, metav1.GetOptions{})
 				return nimServiceObject.Status.State == v1alpha1.NIMServiceStatusReady
-				// TODO - Update the status to Ready
-			}, /*10 minutes*/ 10*time.Minute, 5*time.Second).Should(BeTrue())
+			}, Timeout, 5*time.Second).Should(BeTrue())
 		})
 	})
 })
@@ -146,15 +145,24 @@ func cleanup() {
 
 	for _, release := range deployed {
 		switch release.Name {
-		case nfd, gpuOperator:
-			err := helmClient.UninstallReleaseByName(release.Name)
-			Expect(err).NotTo(HaveOccurred())
+		case nfd:
+			if EnableNFD {
+				err := helmClient.UninstallReleaseByName(release.Name)
+				Expect(err).NotTo(HaveOccurred())
+			} // else skip
+		case gpuOperator:
+			if EnableGPUOperator {
+				err := helmClient.UninstallReleaseByName(release.Name)
+				Expect(err).NotTo(HaveOccurred())
+			} // else skip
 		case localPathProvisioner:
-			err := os.RemoveAll(filepath.Join(cwd, localPathProvisioner))
-			Expect(err).NotTo(HaveOccurred())
+			if EnableLocalPathProvisioner {
+				err := os.RemoveAll(filepath.Join(cwd, localPathProvisioner))
+				Expect(err).NotTo(HaveOccurred())
 
-			err = helmClient.UninstallReleaseByName(release.Name)
-			Expect(err).NotTo(HaveOccurred())
+				err = helmClient.UninstallReleaseByName(release.Name)
+				Expect(err).NotTo(HaveOccurred())
+			} // else skip
 		case helmReleaseName:
 			err := helmClient.UninstallReleaseByName(helmReleaseName)
 			Expect(err).NotTo(HaveOccurred())
@@ -162,6 +170,7 @@ func cleanup() {
 	}
 }
 
+// cleanupCRs deletes all NIMCache, NIMService and NIMPipeline CRs deployed on the test namespace
 func cleanupCRs() {
 	cli, err := versioned.NewForConfig(clientConfig)
 	Expect(err).NotTo(HaveOccurred())
@@ -211,12 +220,16 @@ func cleanupCRDs() {
 		"nimcaches.apps.nvidia.com",
 		"nimservices.apps.nvidia.com",
 		"nimpipelines.apps.nvidia.com",
-		"clusterpolicies.nvidia.com",
-		"nvidiadrivers.nvidia.com",
-		"nodefeatures.nfd.k8s-sigs.io",
-		"nodefeaturerules.nfd.k8s-sigs.io",
-		"nodefeaturegroups.nfd.k8s-sigs.io",
 	}
+
+	if EnableNFD {
+		crds = append(crds, "nodefeatures.nfd.k8s-sigs.io", "nodefeaturerules.nfd.k8s-sigs.io", "nodefeaturegroups.nfd.k8s-sigs.io")
+	}
+
+	if EnableGPUOperator {
+		crds = append(crds, "clusterpolicies.nvidia.com", "nvidiadrivers.nvidia.com")
+	}
+
 	// Delete CRDs
 	for _, crd := range crds {
 		err := extClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, crd, metav1.DeleteOptions{})

@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: nvcr.io/nvstaging/cloud-native/k8s-nim-operator
-  newTag: v0.1.0
+  newTag: v1.0.0

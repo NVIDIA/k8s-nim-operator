@@ -40,22 +40,24 @@ var nimcachesKind = v1alpha1.SchemeGroupVersion.WithKind("NIMCache")
 
 // Get takes name of the nIMCache, and returns the corresponding nIMCache object, and an error if there is any.
 func (c *FakeNIMCaches) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NIMCache, err error) {
+	emptyResult := &v1alpha1.NIMCache{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(nimcachesResource, c.ns, name), &v1alpha1.NIMCache{})
+		Invokes(testing.NewGetActionWithOptions(nimcachesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMCache), err
 }
 
 // List takes label and field selectors, and returns the list of NIMCaches that match those selectors.
 func (c *FakeNIMCaches) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NIMCacheList, err error) {
+	emptyResult := &v1alpha1.NIMCacheList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(nimcachesResource, nimcachesKind, c.ns, opts), &v1alpha1.NIMCacheList{})
+		Invokes(testing.NewListActionWithOptions(nimcachesResource, nimcachesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -74,40 +76,43 @@ func (c *FakeNIMCaches) List(ctx context.Context, opts v1.ListOptions) (result *
 // Watch returns a watch.Interface that watches the requested nIMCaches.
 func (c *FakeNIMCaches) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(nimcachesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(nimcachesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a nIMCache and creates it.  Returns the server's representation of the nIMCache, and an error, if there is any.
 func (c *FakeNIMCaches) Create(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.CreateOptions) (result *v1alpha1.NIMCache, err error) {
+	emptyResult := &v1alpha1.NIMCache{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(nimcachesResource, c.ns, nIMCache), &v1alpha1.NIMCache{})
+		Invokes(testing.NewCreateActionWithOptions(nimcachesResource, c.ns, nIMCache, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMCache), err
 }
 
 // Update takes the representation of a nIMCache and updates it. Returns the server's representation of the nIMCache, and an error, if there is any.
 func (c *FakeNIMCaches) Update(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.UpdateOptions) (result *v1alpha1.NIMCache, err error) {
+	emptyResult := &v1alpha1.NIMCache{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(nimcachesResource, c.ns, nIMCache), &v1alpha1.NIMCache{})
+		Invokes(testing.NewUpdateActionWithOptions(nimcachesResource, c.ns, nIMCache, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMCache), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNIMCaches) UpdateStatus(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.UpdateOptions) (*v1alpha1.NIMCache, error) {
+func (c *FakeNIMCaches) UpdateStatus(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.UpdateOptions) (result *v1alpha1.NIMCache, err error) {
+	emptyResult := &v1alpha1.NIMCache{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(nimcachesResource, "status", c.ns, nIMCache), &v1alpha1.NIMCache{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(nimcachesResource, "status", c.ns, nIMCache, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMCache), err
 }
@@ -122,7 +127,7 @@ func (c *FakeNIMCaches) Delete(ctx context.Context, name string, opts v1.DeleteO
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeNIMCaches) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(nimcachesResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(nimcachesResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.NIMCacheList{})
 	return err
@@ -130,11 +135,12 @@ func (c *FakeNIMCaches) DeleteCollection(ctx context.Context, opts v1.DeleteOpti
 
 // Patch applies the patch and returns the patched nIMCache.
 func (c *FakeNIMCaches) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NIMCache, err error) {
+	emptyResult := &v1alpha1.NIMCache{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(nimcachesResource, c.ns, name, pt, data, subresources...), &v1alpha1.NIMCache{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(nimcachesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NIMCache), err
 }

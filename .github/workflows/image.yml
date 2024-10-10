@@ -128,5 +128,5 @@ jobs:
           BUNDLE_IMAGE: ghcr.io/nvidia/k8s-nim-operator:${{ env.BRANCH_NAME }}
           VERSION: '' # Until we cut a release, Version will be null
         run: |
-          sed -i "s|nvcr.io/nvidia/cloud-native/k8s-nim-operator:v0.1.0|${BUNDLE_IMAGE}|g" bundle/manifests/k8s-nim-operator.clusterserviceversion.yaml
+          sed -i "s|ghcr.io/nvidia/k8s-nim-operator:main|${BUNDLE_IMAGE}|g" bundle/manifests/k8s-nim-operator.clusterserviceversion.yaml
           make -f deployments/container/Makefile build-bundle

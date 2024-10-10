@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Image URL to use all building/pushing image targets
-IMG ?= nvcr.io/nvidia/cloud-native/nim-operator:v0.1.0
+IMG ?= nvcr.io/nvidia/cloud-native/nim-operator:v1.0.0
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.30.0
 
@@ -145,6 +145,13 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
+# Generate helm chart with the specified chart version
+# CHART_VERSION is stripped from "v" prefix to adhere to strict semantic versioning required by Helm.
+CHART_VERSION := $(shell echo ${VERSION} | sed 's/^v//')
+.PHONY: helm-charts
+helm-charts:
+	helm package deployments/helm/k8s-nim-operator/ --version $(CHART_VERSION) --app-version $(CHART_VERSION)
+
 # Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle bundle-validate
 bundle: manifests install-tools
@@ -208,7 +215,7 @@ GINKGO_VERSION ?= $(shell $(GO_CMD) list -m -f '{{.Version}}' github.com/onsi/gi
 KUSTOMIZE_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' sigs.k8s.io/kustomize/kustomize/v5)
 CONTROLLER_TOOLS_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' sigs.k8s.io/controller-tools)
 ENVTEST_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' sigs.k8s.io/controller-runtime/tools/setup-envtest)
-GOLANGCI_LINT_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' github.com/golangci/golangci-lint/cmd/golangci-lint)
+GOLANGCI_LINT_VERSION ?= $(shell cd $(PROJECT_DIR)/deployments/devel; $(GO_CMD) list -m -f '{{.Version}}' github.com/golangci/golangci-lint)
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.

@@ -53,9 +53,6 @@ const (
 
 // NIMServiceSpec defines the desired state of NIMService
 type NIMServiceSpec struct {
-	// +kubebuilder:validation:Enum=llm;embedding;reranking
-	// +kubebuilder:default=llm
-	Type    string          `json:"type,omitempty"`
 	Image   Image           `json:"image,omitempty"`
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
@@ -77,6 +74,7 @@ type NIMServiceSpec struct {
 	Scale          Autoscaling                  `json:"scale,omitempty"`
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default:=1
 	Replicas int    `json:"replicas,omitempty"`
 	UserID   *int64 `json:"userID,omitempty"`
 	GroupID  *int64 `json:"groupID,omitempty"`
@@ -99,7 +97,7 @@ type NIMServiceStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
-// +kubebuilder:printcolumn:name="Age",type=string,JSONPath=`.metadata.creationTimestamp`,priority=0
+// +kubebuilder:printcolumn:name="Age",type="date",format="date-time",JSONPath=".metadata.creationTimestamp",priority=0
 
 // NIMService is the Schema for the nimservices API
 type NIMService struct {
@@ -183,7 +181,7 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_SERVER_PORT",
-			Value: fmt.Sprint(n.Spec.Expose.Service.OpenAIPort),
+			Value: fmt.Sprint(n.Spec.Expose.Service.Port),
 		},
 		{
 			Name:  "NIM_JSONL_LOGGING",
@@ -206,8 +204,8 @@ func (n *NIMService) GetStandardAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetServiceAnnotations returns annotations to apply to the NIMService instance
-func (n *NIMService) GetServiceAnnotations() map[string]string {
+// GetNIMServiceAnnotations returns annotations to apply to the NIMService instance
+func (n *NIMService) GetNIMServiceAnnotations() map[string]string {
 	standardAnnotations := n.GetStandardAnnotations()
 
 	if n.Spec.Annotations != nil {
@@ -317,7 +315,7 @@ func (n *NIMService) GetDefaultLivenessProbe() *corev1.Probe {
 				Path: "/v1/health/live",
 				Port: intstr.IntOrString{
 					Type:   intstr.Type(0),
-					IntVal: n.Spec.Expose.Service.OpenAIPort,
+					IntVal: n.Spec.Expose.Service.Port,
 				},
 			},
 		},
@@ -347,7 +345,7 @@ func (n *NIMService) GetDefaultReadinessProbe() *corev1.Probe {
 				Path: "/v1/health/ready",
 				Port: intstr.IntOrString{
 					Type:   intstr.Type(0),
-					IntVal: n.Spec.Expose.Service.OpenAIPort,
+					IntVal: n.Spec.Expose.Service.Port,
 				},
 			},
 		},
@@ -377,7 +375,7 @@ func (n *NIMService) GetDefaultStartupProbe() *corev1.Probe {
 				Path: "/v1/health/ready",
 				Port: intstr.IntOrString{
 					Type:   intstr.Type(0),
-					IntVal: n.Spec.Expose.Service.OpenAIPort,
+					IntVal: n.Spec.Expose.Service.Port,
 				},
 			},
 		},
@@ -495,7 +493,7 @@ func (n *NIMService) IsServiceMonitorEnabled() bool {
 
 // GetServicePort returns the service port for the NIMService deployment
 func (n *NIMService) GetServicePort() int32 {
-	return n.Spec.Expose.Service.OpenAIPort
+	return n.Spec.Expose.Service.Port
 }
 
 // GetUserID returns the user ID for the NIMService deployment
@@ -526,7 +524,7 @@ func (n *NIMService) GetServiceAccountParams() *rendertypes.ServiceAccountParams
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetNIMServiceAnnotations()
 	return params
 }
 
@@ -538,7 +536,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetNIMServiceAnnotations()
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {
@@ -588,7 +586,7 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetNIMServiceAnnotations()
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {
@@ -631,13 +629,12 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetServiceAnnotations()
-
 	// Set service selector labels
 	params.SelectorLabels = n.GetSelectorLabels()
 
 	// Set service ports
 	params.Port = n.GetServicePort()
-	params.PortName = "open-ai-port"
+	params.PortName = "service-port"
 	return params
 }
 
@@ -650,7 +647,7 @@ func (n *NIMService) GetIngressParams() *rendertypes.IngressParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetIngressAnnotations()
 	params.Spec = n.GetIngressSpec()
 	return params
 }
@@ -699,7 +696,7 @@ func (n *NIMService) GetHPAParams() *rendertypes.HPAParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetHPAAnnotations()
 
 	// Set HPA spec
 	hpa := n.GetHPA()
@@ -738,16 +735,52 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 	svcLabels := n.GetServiceLabels()
 	maps.Copy(svcLabels, serviceMonitor.AdditionalLabels)
 	params.Labels = svcLabels
-	params.Annotations = n.GetServiceAnnotations()
+	params.Annotations = n.GetServiceMonitorAnnotations()
 
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
 		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
 		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
-		Endpoints:         []monitoringv1.Endpoint{{Port: "open-ai-port", ScrapeTimeout: serviceMonitor.ScrapeTimeout, Interval: serviceMonitor.Interval}},
+		Endpoints:         []monitoringv1.Endpoint{{Port: "service-port", ScrapeTimeout: serviceMonitor.ScrapeTimeout, Interval: serviceMonitor.Interval}},
 	}
 	params.SMSpec = smSpec
 	return params
+}
+
+func (n *NIMService) GetIngressAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
+	if n.Spec.Expose.Ingress.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Ingress.Annotations)
+	}
+	return nimServiceAnnotations
+}
+
+func (n *NIMService) GetServiceAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
+	if n.Spec.Expose.Service.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Service.Annotations)
+	}
+	return nimServiceAnnotations
+}
+
+func (n *NIMService) GetHPAAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
+	if n.Spec.Scale.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Scale.Annotations)
+	}
+	return nimServiceAnnotations
+}
+
+func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
+	if n.Spec.Metrics.ServiceMonitor.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
+	}
+	return nimServiceAnnotations
 }
 
 func init() {

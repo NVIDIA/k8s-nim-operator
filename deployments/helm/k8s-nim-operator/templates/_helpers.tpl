@@ -54,5 +54,5 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Full image name with tag
 */}}
 {{- define "k8s-nim-operator.fullimage" -}}
-{{- .Values.operator.image.repository -}}:{{- .Values.operator.image.tag | default .Chart.AppVersion -}}
+{{- .Values.operator.image.repository -}}:{{- .Values.operator.image.tag | default (printf "v%s" .Chart.AppVersion) -}}
 {{- end }}

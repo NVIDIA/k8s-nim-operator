@@ -54,14 +54,14 @@ helm-lint:
     - apk add --update curl curl-dev openssl bash git openssh make
     - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
   script:
-    - helm lint helm/k8s-nim-operator/
+    - helm lint deployments/helm/k8s-nim-operator/
 
 # Define the image build targets
 .image-build:
   stage: image-build
   variables:
     IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/k8s-nim-operator"
-    VERSION: "v0.1.0"
+    VERSION: "v1.0.0"
     IMG: "${IMAGE_NAME}:${VERSION}-${CI_COMMIT_SHORT_SHA}"
   before_script:
     - apk add --no-cache bash make
@@ -79,7 +79,7 @@ image-build:
   stage: release
   variables:
     IMAGE_NAME: "${CI_REGISTRY_IMAGE}/staging/k8s-nim-operator"
-    VERSION: "v0.1.0"
+    VERSION: "v1.0.0"
     IMG: "${IMAGE_NAME}:${VERSION}-${CI_COMMIT_SHORT_SHA}"
   before_script:
     - apk add --no-cache bash make
