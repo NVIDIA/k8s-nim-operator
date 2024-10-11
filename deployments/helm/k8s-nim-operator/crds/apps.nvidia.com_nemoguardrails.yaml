@@ -56,15 +56,15 @@ spec:
                   type: string
                 type: array
               authSecret:
-                description: The name of an existing pull secret containing the NGC_API_KEY
+                description: The name of an secret that contains authn for the NGC
+                  NIM service API
                 type: string
               command:
                 items:
                   type: string
                 type: array
               configStore:
-                description: Storage is the target storage for caching NIM model if
-                  NIMCache is not provided
+                description: ConfigStore stores the config of the guardrail service
                 properties:
                   configmap:
                     type: string

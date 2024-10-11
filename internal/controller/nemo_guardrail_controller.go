@@ -23,7 +23,6 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -60,7 +59,6 @@ type NemoGuardrailReconciler struct {
 	updater  conditions.Updater
 	renderer render.Renderer
 	Config   *rest.Config
-	Platform platform.Platform
 	recorder record.EventRecorder
 }
 
@@ -68,14 +66,13 @@ type NemoGuardrailReconciler struct {
 var _ shared.Reconciler = &NemoGuardrailReconciler{}
 
 // NewNemoGuardrailReconciler creates a new reconciler for NemoGuardrail with the given platform
-func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NemoGuardrailReconciler {
+func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoGuardrailReconciler {
 	return &NemoGuardrailReconciler{
 		Client:   client,
 		scheme:   scheme,
 		updater:  updater,
 		renderer: renderer,
 		log:      log,
-		Platform: platform,
 	}
 }
 
@@ -135,7 +132,7 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// The instance is being deleted
 		if controllerutil.ContainsFinalizer(NemoGuardrail, NemoGuardrailFinalizer) {
 			// Perform platform specific cleanup of resources
-			if err := r.Platform.Delete(ctx, r, NemoGuardrail); err != nil {
+			if err := r.cleanupNemoGuardrail(ctx, NemoGuardrail); err != nil {
 				r.GetEventRecorder().Eventf(NemoGuardrail, corev1.EventTypeNormal, "Delete",
 					"NemoGuardrail %s in deleted", NemoGuardrail.Name)
 				return ctrl.Result{}, err
@@ -159,6 +156,12 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NemoGuardrailReconciler) cleanupNemoGuardrail(ctx context.Context, nimService *appsv1alpha1.NemoGuardrail) error {
+	// All dependent (owned) objects will be automatically garbage collected.
+	// TODO: Handle any custom cleanup logic for the NIM microservice
+	return nil
 }
 
 // GetScheme returns the scheme of the reconciler
@@ -335,6 +338,8 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, Ne
 	// Setup volume mounts with model store
 	deploymentParams.Volumes = NemoGuardrail.GetVolumes()
 	deploymentParams.VolumeMounts = NemoGuardrail.GetVolumeMounts()
+
+	logger.Info("Reconciling", "volumes", NemoGuardrail.GetVolumes())
 
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {

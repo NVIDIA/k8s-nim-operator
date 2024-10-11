@@ -57,9 +57,9 @@ type NemoGuardrailSpec struct {
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
-	// The name of an existing pull secret containing the NGC_API_KEY
+	// The name of an secret that contains authn for the NGC NIM service API
 	AuthSecret string `json:"authSecret"`
-	// Storage is the target storage for caching NIM model if NIMCache is not provided
+	// ConfigStore stores the config of the guardrail service
 	ConfigStore    GuardrailConfig              `json:"configStore,omitempty"`
 	Labels         map[string]string            `json:"labels,omitempty"`
 	Annotations    map[string]string            `json:"annotations,omitempty"`
@@ -81,7 +81,7 @@ type NemoGuardrailSpec struct {
 }
 
 type GuardrailConfig struct {
-	Configmap string                 `json:"configmap,omitempty"`
+	ConfigMap string                 `json:"configMap,omitempty"`
 	PVC       *PersistentVolumeClaim `json:"pvc,omitempty"`
 }
 
@@ -372,13 +372,13 @@ func (n *NemoGuardrail) GetDefaultStartupProbe() *corev1.Probe {
 // GetVolumes returns volumes for the NemoGuardrail container
 func (n *NemoGuardrail) GetVolumes() []corev1.Volume {
 	volumes := []corev1.Volume{}
-	if n.Spec.ConfigStore.Configmap != "" {
+	if n.Spec.ConfigStore.ConfigMap != "" {
 		volumes = append(volumes, corev1.Volume{
 			Name: "config-store",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.ConfigStore.Configmap,
+						Name: n.Spec.ConfigStore.ConfigMap,
 					},
 				},
 			},
