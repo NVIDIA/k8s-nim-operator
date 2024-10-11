@@ -249,6 +249,26 @@ spec:
             kind: ConfigMap
         specDescriptors: []
         statusDescriptors: []
+      - name: nemoguardrails.apps.nvidia.com
+        displayName: NemoGuardrail
+        kind: NemoGuardrail
+        version: v1alpha1
+        description: NEMO guardrail Service
+        resources:
+          - version: v1
+            kind: Deployment
+          - version: v1
+            kind: Service
+          - version: v1
+            kind: ReplicaSet
+          - version: v1
+            kind: Pod
+          - version: v1
+            kind: Secret
+          - version: v1
+            kind: ConfigMap
+        specDescriptors: []
+        statusDescriptors: []
     required: []
   install:
     strategy: deployment
@@ -436,6 +456,32 @@ spec:
                 - apps.nvidia.com
               resources:
                 - nimservices/status
+              verbs:
+                - get
+                - patch
+                - update
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nemoguardrails
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nemoguardrails/finalizers
+              verbs:
+                - update
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nemoguardrails/status
               verbs:
                 - get
                 - patch
