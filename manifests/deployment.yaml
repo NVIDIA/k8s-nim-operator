@@ -76,6 +76,10 @@ spec:
       volumes:
       {{- range .Volumes }}
       - name: {{ .Name }}
+        {{- if .ConfigMap }}
+        configMap:
+          name: {{ .ConfigMap.Name }}
+        {{- end }}
         {{- if .EmptyDir }}
         emptyDir:
           medium: {{ .EmptyDir.Medium }}
