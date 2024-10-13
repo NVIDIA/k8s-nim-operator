@@ -644,7 +644,7 @@ go.uber.org/zap/internal/exit
 go.uber.org/zap/internal/pool
 go.uber.org/zap/internal/stacktrace
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.26.0
+# golang.org/x/crypto v0.27.0
 ## explicit; go 1.20
 golang.org/x/crypto/argon2
 golang.org/x/crypto/bcrypt
@@ -697,17 +697,17 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.18
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.24.0
+# golang.org/x/sys v0.25.0
 ## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.23.0
+# golang.org/x/term v0.24.0
 ## explicit; go 1.18
 golang.org/x/term
-# golang.org/x/text v0.17.0
+# golang.org/x/text v0.18.0
 ## explicit; go 1.18
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -821,7 +821,7 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# helm.sh/helm/v3 v3.16.1
+# helm.sh/helm/v3 v3.16.2
 ## explicit; go 1.22.0
 helm.sh/helm/v3/internal/fileutil
 helm.sh/helm/v3/internal/resolver
@@ -1002,7 +1002,7 @@ k8s.io/apimachinery/third_party/forked/golang/reflect
 # k8s.io/apiserver v0.31.1
 ## explicit; go 1.22.0
 k8s.io/apiserver/pkg/endpoints/deprecation
-# k8s.io/cli-runtime v0.31.0
+# k8s.io/cli-runtime v0.31.1
 ## explicit; go 1.22.0
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/genericiooptions
@@ -1323,7 +1323,7 @@ k8s.io/kube-openapi/pkg/spec3
 k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/util/proto/validation
 k8s.io/kube-openapi/pkg/validation/spec
-# k8s.io/kubectl v0.31.0
+# k8s.io/kubectl v0.31.1
 ## explicit; go 1.22.0
 k8s.io/kubectl/pkg/cmd/util
 k8s.io/kubectl/pkg/scheme
