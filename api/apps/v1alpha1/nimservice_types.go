@@ -51,6 +51,20 @@ const (
 	NIMServiceStatusFailed = "Failed"
 )
 
+// MultiNodeSpec defines the parameters to render a multi-node NIMService deployment.
+type MultiNodeSpec struct {
+	ClusterStartTimeout int             `json:"clusterStartTimeout,omitempty"`
+	Enabled             *bool           `json:"enabled,omitempty"`
+	Workers             int             `json:"workers,omitempty"`
+	GpusPerNode         int             `json:"gpusPerNode,omitempty"`
+	LeaderWorkerSet     LeaderWorkerSet `json:"leaderWorkerSet,omitempty"`
+}
+
+// LeaderWorkerSet defines the details of leader-worker set CRD for the NIMService deployment.
+type LeaderWorkerSet struct {
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
 // NIMServiceSpec defines the desired state of NIMService
 type NIMServiceSpec struct {
 	Image   Image           `json:"image,omitempty"`
@@ -75,9 +89,10 @@ type NIMServiceSpec struct {
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas int    `json:"replicas,omitempty"`
-	UserID   *int64 `json:"userID,omitempty"`
-	GroupID  *int64 `json:"groupID,omitempty"`
+	Replicas  int           `json:"replicas,omitempty"`
+	UserID    *int64        `json:"userID,omitempty"`
+	GroupID   *int64        `json:"groupID,omitempty"`
+	MultiNode MultiNodeSpec `json:"multiNode,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume

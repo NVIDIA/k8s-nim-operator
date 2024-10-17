@@ -702,6 +702,26 @@ spec:
                         type: string
                     type: object
                 type: object
+              multiNode:
+                description: MultiNodeSpec defines the parameters to render a multi-node
+                  NIMService deployment.
+                properties:
+                  clusterStartTimeout:
+                    type: integer
+                  enabled:
+                    type: boolean
+                  gpusPerNode:
+                    type: integer
+                  leaderWorkerSet:
+                    description: LeaderWorkerSet defines the details of leader-worker
+                      set CRD for the NIMService deployment.
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
+                  workers:
+                    type: integer
+                type: object
               nodeSelector:
                 additionalProperties:
                   type: string
