@@ -375,7 +375,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, Ne
 	return ctrl.Result{}, nil
 }
 
-func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, NemoGuardrail *appsv1alpha1.NemoGuardrail, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, NemoGuardrail client.Object, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
 	namespacedName := types.NamespacedName{Name: NemoGuardrail.GetName(), Namespace: NemoGuardrail.GetNamespace()}
@@ -383,9 +383,9 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, Nem
 	resource, err := renderFunc()
 	if err != nil {
 		logger.Error(err, "failed to render", conditionType, namespacedName)
-		statusError := r.SetConditionsFailed(ctx, NemoGuardrail, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, NemoGuardrail, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoGuardrail", NemoGuardrail.Name)
+			logger.Error(statusError, "failed to update status", "NemoGuardrail", NemoGuardrail.GetName())
 		}
 		return err
 	}
@@ -409,9 +409,9 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, Nem
 
 	if err = controllerutil.SetControllerReference(NemoGuardrail, resource, r.GetScheme()); err != nil {
 		logger.Error(err, "failed to set owner", conditionType, namespacedName)
-		statusError := r.SetConditionsFailed(ctx, NemoGuardrail, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, NemoGuardrail, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoGuardrail", NemoGuardrail.Name)
+			logger.Error(statusError, "failed to update status", "NemoGuardrail", NemoGuardrail.GetName())
 		}
 		return err
 	}
@@ -419,9 +419,9 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, Nem
 	err = r.syncResource(ctx, obj, resource, namespacedName)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
-		statusError := r.SetConditionsFailed(ctx, NemoGuardrail, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, NemoGuardrail, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoGuardrail", NemoGuardrail.Name)
+			logger.Error(statusError, "failed to update status", "NemoGuardrail", NemoGuardrail.GetName())
 		}
 		return err
 	}
