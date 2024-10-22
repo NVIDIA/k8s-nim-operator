@@ -23,6 +23,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
@@ -33,7 +34,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,9 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-// NemoGuardrailFinalizer is the finalizer annotation
-const NemoGuardrailFinalizer = "finalizer.NemoGuardrail.apps.nvidia.com"
 
 // DefaultAppReconciler reconciles a NemoGuardrail object
 type DefaultAppReconciler struct {
@@ -62,8 +59,116 @@ type DefaultAppReconciler struct {
 // Ensure DefaultAppReconciler implements the Reconciler interface
 var _ shared.Reconciler = &DefaultAppReconciler{}
 
-type AppParamProvider interface{
+type AppParamProvider interface {
 
+	// GetStandardSelectorLabels returns the standard selector labels for the NemoGuardrail deployment
+	GetStandardSelectorLabels() map[string]string
+
+	// GetStandardLabels returns the standard set of labels for NemoGuardrail resources
+	GetStandardLabels() map[string]string
+
+	// GetStandardEnv returns the standard set of env variables for the NemoGuardrail container
+	GetStandardEnv() []corev1.EnvVar
+	// GetStandardAnnotations returns default annotations to apply to the NemoGuardrail instance
+	GetStandardAnnotations() map[string]string
+	// GetNemoGuardrailAnnotations returns annotations to apply to the NemoGuardrail instance
+	GetNemoGuardrailAnnotations() map[string]string
+
+	// GetServiceLabels returns merged labels to apply to the NemoGuardrail instance
+	GetServiceLabels() map[string]string
+	// GetSelectorLabels returns standard selector labels to apply to the NemoGuardrail instance
+	GetSelectorLabels() map[string]string
+	// GetNodeSelector returns node selector labels for the NemoGuardrail instance
+	GetNodeSelector() map[string]string
+	// GetTolerations returns tolerations for the NemoGuardrail instance
+	GetTolerations() []corev1.Toleration
+	// GetPodAffinity returns pod affinity for the NemoGuardrail instance
+	GetPodAffinity() *corev1.PodAffinity
+	// GetContainerName returns name of the container for NemoGuardrail deployment
+	GetContainerName() string
+	// GetCommand return command to override for the NemoGuardrail container
+	GetCommand() []string
+	// GetArgs return arguments for the NemoGuardrail container
+	GetArgs() []string
+	// GetEnv returns merged slice of standard and user specified env variables
+	GetEnv() []corev1.EnvVar
+	// GetImage returns container image for the NemoGuardrail
+	GetImage() string
+	// GetImagePullSecrets returns the image pull secrets for the NIM container
+	GetImagePullSecrets() []string
+	// GetImagePullPolicy returns the image pull policy for the NIM container
+	GetImagePullPolicy() string
+	// GetResources returns resources to allocate to the NemoGuardrail container
+	GetResources() *corev1.ResourceRequirements
+	// GetLivenessProbe returns liveness probe for the NemoGuardrail container
+	GetLivenessProbe() *corev1.Probe
+	// GetDefaultLivenessProbe returns the default liveness probe for the NemoGuardrail container
+	GetDefaultLivenessProbe() *corev1.Probe
+	// GetReadinessProbe returns readiness probe for the NemoGuardrail container
+	GetReadinessProbe() *corev1.Probe
+
+	// GetDefaultReadinessProbe returns the default readiness probe for the NemoGuardrail container
+	GetDefaultReadinessProbe() *corev1.Probe
+	// GetStartupProbe returns startup probe for the NemoGuardrail container
+	GetStartupProbe() *corev1.Probe
+	// GetDefaultStartupProbe returns the default startup probe for the NemoGuardrail container
+	GetDefaultStartupProbe() *corev1.Probe
+	// GetVolumes returns volumes for the NemoGuardrail container
+	GetVolumes() []corev1.Volume
+	// GetVolumeMounts returns volumes for the NemoGuardrail container
+	GetVolumeMounts() []corev1.VolumeMount
+	// GetServiceAccountName returns service account name for the NemoGuardrail deployment
+	GetServiceAccountName() string
+	// GetHPA returns the HPA spec for the NemoGuardrail deployment
+	GetHPA() appsv1alpha1.HorizontalPodAutoscalerSpec
+	// GetServiceMonitor returns the Service Monitor details for the NemoGuardrail deployment
+	GetServiceMonitor() appsv1alpha1.ServiceMonitor
+	// GetReplicas returns replicas for the NemoGuardrail deployment
+	GetReplicas() int
+	// GetDeploymentKind returns the kind of deployment for NemoGuardrail
+	GetDeploymentKind() string
+	// IsAutoScalingEnabled returns true if autoscaling is enabled for NemoGuardrail deployment
+	IsAutoScalingEnabled() bool
+	// IsIngressEnabled returns true if ingress is enabled for NemoGuardrail deployment
+	IsIngressEnabled() bool
+	// GetIngressSpec returns the Ingress spec NemoGuardrail deployment
+	GetIngressSpec() networkingv1.IngressSpec
+	// IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoGuardrail deployment
+	IsServiceMonitorEnabled() bool
+	// GetServicePort returns the service port for the NemoGuardrail deployment
+	GetServicePort() int32
+	// GetUserID returns the user ID for the NemoGuardrail deployment
+	GetUserID() *int64
+	// GetGroupID returns the group ID for the NemoGuardrail deployment
+	GetGroupID() *int64
+	// GetServiceAccountParams return params to render ServiceAccount from templates
+	GetServiceAccountParams() *rendertypes.ServiceAccountParams
+
+	// GetDeploymentParams returns params to render Deployment from templates
+	GetDeploymentParams() *rendertypes.DeploymentParams
+
+	// GetStatefulSetParams returns params to render StatefulSet from templates
+	GetStatefulSetParams() *rendertypes.StatefulSetParams
+	// GetIngressParams returns params to render Ingress from templates
+	GetIngressParams() *rendertypes.IngressParams
+
+	// GetRoleParams returns params to render Role from templates
+	GetRoleParams() *rendertypes.RoleParams
+	// GetRoleBindingParams returns params to render RoleBinding from templates
+	GetRoleBindingParams() *rendertypes.RoleBindingParams
+	// GetHPAParams returns params to render HPA from templates
+	GetHPAParams() *rendertypes.HPAParams
+	// GetSCCParams return params to render SCC from templates
+	GetSCCParams() *rendertypes.SCCParams
+
+	// GetServiceMonitorParams return params to render Service Monitor from templates
+	GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
+
+	GetIngressAnnotations() map[string]string
+
+	GetServiceAnnotations() map[string]string
+	GetHPAAnnotations() map[string]string
+	GetServiceMonitorAnnotations() map[string]string
 }
 
 // NewDefaultAppReconciler creates a new reconciler for NemoGuardrail with the given platform
@@ -128,7 +233,7 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 	renderer := r.GetRenderer()
 
 	// Sync serviceaccount
-	err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, NemoGuardrail, &corev1.ServiceAccount{}, func() (client.Object, error) {
 		return renderer.ServiceAccount(NemoGuardrail.GetServiceAccountParams())
 	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
 	if err != nil {
@@ -136,7 +241,7 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 	}
 
 	// Sync role
-	err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, NemoGuardrail, &rbacv1.Role{}, func() (client.Object, error) {
 		return renderer.Role(NemoGuardrail.GetRoleParams())
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
@@ -144,7 +249,7 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 	}
 
 	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, NemoGuardrail, &rbacv1.RoleBinding{}, func() (client.Object, error) {
 		return renderer.RoleBinding(NemoGuardrail.GetRoleBindingParams())
 	}, "rolebinding", conditions.ReasonRoleBindingFailed)
 	if err != nil {
@@ -152,7 +257,7 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 	}
 
 	// Sync service
-	err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &corev1.Service{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, NemoGuardrail,  &corev1.Service{}, func() (client.Object, error) {
 		return renderer.Service(NemoGuardrail.GetServiceParams())
 	}, "service", conditions.ReasonServiceFailed)
 	if err != nil {
@@ -161,7 +266,7 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 
 	// Sync ingress
 	if NemoGuardrail.IsIngressEnabled() {
-		err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, NemoGuardrail,  &networkingv1.Ingress{}, func() (client.Object, error) {
 			return renderer.Ingress(NemoGuardrail.GetIngressParams())
 		}, "ingress", conditions.ReasonIngressFailed)
 		if err != nil {
@@ -176,7 +281,7 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 
 	// Sync HPA
 	if NemoGuardrail.IsAutoScalingEnabled() {
-		err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, NemoGuardrail,  &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
 			return renderer.HPA(NemoGuardrail.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
 		if err != nil {
@@ -192,7 +297,7 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 
 	// Sync Service Monitor
 	if NemoGuardrail.IsServiceMonitorEnabled() {
-		err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, NemoGuardrail,  &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
 			return renderer.ServiceMonitor(NemoGuardrail.GetServiceMonitorParams())
 		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
 		if err != nil {
@@ -209,7 +314,7 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 	logger.Info("Reconciling", "volumes", NemoGuardrail.GetVolumes())
 
 	// Sync deployment
-	err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, NemoGuardrail,  &appsv1.Deployment{}, func() (client.Object, error) {
 		return renderer.Deployment(deploymentParams)
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
@@ -224,12 +329,12 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 
 	if !ready {
 		// Update status as NotReady
-		err = r.SetConditionsNotReady(ctx, NemoGuardrail, conditions.NotReady, msg)
+		err = r.updater.SetConditionsNotReady(ctx, NemoGuardrail, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(NemoGuardrail, corev1.EventTypeNormal, conditions.NotReady,
 			"NemoGuardrail %s not ready yet, msg: %s", NemoGuardrail.Name, msg)
 	} else {
 		// Update status as ready
-		err = r.SetConditionsReady(ctx, NemoGuardrail, conditions.Ready, msg)
+		err = r.updater.SetConditionsReady(ctx, NemoGuardrail, conditions.Ready, msg)
 		r.GetEventRecorder().Eventf(NemoGuardrail, corev1.EventTypeNormal, conditions.Ready,
 			"NemoGuardrail %s ready, msg: %s", NemoGuardrail.Name, msg)
 	}
@@ -242,7 +347,7 @@ func (r *DefaultAppReconciler) reconcileNemoGuardrail(ctx context.Context, NemoG
 	return ctrl.Result{}, nil
 }
 
-func (r *DefaultAppReconciler) renderAndSyncResource(ctx context.Context, NemoGuardrail client.Object, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *DefaultAppReconciler) renderAndSyncResource(ctx context.Context, NemoGuardrail client.Object, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
 	namespacedName := types.NamespacedName{Name: NemoGuardrail.GetName(), Namespace: NemoGuardrail.GetNamespace()}
@@ -389,60 +494,6 @@ func (r *DefaultAppReconciler) cleanupResource(ctx context.Context, obj client.O
 	}
 	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
 	return nil
-}
-
-func (r *DefaultAppReconciler) SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NemoGuardrail, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Failed,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Ready,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoGuardrailStatusReady
-	return r.updateNemoGuardrailStatus(ctx, cr)
-}
-
-func (r *DefaultAppReconciler) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NemoGuardrail, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionFalse,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionFalse,
-		Reason:  conditions.Ready,
-		Message: message,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoGuardrailStatusNotReady
-	return r.updateNemoGuardrailStatus(ctx, cr)
-}
-
-func (r *DefaultAppReconciler) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NemoGuardrail, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Ready,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Failed,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-	cr.Status.State = appsv1alpha1.NemoGuardrailStatusFailed
-	return r.updateNemoGuardrailStatus(ctx, cr)
 }
 
 func (r *DefaultAppReconciler) updateNemoGuardrailStatus(ctx context.Context, cr *appsv1alpha1.NemoGuardrail) error {
