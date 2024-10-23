@@ -75,9 +75,10 @@ type NIMServiceSpec struct {
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas int    `json:"replicas,omitempty"`
-	UserID   *int64 `json:"userID,omitempty"`
-	GroupID  *int64 `json:"groupID,omitempty"`
+	Replicas     int    `json:"replicas,omitempty"`
+	UserID       *int64 `json:"userID,omitempty"`
+	GroupID      *int64 `json:"groupID,omitempty"`
+	RuntimeClass string `json:"runtimeClass,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume
@@ -438,6 +439,11 @@ func (n *NIMService) GetServiceAccountName() string {
 	return n.Name
 }
 
+// GetRuntimeClass return the runtime class name for the NIMService deployment
+func (n *NIMService) GetRuntimeClass() string {
+	return n.Spec.RuntimeClass
+}
+
 // GetNIMCacheName returns the NIMCache name to use for the NIMService deployment
 func (n *NIMService) GetNIMCacheName() string {
 	return n.Spec.Storage.NIMCache.Name
@@ -510,10 +516,9 @@ func (n *NIMService) GetUserID() *int64 {
 // GetGroupID returns the group ID for the NIMService deployment
 func (n *NIMService) GetGroupID() *int64 {
 	return n.Spec.GroupID
-
 }
 
-// GetGroupID returns the group ID for the NIMService deployment
+// GetStorageReadOnly returns true if the volume have to be mounted as read-only for the NIMService deployment
 func (n *NIMService) GetStorageReadOnly() bool {
 	if n.Spec.Storage.ReadOnly == nil {
 		return false
@@ -579,6 +584,10 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 
 	// Set service account
 	params.ServiceAccountName = n.GetServiceAccountName()
+
+	// Set runtime class
+	params.RuntimeClassName = n.GetRuntimeClass()
+
 	return params
 }
 
@@ -622,6 +631,9 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 
 	// Set service account
 	params.ServiceAccountName = n.GetServiceAccountName()
+
+	// Set runtime class
+	params.RuntimeClassName = n.GetRuntimeClass()
 	return params
 }
 

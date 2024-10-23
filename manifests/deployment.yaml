@@ -36,6 +36,7 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: {{ .ServiceAccountName }}
+      runtimeClassName: {{ .RuntimeClassName }}
       containers:
       - name: {{ .ContainerName }}
         image: {{ .Image }}

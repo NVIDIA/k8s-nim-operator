@@ -1005,8 +1005,9 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
 					},
-					Containers:    []corev1.Container{},
-					RestartPolicy: corev1.RestartPolicyNever,
+					Containers:       []corev1.Container{},
+					RuntimeClassName: func(s string) *string { return &s }("nvidia"),
+					RestartPolicy:    corev1.RestartPolicyNever,
 					Volumes: []corev1.Volume{
 						{
 							Name: "nim-cache-volume",
