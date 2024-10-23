@@ -462,6 +462,11 @@ func (n *NemoGuardrail) GetServicePort() int32 {
 	return n.Spec.Expose.Service.Port
 }
 
+// GetServiceType returns the service type for the NemoGuardrail deployment
+func (n *NemoGuardrail) GetServiceType() string {
+	return string(n.Spec.Expose.Service.Type)
+}
+
 // GetUserID returns the user ID for the NemoGuardrail deployment
 func (n *NemoGuardrail) GetUserID() *int64 {
 	return n.Spec.UserID
@@ -587,8 +592,12 @@ func (n *NemoGuardrail) GetServiceParams() *rendertypes.ServiceParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetServiceAnnotations()
+
 	// Set service selector labels
 	params.SelectorLabels = n.GetSelectorLabels()
+
+	// Set service type
+	params.Type = n.GetServiceType()
 
 	// Set service ports
 	params.Port = n.GetServicePort()
