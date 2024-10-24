@@ -75,9 +75,10 @@ type NemoGuardrailSpec struct {
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas int    `json:"replicas,omitempty"`
-	UserID   *int64 `json:"userID,omitempty"`
-	GroupID  *int64 `json:"groupID,omitempty"`
+	Replicas     int    `json:"replicas,omitempty"`
+	UserID       *int64 `json:"userID,omitempty"`
+	GroupID      *int64 `json:"groupID,omitempty"`
+	RuntimeClass string `json:"runtimeClass,omitempty"`
 }
 
 type GuardrailConfig struct {
@@ -414,6 +415,11 @@ func (n *NemoGuardrail) GetServiceAccountName() string {
 	return n.Name
 }
 
+// GetRuntimeClass return the runtime class name for the NemoGuardrail deployment
+func (n *NemoGuardrail) GetRuntimeClass() string {
+	return n.Spec.RuntimeClass
+}
+
 // GetHPA returns the HPA spec for the NemoGuardrail deployment
 func (n *NemoGuardrail) GetHPA() HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPA
@@ -537,6 +543,9 @@ func (n *NemoGuardrail) GetDeploymentParams() *rendertypes.DeploymentParams {
 
 	// Set service account
 	params.ServiceAccountName = n.GetServiceAccountName()
+
+	// Set runtime class
+	params.RuntimeClassName = n.GetRuntimeClass()
 	return params
 }
 
@@ -580,6 +589,9 @@ func (n *NemoGuardrail) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 
 	// Set service account
 	params.ServiceAccountName = n.GetServiceAccountName()
+
+	// Set runtime class
+	params.RuntimeClassName = n.GetRuntimeClass()
 	return params
 }
 

@@ -23,6 +23,7 @@ spec:
       labels:
         app: {{ .Name }}
     spec:
+      runtimeClassName: {{ .RuntimeClassName }}
       containers:
       - name: {{ .ContainerName }}
         image: {{ .Image }}

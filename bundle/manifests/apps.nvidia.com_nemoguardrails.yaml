@@ -1318,6 +1318,8 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
+              runtimeClass:
+                type: string
               scale:
                 description: Autoscaling defines attributes to automatically scale
                   the service based on metrics
