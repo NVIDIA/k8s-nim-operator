@@ -7,7 +7,7 @@ operator:
     pullPolicy: Always
   args:
     - --health-probe-bind-address=:8081
-    - --metrics-bind-address=127.0.0.1:8080
+    - --metrics-bind-address=:8080
     - --leader-elect
   resources:
       limits:
@@ -43,30 +43,11 @@ operator:
                 operator: In
                 values: [""]
 
-kubeProxy:
-  image:
-    repository: gcr.io/kubebuilder/kube-rbac-proxy
-    tag: v0.15.0
-    pullPolicy: IfNotPresent
-  args:
-    - --secure-listen-address=0.0.0.0:8443
-    - --upstream=http://127.0.0.1:8080/
-    - --logtostderr=true
-    - --v=0
-  resources:
-    limits:
-      cpu: 500m
-      memory: 128Mi
-    requests:
-      cpu: 50m
-      memory: 64Mi
-
 metricsService:
   ports:
-  - name: https
-    port: 8443
+  - name: metrics
+    port: 8080
     protocol: TCP
-    targetPort: https
   type: ClusterIP
 
 nfd:
