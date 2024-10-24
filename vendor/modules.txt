@@ -468,7 +468,7 @@ github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/reflectwalk v1.0.2
 ## explicit
 github.com/mitchellh/reflectwalk
-# github.com/mittwald/go-helm-client v0.12.13
+# github.com/mittwald/go-helm-client v0.12.14
 ## explicit; go 1.22.0
 github.com/mittwald/go-helm-client
 github.com/mittwald/go-helm-client/values
@@ -1190,7 +1190,7 @@ k8s.io/apiserver/pkg/warning
 k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics
-# k8s.io/cli-runtime v0.31.0
+# k8s.io/cli-runtime v0.31.1
 ## explicit; go 1.22.0
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/genericiooptions
