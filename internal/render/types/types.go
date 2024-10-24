@@ -79,6 +79,7 @@ type DeploymentParams struct {
 	NIMCachePVC        string
 	UserID             *int64
 	GroupID            *int64
+	RuntimeClassName   string
 }
 
 // StatefulSetParams holds the parameters for rendering a StatefulSet template
@@ -108,6 +109,7 @@ type StatefulSetParams struct {
 	ReadinessProbe     *corev1.Probe
 	StartupProbe       *corev1.Probe
 	NIMCachePVC        string
+	RuntimeClassName   string
 }
 
 // ServiceParams holds the parameters for rendering a Service template
