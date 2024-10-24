@@ -23,10 +23,23 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 
 # Use distroless as minimal base image to package the manager binary
 FROM nvcr.io/nvidia/distroless/go:v3.1.2
+
+ARG VERSION="unknown"
+
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532
 
 COPY manifests/ manifests/
+
+LABEL io.k8s.display-name="NVIDIA NIM Operator"
+LABEL name="NVIDIA NIM Operator"
+LABEL vendor="NVIDIA"
+LABEL version="${VERSION}"
+LABEL release="N/A"
+LABEL summary="Deployment and Management of NVIDIA NIM and NeMo Microservices"
+LABEL description="See summary"
+
+COPY LICENSE.md /licenses
 
 ENTRYPOINT ["/manager"]

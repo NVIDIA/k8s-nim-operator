@@ -3,7 +3,19 @@ kind: ClusterServiceVersion
 metadata:
   name: nim-operator-certified.v0.1.0
   namespace: placeholder
+  labels:
+    operatorframework.io/arch.amd64: supported
   annotations:
+    features.operators.openshift.io/disconnected: "true"
+    features.operators.openshift.io/fips-compliant: "false"
+    features.operators.openshift.io/proxy-aware: "true"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
+    features.operators.openshift.io/cnf: "false"
+    features.operators.openshift.io/cni: "false"
+    features.operators.openshift.io/csi: "false"
     alm-examples: |-
       [
         {
