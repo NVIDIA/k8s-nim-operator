@@ -18,6 +18,7 @@ package conditions
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -57,10 +58,11 @@ const (
 )
 
 // Updater is the condition updater
+
 type Updater interface {
-	SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error
-	SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error
-	SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error
+	SetConditionsReady(ctx context.Context, cr client.Object, reason, message string) error
+	SetConditionsNotReady(ctx context.Context, cr client.Object, reason, message string) error
+	SetConditionsFailed(ctx context.Context, cr client.Object, reason, message string) error
 }
 
 type updater struct {
@@ -72,7 +74,16 @@ func NewUpdater(c client.Client) Updater {
 	return &updater{client: c}
 }
 
-func (u *updater) SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error {
+func (u *updater) SetConditionsReady(ctx context.Context, obj client.Object, reason, message string) error {
+	if cr, ok := obj.(*appsv1alpha1.NIMService); ok {
+		return u.SetConditionsReadyNIMService(ctx, cr, reason, message)
+	} else if gr, ok := obj.(*appsv1alpha1.NemoGuardrail); ok {
+		return u.SetConditionsReadyNemoGuardrail(ctx, gr, reason, message)
+	}
+	return fmt.Errorf("unknown CRD type for %v", obj)
+}
+
+func (u *updater) SetConditionsReadyNIMService(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error {
 	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 		Type:    Ready,
 		Status:  metav1.ConditionTrue,
@@ -85,12 +96,28 @@ func (u *updater) SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NIMSe
 		Status: metav1.ConditionFalse,
 		Reason: Ready,
 	})
-
 	cr.Status.State = v1alpha1.NIMServiceStatusReady
 	return u.updateNIMServiceStatus(ctx, cr)
 }
 
-func (u *updater) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error {
+func (u *updater) SetConditionsReadyNemoGuardrail(ctx context.Context, gr *appsv1alpha1.NemoGuardrail, reason, message string) error {
+	meta.SetStatusCondition(&gr.Status.Conditions, metav1.Condition{
+		Type:    Ready,
+		Status:  metav1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	})
+
+	meta.SetStatusCondition(&gr.Status.Conditions, metav1.Condition{
+		Type:   Failed,
+		Status: metav1.ConditionFalse,
+		Reason: Ready,
+	})
+	gr.Status.State = v1alpha1.NIMServiceStatusReady
+	return u.updateNemoGuardrailStatus(ctx, gr)
+}
+
+func (u *updater) SetConditionsNotReadyNIMService(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error {
 	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 		Type:    Ready,
 		Status:  metav1.ConditionFalse,
@@ -104,12 +131,47 @@ func (u *updater) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NI
 		Reason:  Ready,
 		Message: message,
 	})
-
 	cr.Status.State = v1alpha1.NIMServiceStatusNotReady
 	return u.updateNIMServiceStatus(ctx, cr)
 }
 
-func (u *updater) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error {
+func (u *updater) SetConditionsNotReadyNemoGuardrail(ctx context.Context, gr *appsv1alpha1.NemoGuardrail, reason, message string) error {
+	meta.SetStatusCondition(&gr.Status.Conditions, metav1.Condition{
+		Type:    Ready,
+		Status:  metav1.ConditionFalse,
+		Reason:  reason,
+		Message: message,
+	})
+
+	meta.SetStatusCondition(&gr.Status.Conditions, metav1.Condition{
+		Type:    Failed,
+		Status:  metav1.ConditionFalse,
+		Reason:  Ready,
+		Message: message,
+	})
+	gr.Status.State = v1alpha1.NemoGuardrailStatusNotReady
+	return u.updateNemoGuardrailStatus(ctx, gr)
+}
+
+func (u *updater) SetConditionsNotReady(ctx context.Context, obj client.Object, reason, message string) error {
+	if cr, ok := obj.(*appsv1alpha1.NIMService); ok {
+		return u.SetConditionsNotReadyNIMService(ctx, cr, reason, message)
+	} else if gr, ok := obj.(*appsv1alpha1.NemoGuardrail); ok {
+		return u.SetConditionsNotReadyNemoGuardrail(ctx, gr, reason, message)
+	}
+	return fmt.Errorf("unknown CRD type for %v", obj)
+}
+
+func (u *updater) SetConditionsFailed(ctx context.Context, obj client.Object, reason, message string) error {
+	if cr, ok := obj.(*appsv1alpha1.NIMService); ok {
+		return u.SetConditionsFailedNIMService(ctx, cr, reason, message)
+	} else if gr, ok := obj.(*appsv1alpha1.NemoGuardrail); ok {
+		return u.SetConditionsFailedNemoGuardrail(ctx, gr, reason, message)
+	}
+	return fmt.Errorf("unknown CRD type for %v", obj)
+}
+
+func (u *updater) SetConditionsFailedNIMService(ctx context.Context, cr *appsv1alpha1.NIMService, reason, message string) error {
 	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 		Type:   Ready,
 		Status: metav1.ConditionFalse,
@@ -126,9 +188,39 @@ func (u *updater) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NIMS
 	return u.updateNIMServiceStatus(ctx, cr)
 }
 
+func (u *updater) SetConditionsFailedNemoGuardrail(ctx context.Context, cr *appsv1alpha1.NemoGuardrail, reason, message string) error {
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:   Ready,
+		Status: metav1.ConditionFalse,
+		Reason: Failed,
+	})
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:    Failed,
+		Status:  metav1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	})
+	cr.Status.State = v1alpha1.NemoGuardrailStatusFailed
+	return u.updateNemoGuardrailStatus(ctx, cr)
+}
+
 func (u *updater) updateNIMServiceStatus(ctx context.Context, cr *appsv1alpha1.NIMService) error {
 
 	obj := &appsv1alpha1.NIMService{}
+	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
+	if errGet != nil {
+		return errGet
+	}
+	obj.Status = cr.Status
+	if err := u.client.Status().Update(ctx, obj); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *updater) updateNemoGuardrailStatus(ctx context.Context, cr *appsv1alpha1.NemoGuardrail) error {
+	obj := &appsv1alpha1.NemoGuardrail{}
 	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
 	if errGet != nil {
 		return errGet

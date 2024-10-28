@@ -22,3 +22,5 @@ type NIMCacheExpansion interface{}
 type NIMPipelineExpansion interface{}
 
 type NIMServiceExpansion interface{}
+
+type NemoGuardrailExpansion interface{}

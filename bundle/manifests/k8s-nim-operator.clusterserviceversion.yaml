@@ -3,7 +3,19 @@ kind: ClusterServiceVersion
 metadata:
   name: nim-operator-certified.v0.1.0
   namespace: placeholder
+  labels:
+    operatorframework.io/arch.amd64: supported
   annotations:
+    features.operators.openshift.io/disconnected: "true"
+    features.operators.openshift.io/fips-compliant: "false"
+    features.operators.openshift.io/proxy-aware: "true"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
+    features.operators.openshift.io/cnf: "false"
+    features.operators.openshift.io/cni: "false"
+    features.operators.openshift.io/csi: "false"
     alm-examples: |-
       [
         {
@@ -249,6 +261,26 @@ spec:
             kind: ConfigMap
         specDescriptors: []
         statusDescriptors: []
+      - name: nemoguardrails.apps.nvidia.com
+        displayName: NemoGuardrail
+        kind: NemoGuardrail
+        version: v1alpha1
+        description: NEMO guardrail Service
+        resources:
+          - version: v1
+            kind: Deployment
+          - version: v1
+            kind: Service
+          - version: v1
+            kind: ReplicaSet
+          - version: v1
+            kind: Pod
+          - version: v1
+            kind: Secret
+          - version: v1
+            kind: ConfigMap
+        specDescriptors: []
+        statusDescriptors: []
     required: []
   install:
     strategy: deployment
@@ -436,6 +468,32 @@ spec:
                 - apps.nvidia.com
               resources:
                 - nimservices/status
+              verbs:
+                - get
+                - patch
+                - update
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nemoguardrails
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nemoguardrails/finalizers
+              verbs:
+                - update
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nemoguardrails/status
               verbs:
                 - get
                 - patch
