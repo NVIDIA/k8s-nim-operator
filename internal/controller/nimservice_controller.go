@@ -23,6 +23,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/go-logr/logr"
@@ -54,6 +55,7 @@ type NIMServiceReconciler struct {
 	renderer render.Renderer
 	Config   *rest.Config
 	Platform platform.Platform
+	k8sType  k8sutil.OrchestratorType
 	recorder record.EventRecorder
 }
 
@@ -62,6 +64,13 @@ var _ shared.Reconciler = &NIMServiceReconciler{}
 
 // NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform
 func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
+	// Set container orchestrator type
+	k8sType, err := k8sutil.GetOrchestratorType(client)
+	if err != nil {
+		log.Error(err, "Unable to get container orhestrator type")
+		return nil
+	}
+
 	return &NIMServiceReconciler{
 		Client:   client,
 		scheme:   scheme,
@@ -69,6 +78,7 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 		renderer: renderer,
 		log:      log,
 		Platform: platform,
+		k8sType:  k8sType,
 	}
 }
 
@@ -187,6 +197,11 @@ func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder
 func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
+}
+
+// GetK8sType returns the container platform type
+func (r *NIMServiceReconciler) GetK8sType() k8sutil.OrchestratorType {
+	return r.k8sType
 }
 
 // SetupWithManager sets up the controller with the Manager.

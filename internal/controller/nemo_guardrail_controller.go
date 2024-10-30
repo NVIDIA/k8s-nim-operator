@@ -23,6 +23,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -60,6 +61,7 @@ type NemoGuardrailReconciler struct {
 	renderer render.Renderer
 	Config   *rest.Config
 	recorder record.EventRecorder
+	k8sType  k8sutil.OrchestratorType
 }
 
 // Ensure NemoGuardrailReconciler implements the Reconciler interface
@@ -67,12 +69,19 @@ var _ shared.Reconciler = &NemoGuardrailReconciler{}
 
 // NewNemoGuardrailReconciler creates a new reconciler for NemoGuardrail with the given platform
 func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoGuardrailReconciler {
+	// Set container platform type
+	k8sType, err := k8sutil.GetOrchestratorType(client)
+	if err != nil {
+		return nil
+	}
+
 	return &NemoGuardrailReconciler{
 		Client:   client,
 		scheme:   scheme,
 		updater:  updater,
 		renderer: renderer,
 		log:      log,
+		k8sType:  k8sType,
 	}
 }
 
@@ -197,6 +206,11 @@ func (r *NemoGuardrailReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder
 func (r *NemoGuardrailReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
+}
+
+// GetK8sType returns the container platform type
+func (r *NemoGuardrailReconciler) GetK8sType() k8sutil.OrchestratorType {
+	return r.k8sType
 }
 
 // SetupWithManager sets up the controller with the Manager.

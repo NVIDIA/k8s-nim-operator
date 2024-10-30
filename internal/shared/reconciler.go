@@ -18,6 +18,7 @@ package shared
 
 import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,4 +35,5 @@ type Reconciler interface {
 	GetUpdater() conditions.Updater
 	GetRenderer() render.Renderer
 	GetEventRecorder() record.EventRecorder
+	GetK8sType() k8sutil.OrchestratorType
 }

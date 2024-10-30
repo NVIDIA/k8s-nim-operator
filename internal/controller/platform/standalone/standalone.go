@@ -21,6 +21,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/go-logr/logr"
@@ -59,6 +60,7 @@ type NIMServiceReconciler struct {
 	updater  conditions.Updater
 	renderer render.Renderer
 	recorder record.EventRecorder
+	k8sType  k8sutil.OrchestratorType
 }
 
 // NewNIMCacheReconciler returns NIMCacheReconciler for standalone mode
@@ -80,6 +82,7 @@ func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
 		log:      r.GetLogger(),
 		updater:  r.GetUpdater(),
 		recorder: r.GetEventRecorder(),
+		k8sType:  r.GetK8sType(),
 	}
 }
 

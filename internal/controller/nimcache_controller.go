@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
@@ -86,6 +87,7 @@ type NIMCacheReconciler struct {
 	scheme   *runtime.Scheme
 	log      logr.Logger
 	Platform platform.Platform
+	k8sType  k8sutil.OrchestratorType
 	updater  conditions.Updater
 	recorder record.EventRecorder
 }
@@ -95,11 +97,19 @@ var _ shared.Reconciler = &NIMCacheReconciler{}
 
 // NewNIMCacheReconciler creates a new reconciler for NIMCache with the given platform
 func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger, platform platform.Platform) *NIMCacheReconciler {
+	// Set container orchestrator type
+	k8sType, err := k8sutil.GetOrchestratorType(client)
+	if err != nil {
+		log.Error(err, "Unable to get container orhestrator type")
+		return nil
+	}
+
 	return &NIMCacheReconciler{
 		Client:   client,
 		scheme:   scheme,
 		log:      log,
 		Platform: platform,
+		k8sType:  k8sType,
 	}
 }
 
@@ -219,6 +229,11 @@ func (r *NIMCacheReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder
 func (r *NIMCacheReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
+}
+
+// GetK8sType returns the container platform type
+func (r *NIMCacheReconciler) GetK8sType() k8sutil.OrchestratorType {
+	return r.k8sType
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -564,7 +579,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 
 	// Create a configmap by extracting the model manifest
 	// Create a temporary pod for parsing model manifest
-	pod := constructPodSpec(nimCache)
+	pod := constructPodSpec(nimCache, r.GetK8sType())
 	// Add nimCache as owner for watching on status change
 	if err := controllerutil.SetControllerReference(nimCache, pod, r.GetScheme()); err != nil {
 		return false, err
@@ -683,7 +698,7 @@ func (r *NIMCacheReconciler) reconcileJob(ctx context.Context, nimCache *appsv1a
 
 	// If Job does not exist and caching is not complete, create a new one
 	if err != nil && nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
-		job, err := r.constructJob(ctx, nimCache)
+		job, err := r.constructJob(ctx, nimCache, r.GetK8sType())
 		if err != nil {
 			logger.Error(err, "Failed to construct job")
 			return err
@@ -886,15 +901,19 @@ func getManifestConfigName(nimCache *appsv1alpha1.NIMCache) string {
 }
 
 // constructPodSpec constructs a Pod specification
-func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
+func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) *corev1.Pod {
 	labels := map[string]string{
 		"app":                          "k8s-nim-operator",
 		"app.kubernetes.io/name":       nimCache.Name,
 		"app.kubernetes.io/managed-by": "k8s-nim-operator",
 	}
 
-	annotations := map[string]string{
-		"openshift.io/scc": "nonroot",
+	annotations := make(map[string]string)
+
+	if platformType == k8sutil.OpenShift {
+		annotations = map[string]string{
+			"openshift.io/scc": "nonroot",
+		}
 	}
 
 	pod := &corev1.Pod{
@@ -925,14 +944,18 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 				RunAsUser:    nimCache.GetUserID(),
 				FSGroup:      nimCache.GetGroupID(),
 				RunAsNonRoot: ptr.To[bool](true),
-				SeccompProfile: &corev1.SeccompProfile{
-					Type: corev1.SeccompProfileTypeRuntimeDefault,
-				},
 			},
 			ServiceAccountName: NIMCacheServiceAccount,
 			Tolerations:        nimCache.GetTolerations(),
 			NodeSelector:       nimCache.GetNodeSelectors(),
 		},
+	}
+
+	// SeccompProfile must be set for TKGS
+	if platformType == k8sutil.TKGS {
+		pod.Spec.Containers[0].SecurityContext.SeccompProfile = &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		}
 	}
 
 	pod.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
@@ -971,7 +994,7 @@ func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (s
 	return buf.String(), nil
 }
 
-func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
+func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) (*batchv1.Job, error) {
 	logger := r.GetLogger()
 	pvcName := getPvcName(nimCache, nimCache.Spec.Storage.PVC)
 	labels := map[string]string{
@@ -981,8 +1004,11 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	}
 
 	annotations := map[string]string{
-		"openshift.io/scc":        "nonroot",
 		"sidecar.istio.io/inject": "false",
+	}
+
+	if platformType == k8sutil.OpenShift {
+		annotations["openshift.io/scc"] = "nonroot"
 	}
 
 	job := &batchv1.Job{
@@ -1001,9 +1027,6 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						RunAsUser:    nimCache.GetUserID(),
 						FSGroup:      nimCache.GetGroupID(),
 						RunAsNonRoot: ptr.To[bool](true),
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
 					},
 					Containers:    []corev1.Container{},
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -1027,6 +1050,14 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			TTLSecondsAfterFinished: ptr.To[int32](600), // cleanup automatically after job finishes
 		},
 	}
+
+	// SeccompProfile must be set for TKGS
+	if platformType == k8sutil.TKGS {
+		job.Spec.Template.Spec.SecurityContext.SeccompProfile = &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		}
+	}
+
 	if nimCache.Spec.Source.DataStore != nil {
 		outputPath := "/output"
 		if nimCache.Spec.Storage.HostPath != nil {
