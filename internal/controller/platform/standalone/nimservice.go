@@ -347,16 +347,6 @@ func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespaced
 	return fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name), true, nil
 }
 
-func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.DeploymentConditionType) *appsv1.DeploymentCondition {
-	for i := range status.Conditions {
-		c := status.Conditions[i]
-		if c.Type == condType {
-			return &c
-		}
-	}
-	return nil
-}
-
 func (r *NIMServiceReconciler) syncResource(ctx context.Context, obj client.Object, desired client.Object, namespacedName types.NamespacedName) error {
 	logger := log.FromContext(ctx)
 
