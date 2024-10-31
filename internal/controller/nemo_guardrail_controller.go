@@ -55,13 +55,13 @@ const NemoGuardrailFinalizer = "finalizer.NemoGuardrail.apps.nvidia.com"
 // NemoGuardrailReconciler reconciles a NemoGuardrail object
 type NemoGuardrailReconciler struct {
 	client.Client
-	scheme   *runtime.Scheme
-	log      logr.Logger
-	updater  conditions.Updater
-	renderer render.Renderer
-	Config   *rest.Config
-	recorder record.EventRecorder
-	k8sType  k8sutil.OrchestratorType
+	scheme           *runtime.Scheme
+	log              logr.Logger
+	updater          conditions.Updater
+	renderer         render.Renderer
+	Config           *rest.Config
+	recorder         record.EventRecorder
+	orchestratorType k8sutil.OrchestratorType
 }
 
 // Ensure NemoGuardrailReconciler implements the Reconciler interface
@@ -69,19 +69,12 @@ var _ shared.Reconciler = &NemoGuardrailReconciler{}
 
 // NewNemoGuardrailReconciler creates a new reconciler for NemoGuardrail with the given platform
 func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoGuardrailReconciler {
-	// Set container platform type
-	k8sType, err := k8sutil.GetOrchestratorType(client)
-	if err != nil {
-		return nil
-	}
-
 	return &NemoGuardrailReconciler{
 		Client:   client,
 		scheme:   scheme,
 		updater:  updater,
 		renderer: renderer,
 		log:      log,
-		k8sType:  k8sType,
 	}
 }
 
@@ -158,6 +151,15 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
+	// Set container orchestrator type
+	if r.GetOrchestratorType() != "" {
+		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("Unable to get container orhestrator type, %v", err)
+		}
+		r.orchestratorType = orchestratorType
+	}
+
 	// Handle platform-specific reconciliation
 	if result, err := r.reconcileNemoGuardrail(ctx, NemoGuardrail); err != nil {
 		logger.Error(err, "error reconciling NemoGuardrail", "name", NemoGuardrail.Name)
@@ -208,9 +210,9 @@ func (r *NemoGuardrailReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetK8sType returns the container platform type
-func (r *NemoGuardrailReconciler) GetK8sType() k8sutil.OrchestratorType {
-	return r.k8sType
+// GetOrchestratorType returns the container platform type
+func (r *NemoGuardrailReconciler) GetOrchestratorType() k8sutil.OrchestratorType {
+	return r.orchestratorType
 }
 
 // SetupWithManager sets up the controller with the Manager.

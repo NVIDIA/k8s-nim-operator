@@ -76,9 +76,9 @@ func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetK8sType returns the container platform type
-func (r *NIMServiceReconciler) GetK8sType() k8sutil.OrchestratorType {
-	return r.k8sType
+// GetOrchestratorType returns the container platform type
+func (r *NIMServiceReconciler) GetOrchestratorType() k8sutil.OrchestratorType {
+	return r.orchestratorType
 }
 
 func (r *NIMServiceReconciler) cleanupNIMService(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
@@ -179,7 +179,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	var modelPVC *appsv1alpha1.PersistentVolumeClaim
 	modelProfile := ""
 
-	deploymentParams.OrchestratorType = string(r.GetK8sType())
+	deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
 
 	// Select PVC for model store
 	if nimService.GetNIMCacheName() != "" {

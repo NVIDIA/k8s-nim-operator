@@ -55,12 +55,12 @@ type NIMCacheReconciler struct {
 // NIMServiceReconciler represents the NIMService reconciler instance for standalone mode
 type NIMServiceReconciler struct {
 	client.Client
-	scheme   *runtime.Scheme
-	log      logr.Logger
-	updater  conditions.Updater
-	renderer render.Renderer
-	recorder record.EventRecorder
-	k8sType  k8sutil.OrchestratorType
+	scheme           *runtime.Scheme
+	log              logr.Logger
+	updater          conditions.Updater
+	renderer         render.Renderer
+	recorder         record.EventRecorder
+	orchestratorType k8sutil.OrchestratorType
 }
 
 // NewNIMCacheReconciler returns NIMCacheReconciler for standalone mode
@@ -77,12 +77,12 @@ func NewNIMCacheReconciler(r shared.Reconciler) *NIMCacheReconciler {
 // NewNIMServiceReconciler returns NIMServiceReconciler for standalone mode
 func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
-		Client:   r.GetClient(),
-		scheme:   r.GetScheme(),
-		log:      r.GetLogger(),
-		updater:  r.GetUpdater(),
-		recorder: r.GetEventRecorder(),
-		k8sType:  r.GetK8sType(),
+		Client:           r.GetClient(),
+		scheme:           r.GetScheme(),
+		log:              r.GetLogger(),
+		updater:          r.GetUpdater(),
+		recorder:         r.GetEventRecorder(),
+		orchestratorType: r.GetOrchestratorType(),
 	}
 }
 

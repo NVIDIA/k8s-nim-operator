@@ -84,12 +84,12 @@ const (
 // NIMCacheReconciler reconciles a NIMCache object
 type NIMCacheReconciler struct {
 	client.Client
-	scheme   *runtime.Scheme
-	log      logr.Logger
-	Platform platform.Platform
-	k8sType  k8sutil.OrchestratorType
-	updater  conditions.Updater
-	recorder record.EventRecorder
+	scheme           *runtime.Scheme
+	log              logr.Logger
+	Platform         platform.Platform
+	orchestratorType k8sutil.OrchestratorType
+	updater          conditions.Updater
+	recorder         record.EventRecorder
 }
 
 // Ensure NIMCacheReconciler implements the Reconciler interface
@@ -97,19 +97,11 @@ var _ shared.Reconciler = &NIMCacheReconciler{}
 
 // NewNIMCacheReconciler creates a new reconciler for NIMCache with the given platform
 func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger, platform platform.Platform) *NIMCacheReconciler {
-	// Set container orchestrator type
-	k8sType, err := k8sutil.GetOrchestratorType(client)
-	if err != nil {
-		log.Error(err, "Unable to get container orhestrator type")
-		return nil
-	}
-
 	return &NIMCacheReconciler{
 		Client:   client,
 		scheme:   scheme,
 		log:      log,
 		Platform: platform,
-		k8sType:  k8sType,
 	}
 }
 
@@ -184,6 +176,16 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, nil
 		}
 	}
+
+	// Set container orchestrator type
+	if r.GetOrchestratorType() != "" {
+		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("Unable to get container orhestrator type, %v", err)
+		}
+		r.orchestratorType = orchestratorType
+	}
+
 	// Handle nim-cache reconciliation
 	result, err = r.reconcileNIMCache(ctx, nimCache)
 	if err != nil {
@@ -231,9 +233,9 @@ func (r *NIMCacheReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetK8sType returns the container platform type
-func (r *NIMCacheReconciler) GetK8sType() k8sutil.OrchestratorType {
-	return r.k8sType
+// GetOrchestratorType returns the container platform type
+func (r *NIMCacheReconciler) GetOrchestratorType() k8sutil.OrchestratorType {
+	return r.orchestratorType
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -579,7 +581,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 
 	// Create a configmap by extracting the model manifest
 	// Create a temporary pod for parsing model manifest
-	pod := constructPodSpec(nimCache, r.GetK8sType())
+	pod := constructPodSpec(nimCache, r.GetOrchestratorType())
 	// Add nimCache as owner for watching on status change
 	if err := controllerutil.SetControllerReference(nimCache, pod, r.GetScheme()); err != nil {
 		return false, err
@@ -698,7 +700,7 @@ func (r *NIMCacheReconciler) reconcileJob(ctx context.Context, nimCache *appsv1a
 
 	// If Job does not exist and caching is not complete, create a new one
 	if err != nil && nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
-		job, err := r.constructJob(ctx, nimCache, r.GetK8sType())
+		job, err := r.constructJob(ctx, nimCache, r.GetOrchestratorType())
 		if err != nil {
 			logger.Error(err, "Failed to construct job")
 			return err

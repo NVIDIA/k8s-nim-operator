@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -49,14 +50,14 @@ const NIMServiceFinalizer = "finalizer.nimservice.apps.nvidia.com"
 // NIMServiceReconciler reconciles a NIMService object
 type NIMServiceReconciler struct {
 	client.Client
-	scheme   *runtime.Scheme
-	log      logr.Logger
-	updater  conditions.Updater
-	renderer render.Renderer
-	Config   *rest.Config
-	Platform platform.Platform
-	k8sType  k8sutil.OrchestratorType
-	recorder record.EventRecorder
+	scheme           *runtime.Scheme
+	log              logr.Logger
+	updater          conditions.Updater
+	renderer         render.Renderer
+	Config           *rest.Config
+	Platform         platform.Platform
+	orchestratorType k8sutil.OrchestratorType
+	recorder         record.EventRecorder
 }
 
 // Ensure NIMServiceReconciler implements the Reconciler interface
@@ -64,13 +65,6 @@ var _ shared.Reconciler = &NIMServiceReconciler{}
 
 // NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform
 func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
-	// Set container orchestrator type
-	k8sType, err := k8sutil.GetOrchestratorType(client)
-	if err != nil {
-		log.Error(err, "Unable to get container orhestrator type")
-		return nil
-	}
-
 	return &NIMServiceReconciler{
 		Client:   client,
 		scheme:   scheme,
@@ -78,7 +72,6 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 		renderer: renderer,
 		log:      log,
 		Platform: platform,
-		k8sType:  k8sType,
 	}
 }
 
@@ -155,6 +148,15 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	// Set container orchestrator type
+	if r.GetOrchestratorType() != "" {
+		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("Unable to get container orhestrator type, %v", err)
+		}
+		r.orchestratorType = orchestratorType
+	}
+
 	// Handle platform-specific reconciliation
 	if result, err := r.Platform.Sync(ctx, r, nimService); err != nil {
 		logger.Error(err, "error reconciling NIMService", "name", nimService.Name)
@@ -199,9 +201,9 @@ func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetK8sType returns the container platform type
-func (r *NIMServiceReconciler) GetK8sType() k8sutil.OrchestratorType {
-	return r.k8sType
+// GetOrchestratorType returns the container platform type
+func (r *NIMServiceReconciler) GetOrchestratorType() k8sutil.OrchestratorType {
+	return r.orchestratorType
 }
 
 // SetupWithManager sets up the controller with the Manager.

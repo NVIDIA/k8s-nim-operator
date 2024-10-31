@@ -35,5 +35,5 @@ type Reconciler interface {
 	GetUpdater() conditions.Updater
 	GetRenderer() render.Renderer
 	GetEventRecorder() record.EventRecorder
-	GetK8sType() k8sutil.OrchestratorType
+	GetOrchestratorType() k8sutil.OrchestratorType
 }
