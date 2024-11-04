@@ -48,6 +48,8 @@ type NIMCacheSpec struct {
 	// CertConfig is the name of the ConfigMap containing the custom certificates.
 	// for secure communication.
 	CertConfig *CertConfig `json:"certConfig,omitempty"`
+	// Env are the additional custom environment variabes for the caching job
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 // NIMSource defines the source for caching NIM model
