@@ -1148,35 +1148,13 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 
 		// Inject custom CA certificates when running in a proxy envronment
 		if nimCache.Spec.CertConfig != nil {
-			certConfig, err := r.getConfigMap(ctx, nimCache.Spec.CertConfig.Name, nimCache.Namespace)
+			volumes, volumeMounts, err := r.createCertVolumesAndMounts(ctx, nimCache)
 			if err != nil {
-				logger.Error(err, "Failed to get configmap for custom certificates")
+				logger.Error(err, "failed to create volume mounts for custom CA cert injection")
 				return nil, err
 			}
 
-			// Prepare the volume that references the ConfigMap
-			volume := corev1.Volume{
-				Name: "cert-volume",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: nimCache.Spec.CertConfig.Name,
-						},
-					},
-				},
-			}
-
-			// Create individual volume mounts for each key in the ConfigMap
-			volumeMounts := []corev1.VolumeMount{}
-			for key := range certConfig.Data {
-				volumeMounts = append(volumeMounts, corev1.VolumeMount{
-					Name:      "cert-volume",
-					MountPath: fmt.Sprintf("%s/%s", nimCache.Spec.CertConfig.MountPath, key),
-					SubPath:   key,
-				})
-			}
-
-			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volume)
+			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
 			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
 		}
 	}
@@ -1188,6 +1166,43 @@ func (r *NIMCacheReconciler) getConfigMap(ctx context.Context, name, namespace s
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, configMap)
 	return configMap, err
+}
+
+func (r *NIMCacheReconciler) createCertVolumesAndMounts(ctx context.Context, nimCache *appsv1alpha1.NIMCache) ([]corev1.Volume, []corev1.VolumeMount, error) {
+	logger := log.FromContext(ctx)
+
+	// Get the config map for custom certificates
+	certConfig, err := r.getConfigMap(ctx, nimCache.Spec.CertConfig.Name, nimCache.Namespace)
+	if err != nil {
+		logger.Error(err, "Failed to get configmap for custom certificates")
+		return nil, nil, err
+	}
+
+	var volume corev1.Volume
+	var volumeMounts []corev1.VolumeMount
+
+	// Prepare the volume mounts for custom CA certificates
+	volume = corev1.Volume{
+		Name: "cert-volume",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: nimCache.Spec.CertConfig.Name,
+				},
+			},
+		},
+	}
+
+	// Create individual volume mounts for each key in the ConfigMap
+	for key := range certConfig.Data {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "cert-volume",
+			MountPath: fmt.Sprintf("%s/%s", nimCache.Spec.CertConfig.MountPath, key),
+			SubPath:   key,
+		})
+	}
+
+	return []corev1.Volume{volume}, volumeMounts, nil
 }
 
 // extractNIMManifest extracts the NIMManifest from the ConfigMap data
