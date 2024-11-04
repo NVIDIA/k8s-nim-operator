@@ -181,7 +181,7 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if r.GetOrchestratorType() != "" {
 		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("Unable to get container orhestrator type, %v", err)
+			return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
 		}
 		r.orchestratorType = orchestratorType
 	}
