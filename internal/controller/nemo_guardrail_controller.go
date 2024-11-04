@@ -151,14 +151,12 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	// Set container orchestrator type
-	if r.GetOrchestratorType() != "" {
-		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
-		}
-		r.orchestratorType = orchestratorType
+	// Fetch container orchestrator type
+	orchestratorType, err := r.GetOrchestratorType()
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
 	}
+	logger.Info("Container orchestrator is successfully set", "type", orchestratorType)
 
 	// Handle platform-specific reconciliation
 	if result, err := r.reconcileNemoGuardrail(ctx, NemoGuardrail); err != nil {
@@ -211,8 +209,15 @@ func (r *NemoGuardrailReconciler) GetEventRecorder() record.EventRecorder {
 }
 
 // GetOrchestratorType returns the container platform type
-func (r *NemoGuardrailReconciler) GetOrchestratorType() k8sutil.OrchestratorType {
-	return r.orchestratorType
+func (r *NemoGuardrailReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, error) {
+	if r.orchestratorType == "" {
+		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		if err != nil {
+			return k8sutil.Unknown, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+		}
+		r.orchestratorType = orchestratorType
+	}
+	return r.orchestratorType, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

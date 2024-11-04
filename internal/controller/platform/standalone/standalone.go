@@ -76,13 +76,15 @@ func NewNIMCacheReconciler(r shared.Reconciler) *NIMCacheReconciler {
 
 // NewNIMServiceReconciler returns NIMServiceReconciler for standalone mode
 func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
+	orchestratorType, _ := r.GetOrchestratorType()
+
 	return &NIMServiceReconciler{
 		Client:           r.GetClient(),
 		scheme:           r.GetScheme(),
 		log:              r.GetLogger(),
 		updater:          r.GetUpdater(),
 		recorder:         r.GetEventRecorder(),
-		orchestratorType: r.GetOrchestratorType(),
+		orchestratorType: orchestratorType,
 	}
 }
 

@@ -177,14 +177,12 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
-	// Set container orchestrator type
-	if r.GetOrchestratorType() != "" {
-		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
-		}
-		r.orchestratorType = orchestratorType
+	// Fetch container orchestrator type
+	orchestratorType, err := r.GetOrchestratorType()
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
 	}
+	logger.Info("Container orchestrator is successfully set", "type", orchestratorType)
 
 	// Handle nim-cache reconciliation
 	result, err = r.reconcileNIMCache(ctx, nimCache)
@@ -234,8 +232,15 @@ func (r *NIMCacheReconciler) GetEventRecorder() record.EventRecorder {
 }
 
 // GetOrchestratorType returns the container platform type
-func (r *NIMCacheReconciler) GetOrchestratorType() k8sutil.OrchestratorType {
-	return r.orchestratorType
+func (r *NIMCacheReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, error) {
+	if r.orchestratorType == "" {
+		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		if err != nil {
+			return k8sutil.Unknown, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+		}
+		r.orchestratorType = orchestratorType
+	}
+	return r.orchestratorType, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -581,7 +586,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 
 	// Create a configmap by extracting the model manifest
 	// Create a temporary pod for parsing model manifest
-	pod := constructPodSpec(nimCache, r.GetOrchestratorType())
+	pod := constructPodSpec(nimCache, r.orchestratorType)
 	// Add nimCache as owner for watching on status change
 	if err := controllerutil.SetControllerReference(nimCache, pod, r.GetScheme()); err != nil {
 		return false, err
@@ -700,7 +705,7 @@ func (r *NIMCacheReconciler) reconcileJob(ctx context.Context, nimCache *appsv1a
 
 	// If Job does not exist and caching is not complete, create a new one
 	if err != nil && nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
-		job, err := r.constructJob(ctx, nimCache, r.GetOrchestratorType())
+		job, err := r.constructJob(ctx, nimCache, r.orchestratorType)
 		if err != nil {
 			logger.Error(err, "Failed to construct job")
 			return err
