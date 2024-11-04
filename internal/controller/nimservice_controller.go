@@ -149,11 +149,10 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Fetch container orchestrator type
-	orchestratorType, err := r.GetOrchestratorType()
+	_, err := r.GetOrchestratorType()
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
 	}
-	logger.Info("Container orchestrator is successfully set", "type", orchestratorType)
 
 	// Handle platform-specific reconciliation
 	if result, err := r.Platform.Sync(ctx, r, nimService); err != nil {
@@ -207,6 +206,7 @@ func (r *NIMServiceReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, 
 			return k8sutil.Unknown, fmt.Errorf("Unable to get container orchestrator type, %v", err)
 		}
 		r.orchestratorType = orchestratorType
+		r.GetLogger().Info("Container orchestrator is successfully set", "type", orchestratorType)
 	}
 	return r.orchestratorType, nil
 }
