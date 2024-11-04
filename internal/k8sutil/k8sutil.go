@@ -24,35 +24,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// PlatformType is the underlying container orchestrator type
-type PlatformType string
+// OrchestratorType is the underlying container orchestrator type
+type OrchestratorType string
 
 const (
 	// TKGS is the VMware Tanzu Kubernetes Grid Service
-	TKGS PlatformType = "TKGS"
+	TKGS OrchestratorType = "TKGS"
 	// OpenShift is the RedHat Openshift Container Platform
-	OpenShift PlatformType = "OpenShift"
+	OpenShift OrchestratorType = "OpenShift"
 	// GKE is the Google Kubernetes Engine Service
-	GKE PlatformType = "GKE"
+	GKE OrchestratorType = "GKE"
 	// EKS is the Amazon Elastic Kubernetes Service
-	EKS PlatformType = "EKS"
+	EKS OrchestratorType = "EKS"
 	// AKS is the Azure Kubernetes Service
-	AKS PlatformType = "AKS"
+	AKS OrchestratorType = "AKS"
 	// OKE is the Oracle Kubernetes Service
-	OKE PlatformType = "OKE"
+	OKE OrchestratorType = "OKE"
 	// Ezmeral is the HPE Ezmeral Data Fabric
-	Ezmeral PlatformType = "Ezmeral"
+	Ezmeral OrchestratorType = "Ezmeral"
 	// RKE is the Rancker Kubernetes Engine
-	RKE PlatformType = "RKE"
+	RKE OrchestratorType = "RKE"
 	// K8s is the upstream Kubernetes Distribution
-	K8s PlatformType = "Kubernetes"
+	K8s OrchestratorType = "Kubernetes"
 	// Unknown distribution type
-	Unknown PlatformType = "Unknown"
+	Unknown OrchestratorType = "Unknown"
 )
 
-// GetContainerPlatform checks the platform by looking for specific node labels that identify
+// GetOrchestratorType checks the container orchestrator by looking for specific node labels that identify
 // TKGS, OpenShift, or CSP-specific Kubernetes distributions.
-func GetContainerPlatform(k8sClient client.Client) (PlatformType, error) {
+func GetOrchestratorType(k8sClient client.Client) (OrchestratorType, error) {
 	nodes := &corev1.NodeList{}
 	err := k8sClient.List(context.TODO(), nodes)
 	if err != nil {

@@ -18,11 +18,13 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/go-logr/logr"
@@ -48,13 +50,14 @@ const NIMServiceFinalizer = "finalizer.nimservice.apps.nvidia.com"
 // NIMServiceReconciler reconciles a NIMService object
 type NIMServiceReconciler struct {
 	client.Client
-	scheme   *runtime.Scheme
-	log      logr.Logger
-	updater  conditions.Updater
-	renderer render.Renderer
-	Config   *rest.Config
-	Platform platform.Platform
-	recorder record.EventRecorder
+	scheme           *runtime.Scheme
+	log              logr.Logger
+	updater          conditions.Updater
+	renderer         render.Renderer
+	Config           *rest.Config
+	Platform         platform.Platform
+	orchestratorType k8sutil.OrchestratorType
+	recorder         record.EventRecorder
 }
 
 // Ensure NIMServiceReconciler implements the Reconciler interface
@@ -145,6 +148,12 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	// Fetch container orchestrator type
+	_, err := r.GetOrchestratorType()
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+	}
+
 	// Handle platform-specific reconciliation
 	if result, err := r.Platform.Sync(ctx, r, nimService); err != nil {
 		logger.Error(err, "error reconciling NIMService", "name", nimService.Name)
@@ -187,6 +196,19 @@ func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder
 func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
+}
+
+// GetOrchestratorType returns the container platform type
+func (r *NIMServiceReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, error) {
+	if r.orchestratorType == "" {
+		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		if err != nil {
+			return k8sutil.Unknown, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+		}
+		r.orchestratorType = orchestratorType
+		r.GetLogger().Info("Container orchestrator is successfully set", "type", orchestratorType)
+	}
+	return r.orchestratorType, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
