@@ -468,6 +468,16 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
 					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{GPUs: []appsv1alpha1.GPUSpec{{IDs: []string{"26b5"}}}}}},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "NGC_HOME",
+							Value: "/opt/ngc/hub",
+						},
+						{
+							Name:  "HTTPS_PROXY",
+							Value: "https://my-custom-proxy-server:port",
+						},
+					},
 				},
 			}
 
@@ -482,6 +492,24 @@ var _ = Describe("NIMCache Controller", func() {
 				jobName := types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}
 				return cli.Get(ctx, jobName, job)
 			}, time.Second*10).Should(Succeed())
+
+			// Expected environment variables
+			expectedEnvs := map[string]string{
+				"NGC_HOME":    "/opt/ngc/hub",
+				"HTTPS_PROXY": "https://my-custom-proxy-server:port",
+			}
+
+			// Verify each custom environment variable
+			for key, value := range expectedEnvs {
+				var found bool
+				for _, envVar := range job.Spec.Template.Spec.Containers[0].Env {
+					if envVar.Name == key && envVar.Value == value {
+						found = true
+						break
+					}
+				}
+				Expect(found).To(BeTrue(), "Expected environment variable %s=%s not found", key, value)
+			}
 		})
 
 		It("should create a job with the right custom CA certificate volumes", func() {

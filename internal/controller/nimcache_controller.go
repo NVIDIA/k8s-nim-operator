@@ -1146,6 +1146,9 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			}
 		}
 
+		// Merge env with the user provided values
+		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.Spec.Env)
+
 		// Inject custom CA certificates when running in a proxy envronment
 		if nimCache.Spec.CertConfig != nil {
 			volumes, volumeMounts, err := r.createCertVolumesAndMounts(ctx, nimCache)
