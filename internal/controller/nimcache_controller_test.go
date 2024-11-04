@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
 )
 
@@ -338,7 +339,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
 				},
 			}
-			pod := constructPodSpec(nimCache)
+			pod := constructPodSpec(nimCache, k8sutil.K8s)
 			Expect(pod.Name).To(Equal(getPodName(nimCache)))
 			Expect(pod.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
 			Expect(pod.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
@@ -359,7 +360,7 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			}
 
-			pod := constructPodSpec(nimCache)
+			pod := constructPodSpec(nimCache, k8sutil.K8s)
 
 			err := cli.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
@@ -387,7 +388,7 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			}
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(job.Name).To(Equal(getJobName(nimCache)))
@@ -418,7 +419,7 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			}
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(job.Name).To(Equal(getJobName(nimCache)))
@@ -445,7 +446,7 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			}
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(job.Name).To(Equal(getJobName(nimCache)))
@@ -481,7 +482,7 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			}
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = cli.Create(context.TODO(), job)
@@ -544,7 +545,7 @@ var _ = Describe("NIMCache Controller", func() {
 			err := reconciler.Create(context.TODO(), configMap)
 			Expect(err).ToNot(HaveOccurred())
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = cli.Create(context.TODO(), job)

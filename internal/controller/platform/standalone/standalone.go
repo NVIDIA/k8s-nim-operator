@@ -21,6 +21,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/go-logr/logr"
@@ -54,11 +55,12 @@ type NIMCacheReconciler struct {
 // NIMServiceReconciler represents the NIMService reconciler instance for standalone mode
 type NIMServiceReconciler struct {
 	client.Client
-	scheme   *runtime.Scheme
-	log      logr.Logger
-	updater  conditions.Updater
-	renderer render.Renderer
-	recorder record.EventRecorder
+	scheme           *runtime.Scheme
+	log              logr.Logger
+	updater          conditions.Updater
+	renderer         render.Renderer
+	recorder         record.EventRecorder
+	orchestratorType k8sutil.OrchestratorType
 }
 
 // NewNIMCacheReconciler returns NIMCacheReconciler for standalone mode
@@ -74,12 +76,15 @@ func NewNIMCacheReconciler(r shared.Reconciler) *NIMCacheReconciler {
 
 // NewNIMServiceReconciler returns NIMServiceReconciler for standalone mode
 func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
+	orchestratorType, _ := r.GetOrchestratorType()
+
 	return &NIMServiceReconciler{
-		Client:   r.GetClient(),
-		scheme:   r.GetScheme(),
-		log:      r.GetLogger(),
-		updater:  r.GetUpdater(),
-		recorder: r.GetEventRecorder(),
+		Client:           r.GetClient(),
+		scheme:           r.GetScheme(),
+		log:              r.GetLogger(),
+		updater:          r.GetUpdater(),
+		recorder:         r.GetEventRecorder(),
+		orchestratorType: orchestratorType,
 	}
 }
 

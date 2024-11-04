@@ -28,7 +28,7 @@ func TestDetectPlatform(t *testing.T) {
 	tests := []struct {
 		name     string
 		labels   map[string]string
-		expected PlatformType
+		expected OrchestratorType
 	}{
 		{"TKGS platform detected", map[string]string{"node.vmware.com/tkg": "true"}, TKGS},
 		{"OpenShift platform detected", map[string]string{"node.openshift.io/os_id": "rhcos"}, OpenShift},
@@ -53,7 +53,7 @@ func TestDetectPlatform(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithObjects(node).Build()
 
 			// Detect container platform
-			platform, err := GetContainerPlatform(fakeClient)
+			platform, err := GetOrchestratorType(fakeClient)
 			if err != nil {
 				t.Fatalf("GetContainerPlatform failed: %v", err)
 			}
