@@ -1113,20 +1113,12 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			{
 				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.NGC.ModelPuller,
-				Command: []string{"download-to-cache"},
+				Args:    []string{"download-to-cache"},
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
 				Env: []corev1.EnvVar{
 					{
-						Name:  "HF_HOME",
-						Value: "/model-store/huggingface",
-					},
-					{
 						Name:  "NIM_CACHE_PATH",
 						Value: "/model-store",
-					},
-					{
-						Name:  "NGC_HOME",
-						Value: "/model-store/ngc",
 					},
 				},
 				VolumeMounts: []corev1.VolumeMount{
@@ -1164,6 +1156,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Name: nimCache.Spec.Source.NGC.PullSecret,
 			},
 		}
+
 		// Pass specific profiles to download based on user selection or auto-selection
 		selectedProfiles, err := getSelectedProfiles(nimCache)
 		if err != nil {
@@ -1177,9 +1170,9 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 
 		if len(selectedProfiles) > 0 {
 			if utils.ContainsElement(selectedProfiles, AllProfiles) {
-				job.Spec.Template.Spec.Containers[0].Args = []string{"--all"}
+				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, "--all")
 			} else {
-				job.Spec.Template.Spec.Containers[0].Args = []string{"--profiles"}
+				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, "--profiles")
 				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
 			}
 		}
