@@ -79,6 +79,32 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nemoguardrails
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.nvidia.com
+  resources:
+  - nemoguardrails/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.nvidia.com
+  resources:
+  - nemoguardrails/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.nvidia.com
+  resources:
   - nimcaches
   verbs:
   - create
