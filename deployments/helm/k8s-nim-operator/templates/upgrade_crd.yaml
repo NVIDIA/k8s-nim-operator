@@ -91,10 +91,10 @@ spec:
             capabilities:
               drop:
               - ALL
-          command:
-          - /bin/sh
-          - -c
-          - >
-            kubectl apply -f /opt/nim-operator/crds/*.yaml;
+          command: ["kubectl"]
+          args:
+            - "apply"
+            - "-f"
+            - "/opt/nim-operator/crds/*.yaml"
       restartPolicy: OnFailure
 {{- end }}
