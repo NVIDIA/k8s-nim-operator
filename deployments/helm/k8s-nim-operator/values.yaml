@@ -1,5 +1,6 @@
 operator:
   replicas: 1
+  upgradeCRD: true
   image:
     repository: nvcr.io/nvidia/cloud-native/k8s-nim-operator
     tag: v1.0.0
@@ -19,10 +20,6 @@ operator:
   nodeSelector: {}
   annotations: {}
   tolerations:
-  - key: "node-role.kubernetes.io/master"
-    operator: "Equal"
-    value: ""
-    effect: "NoSchedule"
   - key: "node-role.kubernetes.io/control-plane"
     operator: "Equal"
     value: ""
@@ -30,12 +27,6 @@ operator:
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 1
-          preference:
-            matchExpressions:
-              - key: "node-role.kubernetes.io/master"
-                operator: In
-                values: [""]
         - weight: 1
           preference:
             matchExpressions:
@@ -53,4 +44,3 @@ metricsService:
 nfd:
   nodeFeatureRules:
     deviceID: true
-
