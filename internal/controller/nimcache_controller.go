@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
@@ -83,11 +84,12 @@ const (
 // NIMCacheReconciler reconciles a NIMCache object
 type NIMCacheReconciler struct {
 	client.Client
-	scheme   *runtime.Scheme
-	log      logr.Logger
-	Platform platform.Platform
-	updater  conditions.Updater
-	recorder record.EventRecorder
+	scheme           *runtime.Scheme
+	log              logr.Logger
+	Platform         platform.Platform
+	orchestratorType k8sutil.OrchestratorType
+	updater          conditions.Updater
+	recorder         record.EventRecorder
 }
 
 // Ensure NIMCacheReconciler implements the Reconciler interface
@@ -174,6 +176,13 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, nil
 		}
 	}
+
+	// Fetch container orchestrator type
+	_, err = r.GetOrchestratorType()
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+	}
+
 	// Handle nim-cache reconciliation
 	result, err = r.reconcileNIMCache(ctx, nimCache)
 	if err != nil {
@@ -219,6 +228,19 @@ func (r *NIMCacheReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder
 func (r *NIMCacheReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
+}
+
+// GetOrchestratorType returns the container platform type
+func (r *NIMCacheReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, error) {
+	if r.orchestratorType == "" {
+		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		if err != nil {
+			return k8sutil.Unknown, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+		}
+		r.orchestratorType = orchestratorType
+		r.GetLogger().Info("Container orchestrator is successfully set", "type", orchestratorType)
+	}
+	return r.orchestratorType, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -564,7 +586,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 
 	// Create a configmap by extracting the model manifest
 	// Create a temporary pod for parsing model manifest
-	pod := constructPodSpec(nimCache)
+	pod := constructPodSpec(nimCache, r.orchestratorType)
 	// Add nimCache as owner for watching on status change
 	if err := controllerutil.SetControllerReference(nimCache, pod, r.GetScheme()); err != nil {
 		return false, err
@@ -683,7 +705,7 @@ func (r *NIMCacheReconciler) reconcileJob(ctx context.Context, nimCache *appsv1a
 
 	// If Job does not exist and caching is not complete, create a new one
 	if err != nil && nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
-		job, err := r.constructJob(ctx, nimCache)
+		job, err := r.constructJob(ctx, nimCache, r.orchestratorType)
 		if err != nil {
 			logger.Error(err, "Failed to construct job")
 			return err
@@ -886,15 +908,19 @@ func getManifestConfigName(nimCache *appsv1alpha1.NIMCache) string {
 }
 
 // constructPodSpec constructs a Pod specification
-func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
+func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) *corev1.Pod {
 	labels := map[string]string{
 		"app":                          "k8s-nim-operator",
 		"app.kubernetes.io/name":       nimCache.Name,
 		"app.kubernetes.io/managed-by": "k8s-nim-operator",
 	}
 
-	annotations := map[string]string{
-		"openshift.io/scc": "nonroot",
+	annotations := make(map[string]string)
+
+	if platformType == k8sutil.OpenShift {
+		annotations = map[string]string{
+			"openshift.io/scc": "nonroot",
+		}
 	}
 
 	pod := &corev1.Pod{
@@ -925,14 +951,18 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache) *corev1.Pod {
 				RunAsUser:    nimCache.GetUserID(),
 				FSGroup:      nimCache.GetGroupID(),
 				RunAsNonRoot: ptr.To[bool](true),
-				SeccompProfile: &corev1.SeccompProfile{
-					Type: corev1.SeccompProfileTypeRuntimeDefault,
-				},
 			},
 			ServiceAccountName: NIMCacheServiceAccount,
 			Tolerations:        nimCache.GetTolerations(),
 			NodeSelector:       nimCache.GetNodeSelectors(),
 		},
+	}
+
+	// SeccompProfile must be set for TKGS
+	if platformType == k8sutil.TKGS {
+		pod.Spec.Containers[0].SecurityContext.SeccompProfile = &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		}
 	}
 
 	pod.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
@@ -971,7 +1001,7 @@ func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (s
 	return buf.String(), nil
 }
 
-func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (*batchv1.Job, error) {
+func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) (*batchv1.Job, error) {
 	logger := r.GetLogger()
 	pvcName := getPvcName(nimCache, nimCache.Spec.Storage.PVC)
 	labels := map[string]string{
@@ -981,8 +1011,11 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	}
 
 	annotations := map[string]string{
-		"openshift.io/scc":        "nonroot",
 		"sidecar.istio.io/inject": "false",
+	}
+
+	if platformType == k8sutil.OpenShift {
+		annotations["openshift.io/scc"] = "nonroot"
 	}
 
 	job := &batchv1.Job{
@@ -1001,9 +1034,6 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						RunAsUser:    nimCache.GetUserID(),
 						FSGroup:      nimCache.GetGroupID(),
 						RunAsNonRoot: ptr.To[bool](true),
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
 					},
 					Containers:    []corev1.Container{},
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -1027,6 +1057,14 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			TTLSecondsAfterFinished: ptr.To[int32](600), // cleanup automatically after job finishes
 		},
 	}
+
+	// SeccompProfile must be set for TKGS
+	if platformType == k8sutil.TKGS {
+		job.Spec.Template.Spec.SecurityContext.SeccompProfile = &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		}
+	}
+
 	if nimCache.Spec.Source.DataStore != nil {
 		outputPath := "/output"
 		if nimCache.Spec.Storage.HostPath != nil {
@@ -1075,20 +1113,12 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			{
 				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.NGC.ModelPuller,
-				Command: []string{"download-to-cache"},
+				Args:    []string{"download-to-cache"},
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
 				Env: []corev1.EnvVar{
 					{
-						Name:  "HF_HOME",
-						Value: "/model-store/huggingface",
-					},
-					{
 						Name:  "NIM_CACHE_PATH",
 						Value: "/model-store",
-					},
-					{
-						Name:  "NGC_HOME",
-						Value: "/model-store/ngc",
 					},
 				},
 				VolumeMounts: []corev1.VolumeMount{
@@ -1126,6 +1156,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Name: nimCache.Spec.Source.NGC.PullSecret,
 			},
 		}
+
 		// Pass specific profiles to download based on user selection or auto-selection
 		selectedProfiles, err := getSelectedProfiles(nimCache)
 		if err != nil {
@@ -1139,44 +1170,25 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 
 		if len(selectedProfiles) > 0 {
 			if utils.ContainsElement(selectedProfiles, AllProfiles) {
-				job.Spec.Template.Spec.Containers[0].Args = []string{"--all"}
+				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, "--all")
 			} else {
-				job.Spec.Template.Spec.Containers[0].Args = []string{"--profiles"}
+				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, "--profiles")
 				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
 			}
 		}
 
+		// Merge env with the user provided values
+		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.Spec.Env)
+
 		// Inject custom CA certificates when running in a proxy envronment
 		if nimCache.Spec.CertConfig != nil {
-			certConfig, err := r.getConfigMap(ctx, nimCache.Spec.CertConfig.Name, nimCache.Namespace)
+			volumes, volumeMounts, err := r.createCertVolumesAndMounts(ctx, nimCache)
 			if err != nil {
-				logger.Error(err, "Failed to get configmap for custom certificates")
+				logger.Error(err, "failed to create volume mounts for custom CA cert injection")
 				return nil, err
 			}
 
-			// Prepare the volume that references the ConfigMap
-			volume := corev1.Volume{
-				Name: "cert-volume",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: nimCache.Spec.CertConfig.Name,
-						},
-					},
-				},
-			}
-
-			// Create individual volume mounts for each key in the ConfigMap
-			volumeMounts := []corev1.VolumeMount{}
-			for key := range certConfig.Data {
-				volumeMounts = append(volumeMounts, corev1.VolumeMount{
-					Name:      "cert-volume",
-					MountPath: fmt.Sprintf("%s/%s", nimCache.Spec.CertConfig.MountPath, key),
-					SubPath:   key,
-				})
-			}
-
-			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volume)
+			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
 			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
 		}
 	}
@@ -1188,6 +1200,43 @@ func (r *NIMCacheReconciler) getConfigMap(ctx context.Context, name, namespace s
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, configMap)
 	return configMap, err
+}
+
+func (r *NIMCacheReconciler) createCertVolumesAndMounts(ctx context.Context, nimCache *appsv1alpha1.NIMCache) ([]corev1.Volume, []corev1.VolumeMount, error) {
+	logger := log.FromContext(ctx)
+
+	// Get the config map for custom certificates
+	certConfig, err := r.getConfigMap(ctx, nimCache.Spec.CertConfig.Name, nimCache.Namespace)
+	if err != nil {
+		logger.Error(err, "Failed to get configmap for custom certificates")
+		return nil, nil, err
+	}
+
+	var volume corev1.Volume
+	var volumeMounts []corev1.VolumeMount
+
+	// Prepare the volume mounts for custom CA certificates
+	volume = corev1.Volume{
+		Name: "cert-volume",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: nimCache.Spec.CertConfig.Name,
+				},
+			},
+		},
+	}
+
+	// Create individual volume mounts for each key in the ConfigMap
+	for key := range certConfig.Data {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "cert-volume",
+			MountPath: fmt.Sprintf("%s/%s", nimCache.Spec.CertConfig.MountPath, key),
+			SubPath:   key,
+		})
+	}
+
+	return []corev1.Volume{volume}, volumeMounts, nil
 }
 
 // extractNIMManifest extracts the NIMManifest from the ConfigMap data

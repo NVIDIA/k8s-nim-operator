@@ -184,7 +184,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 				},
 				Expose: appsv1alpha1.Expose{
-					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeClusterIP, Port: 8123, Annotations: map[string]string{"annotation-key-specific": "service"}},
+					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: 8123, Annotations: map[string]string{"annotation-key-specific": "service"}},
 					Ingress: appsv1alpha1.Ingress{
 						Enabled:     ptr.To[bool](true),
 						Annotations: map[string]string{"annotation-key-specific": "ingress"},
@@ -281,6 +281,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						},
 					},
 				},
+				RuntimeClass: "nvidia",
 			},
 			Status: appsv1alpha1.NIMServiceStatus{
 				State: conditions.NotReady,
@@ -408,6 +409,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			err = client.Get(context.TODO(), namespacedName, service)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(service.Name).To(Equal(nimService.GetName()))
+			Expect(string(service.Spec.Type)).To(Equal(nimService.GetServiceType()))
 			Expect(service.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(service.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(service.Annotations["annotation-key-specific"]).To(Equal("service"))
@@ -458,6 +460,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(Equal(nimService.Spec.ReadinessProbe.Probe))
 			Expect(deployment.Spec.Template.Spec.Containers[0].LivenessProbe).To(Equal(nimService.Spec.LivenessProbe.Probe))
 			Expect(deployment.Spec.Template.Spec.Containers[0].StartupProbe).To(Equal(nimService.Spec.StartupProbe.Probe))
+			Expect(*deployment.Spec.Template.Spec.RuntimeClassName).To(Equal(nimService.Spec.RuntimeClass))
 
 			sortEnvVars(deployment.Spec.Template.Spec.Containers[0].Env)
 			sortEnvVars(nimService.Spec.Env)

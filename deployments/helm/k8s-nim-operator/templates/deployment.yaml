@@ -23,32 +23,18 @@ spec:
         kubectl.kubernetes.io/default-container: manager
     spec:
       containers:
-      - args: {{- toYaml .Values.kubeProxy.args | nindent 8 }}
-        image: {{ .Values.kubeProxy.image.repository }}:{{ .Values.kubeProxy.image.tag }}
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 8443
-          name: https
-          protocol: TCP
-        resources: {{- toYaml .Values.kubeProxy.resources | nindent
-          10 }}
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
       - args: {{- toYaml .Values.operator.args | nindent 8 }}
         command:
         - /manager
         image: {{ include "k8s-nim-operator.fullimage" . }}
         imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
         env:
-        - name: WATCH_NAMESPACE
-          value: ""
-        - name: OPERATOR_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+          - name: WATCH_NAMESPACE
+            value: ""
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
         livenessProbe:
           httpGet:
             path: /healthz

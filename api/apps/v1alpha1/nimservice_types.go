@@ -75,9 +75,10 @@ type NIMServiceSpec struct {
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas int    `json:"replicas,omitempty"`
-	UserID   *int64 `json:"userID,omitempty"`
-	GroupID  *int64 `json:"groupID,omitempty"`
+	Replicas     int    `json:"replicas,omitempty"`
+	UserID       *int64 `json:"userID,omitempty"`
+	GroupID      *int64 `json:"groupID,omitempty"`
+	RuntimeClass string `json:"runtimeClass,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume
@@ -438,6 +439,11 @@ func (n *NIMService) GetServiceAccountName() string {
 	return n.Name
 }
 
+// GetRuntimeClass return the runtime class name for the NIMService deployment
+func (n *NIMService) GetRuntimeClass() string {
+	return n.Spec.RuntimeClass
+}
+
 // GetNIMCacheName returns the NIMCache name to use for the NIMService deployment
 func (n *NIMService) GetNIMCacheName() string {
 	return n.Spec.Storage.NIMCache.Name
@@ -496,6 +502,11 @@ func (n *NIMService) GetServicePort() int32 {
 	return n.Spec.Expose.Service.Port
 }
 
+// GetServiceType returns the service type for the NIMService deployment
+func (n *NIMService) GetServiceType() string {
+	return string(n.Spec.Expose.Service.Type)
+}
+
 // GetUserID returns the user ID for the NIMService deployment
 func (n *NIMService) GetUserID() *int64 {
 	return n.Spec.UserID
@@ -505,10 +516,9 @@ func (n *NIMService) GetUserID() *int64 {
 // GetGroupID returns the group ID for the NIMService deployment
 func (n *NIMService) GetGroupID() *int64 {
 	return n.Spec.GroupID
-
 }
 
-// GetGroupID returns the group ID for the NIMService deployment
+// GetStorageReadOnly returns true if the volume have to be mounted as read-only for the NIMService deployment
 func (n *NIMService) GetStorageReadOnly() bool {
 	if n.Spec.Storage.ReadOnly == nil {
 		return false
@@ -574,6 +584,10 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 
 	// Set service account
 	params.ServiceAccountName = n.GetServiceAccountName()
+
+	// Set runtime class
+	params.RuntimeClassName = n.GetRuntimeClass()
+
 	return params
 }
 
@@ -617,6 +631,9 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 
 	// Set service account
 	params.ServiceAccountName = n.GetServiceAccountName()
+
+	// Set runtime class
+	params.RuntimeClassName = n.GetRuntimeClass()
 	return params
 }
 
@@ -629,8 +646,12 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetServiceAnnotations()
+
 	// Set service selector labels
 	params.SelectorLabels = n.GetSelectorLabels()
+
+	// Set service type
+	params.Type = n.GetServiceType()
 
 	// Set service ports
 	params.Port = n.GetServicePort()

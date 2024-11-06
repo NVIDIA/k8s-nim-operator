@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
 )
 
@@ -338,7 +339,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
 				},
 			}
-			pod := constructPodSpec(nimCache)
+			pod := constructPodSpec(nimCache, k8sutil.K8s)
 			Expect(pod.Name).To(Equal(getPodName(nimCache)))
 			Expect(pod.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
 			Expect(pod.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
@@ -359,7 +360,7 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			}
 
-			pod := constructPodSpec(nimCache)
+			pod := constructPodSpec(nimCache, k8sutil.K8s)
 
 			err := cli.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
@@ -387,14 +388,13 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			}
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(job.Name).To(Equal(getJobName(nimCache)))
 			Expect(job.Spec.Template.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
 			Expect(job.Spec.Template.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
-			Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElements("download-to-cache"))
-			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--profiles", "36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"))
+			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("download-to-cache", "--profiles", "36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
@@ -418,14 +418,13 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			}
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(job.Name).To(Equal(getJobName(nimCache)))
 			Expect(job.Spec.Template.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
 			Expect(job.Spec.Template.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
-			Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElements("download-to-cache"))
-			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--profiles", "36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff", "04fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc12345"))
+			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("download-to-cache", "--profiles", "36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff", "04fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc12345"))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
@@ -445,14 +444,13 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			}
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(job.Name).To(Equal(getJobName(nimCache)))
 			Expect(job.Spec.Template.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
 			Expect(job.Spec.Template.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
-			Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElements("download-to-cache"))
-			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--all"))
+			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("download-to-cache", "--all"))
 		})
 
 		It("should create a job with the correct specifications", func() {
@@ -468,10 +466,20 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
 					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{GPUs: []appsv1alpha1.GPUSpec{{IDs: []string{"26b5"}}}}}},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "NGC_HOME",
+							Value: "/opt/ngc/hub",
+						},
+						{
+							Name:  "HTTPS_PROXY",
+							Value: "https://my-custom-proxy-server:port",
+						},
+					},
 				},
 			}
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = cli.Create(context.TODO(), job)
@@ -482,6 +490,24 @@ var _ = Describe("NIMCache Controller", func() {
 				jobName := types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}
 				return cli.Get(ctx, jobName, job)
 			}, time.Second*10).Should(Succeed())
+
+			// Expected environment variables
+			expectedEnvs := map[string]string{
+				"NGC_HOME":    "/opt/ngc/hub",
+				"HTTPS_PROXY": "https://my-custom-proxy-server:port",
+			}
+
+			// Verify each custom environment variable
+			for key, value := range expectedEnvs {
+				var found bool
+				for _, envVar := range job.Spec.Template.Spec.Containers[0].Env {
+					if envVar.Name == key && envVar.Value == value {
+						found = true
+						break
+					}
+				}
+				Expect(found).To(BeTrue(), "Expected environment variable %s=%s not found", key, value)
+			}
 		})
 
 		It("should create a job with the right custom CA certificate volumes", func() {
@@ -516,7 +542,7 @@ var _ = Describe("NIMCache Controller", func() {
 			err := reconciler.Create(context.TODO(), configMap)
 			Expect(err).ToNot(HaveOccurred())
 
-			job, err := reconciler.constructJob(context.TODO(), nimCache)
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = cli.Create(context.TODO(), job)
