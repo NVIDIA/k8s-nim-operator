@@ -29,8 +29,8 @@ stages:
   - lint
   - helm-lint
   - scan
-  - release
   - sign
+  - release
 
 .pipeline-trigger-rules:
   rules:
