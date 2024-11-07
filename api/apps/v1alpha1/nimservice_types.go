@@ -75,10 +75,10 @@ type NIMServiceSpec struct {
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas     int    `json:"replicas,omitempty"`
-	UserID       *int64 `json:"userID,omitempty"`
-	GroupID      *int64 `json:"groupID,omitempty"`
-	RuntimeClass string `json:"runtimeClass,omitempty"`
+	Replicas         int    `json:"replicas,omitempty"`
+	UserID           *int64 `json:"userID,omitempty"`
+	GroupID          *int64 `json:"groupID,omitempty"`
+	RuntimeClassName string `json:"runtimeClassName,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume
@@ -439,9 +439,9 @@ func (n *NIMService) GetServiceAccountName() string {
 	return n.Name
 }
 
-// GetRuntimeClass return the runtime class name for the NIMService deployment
-func (n *NIMService) GetRuntimeClass() string {
-	return n.Spec.RuntimeClass
+// GetRuntimeClassName return the runtime class name for the NIMService deployment
+func (n *NIMService) GetRuntimeClassName() string {
+	return n.Spec.RuntimeClassName
 }
 
 // GetNIMCacheName returns the NIMCache name to use for the NIMService deployment
@@ -586,7 +586,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.ServiceAccountName = n.GetServiceAccountName()
 
 	// Set runtime class
-	params.RuntimeClassName = n.GetRuntimeClass()
+	params.RuntimeClassName = n.GetRuntimeClassName()
 
 	return params
 }
@@ -633,7 +633,7 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	params.ServiceAccountName = n.GetServiceAccountName()
 
 	// Set runtime class
-	params.RuntimeClassName = n.GetRuntimeClass()
+	params.RuntimeClassName = n.GetRuntimeClassName()
 	return params
 }
 
