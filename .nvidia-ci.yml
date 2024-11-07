@@ -180,7 +180,7 @@ sign:ngc:
 
 helm:ngc:
   image: ubuntu:latest
-  stage: release
+  stage: helm
   needs:
     - sign:ngc
   rules:
