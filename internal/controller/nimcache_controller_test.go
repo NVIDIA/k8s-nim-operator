@@ -107,14 +107,16 @@ var _ = Describe("NIMCache Controller", func() {
 	Context("When creating a NIMCache", func() {
 		It("should create a Job and PVC", func() {
 			ctx := context.TODO()
+			runtimeClassName := "test-class"
 			NIMCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-nimcache",
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					Source:           appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage:          appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					RuntimeClassName: runtimeClassName,
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
 					State: appsv1alpha1.NimCacheStatusNotReady,
@@ -128,11 +130,13 @@ var _ = Describe("NIMCache Controller", func() {
 
 			// Check if the Job was created
 			// Wait for reconciliation to complete with a timeout
+			job := &batchv1.Job{}
 			Eventually(func() error {
-				job := &batchv1.Job{}
 				jobName := types.NamespacedName{Name: "test-nimcache-job", Namespace: "default"}
 				return cli.Get(ctx, jobName, job)
 			}, time.Second*10).Should(Succeed())
+			Expect(job.Spec.Template.Spec.Containers[0].Image).To(Equal("test-container"))
+			Expect(job.Spec.Template.Spec.RuntimeClassName).To(Equal(&runtimeClassName))
 
 			// Check if the PVC was created
 			// Wait for reconciliation to complete with a timeout
