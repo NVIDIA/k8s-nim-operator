@@ -281,7 +281,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						},
 					},
 				},
-				RuntimeClass: "nvidia",
+				RuntimeClassName: "nvidia",
 			},
 			Status: appsv1alpha1.NIMServiceStatus{
 				State: conditions.NotReady,
@@ -460,7 +460,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(Equal(nimService.Spec.ReadinessProbe.Probe))
 			Expect(deployment.Spec.Template.Spec.Containers[0].LivenessProbe).To(Equal(nimService.Spec.LivenessProbe.Probe))
 			Expect(deployment.Spec.Template.Spec.Containers[0].StartupProbe).To(Equal(nimService.Spec.StartupProbe.Probe))
-			Expect(*deployment.Spec.Template.Spec.RuntimeClassName).To(Equal(nimService.Spec.RuntimeClass))
+			Expect(*deployment.Spec.Template.Spec.RuntimeClassName).To(Equal(nimService.Spec.RuntimeClassName))
 
 			sortEnvVars(deployment.Spec.Template.Spec.Containers[0].Env)
 			sortEnvVars(nimService.Spec.Env)
