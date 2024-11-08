@@ -275,8 +275,11 @@ func (n *NIMCache) GetNodeSelectors() map[string]string {
 }
 
 // GetRuntimeClassName return the runtime class name for the NIMCache Job
-func (n *NIMCache) GetRuntimeClassName() string {
-	return n.Spec.RuntimeClassName
+func (n *NIMCache) GetRuntimeClassName() *string {
+	if n.Spec.RuntimeClassName == "" {
+		return nil
+	}
+	return &n.Spec.RuntimeClassName
 }
 
 // +kubebuilder:object:root=true
