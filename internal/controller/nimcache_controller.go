@@ -914,7 +914,6 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 		"app.kubernetes.io/name":       nimCache.Name,
 		"app.kubernetes.io/managed-by": "k8s-nim-operator",
 	}
-	runtimeClassName := nimCache.GetRuntimeClassName()
 	annotations := make(map[string]string)
 
 	if platformType == k8sutil.OpenShift {
@@ -931,7 +930,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
-			RuntimeClassName: &runtimeClassName,
+			RuntimeClassName: nimCache.GetRuntimeClassName(),
 			Containers: []corev1.Container{
 				{
 					Name:    NIMCacheContainerName,
@@ -1005,7 +1004,6 @@ func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (s
 func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) (*batchv1.Job, error) {
 	logger := r.GetLogger()
 	pvcName := getPvcName(nimCache, nimCache.Spec.Storage.PVC)
-	runtimeClassName := nimCache.GetRuntimeClassName()
 	labels := map[string]string{
 		"app":                          "k8s-nim-operator",
 		"app.kubernetes.io/name":       nimCache.Name,
@@ -1032,7 +1030,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
-					RuntimeClassName: &runtimeClassName,
+					RuntimeClassName: nimCache.GetRuntimeClassName(),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser:    nimCache.GetUserID(),
 						FSGroup:      nimCache.GetGroupID(),
