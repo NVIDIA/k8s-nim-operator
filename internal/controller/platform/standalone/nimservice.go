@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
@@ -73,6 +74,11 @@ func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder
 func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
+}
+
+// GetOrchestratorType returns the container platform type
+func (r *NIMServiceReconciler) GetOrchestratorType() k8sutil.OrchestratorType {
+	return r.orchestratorType
 }
 
 func (r *NIMServiceReconciler) cleanupNIMService(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
@@ -172,6 +178,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	deploymentParams := nimService.GetDeploymentParams()
 	var modelPVC *appsv1alpha1.PersistentVolumeClaim
 	modelProfile := ""
+
+	deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
 
 	// Select PVC for model store
 	if nimService.GetNIMCacheName() != "" {

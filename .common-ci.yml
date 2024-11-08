@@ -31,6 +31,8 @@ stages:
   - scan
   - release
   - sign
+  - helm
+
 
 .pipeline-trigger-rules:
   rules:

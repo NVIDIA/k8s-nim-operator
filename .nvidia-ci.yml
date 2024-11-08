@@ -171,9 +171,16 @@ release:ngc:
     - 'echo "Signing the image ${IMAGE_NAME}:${IMAGE_TAG}"'
     - ngc-cli/ngc registry image publish --source ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:${IMAGE_TAG} --public --discoverable --allow-guest --sign --org nvidia
 
+sign:ngc:
+  extends:
+    - .sign:ngc
+  needs:
+    - release:ngc
+
+
 helm:ngc:
   image: ubuntu:latest
-  stage: release
+  stage: helm
   needs:
     - sign:ngc
   rules:
@@ -201,9 +208,3 @@ sign:ngc-short-tag:
     - release:ngc
   variables:
     IMAGE_TAG: "${CI_COMMIT_TAG}"
-
-sign:ngc:
-  extends:
-    - .sign:ngc
-  needs:
-    - release:ngc

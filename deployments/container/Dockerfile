@@ -21,6 +21,14 @@ COPY internal/ internal/
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
+# Install curl
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Install kubectl for must-gather and helm upgrades hooks
+RUN if [ "$TARGETARCH" = "x86_64" ]; then OS_ARCH="amd64"; elif [ "$TARGETARCH" = "aarch64" ]; then OS_ARCH="arm64"; else OS_ARCH="$TARGETARCH"; fi \
+    && curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl \
+    && chmod +x ./kubectl
+
 # Use distroless as minimal base image to package the manager binary
 FROM nvcr.io/nvidia/distroless/go:v3.1.2
 
@@ -28,6 +36,11 @@ ARG VERSION="unknown"
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/kubectl /usr/local/bin/kubectl
+
+# Add CRD resource into the image for helm upgrades
+COPY deployments/helm/k8s-nim-operator/crds/ /opt/nim-operator/crds/
+
 USER 65532:65532
 
 COPY manifests/ manifests/

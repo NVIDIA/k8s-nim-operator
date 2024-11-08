@@ -48,6 +48,10 @@ type NIMCacheSpec struct {
 	// CertConfig is the name of the ConfigMap containing the custom certificates.
 	// for secure communication.
 	CertConfig *CertConfig `json:"certConfig,omitempty"`
+	// Env are the additional custom environment variabes for the caching job
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// RuntimeClassName is the runtimeclass for the caching job
+	RuntimeClassName string `json:"runtimeClassName,omitempty"`
 }
 
 // NIMSource defines the source for caching NIM model
@@ -268,6 +272,14 @@ func (n *NIMCache) GetTolerations() []corev1.Toleration {
 // GetNodeSelectors returns nodeselectors configured for the NIMCache Job
 func (n *NIMCache) GetNodeSelectors() map[string]string {
 	return n.Spec.NodeSelectors
+}
+
+// GetRuntimeClassName return the runtime class name for the NIMCache Job
+func (n *NIMCache) GetRuntimeClassName() *string {
+	if n.Spec.RuntimeClassName == "" {
+		return nil
+	}
+	return &n.Spec.RuntimeClassName
 }
 
 // +kubebuilder:object:root=true
