@@ -6,7 +6,7 @@ metadata:
 spec:
   provider: aws
   auth:
-    keyName: cnt-ci
+    keyName: cnt-ci-east-1
     privateKey: HOLODECK_PRIVATE_KEY
   instance:
     type: g6e.xlarge
