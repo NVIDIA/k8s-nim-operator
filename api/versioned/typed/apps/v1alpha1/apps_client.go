@@ -30,6 +30,7 @@ type AppsV1alpha1Interface interface {
 	NIMCachesGetter
 	NIMPipelinesGetter
 	NIMServicesGetter
+	NemoDatastoresGetter
 	NemoGuardrailsGetter
 }
 
@@ -48,6 +49,10 @@ func (c *AppsV1alpha1Client) NIMPipelines(namespace string) NIMPipelineInterface
 
 func (c *AppsV1alpha1Client) NIMServices(namespace string) NIMServiceInterface {
 	return newNIMServices(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) NemoDatastores(namespace string) NemoDatastoreInterface {
+	return newNemoDatastores(c, namespace)
 }
 
 func (c *AppsV1alpha1Client) NemoGuardrails(namespace string) NemoGuardrailInterface {
