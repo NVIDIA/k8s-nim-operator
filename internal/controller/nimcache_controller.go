@@ -32,6 +32,7 @@ import (
 	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
+	nimparserutils "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/utils"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -621,8 +622,9 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 		return true, nil
 	}
 
+	parser := nimparserutils.GetNIMParser([]byte(output))
 	// Parse the file
-	manifest, err := nimparser.ParseModelManifestFromRawOutput([]byte(output))
+	manifest, err := parser.ParseModelManifestFromRawOutput([]byte(output))
 	if err != nil {
 		logger.Error(err, "Failed to parse model manifest from the pod")
 		return false, err
@@ -630,7 +632,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 	logger.V(2).Info("manifest file", "nimcache", nimCache.Name, "manifest", manifest)
 
 	// Create a ConfigMap with the model manifest file for re-use
-	err = r.createManifestConfigMap(ctx, nimCache, manifest)
+	err = r.createManifestConfigMap(ctx, nimCache, &manifest)
 	if err != nil {
 		logger.Error(err, "Failed to create model manifest config map")
 		return false, err
@@ -670,7 +672,7 @@ func (r *NIMCacheReconciler) reconcileModelSelection(ctx context.Context, nimCac
 		}
 
 		// Match profiles with user input
-		profiles, err := nimparser.MatchProfiles(nimCache.Spec.Source.NGC.Model, *nimManifest, discoveredGPUs)
+		profiles, err := nimManifest.MatchProfiles(nimCache.Spec.Source.NGC.Model, discoveredGPUs)
 		if err != nil {
 			logger.Error(err, "Failed to match profiles for given model parameters")
 			return err
@@ -758,17 +760,18 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 			logger.V(2).Info("model manifest config", "manifest", nimManifest)
 
 			// for selected profiles, update relevant info for status
-			for profileName, profileData := range *nimManifest {
+			for _, profileName := range nimManifest.GetProfilesList() {
 				for _, selectedProfile := range selectedProfiles {
 					if profileName == selectedProfile {
 						nimCache.Status.Profiles = append(nimCache.Status.Profiles, appsv1alpha1.NIMProfile{
 							Name:    profileName,
-							Model:   profileData.Model,
-							Config:  profileData.Tags,
-							Release: profileData.Release,
+							Model:   nimManifest.GetProfileModel(profileName),
+							Config:  nimManifest.GetProfileTags(profileName),
+							Release: nimManifest.GetProfileRelease(profileName),
 						})
 					}
 				}
+
 			}
 		}
 
@@ -1241,7 +1244,7 @@ func (r *NIMCacheReconciler) createCertVolumesAndMounts(ctx context.Context, nim
 }
 
 // extractNIMManifest extracts the NIMManifest from the ConfigMap data
-func (r *NIMCacheReconciler) extractNIMManifest(ctx context.Context, configName, namespace string) (*nimparser.NIMManifest, error) {
+func (r *NIMCacheReconciler) extractNIMManifest(ctx context.Context, configName, namespace string) (nimparser.NIMManifestInterface, error) {
 	configMap, err := r.getConfigMap(ctx, configName, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get ConfigMap %s: %w", configName, err)
@@ -1252,7 +1255,8 @@ func (r *NIMCacheReconciler) extractNIMManifest(ctx context.Context, configName,
 		return nil, fmt.Errorf("model_manifest.yaml not found in ConfigMap")
 	}
 
-	manifest, err := nimparser.ParseModelManifestFromRawOutput([]byte(data))
+	parser := nimparserutils.GetNIMParser([]byte(data))
+	manifest, err := parser.ParseModelManifestFromRawOutput([]byte(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal manifest data: %w", err)
 	}
@@ -1260,7 +1264,7 @@ func (r *NIMCacheReconciler) extractNIMManifest(ctx context.Context, configName,
 }
 
 // createManifestConfigMap creates a ConfigMap with the given model manifest data
-func (r *NIMCacheReconciler) createManifestConfigMap(ctx context.Context, nimCache *appsv1alpha1.NIMCache, manifestData *nimparser.NIMManifest) error {
+func (r *NIMCacheReconciler) createManifestConfigMap(ctx context.Context, nimCache *appsv1alpha1.NIMCache, manifestData *nimparser.NIMManifestInterface) error {
 	// Convert manifestData to YAML
 	manifestBytes, err := yaml.Marshal(manifestData)
 	if err != nil {
