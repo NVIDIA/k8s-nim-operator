@@ -74,6 +74,33 @@ spec:
         startupProbe:
           {{ . | yaml | nindent 10 }}
         {{- end }}
+      initcontainers:
+      {{- range .InitContainers }}
+      - name: {{ .Name }}
+        image: {{ .Image }}
+        imagePullPolicy: {{ .ImagePullPolicy }}
+        command: {{ .Command }}
+        volumeMounts:
+        {{- range .VolumeMounts }}
+        - name: {{ .Name }}
+          mountPath: {{ .MountPath }}
+          subPath: {{ .SubPath }}
+        {{- end }}
+        env:
+        {{- range .Env }}
+        - name: {{ .Name }}
+          value: {{ .Value | quote  }}
+          {{- if .ValueFrom }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .ValueFrom.SecretKeyRef.Name }}
+              key: {{ .ValueFrom.SecretKeyRef.Key }}
+          {{- end }}
+        {{- end }}
+        {{- with .Resources }}
+        resources:
+          {{ . | yaml | nindent 10 }}
+        {{- end }}
       volumes:
       {{- range .Volumes }}
       - name: {{ .Name }}
