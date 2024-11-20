@@ -76,25 +76,38 @@ func (manifest NIMManifest) MatchProfiles(modelSpec appsv1alpha1.ModelSpec, disc
 			continue
 		}
 
-		// Determine backend type
-		backend := profile.Tags["llm_engine"]
-		if backend == "" {
-			backend = profile.Tags["backend"]
-		}
+		buildable := profile.Tags["trtllm_buildable"]
+		buildable = strings.TrimSpace(buildable)
 
-		if modelSpec.Engine != "" && !strings.Contains(backend, strings.TrimSuffix(modelSpec.Engine, "_llm")) {
-			continue
-		}
-
-		// Perform GPU match only when optimized engine is selected or GPU filters are provided
-		if isOptimizedEngine(modelSpec.Engine) || len(modelSpec.GPUs) > 0 {
-			// Skip non optimized profiles
-			if !isOptimizedEngine(backend) {
+		if modelSpec.Buildable != nil && *modelSpec.Buildable {
+			if !strings.EqualFold(buildable, "true") {
 				continue
 			}
-			if len(modelSpec.GPUs) > 0 || len(discoveredGPUs) > 0 {
-				if !matchGPUProfile(modelSpec, profile, discoveredGPUs) {
-					continue
+		} else {
+			// Determine backend type
+			backend := profile.Tags["llm_engine"]
+			if backend == "" {
+				backend = profile.Tags["backend"]
+			}
+
+			if modelSpec.Engine != "" && !strings.Contains(backend, strings.TrimSuffix(modelSpec.Engine, "_llm")) {
+				continue
+			}
+
+			// If profile is not buildable then go for GPU selection
+			if !strings.EqualFold(buildable, "true") {
+				// Perform GPU match only when optimized engine is selected or GPU filters are provided
+				if isOptimizedEngine(modelSpec.Engine) || len(modelSpec.GPUs) > 0 {
+					// Skip non optimized profiles
+					if !isOptimizedEngine(backend) {
+						continue
+					}
+
+					if len(modelSpec.GPUs) > 0 || len(discoveredGPUs) > 0 {
+						if !matchGPUProfile(modelSpec, profile, discoveredGPUs) {
+							continue
+						}
+					}
 				}
 			}
 		}

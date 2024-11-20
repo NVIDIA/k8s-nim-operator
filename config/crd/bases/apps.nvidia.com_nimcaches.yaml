@@ -266,6 +266,9 @@ spec:
                       model:
                         description: Model spec for caching
                         properties:
+                          buildable:
+                            description: Buildable indicates
+                            type: boolean
                           engine:
                             description: Engine is the backend engine (tensort_llm,
                               vllm)

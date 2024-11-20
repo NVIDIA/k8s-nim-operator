@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"regexp"
 	"strings"
 
 	nimparser "github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
@@ -41,7 +42,9 @@ func GetNIMParser(data []byte) nimparser.NIMParserInterface {
 		return nimparserv1.NIMParser{}
 	} else {
 		schemaVersion := strings.TrimSpace(config.SchemaVersion)
-		if schemaVersion == "2.0" {
+
+		match, _ := regexp.MatchString("2\\.*\\.*", schemaVersion)
+		if match {
 			return nimparserv2.NIMParser{}
 		}
 	}

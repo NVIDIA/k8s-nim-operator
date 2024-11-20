@@ -92,6 +92,8 @@ type ModelSpec struct {
 	GPUs []GPUSpec `json:"gpus,omitempty"`
 	// Lora indicates a finetuned model with LoRa adapters
 	Lora *bool `json:"lora,omitempty"`
+	// Buildable indicates
+	Buildable *bool `json:"buildable,omitempty"`
 }
 
 // GPUSpec is the spec required to cache models for selected gpu type
