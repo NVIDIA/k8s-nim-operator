@@ -40,7 +40,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -166,12 +165,12 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 				Resources: &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("500m"),
-						corev1.ResourceMemory: resource.MustParse("128Mi"),
+						corev1.ResourceCPU:    apiResource.MustParse("500m"),
+						corev1.ResourceMemory: apiResource.MustParse("128Mi"),
 					},
 					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("250m"),
-						corev1.ResourceMemory: resource.MustParse("64Mi"),
+						corev1.ResourceCPU:    apiResource.MustParse("250m"),
+						corev1.ResourceMemory: apiResource.MustParse("64Mi"),
 					},
 				},
 				NodeSelector: map[string]string{"disktype": "ssd"},

@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -26,19 +25,13 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/standalone"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -245,13 +238,14 @@ func (r *NemoGuardrailReconciler) refreshMetrics(ctx context.Context) {
 	}
 	//refreshNemoGuardrailMetrics(NemoGuardrailList)
 }
-func (r *NemoGuardrailReconciler) getDefaultAppReconciler() *standalone.DefaultAppReconciler{
+
+func (r *NemoGuardrailReconciler) getDefaultAppReconciler() *standalone.DefaultAppReconciler {
 	return standalone.NewDefaultAppReconciler(
 		r.GetClient(),
 		r.GetScheme(),
 		r.GetUpdater(),
 		r.GetRenderer(),
-		r.GetLogger()
+		r.GetLogger(),
 	)
 }
 

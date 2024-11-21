@@ -47,7 +47,7 @@ import (
 
 // DefaultAppReconciler reconciles a NemoGuardrail object
 type DefaultAppReconciler struct {
-	client   client.Client
+	client.Client
 	scheme   *runtime.Scheme
 	log      logr.Logger
 	updater  conditions.Updater
@@ -153,6 +153,8 @@ type AppParamProvider interface {
 	GetStatefulSetParams() *rendertypes.StatefulSetParams
 	// GetIngressParams returns params to render Ingress from templates
 	GetIngressParams() *rendertypes.IngressParams
+	// GetIngressParams returns params to render Ingress from templates
+	GetServiceParams() *rendertypes.ServiceParams
 
 	// GetRoleParams returns params to render Role from templates
 	GetRoleParams() *rendertypes.RoleParams
@@ -333,12 +335,12 @@ func (r *DefaultAppReconciler) ReconcileDefaultApp(ctx context.Context, appObjec
 		// Update status as NotReady
 		err = r.updater.SetConditionsNotReady(ctx, appObject, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(appObject, corev1.EventTypeNormal, conditions.NotReady,
-			"NemoGuardrail %s not ready yet, msg: %s", appObject.Name, msg)
+			"NemoGuardrail %s not ready yet, msg: %s", appObject.GetName(), msg)
 	} else {
 		// Update status as ready
 		err = r.updater.SetConditionsReady(ctx, appObject, conditions.Ready, msg)
 		r.GetEventRecorder().Eventf(appObject, corev1.EventTypeNormal, conditions.Ready,
-			"NemoGuardrail %s ready, msg: %s", appObject.Name, msg)
+			"NemoGuardrail %s ready, msg: %s", appObject.GetName(), msg)
 	}
 
 	if err != nil {
