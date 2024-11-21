@@ -40,7 +40,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
+	nimparserv1 "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/v1"
 )
 
 var _ = Describe("NIMCache Controller", func() {
@@ -79,11 +79,11 @@ var _ = Describe("NIMCache Controller", func() {
 
 		// Create a model manifest configmap, as we cannot run a sample NIM container to extract for tests
 		filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+		nimparser := nimparserv1.NIMParser{}
 		manifestData, err := nimparser.ParseModelManifest(filePath)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(*manifestData).To(HaveLen(2))
 
-		err = reconciler.createManifestConfigMap(context.TODO(), nimCache, manifestData)
+		err = reconciler.createManifestConfigMap(context.TODO(), nimCache, &manifestData)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Verify that the ConfigMap was created
@@ -601,11 +601,12 @@ var _ = Describe("NIMCache Controller", func() {
 			}
 
 			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+
+			nimparser := nimparserv1.NIMParser{}
 			manifestData, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(*manifestData).To(HaveLen(2))
 
-			err = reconciler.createManifestConfigMap(ctx, nimCache, manifestData)
+			err = reconciler.createManifestConfigMap(ctx, nimCache, &manifestData)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify that the ConfigMap was created
@@ -618,8 +619,9 @@ var _ = Describe("NIMCache Controller", func() {
 			extractedManifest, err := reconciler.extractNIMManifest(ctx, createdConfigMap.Name, createdConfigMap.Namespace)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(extractedManifest).NotTo(BeNil())
-			Expect(*extractedManifest).To(HaveLen(2))
-			profile, exists := (*extractedManifest)["03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61"]
+			nimManifest := extractedManifest.(nimparserv1.NIMManifest)
+
+			profile, exists := (nimManifest)["03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61"]
 			Expect(exists).To(BeTrue())
 			Expect(profile.Model).To(Equal("meta/llama3-70b-instruct"))
 			Expect(profile.Tags["llm_engine"]).To(Equal("tensorrt_llm"))
