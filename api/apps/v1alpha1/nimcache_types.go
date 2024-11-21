@@ -39,8 +39,8 @@ type NIMCacheSpec struct {
 	Resources Resources `json:"resources,omitempty"`
 	// Tolerations for running the job to cache the NIM model
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-	// NodeSelectors are the node selector labels to schedule the caching job.
-	NodeSelectors map[string]string `json:"gpuSelectors,omitempty"`
+	// NodeSelector is the node selector labels to schedule the caching job.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// UserID is the user ID for the caching job
 	UserID *int64 `json:"userID,omitempty"`
 	// GroupID is the group ID for the caching job
@@ -273,7 +273,10 @@ func (n *NIMCache) GetTolerations() []corev1.Toleration {
 
 // GetNodeSelectors returns nodeselectors configured for the NIMCache Job
 func (n *NIMCache) GetNodeSelectors() map[string]string {
-	return n.Spec.NodeSelectors
+	if n.Spec.NodeSelector == nil {
+		return map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true"}
+	}
+	return n.Spec.NodeSelector
 }
 
 // GetRuntimeClassName return the runtime class name for the NIMCache Job

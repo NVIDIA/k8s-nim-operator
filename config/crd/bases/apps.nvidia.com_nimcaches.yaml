@@ -186,16 +186,16 @@ spec:
                   - name
                   type: object
                 type: array
-              gpuSelectors:
-                additionalProperties:
-                  type: string
-                description: NodeSelectors are the node selector labels to schedule
-                  the caching job.
-                type: object
               groupID:
                 description: GroupID is the group ID for the caching job
                 format: int64
                 type: integer
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: NodeSelector is the node selector labels to schedule
+                  the caching job.
+                type: object
               resources:
                 description: Resources defines the minimum resources required for
                   the caching job to run(cpu, memory, gpu).

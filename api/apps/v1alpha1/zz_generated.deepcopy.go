@@ -398,8 +398,8 @@ func (in *NIMCacheSpec) DeepCopyInto(out *NIMCacheSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.NodeSelectors != nil {
-		in, out := &in.NodeSelectors, &out.NodeSelectors
+	if in.NodeSelector != nil {
+		in, out := &in.NodeSelector, &out.NodeSelector
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
