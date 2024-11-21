@@ -137,6 +137,7 @@ var _ = Describe("NIMCache Controller", func() {
 			}, time.Second*10).Should(Succeed())
 			Expect(job.Spec.Template.Spec.Containers[0].Image).To(Equal("test-container"))
 			Expect(job.Spec.Template.Spec.RuntimeClassName).To(Equal(&runtimeClassName))
+			Expect(job.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true"}))
 
 			// Check if the PVC was created
 			// Wait for reconciliation to complete with a timeout
@@ -350,6 +351,33 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(*pod.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*pod.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
 			Expect(*pod.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
+			Expect(pod.Spec.NodeSelector["feature.node.kubernetes.io/pci-10de.present"]).To(Equal("true"))
+		})
+
+		It("should construct a pod with runtime class and node selector", func() {
+			runtimeClassName := "test-class"
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source:           appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+					RuntimeClassName: runtimeClassName,
+					NodeSelector: map[string]string{
+						"test-label": "true",
+					},
+				},
+			}
+			pod := constructPodSpec(nimCache, k8sutil.K8s)
+			Expect(pod.Name).To(Equal(getPodName(nimCache)))
+			Expect(pod.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
+			Expect(pod.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
+			Expect(*pod.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
+			Expect(*pod.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
+			Expect(*pod.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
+			Expect(pod.Spec.NodeSelector["test-label"]).To(Equal("true"))
+			Expect(pod.Spec.RuntimeClassName).To(Equal(&runtimeClassName))
 		})
 
 		It("should create a pod with the correct specifications", func() {
