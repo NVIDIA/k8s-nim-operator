@@ -17,13 +17,7 @@ limitations under the License.
 package nimparser
 
 import (
-	"os"
-	"regexp"
-	"strconv"
-	"strings"
-
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -31,226 +25,19 @@ const (
 	BackendTypeTensorRT = "tensorrt"
 )
 
-// File represents the model files
-type File struct {
-	Name string `yaml:"name" json:"name,omitempty"`
+type NIMSchemaManifest struct {
+	SchemaVersion string `yaml:"schema_version" json:"schema_version,omitempty"`
 }
 
-// Src represents model source
-type Src struct {
-	RepoID string `yaml:"repo_id" json:"repo_id,omitempty"`
-	Files  []File `yaml:"files" json:"files,omitempty"`
+type NIMParserInterface interface {
+	ParseModelManifest(filePath string) (NIMManifestInterface, error)
+	ParseModelManifestFromRawOutput(data []byte) (NIMManifestInterface, error)
 }
 
-// Component represents source and destination for model files
-type Component struct {
-	Dst string `yaml:"dst" json:"dst,omitempty"`
-	Src Src    `yaml:"src" json:"src,omitempty"`
-}
-
-// Workspace represents workspace for model components
-type Workspace struct {
-	Components []Component `yaml:"components" json:"components,omitempty"`
-}
-
-// NIMProfile is the model profile supported by the NIM container
-type NIMProfile struct {
-	Model        string            `yaml:"model" json:"model,omitempty"`
-	Release      string            `yaml:"release" json:"release,omitempty"`
-	Tags         map[string]string `yaml:"tags" json:"tags,omitempty"`
-	ContainerURL string            `yaml:"container_url" json:"container_url,omitempty"`
-	Workspace    Workspace         `yaml:"workspace" json:"workspace,omitempty"`
-}
-
-// NIMManifest is the model manifest file
-type NIMManifest map[string]NIMProfile
-
-// UnmarshalYAML is the custom unmarshal function for Src
-func (s *Src) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var raw map[string]interface{}
-	if err := unmarshal(&raw); err != nil {
-		return err
-	}
-
-	if repoID, ok := raw["repo_id"].(string); ok {
-		s.RepoID = repoID
-	}
-
-	if files, ok := raw["files"].([]interface{}); ok {
-		for _, file := range files {
-			if fileStr, ok := file.(string); ok {
-				s.Files = append(s.Files, File{Name: fileStr})
-			} else if fileMap, ok := file.(map[interface{}]interface{}); ok {
-				for k := range fileMap {
-					if fileName, ok := k.(string); ok {
-						s.Files = append(s.Files, File{Name: fileName})
-					}
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-// UnmarshalYAML unmarshalls given yaml data into NIM manifest struct
-func (f *File) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var name string
-	if err := unmarshal(&name); err != nil {
-		return err
-	}
-	f.Name = name
-	return nil
-}
-
-// ParseModelManifest parses the given NIM manifest yaml file
-func ParseModelManifest(filePath string) (*NIMManifest, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	var config NIMManifest
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
-
-// ParseModelManifestFromRawOutput parses the given raw NIM manifest data
-func ParseModelManifestFromRawOutput(data []byte) (*NIMManifest, error) {
-	var config NIMManifest
-	err := yaml.Unmarshal(data, &config)
-	if err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
-
-// MatchProfiles matches the given model parameters with the profiles in the manifest
-func MatchProfiles(modelSpec appsv1alpha1.ModelSpec, manifest NIMManifest, discoveredGPUs []string) ([]string, error) {
-	var selectedProfiles []string
-
-	for hash, profile := range manifest {
-		// Check precision, tensor parallelism, and QoS profile
-		if (modelSpec.Precision != "" && profile.Tags["precision"] != modelSpec.Precision) ||
-			(modelSpec.TensorParallelism != "" && profile.Tags["tp"] != modelSpec.TensorParallelism) ||
-			(modelSpec.QoSProfile != "" && profile.Tags["profile"] != modelSpec.QoSProfile) {
-			continue
-		}
-
-		// Check LoRA configuration
-		if modelSpec.Lora == nil && profile.Tags["feat_lora"] == "true" {
-			continue
-		}
-		if modelSpec.Lora != nil && profile.Tags["feat_lora"] != strconv.FormatBool(*modelSpec.Lora) {
-			continue
-		}
-
-		// Determine backend type
-		backend := profile.Tags["llm_engine"]
-		if backend == "" {
-			backend = profile.Tags["backend"]
-		}
-
-		if modelSpec.Engine != "" && !strings.Contains(backend, strings.TrimSuffix(modelSpec.Engine, "_llm")) {
-			continue
-		}
-
-		// Perform GPU match only when optimized engine is selected or GPU filters are provided
-		if isOptimizedEngine(modelSpec.Engine) || len(modelSpec.GPUs) > 0 {
-			// Skip non optimized profiles
-			if !isOptimizedEngine(backend) {
-				continue
-			}
-			if len(modelSpec.GPUs) > 0 || len(discoveredGPUs) > 0 {
-				if !matchGPUProfile(modelSpec, profile, discoveredGPUs) {
-					continue
-				}
-			}
-		}
-
-		// Profile matched the given model parameters, add hash to the selected profiles
-		selectedProfiles = append(selectedProfiles, hash)
-	}
-
-	return selectedProfiles, nil
-}
-
-func isOptimizedEngine(engine string) bool {
-	return engine != "" && strings.Contains(strings.ToLower(engine), BackendTypeTensorRT)
-}
-
-func matchGPUProfile(modelSpec appsv1alpha1.ModelSpec, profile NIMProfile, discoveredGPUs []string) bool {
-	foundGPU := false
-
-	for _, gpu := range modelSpec.GPUs {
-		// Check for GPU product match
-		if gpu.Product != "" {
-			// Check if the product matches the "gpu" tag
-			if strings.Contains(strings.ToLower(profile.Tags["gpu"]), strings.ToLower(gpu.Product)) {
-				foundGPU = true
-			}
-
-			// Check if the product matches the "key" tag
-			if strings.Contains(strings.ToLower(profile.Tags["key"]), strings.ToLower(gpu.Product)) {
-				foundGPU = true
-			}
-
-			// If the GPU product matches, check the GPU IDs
-			if foundGPU && len(gpu.IDs) > 0 {
-				foundID := false
-				for _, id := range gpu.IDs {
-					if id == strings.TrimSuffix(profile.Tags["gpu_device"], ":10de") {
-						foundID = true
-						break
-					}
-				}
-
-				// If the GPU product matches but no IDs match, return false
-				if !foundID {
-					return false
-				}
-			}
-		}
-	}
-
-	// If a GPU product was matched and IDs (if any) also matched, return true
-	if foundGPU {
-		return true
-	}
-
-	// If no match was found in the specified GPUs, check the discovered GPUs
-	for _, productLabel := range discoveredGPUs {
-		if productLabel != "" {
-			// match for llm nim format
-			if strings.Contains(strings.ToLower(productLabel), strings.ToLower(profile.Tags["gpu"])) {
-				return true
-			}
-			// match for non-llm nim format
-			if matches, _ := matchesRegex(productLabel, profile.Tags["product_name_regex"]); matches {
-				return true
-			}
-		}
-	}
-
-	// If no match found in both specified and discovered GPUs, return false
-	return false
-}
-
-func matchesRegex(productLabel, regexPattern string) (bool, error) {
-	// If regexPattern is empty, return false
-	if regexPattern == "" {
-		return false, nil
-	}
-
-	// Compile the regex pattern
-	regex, err := regexp.Compile(regexPattern)
-	if err != nil {
-		return false, err
-	}
-
-	// Check if the productLabel matches the regex
-	return regex.MatchString(productLabel), nil
+type NIMManifestInterface interface {
+	MatchProfiles(modelSpec appsv1alpha1.ModelSpec, discoveredGPUs []string) ([]string, error)
+	GetProfilesList() []string
+	GetProfileModel(profileID string) string
+	GetProfileTags(profileID string) map[string]string
+	GetProfileRelease(profileID string) string
 }
