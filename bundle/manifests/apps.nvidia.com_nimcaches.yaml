@@ -268,7 +268,8 @@ spec:
                         properties:
                           buildable:
                             description: Buildable indicates generic model profiles
-                              that can be optimized with trtllm for any GPUs
+                              that can be optimized with an NVIDIA engine for any
+                              GPUs
                             type: boolean
                           engine:
                             description: Engine is the backend engine (tensort_llm,
