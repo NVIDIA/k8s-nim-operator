@@ -192,10 +192,6 @@ func (n *NemoDatastore) GetStandardEnv() []corev1.EnvVar {
 			},
 		},
 		{
-			Name:  "DATABASE_URL",
-			Value: n.Spec.DataStoreParams.DatabaseURL,
-		},
-		{
 			Name: "DB_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
@@ -205,6 +201,10 @@ func (n *NemoDatastore) GetStandardEnv() []corev1.EnvVar {
 					},
 				},
 			},
+		},
+		{
+			Name:  "DATABASE_URL",
+			Value: n.Spec.DataStoreParams.DatabaseURL,
 		},
 	}
 	return envVars
