@@ -130,7 +130,9 @@ func (n *NemoGuardrail) GetPVCName(pvc PersistentVolumeClaim) string {
 // GetStandardSelectorLabels returns the standard selector labels for the NemoGuardrail deployment
 func (n *NemoGuardrail) GetStandardSelectorLabels() map[string]string {
 	return map[string]string{
-		"app": n.Name,
+		"app":                        n.Name,
+		"app.kubernetes.io/name":     n.Name,
+		"app.kubernetes.io/instance": n.Name,
 	}
 }
 

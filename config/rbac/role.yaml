@@ -62,6 +62,7 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nemodatastores
   - nemoguardrails
   - nimcaches
   - nimpipelines
@@ -77,6 +78,7 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nemodatastores/finalizers
   - nemoguardrails/finalizers
   - nimcaches/finalizers
   - nimpipelines/finalizers
@@ -86,6 +88,7 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nemodatastores/status
   - nemoguardrails/status
   - nimcaches/status
   - nimpipelines/status

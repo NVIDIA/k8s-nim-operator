@@ -36,18 +36,18 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	// NemoDatastoreConditionReady indicates that the NEMO GuardrailService is ready.
+	// NemoDatastoreConditionReady indicates that the NEMO datastore service is ready.
 	NemoDatastoreConditionReady = "Ready"
-	// NemoDatastoreConditionFailed indicates that the NEMO GuardrailService has failed.
+	// NemoDatastoreConditionFailed indicates that the NEMO datastore service has failed.
 	NemoDatastoreConditionFailed = "Failed"
 
-	// NemoDatastoreStatusPending indicates that NEMO GuardrailService is in pending state
+	// NemoDatastoreStatusPending indicates that NEMO datastore service is in pending state
 	NemoDatastoreStatusPending = "Pending"
-	// NemoDatastoreStatusNotReady indicates that NEMO GuardrailService is not ready
+	// NemoDatastoreStatusNotReady indicates that NEMO datastore service is not ready
 	NemoDatastoreStatusNotReady = "NotReady"
-	// NemoDatastoreStatusReady indicates that NEMO GuardrailService is ready
+	// NemoDatastoreStatusReady indicates that NEMO datastore service is ready
 	NemoDatastoreStatusReady = "Ready"
-	// NemoDatastoreStatusFailed indicates that NEMO GuardrailService has failed
+	// NemoDatastoreStatusFailed indicates that NEMO datastore service has failed
 	NemoDatastoreStatusFailed = "Failed"
 )
 
@@ -58,7 +58,7 @@ type NemoDatastoreSpec struct {
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
 	// The name of an secret that contains authn for the NGC NIM service API
-	AuthSecret string `json:"authSecret"`
+	AuthSecret     string                       `json:"authSecret"`
 	Labels         map[string]string            `json:"labels,omitempty"`
 	Annotations    map[string]string            `json:"annotations,omitempty"`
 	NodeSelector   map[string]string            `json:"nodeSelector,omitempty"`
@@ -78,6 +78,7 @@ type NemoDatastoreSpec struct {
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 
+	DataStoreParams NemoDataStoreParams `json:"dataStoreParams"`
 }
 
 // NemoDatastoreStatus defines the observed state of NemoDatastore
@@ -85,6 +86,22 @@ type NemoDatastoreStatus struct {
 	Conditions        []metav1.Condition `json:"conditions,omitempty"`
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
 	State             string             `json:"state,omitempty"`
+}
+
+type NemoDataStoreParams struct {
+	AppVersion    string `json:"appVersion"`
+	GiteaEndpoint string `json:"giteaEndpoint"`
+	GiteaSecret   string `json:"giteaSecret"`
+	DatabaseURL   string `json:"databaseURL"`
+	DatabaseHost  string `json:"databaseHost"`
+	DatabasePort  string `json:"databasePort"`
+	DBSecret      string `json:"dbSecret"`
+
+	EnvConfigMap string `json:"envConfigmap"`
+	EnvSecret    string `json:"envSecret"`
+
+	InitContainerImage   string   `json:"initContainerImage,omitempty"`
+	InitContainerCommand []string `json:"initContainerCommand,omitempty"`
 }
 
 // +genclient
@@ -124,7 +141,8 @@ func (n *NemoDatastore) GetPVCName(pvc PersistentVolumeClaim) string {
 // GetStandardSelectorLabels returns the standard selector labels for the NemoDatastore deployment
 func (n *NemoDatastore) GetStandardSelectorLabels() map[string]string {
 	return map[string]string{
-		"app": n.Name,
+		"app.kubernetes.io/name":     n.Name,
+		"app.kubernetes.io/instance": n.Name,
 	}
 }
 
@@ -142,9 +160,96 @@ func (n *NemoDatastore) GetStandardLabels() map[string]string {
 // GetStandardEnv returns the standard set of env variables for the NemoDatastore container
 func (n *NemoDatastore) GetStandardEnv() []corev1.EnvVar {
 	// add standard env required for NIM service
-	envVars := []corev1.EnvVar{}
-
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "APP_VERSION",
+			Value: n.Spec.DataStoreParams.AppVersion,
+		},
+		{
+			Name:  "GITEA_ENDPOINT",
+			Value: n.Spec.DataStoreParams.GiteaEndpoint,
+		},
+		{
+			Name: "GITEA_ORG_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "username",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.GiteaSecret,
+					},
+				},
+			},
+		},
+		{
+			Name: "GITEA_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "password",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.GiteaSecret,
+					},
+				},
+			},
+		},
+		{
+			Name:  "DATABASE_URL",
+			Value: n.Spec.DataStoreParams.DatabaseURL,
+		},
+		{
+			Name: "DB_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "password",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.DBSecret,
+					},
+				},
+			},
+		},
+	}
 	return envVars
+}
+
+// GetStandardAnnotations returns default annotations to apply to the NemoDatastore instance
+func (n *NemoDatastore) GetEnvFrom() []corev1.EnvFromSource {
+	return []corev1.EnvFromSource{
+		{
+			ConfigMapRef: &corev1.ConfigMapEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: n.Spec.DataStoreParams.EnvConfigMap,
+				},
+			},
+		},
+		{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: n.Spec.DataStoreParams.EnvSecret,
+				},
+			},
+		},
+	}
+}
+
+func (n *NemoDatastore) GetInitContainers() []corev1.Container {
+	image := n.Spec.DataStoreParams.InitContainerImage
+	if image == "" {
+		image = "busybox"
+	}
+	cmd := n.Spec.DataStoreParams.InitContainerCommand
+	if len(cmd) == 0 {
+		cmd = []string{
+			"sh",
+			"-c",
+			fmt.Sprintf("until nc -z %s %s; do echo \"PostgreSQL is unavailable. Sleeping for 5 seconds\"; sleep 5; done;", n.Spec.DataStoreParams.DatabaseHost, n.Spec.DataStoreParams.DatabasePort),
+		}
+	}
+	return []corev1.Container{
+		{
+			Name:    "wait-postgres-ready",
+			Image:   image,
+			Command: cmd,
+		},
+	}
 }
 
 // GetStandardAnnotations returns default annotations to apply to the NemoDatastore instance
@@ -299,9 +404,6 @@ func (n *NemoDatastore) GetDefaultReadinessProbe() *corev1.Probe {
 
 // GetStartupProbe returns startup probe for the NemoDatastore container
 func (n *NemoDatastore) GetStartupProbe() *corev1.Probe {
-	if n.Spec.StartupProbe.Probe == nil {
-		return n.GetDefaultStartupProbe()
-	}
 	return n.Spec.StartupProbe.Probe
 }
 

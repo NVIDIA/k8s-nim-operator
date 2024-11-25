@@ -78,10 +78,9 @@ func NewNemoDatastoreReconciler(client client.Client, scheme *runtime.Scheme, up
 	}
 }
 
-// +kubebuilder:rbac:groups=apps.nvidia.com,resources=nemoguardrails,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.nvidia.com,resources=nemoguardrails/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.nvidia.com,resources=nemoguardrails/finalizers,verbs=update
-// +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimcaches,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=apps.nvidia.com,resources=nemodatastores,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.nvidia.com,resources=nemodatastores/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.nvidia.com,resources=nemodatastores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions;proxies,verbs=get;list;watch
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=use,resourceNames=nonroot
@@ -222,7 +221,7 @@ func (r *NemoDatastoreReconciler) GetOrchestratorType() (k8sutil.OrchestratorTyp
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoDatastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nemo-guardrail-service-controller")
+	r.recorder = mgr.GetEventRecorderFor("nemo-datastore-service-controller")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoDatastore{}).
 		Owns(&appsv1.Deployment{}).
@@ -364,7 +363,19 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
-		return renderer.Deployment(deploymentParams)
+		result, err := renderer.Deployment(deploymentParams)
+		if err != nil {
+			return nil, err
+		}
+		initContainers := nemoDatastore.GetInitContainers()
+		if len(initContainers) > 0 {
+			result.Spec.Template.Spec.InitContainers = initContainers
+		}
+		envFrom := nemoDatastore.GetEnvFrom()
+		if len(envFrom) > 0 {
+			result.Spec.Template.Spec.Containers[0].EnvFrom = envFrom
+		}
+		return result, nil
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
 		return ctrl.Result{}, err
