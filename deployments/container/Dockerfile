@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Install kubectl for must-gather and helm upgrades hooks
 RUN if [ "$TARGETARCH" = "x86_64" ]; then OS_ARCH="amd64"; elif [ "$TARGETARCH" = "aarch64" ]; then OS_ARCH="arm64"; else OS_ARCH="$TARGETARCH"; fi \
-    && curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl \
+    && curl -LO https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl \
     && chmod +x ./kubectl
 
 # Use distroless as minimal base image to package the manager binary
