@@ -36,31 +36,29 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	// NemoGuardrailConditionReady indicates that the NEMO GuardrailService is ready.
-	NemoGuardrailConditionReady = "Ready"
-	// NemoGuardrailConditionFailed indicates that the NEMO GuardrailService has failed.
-	NemoGuardrailConditionFailed = "Failed"
+	// NemoDatastoreConditionReady indicates that the NEMO datastore service is ready.
+	NemoDatastoreConditionReady = "Ready"
+	// NemoDatastoreConditionFailed indicates that the NEMO datastore service has failed.
+	NemoDatastoreConditionFailed = "Failed"
 
-	// NemoGuardrailStatusPending indicates that NEMO GuardrailService is in pending state
-	NemoGuardrailStatusPending = "Pending"
-	// NemoGuardrailStatusNotReady indicates that NEMO GuardrailService is not ready
-	NemoGuardrailStatusNotReady = "NotReady"
-	// NemoGuardrailStatusReady indicates that NEMO GuardrailService is ready
-	NemoGuardrailStatusReady = "Ready"
-	// NemoGuardrailStatusFailed indicates that NEMO GuardrailService has failed
-	NemoGuardrailStatusFailed = "Failed"
+	// NemoDatastoreStatusPending indicates that NEMO datastore service is in pending state
+	NemoDatastoreStatusPending = "Pending"
+	// NemoDatastoreStatusNotReady indicates that NEMO datastore service is not ready
+	NemoDatastoreStatusNotReady = "NotReady"
+	// NemoDatastoreStatusReady indicates that NEMO datastore service is ready
+	NemoDatastoreStatusReady = "Ready"
+	// NemoDatastoreStatusFailed indicates that NEMO datastore service has failed
+	NemoDatastoreStatusFailed = "Failed"
 )
 
-// NemoGuardrailSpec defines the desired state of NemoGuardrail
-type NemoGuardrailSpec struct {
+// NemoDatastoreSpec defines the desired state of NemoDatastore
+type NemoDatastoreSpec struct {
 	Image   Image           `json:"image,omitempty"`
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
 	// The name of an secret that contains authn for the NGC NIM service API
-	AuthSecret string `json:"authSecret"`
-	// ConfigStore stores the config of the guardrail service
-	ConfigStore    GuardrailConfig              `json:"configStore,omitempty"`
+	AuthSecret     string                       `json:"authSecret"`
 	Labels         map[string]string            `json:"labels,omitempty"`
 	Annotations    map[string]string            `json:"annotations,omitempty"`
 	NodeSelector   map[string]string            `json:"nodeSelector,omitempty"`
@@ -79,18 +77,31 @@ type NemoGuardrailSpec struct {
 	UserID       *int64 `json:"userID,omitempty"`
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
+
+	DataStoreParams NemoDataStoreParams `json:"dataStoreParams"`
 }
 
-type GuardrailConfig struct {
-	ConfigMap string                 `json:"configMap,omitempty"`
-	PVC       *PersistentVolumeClaim `json:"pvc,omitempty"`
-}
-
-// NemoGuardrailStatus defines the observed state of NemoGuardrail
-type NemoGuardrailStatus struct {
+// NemoDatastoreStatus defines the observed state of NemoDatastore
+type NemoDatastoreStatus struct {
 	Conditions        []metav1.Condition `json:"conditions,omitempty"`
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
 	State             string             `json:"state,omitempty"`
+}
+
+type NemoDataStoreParams struct {
+	AppVersion    string `json:"appVersion"`
+	GiteaEndpoint string `json:"giteaEndpoint"`
+	GiteaSecret   string `json:"giteaSecret"`
+	DatabaseURL   string `json:"databaseURL"`
+	DatabaseHost  string `json:"databaseHost"`
+	DatabasePort  string `json:"databasePort"`
+	DBSecret      string `json:"dbSecret"`
+
+	EnvConfigMap string `json:"envConfigmap"`
+	EnvSecret    string `json:"envSecret"`
+
+	InitContainerImage   string   `json:"initContainerImage,omitempty"`
+	InitContainerCommand []string `json:"initContainerCommand,omitempty"`
 }
 
 // +genclient
@@ -99,27 +110,27 @@ type NemoGuardrailStatus struct {
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
 // +kubebuilder:printcolumn:name="Age",type="date",format="date-time",JSONPath=".metadata.creationTimestamp",priority=0
 
-// NemoGuardrail is the Schema for the NemoGuardrail API
-type NemoGuardrail struct {
+// NemoDatastore is the Schema for the NemoDatastore API
+type NemoDatastore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   NemoGuardrailSpec   `json:"spec,omitempty"`
-	Status NemoGuardrailStatus `json:"status,omitempty"`
+	Spec   NemoDatastoreSpec   `json:"spec,omitempty"`
+	Status NemoDatastoreStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// NemoGuardrailList contains a list of NemoGuardrail
-type NemoGuardrailList struct {
+// NemoDatastoreList contains a list of NemoDatastore
+type NemoDatastoreList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NemoGuardrail `json:"items"`
+	Items           []NemoDatastore `json:"items"`
 }
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
-// Prefers pvc.Name if explicitly set by the user in the NemoGuardrail instance
-func (n *NemoGuardrail) GetPVCName(pvc PersistentVolumeClaim) string {
+// Prefers pvc.Name if explicitly set by the user in the NemoDatastore instance
+func (n *NemoDatastore) GetPVCName(pvc PersistentVolumeClaim) string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
 	if pvc.Name != "" {
 		pvcName = pvc.Name
@@ -127,81 +138,130 @@ func (n *NemoGuardrail) GetPVCName(pvc PersistentVolumeClaim) string {
 	return pvcName
 }
 
-// GetStandardSelectorLabels returns the standard selector labels for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetStandardSelectorLabels() map[string]string {
+// GetStandardSelectorLabels returns the standard selector labels for the NemoDatastore deployment
+func (n *NemoDatastore) GetStandardSelectorLabels() map[string]string {
 	return map[string]string{
-		"app":                        n.Name,
 		"app.kubernetes.io/name":     n.Name,
 		"app.kubernetes.io/instance": n.Name,
 	}
 }
 
-// GetStandardLabels returns the standard set of labels for NemoGuardrail resources
-func (n *NemoGuardrail) GetStandardLabels() map[string]string {
+// GetStandardLabels returns the standard set of labels for NemoDatastore resources
+func (n *NemoDatastore) GetStandardLabels() map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":             n.Name,
 		"app.kubernetes.io/instance":         n.Name,
 		"app.kubernetes.io/operator-version": os.Getenv("OPERATOR_VERSION"),
-		"app.kubernetes.io/part-of":          "nemo-guardrail-service",
+		"app.kubernetes.io/part-of":          "nemo-datastore-service",
 		"app.kubernetes.io/managed-by":       "k8s-nim-operator",
 	}
 }
 
-// GetStandardEnv returns the standard set of env variables for the NemoGuardrail container
-func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
+// GetStandardEnv returns the standard set of env variables for the NemoDatastore container
+func (n *NemoDatastore) GetStandardEnv() []corev1.EnvVar {
 	// add standard env required for NIM service
 	envVars := []corev1.EnvVar{
 		{
-			Name:  "CONFIG_STORE_PATH",
-			Value: "/config-store",
+			Name:  "APP_VERSION",
+			Value: n.Spec.DataStoreParams.AppVersion,
 		},
 		{
-			Name:  "NIM_ENDPOINT_URL",
-			Value: "https://integrate.api.nvidia.com/v1",
+			Name:  "GITEA_ENDPOINT",
+			Value: n.Spec.DataStoreParams.GiteaEndpoint,
 		},
 		{
-			Name:  "DEFAULT_CONFIG_ID",
-			Value: "default",
+			Name: "GITEA_ORG_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "username",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.GiteaSecret,
+					},
+				},
+			},
 		},
 		{
-			Name:  "DEFAULT_LLM_PROVIDER",
-			Value: "nim",
+			Name: "GITEA_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "password",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.GiteaSecret,
+					},
+				},
+			},
 		},
 		{
-			Name:  "NEMO_GUARDRAILS_SERVER_ENABLE_CORS",
-			Value: "False",
+			Name: "DB_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "password",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.DBSecret,
+					},
+				},
+			},
 		},
 		{
-			Name:  "NEMO_GUARDRAILS_SERVER_ALLOWED_ORIGINS",
-			Value: "*",
-		},
-		{
-			Name:  "GUARDRAILS_HOST",
-			Value: "0.0.0.0",
-		},
-		{
-			Name:  "GUARDRAILS_PORT",
-			Value: "7331",
-		},
-		{
-			Name:  "DEMO",
-			Value: "False",
+			Name:  "DATABASE_URL",
+			Value: n.Spec.DataStoreParams.DatabaseURL,
 		},
 	}
-
 	return envVars
 }
 
-// GetStandardAnnotations returns default annotations to apply to the NemoGuardrail instance
-func (n *NemoGuardrail) GetStandardAnnotations() map[string]string {
+// GetStandardAnnotations returns default annotations to apply to the NemoDatastore instance
+func (n *NemoDatastore) GetEnvFrom() []corev1.EnvFromSource {
+	return []corev1.EnvFromSource{
+		{
+			ConfigMapRef: &corev1.ConfigMapEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: n.Spec.DataStoreParams.EnvConfigMap,
+				},
+			},
+		},
+		{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: n.Spec.DataStoreParams.EnvSecret,
+				},
+			},
+		},
+	}
+}
+
+func (n *NemoDatastore) GetInitContainers() []corev1.Container {
+	image := n.Spec.DataStoreParams.InitContainerImage
+	if image == "" {
+		image = "busybox"
+	}
+	cmd := n.Spec.DataStoreParams.InitContainerCommand
+	if len(cmd) == 0 {
+		cmd = []string{
+			"sh",
+			"-c",
+			fmt.Sprintf("until nc -z %s %s; do echo \"PostgreSQL is unavailable. Sleeping for 5 seconds\"; sleep 5; done;", n.Spec.DataStoreParams.DatabaseHost, n.Spec.DataStoreParams.DatabasePort),
+		}
+	}
+	return []corev1.Container{
+		{
+			Name:    "wait-postgres-ready",
+			Image:   image,
+			Command: cmd,
+		},
+	}
+}
+
+// GetStandardAnnotations returns default annotations to apply to the NemoDatastore instance
+func (n *NemoDatastore) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
 		"openshift.io/scc": "nonroot",
 	}
 	return standardAnnotations
 }
 
-// GetNemoGuardrailAnnotations returns annotations to apply to the NemoGuardrail instance
-func (n *NemoGuardrail) GetNemoGuardrailAnnotations() map[string]string {
+// GetNemoDatastoreAnnotations returns annotations to apply to the NemoDatastore instance
+func (n *NemoDatastore) GetNemoDatastoreAnnotations() map[string]string {
 	standardAnnotations := n.GetStandardAnnotations()
 
 	if n.Spec.Annotations != nil {
@@ -211,8 +271,8 @@ func (n *NemoGuardrail) GetNemoGuardrailAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetServiceLabels returns merged labels to apply to the NemoGuardrail instance
-func (n *NemoGuardrail) GetServiceLabels() map[string]string {
+// GetServiceLabels returns merged labels to apply to the NemoDatastore instance
+func (n *NemoDatastore) GetServiceLabels() map[string]string {
 	standardLabels := n.GetStandardLabels()
 
 	if n.Spec.Labels != nil {
@@ -221,77 +281,77 @@ func (n *NemoGuardrail) GetServiceLabels() map[string]string {
 	return standardLabels
 }
 
-// GetSelectorLabels returns standard selector labels to apply to the NemoGuardrail instance
-func (n *NemoGuardrail) GetSelectorLabels() map[string]string {
+// GetSelectorLabels returns standard selector labels to apply to the NemoDatastore instance
+func (n *NemoDatastore) GetSelectorLabels() map[string]string {
 	// TODO: add custom ones
 	return n.GetStandardSelectorLabels()
 }
 
-// GetNodeSelector returns node selector labels for the NemoGuardrail instance
-func (n *NemoGuardrail) GetNodeSelector() map[string]string {
+// GetNodeSelector returns node selector labels for the NemoDatastore instance
+func (n *NemoDatastore) GetNodeSelector() map[string]string {
 	return n.Spec.NodeSelector
 }
 
-// GetTolerations returns tolerations for the NemoGuardrail instance
-func (n *NemoGuardrail) GetTolerations() []corev1.Toleration {
+// GetTolerations returns tolerations for the NemoDatastore instance
+func (n *NemoDatastore) GetTolerations() []corev1.Toleration {
 	return n.Spec.Tolerations
 }
 
-// GetPodAffinity returns pod affinity for the NemoGuardrail instance
-func (n *NemoGuardrail) GetPodAffinity() *corev1.PodAffinity {
+// GetPodAffinity returns pod affinity for the NemoDatastore instance
+func (n *NemoDatastore) GetPodAffinity() *corev1.PodAffinity {
 	return n.Spec.PodAffinity
 }
 
-// GetContainerName returns name of the container for NemoGuardrail deployment
-func (n *NemoGuardrail) GetContainerName() string {
+// GetContainerName returns name of the container for NemoDatastore deployment
+func (n *NemoDatastore) GetContainerName() string {
 	return fmt.Sprintf("%s-ctr", n.Name)
 }
 
-// GetCommand return command to override for the NemoGuardrail container
-func (n *NemoGuardrail) GetCommand() []string {
+// GetCommand return command to override for the NemoDatastore container
+func (n *NemoDatastore) GetCommand() []string {
 	return n.Spec.Command
 }
 
-// GetArgs return arguments for the NemoGuardrail container
-func (n *NemoGuardrail) GetArgs() []string {
+// GetArgs return arguments for the NemoDatastore container
+func (n *NemoDatastore) GetArgs() []string {
 	return n.Spec.Args
 }
 
 // GetEnv returns merged slice of standard and user specified env variables
-func (n *NemoGuardrail) GetEnv() []corev1.EnvVar {
+func (n *NemoDatastore) GetEnv() []corev1.EnvVar {
 	return utils.MergeEnvVars(n.GetStandardEnv(), n.Spec.Env)
 }
 
-// GetImage returns container image for the NemoGuardrail
-func (n *NemoGuardrail) GetImage() string {
+// GetImage returns container image for the NemoDatastore
+func (n *NemoDatastore) GetImage() string {
 	return fmt.Sprintf("%s:%s", n.Spec.Image.Repository, n.Spec.Image.Tag)
 }
 
 // GetImagePullSecrets returns the image pull secrets for the NIM container
-func (n *NemoGuardrail) GetImagePullSecrets() []string {
+func (n *NemoDatastore) GetImagePullSecrets() []string {
 	return n.Spec.Image.PullSecrets
 }
 
 // GetImagePullPolicy returns the image pull policy for the NIM container
-func (n *NemoGuardrail) GetImagePullPolicy() string {
+func (n *NemoDatastore) GetImagePullPolicy() string {
 	return n.Spec.Image.PullPolicy
 }
 
-// GetResources returns resources to allocate to the NemoGuardrail container
-func (n *NemoGuardrail) GetResources() *corev1.ResourceRequirements {
+// GetResources returns resources to allocate to the NemoDatastore container
+func (n *NemoDatastore) GetResources() *corev1.ResourceRequirements {
 	return n.Spec.Resources
 }
 
-// GetLivenessProbe returns liveness probe for the NemoGuardrail container
-func (n *NemoGuardrail) GetLivenessProbe() *corev1.Probe {
+// GetLivenessProbe returns liveness probe for the NemoDatastore container
+func (n *NemoDatastore) GetLivenessProbe() *corev1.Probe {
 	if n.Spec.LivenessProbe.Probe == nil {
 		return n.GetDefaultLivenessProbe()
 	}
 	return n.Spec.LivenessProbe.Probe
 }
 
-// GetDefaultLivenessProbe returns the default liveness probe for the NemoGuardrail container
-func (n *NemoGuardrail) GetDefaultLivenessProbe() *corev1.Probe {
+// GetDefaultLivenessProbe returns the default liveness probe for the NemoDatastore container
+func (n *NemoDatastore) GetDefaultLivenessProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 15,
 		TimeoutSeconds:      1,
@@ -312,16 +372,16 @@ func (n *NemoGuardrail) GetDefaultLivenessProbe() *corev1.Probe {
 	return &probe
 }
 
-// GetReadinessProbe returns readiness probe for the NemoGuardrail container
-func (n *NemoGuardrail) GetReadinessProbe() *corev1.Probe {
+// GetReadinessProbe returns readiness probe for the NemoDatastore container
+func (n *NemoDatastore) GetReadinessProbe() *corev1.Probe {
 	if n.Spec.ReadinessProbe.Probe == nil {
 		return n.GetDefaultReadinessProbe()
 	}
 	return n.Spec.ReadinessProbe.Probe
 }
 
-// GetDefaultReadinessProbe returns the default readiness probe for the NemoGuardrail container
-func (n *NemoGuardrail) GetDefaultReadinessProbe() *corev1.Probe {
+// GetDefaultReadinessProbe returns the default readiness probe for the NemoDatastore container
+func (n *NemoDatastore) GetDefaultReadinessProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 15,
 		TimeoutSeconds:      1,
@@ -342,16 +402,13 @@ func (n *NemoGuardrail) GetDefaultReadinessProbe() *corev1.Probe {
 	return &probe
 }
 
-// GetStartupProbe returns startup probe for the NemoGuardrail container
-func (n *NemoGuardrail) GetStartupProbe() *corev1.Probe {
-	if n.Spec.StartupProbe.Probe == nil {
-		return n.GetDefaultStartupProbe()
-	}
+// GetStartupProbe returns startup probe for the NemoDatastore container
+func (n *NemoDatastore) GetStartupProbe() *corev1.Probe {
 	return n.Spec.StartupProbe.Probe
 }
 
-// GetDefaultStartupProbe returns the default startup probe for the NemoGuardrail container
-func (n *NemoGuardrail) GetDefaultStartupProbe() *corev1.Probe {
+// GetDefaultStartupProbe returns the default startup probe for the NemoDatastore container
+func (n *NemoDatastore) GetDefaultStartupProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 40,
 		TimeoutSeconds:      1,
@@ -372,142 +429,113 @@ func (n *NemoGuardrail) GetDefaultStartupProbe() *corev1.Probe {
 	return &probe
 }
 
-// GetVolumes returns volumes for the NemoGuardrail container
-func (n *NemoGuardrail) GetVolumes() []corev1.Volume {
+// GetVolumes returns volumes for the NemoDatastore container
+func (n *NemoDatastore) GetVolumes() []corev1.Volume {
 	volumes := []corev1.Volume{}
-	if n.Spec.ConfigStore.ConfigMap != "" {
-		volumes = append(volumes, corev1.Volume{
-			Name: "config-store",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.ConfigStore.ConfigMap,
-					},
-				},
-			},
-		})
-	} else {
-		volumes = append(volumes, corev1.Volume{
-			Name: "config-store",
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: n.Spec.ConfigStore.PVC.Name,
-				},
-			},
-		})
-	}
 	return volumes
 }
 
-// GetVolumeMounts returns volumes for the NemoGuardrail container
-func (n *NemoGuardrail) GetVolumeMounts() []corev1.VolumeMount {
-	volumeMount := corev1.VolumeMount{
-		Name:      "config-store",
-		MountPath: "/config-store",
-	}
-	if n.Spec.ConfigStore.PVC != nil {
-		volumeMount.SubPath = n.Spec.ConfigStore.PVC.SubPath
-	}
-
-	return []corev1.VolumeMount{volumeMount}
+// GetVolumeMounts returns volumes for the NemoDatastore container
+func (n *NemoDatastore) GetVolumeMounts() []corev1.VolumeMount {
+	return []corev1.VolumeMount{}
 }
 
-// GetServiceAccountName returns service account name for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetServiceAccountName() string {
+// GetServiceAccountName returns service account name for the NemoDatastore deployment
+func (n *NemoDatastore) GetServiceAccountName() string {
 	return n.Name
 }
 
-// GetRuntimeClass return the runtime class name for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetRuntimeClass() string {
+// GetRuntimeClass return the runtime class name for the NemoDatastore deployment
+func (n *NemoDatastore) GetRuntimeClass() string {
 	return n.Spec.RuntimeClass
 }
 
-// GetHPA returns the HPA spec for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetHPA() HorizontalPodAutoscalerSpec {
+// GetHPA returns the HPA spec for the NemoDatastore deployment
+func (n *NemoDatastore) GetHPA() HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPA
 }
 
-// GetServiceMonitor returns the Service Monitor details for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetServiceMonitor() ServiceMonitor {
+// GetServiceMonitor returns the Service Monitor details for the NemoDatastore deployment
+func (n *NemoDatastore) GetServiceMonitor() ServiceMonitor {
 	return n.Spec.Metrics.ServiceMonitor
 }
 
-// GetReplicas returns replicas for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetReplicas() int {
+// GetReplicas returns replicas for the NemoDatastore deployment
+func (n *NemoDatastore) GetReplicas() int {
 	if n.IsAutoScalingEnabled() {
 		return 0
 	}
 	return n.Spec.Replicas
 }
 
-// GetDeploymentKind returns the kind of deployment for NemoGuardrail
-func (n *NemoGuardrail) GetDeploymentKind() string {
+// GetDeploymentKind returns the kind of deployment for NemoDatastore
+func (n *NemoDatastore) GetDeploymentKind() string {
 	return "Deployment"
 }
 
-// IsAutoScalingEnabled returns true if autoscaling is enabled for NemoGuardrail deployment
-func (n *NemoGuardrail) IsAutoScalingEnabled() bool {
+// IsAutoScalingEnabled returns true if autoscaling is enabled for NemoDatastore deployment
+func (n *NemoDatastore) IsAutoScalingEnabled() bool {
 	return n.Spec.Scale.Enabled != nil && *n.Spec.Scale.Enabled
 }
 
-// IsIngressEnabled returns true if ingress is enabled for NemoGuardrail deployment
-func (n *NemoGuardrail) IsIngressEnabled() bool {
+// IsIngressEnabled returns true if ingress is enabled for NemoDatastore deployment
+func (n *NemoDatastore) IsIngressEnabled() bool {
 	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
 }
 
-// GetIngressSpec returns the Ingress spec NemoGuardrail deployment
-func (n *NemoGuardrail) GetIngressSpec() networkingv1.IngressSpec {
+// GetIngressSpec returns the Ingress spec NemoDatastore deployment
+func (n *NemoDatastore) GetIngressSpec() networkingv1.IngressSpec {
 	return n.Spec.Expose.Ingress.Spec
 }
 
-// IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoGuardrail deployment
-func (n *NemoGuardrail) IsServiceMonitorEnabled() bool {
+// IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoDatastore deployment
+func (n *NemoDatastore) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
 }
 
-// GetServicePort returns the service port for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetServicePort() int32 {
+// GetServicePort returns the service port for the NemoDatastore deployment
+func (n *NemoDatastore) GetServicePort() int32 {
 	return n.Spec.Expose.Service.Port
 }
 
-// GetServiceType returns the service type for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetServiceType() string {
+// GetServiceType returns the service type for the NemoDatastore deployment
+func (n *NemoDatastore) GetServiceType() string {
 	return string(n.Spec.Expose.Service.Type)
 }
 
-// GetUserID returns the user ID for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetUserID() *int64 {
+// GetUserID returns the user ID for the NemoDatastore deployment
+func (n *NemoDatastore) GetUserID() *int64 {
 	return n.Spec.UserID
 
 }
 
-// GetGroupID returns the group ID for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetGroupID() *int64 {
+// GetGroupID returns the group ID for the NemoDatastore deployment
+func (n *NemoDatastore) GetGroupID() *int64 {
 	return n.Spec.GroupID
 
 }
 
 // GetServiceAccountParams return params to render ServiceAccount from templates
-func (n *NemoGuardrail) GetServiceAccountParams() *rendertypes.ServiceAccountParams {
+func (n *NemoDatastore) GetServiceAccountParams() *rendertypes.ServiceAccountParams {
 	params := &rendertypes.ServiceAccountParams{}
 
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetNemoGuardrailAnnotations()
+	params.Annotations = n.GetNemoDatastoreAnnotations()
 	return params
 }
 
 // GetDeploymentParams returns params to render Deployment from templates
-func (n *NemoGuardrail) GetDeploymentParams() *rendertypes.DeploymentParams {
+func (n *NemoDatastore) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params := &rendertypes.DeploymentParams{}
 
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetNemoGuardrailAnnotations()
+	params.Annotations = n.GetNemoDatastoreAnnotations()
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {
@@ -552,7 +580,7 @@ func (n *NemoGuardrail) GetDeploymentParams() *rendertypes.DeploymentParams {
 }
 
 // GetStatefulSetParams returns params to render StatefulSet from templates
-func (n *NemoGuardrail) GetStatefulSetParams() *rendertypes.StatefulSetParams {
+func (n *NemoDatastore) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 
 	params := &rendertypes.StatefulSetParams{}
 
@@ -560,7 +588,7 @@ func (n *NemoGuardrail) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetNemoGuardrailAnnotations()
+	params.Annotations = n.GetNemoDatastoreAnnotations()
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {
@@ -598,7 +626,7 @@ func (n *NemoGuardrail) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 }
 
 // GetServiceParams returns params to render Service from templates
-func (n *NemoGuardrail) GetServiceParams() *rendertypes.ServiceParams {
+func (n *NemoDatastore) GetServiceParams() *rendertypes.ServiceParams {
 	params := &rendertypes.ServiceParams{}
 
 	// Set metadata
@@ -620,7 +648,7 @@ func (n *NemoGuardrail) GetServiceParams() *rendertypes.ServiceParams {
 }
 
 // GetIngressParams returns params to render Ingress from templates
-func (n *NemoGuardrail) GetIngressParams() *rendertypes.IngressParams {
+func (n *NemoDatastore) GetIngressParams() *rendertypes.IngressParams {
 	params := &rendertypes.IngressParams{}
 
 	params.Enabled = n.IsIngressEnabled()
@@ -634,7 +662,7 @@ func (n *NemoGuardrail) GetIngressParams() *rendertypes.IngressParams {
 }
 
 // GetRoleParams returns params to render Role from templates
-func (n *NemoGuardrail) GetRoleParams() *rendertypes.RoleParams {
+func (n *NemoDatastore) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
 	// Set metadata
@@ -655,7 +683,7 @@ func (n *NemoGuardrail) GetRoleParams() *rendertypes.RoleParams {
 }
 
 // GetRoleBindingParams returns params to render RoleBinding from templates
-func (n *NemoGuardrail) GetRoleBindingParams() *rendertypes.RoleBindingParams {
+func (n *NemoDatastore) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	params := &rendertypes.RoleBindingParams{}
 
 	// Set metadata
@@ -668,7 +696,7 @@ func (n *NemoGuardrail) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 }
 
 // GetHPAParams returns params to render HPA from templates
-func (n *NemoGuardrail) GetHPAParams() *rendertypes.HPAParams {
+func (n *NemoDatastore) GetHPAParams() *rendertypes.HPAParams {
 	params := &rendertypes.HPAParams{}
 
 	params.Enabled = n.IsAutoScalingEnabled()
@@ -697,17 +725,17 @@ func (n *NemoGuardrail) GetHPAParams() *rendertypes.HPAParams {
 }
 
 // GetSCCParams return params to render SCC from templates
-func (n *NemoGuardrail) GetSCCParams() *rendertypes.SCCParams {
+func (n *NemoDatastore) GetSCCParams() *rendertypes.SCCParams {
 	params := &rendertypes.SCCParams{}
 	// Set metadata
-	params.Name = "nemo-guardrails-scc"
+	params.Name = "nemo-datastore-scc"
 
 	params.ServiceAccountName = n.GetServiceAccountName()
 	return params
 }
 
 // GetServiceMonitorParams return params to render Service Monitor from templates
-func (n *NemoGuardrail) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams {
+func (n *NemoDatastore) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams {
 	params := &rendertypes.ServiceMonitorParams{}
 	serviceMonitor := n.GetServiceMonitor()
 	params.Enabled = n.IsServiceMonitorEnabled()
@@ -728,42 +756,42 @@ func (n *NemoGuardrail) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 	return params
 }
 
-func (n *NemoGuardrail) GetIngressAnnotations() map[string]string {
-	NemoGuardrailAnnotations := n.GetNemoGuardrailAnnotations()
+func (n *NemoDatastore) GetIngressAnnotations() map[string]string {
+	NemoDatastoreAnnotations := n.GetNemoDatastoreAnnotations()
 
 	if n.Spec.Expose.Ingress.Annotations != nil {
-		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Expose.Ingress.Annotations)
+		return utils.MergeMaps(NemoDatastoreAnnotations, n.Spec.Expose.Ingress.Annotations)
 	}
-	return NemoGuardrailAnnotations
+	return NemoDatastoreAnnotations
 }
 
-func (n *NemoGuardrail) GetServiceAnnotations() map[string]string {
-	NemoGuardrailAnnotations := n.GetNemoGuardrailAnnotations()
+func (n *NemoDatastore) GetServiceAnnotations() map[string]string {
+	NemoDatastoreAnnotations := n.GetNemoDatastoreAnnotations()
 
 	if n.Spec.Expose.Service.Annotations != nil {
-		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Expose.Service.Annotations)
+		return utils.MergeMaps(NemoDatastoreAnnotations, n.Spec.Expose.Service.Annotations)
 	}
-	return NemoGuardrailAnnotations
+	return NemoDatastoreAnnotations
 }
 
-func (n *NemoGuardrail) GetHPAAnnotations() map[string]string {
-	NemoGuardrailAnnotations := n.GetNemoGuardrailAnnotations()
+func (n *NemoDatastore) GetHPAAnnotations() map[string]string {
+	NemoDatastoreAnnotations := n.GetNemoDatastoreAnnotations()
 
 	if n.Spec.Scale.Annotations != nil {
-		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Scale.Annotations)
+		return utils.MergeMaps(NemoDatastoreAnnotations, n.Spec.Scale.Annotations)
 	}
-	return NemoGuardrailAnnotations
+	return NemoDatastoreAnnotations
 }
 
-func (n *NemoGuardrail) GetServiceMonitorAnnotations() map[string]string {
-	NemoGuardrailAnnotations := n.GetNemoGuardrailAnnotations()
+func (n *NemoDatastore) GetServiceMonitorAnnotations() map[string]string {
+	NemoDatastoreAnnotations := n.GetNemoDatastoreAnnotations()
 
 	if n.Spec.Metrics.ServiceMonitor.Annotations != nil {
-		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
+		return utils.MergeMaps(NemoDatastoreAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
-	return NemoGuardrailAnnotations
+	return NemoDatastoreAnnotations
 }
 
 func init() {
-	SchemeBuilder.Register(&NemoGuardrail{}, &NemoGuardrailList{})
+	SchemeBuilder.Register(&NemoDatastore{}, &NemoDatastoreList{})
 }
