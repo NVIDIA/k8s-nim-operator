@@ -3,7 +3,7 @@ operator:
   upgradeCRD: true
   image:
     repository: nvcr.io/nvidia/cloud-native/k8s-nim-operator
-    tag: v1.0.0
+    tag: v1.0.1
     pullSecrets: []
     pullPolicy: Always
   args:
