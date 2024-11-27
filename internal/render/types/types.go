@@ -81,6 +81,7 @@ type DeploymentParams struct {
 	GroupID            *int64
 	RuntimeClassName   string
 	OrchestratorType   string
+	Ports              []corev1.ContainerPort
 }
 
 // StatefulSetParams holds the parameters for rendering a StatefulSet template
