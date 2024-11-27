@@ -22,7 +22,7 @@ MODULE := github.com/NVIDIA/$(MODULE_NAME)
 
 REGISTRY ?= nvcr.io/nvidia
 
-VERSION ?= v1.0.0
+VERSION ?= v1.0.1
 
 GOLANG_VERSION ?= 1.22.2
 
