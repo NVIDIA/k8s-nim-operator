@@ -1,7 +1,7 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  name: nim-operator-certified.v1.0.0
+  name: nim-operator-certified.v1.0.1
   namespace: placeholder
   labels:
     operatorframework.io/arch.amd64: supported
@@ -28,7 +28,7 @@ metadata:
           "spec": {
             "source": {
               "ngc": {
-                "modelPuller": "nvcr.io/nim/meta/llama3-8b-instruct:1.0.3",
+                "modelPuller": "nvcr.io/nim/meta/llama-3.1-8b-instruct:1.3",
                 "pullSecret": "ngc-secret",
                 "authSecret": "ngc-api-secret",
                 "model": {
@@ -64,8 +64,8 @@ metadata:
           },
           "spec": {
             "image": {
-              "repository": "nvcr.io/nim/meta/llama3-8b-instruct",
-              "tag": "1.0.3",
+              "repository": "nvcr.io/nim/meta/llama-3.1-8b-instruct",
+              "tag": "1.3",
               "pullPolicy": "IfNotPresent",
               "pullSecrets": [
                 "ngc-secret"
@@ -114,8 +114,8 @@ metadata:
                 "enabled": true,
                 "spec": {
                   "image": {
-                    "repository": "nvcr.io/nim/meta/llama3-8b-instruct",
-                    "tag": "1.0.3",
+                    "repository": "nvcr.io/nim/meta/llama-3.1-8b-instruct",
+                    "tag": "1.3",
                     "pullPolicy": "IfNotPresent",
                     "pullSecrets": [
                       "ngc-secret"
@@ -149,10 +149,10 @@ metadata:
     k8sMinVersion: 1.26.0
     categories: AI/Machine Learning
     certified: 'false'
-    createdAt: 'Fri Sep 27 08:33:17 PDT 2024'
+    createdAt: 'Wed Nov 27 09:18:21 PST 2024'
     description: >-
       An Operator for deployment and maintenance of NVIDIA NIMs and NeMo microservices in a Kubernetes environment
-    containerImage: 'nvcr.io/nvidia/cloud-native/k8s-nim-operator:v1.0.0'
+    containerImage: 'ghcr.io/nvidia/k8s-nim-operator:release-1.0'
     support: NVIDIA
     capabilities: Basic Install
     repository: github.com/NVIDIA/k8s-nim-operator
@@ -177,7 +177,7 @@ spec:
     * Install CSI Driver or Local Path Provision 
     * Create necessary ImagePullSecret and NGC Auth Secrets
   maturity: alpha
-  version: 1.0.0
+  version: 1.0.1
   replaces: ''
   skips: []
   minKubeVersion: 1.26.0
@@ -620,13 +620,6 @@ spec:
                     preferredDuringSchedulingIgnoredDuringExecution:
                       - preference:
                           matchExpressions:
-                            - key: node-role.kubernetes.io/master
-                              operator: In
-                              values:
-                                - ''
-                        weight: 1
-                      - preference:
-                          matchExpressions:
                             - key: node-role.kubernetes.io/control-plane
                               operator: In
                               values:
@@ -634,34 +627,8 @@ spec:
                         weight: 1
                 containers:
                   - args:
-                      - '--secure-listen-address=0.0.0.0:8443'
-                      - '--upstream=http://127.0.0.1:8080/'
-                      - '--logtostderr=true'
-                      - '--v=0'
-                    image: 'gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0'
-                    imagePullPolicy: IfNotPresent
-                    name: kube-rbac-proxy
-                    ports:
-                      - containerPort: 8443
-                        name: https
-                        protocol: TCP
-                    resources:
-                      limits:
-                        cpu: 500m
-                        memory: 128Mi
-                      requests:
-                        cpu: 50m
-                        memory: 64Mi
-                    securityContext:
-                      allowPrivilegeEscalation: false
-                      capabilities:
-                        drop:
-                          - ALL
-                    terminationMessagePath: /dev/termination-log
-                    terminationMessagePolicy: File
-                  - args:
                       - '--health-probe-bind-address=:8081'
-                      - '--metrics-bind-address=127.0.0.1:8080'
+                      - '--metrics-bind-address=:8080'
                       - '--leader-elect'
                     command:
                       - /manager
@@ -672,7 +639,7 @@ spec:
                           fieldRef:
                             apiVersion: v1
                             fieldPath: metadata.namespace
-                    image: 'nvcr.io/nvidia/cloud-native/k8s-nim-operator:v1.0.0'
+                    image: 'ghcr.io/nvidia/k8s-nim-operator:release-1.0'
                     imagePullPolicy: Always
                     livenessProbe:
                       failureThreshold: 3
@@ -714,9 +681,6 @@ spec:
                   runAsNonRoot: true
                 terminationGracePeriodSeconds: 10
                 tolerations:
-                  - effect: NoSchedule
-                    key: node-role.kubernetes.io/master
-                    operator: Equal
                   - effect: NoSchedule
                     key: node-role.kubernetes.io/control-plane
                     operator: Equal
