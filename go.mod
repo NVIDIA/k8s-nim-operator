@@ -11,7 +11,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/mittwald/go-helm-client v0.12.13
 	github.com/onsi/ginkgo/v2 v2.20.2
-	github.com/onsi/gomega v1.34.2
+	github.com/onsi/gomega v1.36.1
 	github.com/openshift/api v0.0.0-20240708071937-c9a91940bf0f
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.76.1
 	github.com/prometheus/client_golang v1.20.5
