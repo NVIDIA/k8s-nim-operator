@@ -910,6 +910,21 @@ func getManifestConfigName(nimCache *appsv1alpha1.NIMCache) string {
 	return fmt.Sprintf("%s-manifest", nimCache.GetName())
 }
 
+func getCommand() []string {
+	return []string{
+		"sh",
+		"-c",
+		strings.Join([]string{
+			"if [ -f /opt/nim/etc/default/model_manifest.yaml ]; then",
+			"cat /opt/nim/etc/default/model_manifest.yaml;",
+			"else",
+			"cat /etc/nim/config/model_manifest.yaml;",
+			"fi;",
+			"sleep infinity",
+		}, " "),
+	}
+}
+
 // constructPodSpec constructs a Pod specification
 func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) *corev1.Pod {
 	labels := map[string]string{
@@ -938,7 +953,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 				{
 					Name:    NIMCacheContainerName,
 					Image:   nimCache.Spec.Source.NGC.ModelPuller,
-					Command: []string{"sh", "-c", "cat /etc/nim/config/model_manifest.yaml; sleep infinity"},
+					Command: getCommand(),
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: ptr.To[bool](false),
 						Capabilities: &corev1.Capabilities{
