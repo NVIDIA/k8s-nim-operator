@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -912,17 +911,18 @@ func getManifestConfigName(nimCache *appsv1alpha1.NIMCache) string {
 }
 
 func getCommand() []string {
-	// Default model manifest file path
-	defaultManifestFile := "/etc/nim/config/model_manifest.yaml"
-	updatedManifestFile := "/opt/nim/etc/default/model_manifest.yaml"
-
-	// Check for the manifest file at the updated path with latest NIMs
-	if _, err := os.Stat(updatedManifestFile); err == nil {
-		return []string{"sh", "-c", strings.Join([]string{"cat", updatedManifestFile, "; sleep infinity"}, " ")}
+	return []string{
+		"sh",
+		"-c",
+		strings.Join([]string{
+			"if [ -f /opt/nim/etc/default/model_manifest.yaml ]; then",
+			"cat /opt/nim/etc/default/model_manifest.yaml;",
+			"else",
+			"cat /etc/nim/config/model_manifest.yaml;",
+			"fi;",
+			"sleep infinity",
+		}, " "),
 	}
-
-	// Fallback to default file
-	return []string{"sh", "-c", strings.Join([]string{"cat", defaultManifestFile, "; sleep infinity"}, " ")}
 }
 
 // constructPodSpec constructs a Pod specification
