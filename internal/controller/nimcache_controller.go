@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -910,6 +911,20 @@ func getManifestConfigName(nimCache *appsv1alpha1.NIMCache) string {
 	return fmt.Sprintf("%s-manifest", nimCache.GetName())
 }
 
+func getCommand() []string {
+	// Default model manifest file path
+	defaultManifestFile := "/etc/nim/config/model_manifest.yaml"
+	updatedManifestFile := "/opt/nim/etc/default/model_manifest.yaml"
+
+	// Check for the manifest file at the updated path with latest NIMs
+	if _, err := os.Stat(updatedManifestFile); err == nil {
+		return []string{"sh", "-c", strings.Join([]string{"cat", updatedManifestFile, "; sleep infinity"}, " ")}
+	}
+
+	// Fallback to default file
+	return []string{"sh", "-c", strings.Join([]string{"cat", defaultManifestFile, "; sleep infinity"}, " ")}
+}
+
 // constructPodSpec constructs a Pod specification
 func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) *corev1.Pod {
 	labels := map[string]string{
@@ -938,7 +953,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 				{
 					Name:    NIMCacheContainerName,
 					Image:   nimCache.Spec.Source.NGC.ModelPuller,
-					Command: []string{"sh", "-c", "cat /etc/nim/config/model_manifest.yaml; sleep infinity"},
+					Command: getCommand(),
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: ptr.To[bool](false),
 						Capabilities: &corev1.Capabilities{
