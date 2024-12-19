@@ -67,7 +67,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GOLANG_VERSION }}
-    - run: make test
+    - run: make coverage
   build:
     name: Build
     runs-on: ubuntu-latest
