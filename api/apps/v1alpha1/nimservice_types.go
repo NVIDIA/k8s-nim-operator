@@ -760,10 +760,22 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
-		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
-		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
-		Endpoints:         []monitoringv1.Endpoint{{Port: "service-port", ScrapeTimeout: serviceMonitor.ScrapeTimeout, Interval: serviceMonitor.Interval}},
+		NamespaceSelector: monitoringv1.NamespaceSelector{
+			MatchNames: []string{n.Namespace},
+		},
+		Selector: metav1.LabelSelector{
+			MatchLabels: n.GetServiceLabels(),
+		},
+		Endpoints: []monitoringv1.Endpoint{
+			{
+				Port:          "service-port",
+				Path:          "/v1/metrics",
+				ScrapeTimeout: serviceMonitor.ScrapeTimeout,
+				Interval:      serviceMonitor.Interval,
+			},
+		},
 	}
+
 	params.SMSpec = smSpec
 	return params
 }
