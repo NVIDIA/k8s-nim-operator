@@ -43,6 +43,10 @@ func (c *FakeAppsV1alpha1) NemoDatastores(namespace string) v1alpha1.NemoDatasto
 	return &FakeNemoDatastores{c, namespace}
 }
 
+func (c *FakeAppsV1alpha1) NemoDatastoreV2s(namespace string) v1alpha1.NemoDatastoreV2Interface {
+	return &FakeNemoDatastoreV2s{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) NemoGuardrails(namespace string) v1alpha1.NemoGuardrailInterface {
 	return &FakeNemoGuardrails{c, namespace}
 }
