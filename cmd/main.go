@@ -221,6 +221,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = controller.NewNemoDatastoreV2Reconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		updater,
+		render.NewRenderer("/manifests"),
+		ctrl.Log.WithName("controllers").WithName("NemoDatastoreV2"),
+	).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NemoDatastoreV2")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
