@@ -1,5 +1,5 @@
 <!--
-  SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
   SPDX-License-Identifier: Apache-2.0
 -->
 
@@ -21,7 +21,7 @@ for installation and configuration information.
 
 ### Deploying the Operator on the Cluster
 
-**Build and push your image to the location specified by `IMG`:**
+**Build and push your image to the location specified by `IMAGE_NAME`:`VERSION`:**
 
 ```sh
 make build IMAGE_NAME=<your-private-registry>/k8s-nim-operator VERSION=<tag> -f deployments/container/Makefile
@@ -101,7 +101,7 @@ To get started with building the NIM Operator, follow these steps:
 ```shell
 git clone git@github.com:NVIDIA/k8s-nim-operator.git
 cd k8s-nim-operator
-make IMG=<image-name> docker-build
+make build IMAGE_NAME=<your-private-registry>/k8s-nim-operator VERSION=<tag> -f deployments/container/Makefile
 ```
 
 Run `make help` for more information about additional `make` targets.
