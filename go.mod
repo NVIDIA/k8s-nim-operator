@@ -18,11 +18,11 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/stretchr/testify v1.9.0
 	gopkg.in/yaml.v2 v2.4.0
-	helm.sh/helm/v3 v3.16.1
-	k8s.io/api v0.31.1
-	k8s.io/apiextensions-apiserver v0.31.1
-	k8s.io/apimachinery v0.31.1
-	k8s.io/client-go v0.31.1
+	helm.sh/helm/v3 v3.16.4
+	k8s.io/api v0.31.3
+	k8s.io/apiextensions-apiserver v0.31.3
+	k8s.io/apimachinery v0.31.3
+	k8s.io/client-go v0.31.3
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6
 	sigs.k8s.io/controller-runtime v0.19.4
 	sigs.k8s.io/yaml v1.4.0
@@ -37,8 +37,7 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
-	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/Microsoft/hcsshim v0.11.4 // indirect
+	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
@@ -48,11 +47,13 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
-	github.com/containerd/containerd v1.7.12 // indirect
+	github.com/containerd/containerd v1.7.23 // indirect
+	github.com/containerd/errdefs v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/cyphar/filepath-securejoin v0.3.1 // indirect
+	github.com/containerd/platforms v0.2.1 // indirect
+	github.com/cyphar/filepath-securejoin v0.3.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/distribution/reference v0.5.0 // indirect
+	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/cli v25.0.1+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker v25.0.6+incompatible // indirect
@@ -163,7 +164,6 @@ require (
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
-	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
@@ -181,12 +181,12 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiserver v0.31.1 // indirect
-	k8s.io/cli-runtime v0.31.0 // indirect
-	k8s.io/component-base v0.31.1 // indirect
+	k8s.io/apiserver v0.31.3 // indirect
+	k8s.io/cli-runtime v0.31.3 // indirect
+	k8s.io/component-base v0.31.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241009091222-67ed5848f094 // indirect
-	k8s.io/kubectl v0.31.0 // indirect
+	k8s.io/kubectl v0.31.3 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
