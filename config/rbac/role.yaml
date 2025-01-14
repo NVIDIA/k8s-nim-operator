@@ -100,7 +100,7 @@ rules:
 - apiGroups:
   - autoscaling
   resources:
-  - horizontalpodautoscalars
+  - horizontalpodautoscalers
   verbs:
   - create
   - delete
