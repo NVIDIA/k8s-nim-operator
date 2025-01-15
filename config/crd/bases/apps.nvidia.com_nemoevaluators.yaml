@@ -2126,11 +2126,6 @@ spec:
               userID:
                 format: int64
                 type: integer
-            required:
-            - argoWorkFlows
-            - dataStore
-            - milvus
-            - mongodb
             type: object
           status:
             description: NemoEvaluatorStatus defines the observed state of NemoEvaluator

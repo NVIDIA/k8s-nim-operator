@@ -74,10 +74,10 @@ type NemoEvaluatorSpec struct {
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 
-	Mongodb       Mongodb       `json:"mongodb"`
-	ArgoWorkFlows ArgoWorkFlows `json:"argoWorkFlows"`
-	Milvus        Milvus        `json:"milvus"`
-	DataStore     DataStore     `json:"dataStore"`
+	Mongodb       *Mongodb       `json:"mongodb,omitempty"`
+	ArgoWorkFlows *ArgoWorkFlows `json:"argoWorkFlows,omitempty"`
+	Milvus        *Milvus        `json:"milvus,omitempty"`
+	DataStore     *DataStore     `json:"dataStore,omitempty"`
 }
 
 // NemoEvaluatorStatus defines the observed state of NemoEvaluator
@@ -111,23 +111,6 @@ type NemoEvaluatorList struct {
 	Items           []NemoEvaluator `json:"items"`
 }
 
-type Mongodb struct {
-	Endpoint string `json:"endpoint"`
-}
-
-type ArgoWorkFlows struct {
-	Endpoint       string `json:"endpoint"`
-	ServiceAccount string `json:"serviceAccount"`
-}
-
-type Milvus struct {
-	Endpoint string `json:"endpoint"`
-}
-
-type DataStore struct {
-	Endpoint string `json:"endpoint"`
-}
-
 // GetStandardSelectorLabels returns the standard selector labels for the NemoEvaluator deployment
 func (n *NemoEvaluator) GetStandardSelectorLabels() map[string]string {
 	return map[string]string{
@@ -149,6 +132,7 @@ func (n *NemoEvaluator) GetStandardLabels() map[string]string {
 // GetStandardEnv returns the standard set of env variables for the NemoEvaluator container
 func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 	// add standard env required for NIM service
+
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "NAMESPACE",
@@ -194,9 +178,6 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 		{
 			Name:  "DATA_STORE_HOST",
 			Value: n.Spec.DataStore.Endpoint,
-		},
-		{
-			Name: "INFERENCE_URL",
 		},
 		{
 			Name:  "DATABASE_USERNAME",

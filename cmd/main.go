@@ -206,7 +206,7 @@ func main() {
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoEvaluator"),
 	).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NemoDatastore")
+		setupLog.Error(err, "unable to create controller", "controller", "NemoEvaluator")
 		os.Exit(1)
 	}
 
