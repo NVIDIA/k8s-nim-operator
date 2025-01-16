@@ -39,6 +39,10 @@ spec:
       runtimeClassName: {{ .RuntimeClassName }}
       containers:
       - name: {{ .ContainerName }}
+        ports:
+        {{- if .Ports }}
+          {{- .Ports | yaml | nindent 10 }}
+        {{- end }}
         image: {{ .Image }}
         imagePullPolicy: {{ .ImagePullPolicy }}
         volumeMounts:
@@ -48,15 +52,8 @@ spec:
           subPath: {{ .SubPath }}
         {{- end }}
         env:
-        {{- range .Env }}
-        - name: {{ .Name }}
-          value: {{ .Value | quote  }}
-          {{- if .ValueFrom }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ .ValueFrom.SecretKeyRef.Name }}
-              key: {{ .ValueFrom.SecretKeyRef.Key }}
-          {{- end }}
+        {{- if .Env }}
+          {{- .Env | yaml | nindent 10 }}
         {{- end }}
         {{- with .Resources }}
         resources:
