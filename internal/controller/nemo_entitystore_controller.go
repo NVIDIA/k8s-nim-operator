@@ -52,12 +52,6 @@ import (
 // NemoEntitystoreFinalizer is the finalizer annotation
 const NemoEntitystoreFinalizer = "finalizer.NemoEntitystore.apps.nvidia.com"
 
-// Various error messages for the controller.
-var (
-	NilErrorFmtStr   = "`%s` cannot be nil"
-	EmptyErrorFmtStr = "`%s` cannot be empty"
-)
-
 // NemoEntitystoreReconciler reconciles a NemoEntitystore object
 type NemoEntitystoreReconciler struct {
 	client.Client
@@ -271,31 +265,6 @@ func (r *NemoEntitystoreReconciler) refreshMetrics(ctx context.Context) {
 	//refreshNemoEntitystoreMetrics(NemoEntitystoreList)
 }
 
-func (r *NemoEntitystoreReconciler) validateNemoEntitystore(NemoEntitystore *appsv1alpha1.NemoEntitystore) error {
-	entityStoreParams := NemoEntitystore.Spec.EntityStoreParams
-	if entityStoreParams == nil {
-		return fmt.Errorf(NilErrorFmtStr, "spec.entityStoreParams")
-	}
-
-	if entityStoreParams.DatabaseHost == "" {
-		return fmt.Errorf(EmptyErrorFmtStr, "spec.entityStoreParams.databaseHost")
-	}
-
-	if entityStoreParams.DatabaseUser == "" {
-		return fmt.Errorf(EmptyErrorFmtStr, "spec.entityStoreParams.databaseUser")
-	}
-
-	if entityStoreParams.DatabaseName == "" {
-		return fmt.Errorf(EmptyErrorFmtStr, "spec.entityStoreParams.databaseName")
-	}
-
-	if entityStoreParams.DBSecret == "" {
-		return fmt.Errorf(EmptyErrorFmtStr, "spec.entityStoreParams.dbSecret")
-	}
-
-	return nil
-}
-
 func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context, NemoEntitystore *appsv1alpha1.NemoEntitystore) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	var err error
@@ -306,7 +275,8 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 		}
 	}()
 
-	err = r.validateNemoEntitystore(NemoEntitystore)
+	NemoEntitystore.Normalize()
+	err = NemoEntitystore.Validate()
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -400,17 +370,7 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, NemoEntitystore, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
-		result, err := renderer.Deployment(deploymentParams)
-		if err != nil {
-			return nil, err
-		}
-
-		envFrom := NemoEntitystore.GetEnvFrom()
-		if len(envFrom) > 0 {
-			result.Spec.Template.Spec.Containers[0].EnvFrom = envFrom
-		}
-
-		return result, nil
+		return renderer.Deployment(deploymentParams)
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
 		return ctrl.Result{}, err

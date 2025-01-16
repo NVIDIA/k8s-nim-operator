@@ -51,6 +51,18 @@ const (
 	NemoEntitystoreStatusFailed = "Failed"
 )
 
+// Default values for NEMO entitystore.
+const (
+	defaultDBSecretPasswordKey = "password"
+	defaultDatabasePort        = "5432"
+)
+
+// Various error messages for NEMO entitystore.
+var (
+	nilErrorFmtStr   = "`%s` cannot be nil"
+	emptyErrorFmtStr = "`%s` cannot be empty"
+)
+
 // NemoEntitystoreSpec defines the desired state of NemoEntitystore
 type NemoEntitystoreSpec struct {
 	Image   Image           `json:"image,omitempty"`
@@ -123,6 +135,52 @@ type NemoEntitystoreList struct {
 	Items           []NemoEntitystore `json:"items"`
 }
 
+func (n *EntityStoreParams) Normalize() {
+	if n.DatabasePort == "" {
+		n.DatabasePort = defaultDatabasePort
+	}
+
+	if n.DBSecretPasswordKey == "" {
+		n.DBSecretPasswordKey = defaultDBSecretPasswordKey
+	}
+}
+
+func (n *EntityStoreParams) Validate() error {
+	if n.DatabaseHost == "" {
+		return fmt.Errorf(emptyErrorFmtStr, "spec.entityStoreParams.databaseHost")
+	}
+
+	if n.DatabaseUser == "" {
+		return fmt.Errorf(emptyErrorFmtStr, "spec.entityStoreParams.databaseUser")
+	}
+
+	if n.DatabaseName == "" {
+		return fmt.Errorf(emptyErrorFmtStr, "spec.entityStoreParams.databaseName")
+	}
+
+	if n.DBSecret == "" {
+		return fmt.Errorf(emptyErrorFmtStr, "spec.entityStoreParams.dbSecret")
+	}
+
+	return nil
+}
+
+func (n *NemoEntitystore) Normalize() {
+	if n.Spec.EntityStoreParams == nil {
+		return
+	}
+
+	n.Spec.EntityStoreParams.Normalize()
+}
+
+func (n *NemoEntitystore) Validate() error {
+	if n.Spec.EntityStoreParams == nil {
+		return fmt.Errorf(nilErrorFmtStr, "spec.entityStoreParams")
+	}
+
+	return n.Spec.EntityStoreParams.Validate()
+}
+
 // GetPVCName returns the name to be used for the PVC based on the custom spec
 // Prefers pvc.Name if explicitly set by the user in the NemoEntitystore instance
 func (n *NemoEntitystore) GetPVCName(pvc PersistentVolumeClaim) string {
@@ -155,11 +213,6 @@ func (n *NemoEntitystore) GetStandardLabels() map[string]string {
 
 // GetStandardEnv returns the standard set of env variables for the NemoEntitystore container
 func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
-	passwordKey := "password"
-	if n.Spec.EntityStoreParams.DBSecretPasswordKey != "" {
-		passwordKey = n.Spec.EntityStoreParams.DBSecretPasswordKey
-	}
-
 	// add standard env required for NIM service
 	envVars := []corev1.EnvVar{
 		{
@@ -170,7 +223,7 @@ func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
 			Name: "POSTGRES_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: passwordKey,
+					Key: n.Spec.EntityStoreParams.DBSecretPasswordKey,
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: n.Spec.EntityStoreParams.DBSecret,
 					},
@@ -196,19 +249,6 @@ func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
 	}
 
 	return envVars
-}
-
-// GetEnvFrom returns additional env variables to apply to the NemoEntitystore instance
-func (n *NemoEntitystore) GetEnvFrom() []corev1.EnvFromSource {
-	return []corev1.EnvFromSource{
-		{
-			ConfigMapRef: &corev1.ConfigMapEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: n.Spec.EntityStoreParams.EnvConfigMap,
-				},
-			},
-		},
-	}
 }
 
 // GetStandardAnnotations returns default annotations to apply to the NemoEntitystore instance
