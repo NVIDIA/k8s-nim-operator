@@ -1,0 +1,25 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NemoEntitystore
+metadata:
+  name: nemoentitystore-sample
+spec:
+  image:
+    repository: <registry>/<nemo-entity-store>
+    tag: "<version>"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - <ngc-image-pull-secret>
+  authSecret: <ngc-api-secret>
+  env:
+    - name: BASE_URL_DATASTORE
+      value: http://<DATASTORE_SVC_NAME>.<DATASTORE_SVC_NAMESPACE>:3000
+  expose:
+    service:
+      port: 8000
+  entityStoreParams:
+    appVersion: "<version>"
+    databaseName: gateway
+    databaseUser: esuser
+    databaseHost: <postgresql-endpoint>
+    databasePort: "5432"
+    dbSecret: <entity-store-db-secret>
