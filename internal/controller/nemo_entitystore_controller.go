@@ -35,7 +35,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -278,6 +277,10 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 	NemoEntitystore.Normalize()
 	err = NemoEntitystore.Validate()
 	if err != nil {
+		statusError := r.updater.SetConditionsFailed(ctx, NemoEntitystore, conditions.ValidationFailed, err.Error())
+		if statusError != nil {
+			logger.Error(statusError, "failed to update status", "NemoEntitystore", NemoEntitystore.GetName())
+		}
 		return ctrl.Result{}, err
 	}
 
@@ -384,12 +387,12 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 
 	if !ready {
 		// Update status as NotReady
-		err = r.SetConditionsNotReady(ctx, NemoEntitystore, conditions.NotReady, msg)
+		err = r.updater.SetConditionsNotReady(ctx, NemoEntitystore, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(NemoEntitystore, corev1.EventTypeNormal, conditions.NotReady,
 			"NemoEntitystore %s not ready yet, msg: %s", NemoEntitystore.Name, msg)
 	} else {
 		// Update status as ready
-		err = r.SetConditionsReady(ctx, NemoEntitystore, conditions.Ready, msg)
+		err = r.updater.SetConditionsReady(ctx, NemoEntitystore, conditions.Ready, msg)
 		r.GetEventRecorder().Eventf(NemoEntitystore, corev1.EventTypeNormal, conditions.Ready,
 			"NemoEntitystore %s ready, msg: %s", NemoEntitystore.Name, msg)
 	}
@@ -538,73 +541,5 @@ func (r *NemoEntitystoreReconciler) cleanupResource(ctx context.Context, obj cli
 		return err
 	}
 	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
-	return nil
-}
-
-func (r *NemoEntitystoreReconciler) SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NemoEntitystore, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Failed,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Ready,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoEntitystoreStatusReady
-	return r.updateNemoEntitystoreStatus(ctx, cr)
-}
-
-func (r *NemoEntitystoreReconciler) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NemoEntitystore, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionFalse,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionFalse,
-		Reason:  conditions.Ready,
-		Message: message,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoEntitystoreStatusNotReady
-	return r.updateNemoEntitystoreStatus(ctx, cr)
-}
-
-func (r *NemoEntitystoreReconciler) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NemoEntitystore, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Ready,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Failed,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-	cr.Status.State = appsv1alpha1.NemoEntitystoreStatusFailed
-	return r.updateNemoEntitystoreStatus(ctx, cr)
-}
-
-func (r *NemoEntitystoreReconciler) updateNemoEntitystoreStatus(ctx context.Context, cr *appsv1alpha1.NemoEntitystore) error {
-
-	obj := &appsv1alpha1.NemoEntitystore{}
-	errGet := r.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := r.Status().Update(ctx, obj); err != nil {
-		return err
-	}
 	return nil
 }
