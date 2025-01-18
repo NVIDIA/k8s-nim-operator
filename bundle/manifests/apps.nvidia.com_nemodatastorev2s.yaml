@@ -81,14 +81,34 @@ spec:
                     type: string
                   objStoreSecret:
                     type: string
-                  pvcSharedData:
-                    type: string
-                  size:
-                    type: string
+                  persistence:
+                    properties:
+                      accessModes:
+                        items:
+                          type: string
+                        type: array
+                      claimName:
+                        type: string
+                      create:
+                        type: boolean
+                      enabled:
+                        type: boolean
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      size:
+                        type: string
+                      storageClass:
+                        type: string
+                    required:
+                    - claimName
+                    - create
+                    - enabled
+                    - size
+                    type: object
                   sshEnabled:
                     type: boolean
-                  storageClass:
-                    type: string
                 required:
                 - datastoreConfigSecret
                 - datastoreInitSecret
@@ -98,9 +118,7 @@ spec:
                 - giteaAdminSecret
                 - lfsJwtSecret
                 - objStoreSecret
-                - pvcSharedData
                 - sshEnabled
-                - storageClass
                 type: object
               env:
                 items:

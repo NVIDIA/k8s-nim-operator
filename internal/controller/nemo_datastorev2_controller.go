@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
@@ -95,7 +93,7 @@ func NewNemoDatastoreV2Reconciler(client client.Client, scheme *runtime.Scheme, 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalars,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -277,24 +275,15 @@ func (r *NemoDatastoreV2Reconciler) reconcileNemoDatastoreV2(ctx context.Context
 		}
 	}()
 
-	pvc := corev1.PersistentVolumeClaim{}
-	pvc.Name = nemoDatastore.Spec.DataStoreParams.PVCSharedData
-	pvc.Spec.StorageClassName = &nemoDatastore.Spec.DataStoreParams.StorageClass
-	size, err := resource.ParseQuantity(nemoDatastore.Spec.DataStoreParams.Size)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to parse size for pvc creation %s, err %v", nemoDatastore.Name, err)
-	}
-	pvc.Spec.Resources = corev1.VolumeResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceStorage: size,
-		},
-	}
-	pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany}
-	pvc.Namespace = nemoDatastore.Namespace
-
-	err = r.Create(ctx, &pvc)
-	if err != nil && !errors.IsAlreadyExists(err) {
-		logger.Error(err, "Failed to create pvc", "name", pvc.Name)
+	if nemoDatastore.ShouldCreatePersistentStorage() {
+		pvc, err := nemoDatastore.GetPVC()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		err = r.Create(ctx, pvc)
+		if err != nil && !errors.IsAlreadyExists(err) {
+			logger.Error(err, "Failed to create pvc", "name", pvc.Name)
+		}
 	}
 
 	// Generate annotation for the current operator-version and apply to all resources

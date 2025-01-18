@@ -1,0 +1,65 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NemoDatastoreV2
+metadata:
+  name: nemodatastore
+spec:
+  authSecret: ngc-image-pull-secret
+  dataStoreParams:
+    datastoreConfigSecret: "nemo-ms-nemo-datastore"
+    datastoreInitSecret: "nemo-ms-nemo-datastore-init"
+    datastoreInlineConfigSecret: "nemo-ms-nemo-datastore-inline-config"
+    datastoreSettingsSecret: "nemo-ms-nemo-datastore-setting"
+    dbSecret: "nds-pg-existing-secret"
+    giteaAdminSecret: "gitea-admin-credentials"
+    lfsJwtSecret: "nemo-ms-nemo-datastore--lfs-jwt" 
+    objStoreSecret: "nds-minio-existing-secret" 
+    sshEnabled: false
+    persistence:
+      claimName: "pvc-shared-data"
+      create: true
+      enabled: true
+      storageClass: "local-path"
+      accessModes:
+        - ReadWriteOnce
+      size: "10Gi"
+  expose:
+    service:
+      port: 3000
+      type: ClusterIP
+  image:
+    repository: "nvcr.io/nvidian/nemo-llm/datastore"
+    tag: "25.01-rc8"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "500m"
+    limits:
+      memory: "512Mi"
+      cpu: "1"
+  livenessProbe:
+    enabled: true
+    probe:
+      httpGet:
+        path: /v1/health
+        port: 3000
+        scheme: HTTP
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+  readinessProbe:
+    enabled: true
+    probe:
+      httpGet:
+        path: /v1/health
+        port: 3000
+        scheme: HTTP
+      initialDelaySeconds: 5
+      timeoutSeconds: 3
+  # metrics:
+  #   enabled: true
+  #   serviceMonitor:
+  #     additionalLabels:
+  #       app: sample-nemodatastore
+  #     interval: "30s"
+  #     scrapeTimeout: "10s"
