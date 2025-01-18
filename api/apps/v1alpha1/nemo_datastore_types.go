@@ -30,6 +30,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -78,7 +79,7 @@ type NemoDatastoreSpec struct {
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 
-	DataStoreParams NemoDataStoreParams `json:"dataStoreParams"`
+	DataStoreParams NemoDatastoreParams `json:"dataStoreParams"`
 }
 
 // NemoDatastoreStatus defines the observed state of NemoDatastore
@@ -88,20 +89,21 @@ type NemoDatastoreStatus struct {
 	State             string             `json:"state,omitempty"`
 }
 
-type NemoDataStoreParams struct {
-	AppVersion    string `json:"appVersion"`
-	GiteaEndpoint string `json:"giteaEndpoint"`
-	GiteaSecret   string `json:"giteaSecret"`
-	DatabaseURL   string `json:"databaseURL"`
-	DatabaseHost  string `json:"databaseHost"`
-	DatabasePort  string `json:"databasePort"`
-	DBSecret      string `json:"dbSecret"`
+type NemoDatastoreParams struct {
+	DBSecret         string `json:"dbSecret"`
+	GiteaAdminSecret string `json:"giteaAdminSecret"`
 
-	EnvConfigMap string `json:"envConfigmap"`
-	EnvSecret    string `json:"envSecret"`
+	ObjectStoreSecret       string `json:"objStoreSecret"`
+	DataStoreSettingsSecret string `json:"datastoreSettingsSecret"`
+	LfsJwtSecret            string `json:"lfsJwtSecret"`
 
-	InitContainerImage   string   `json:"initContainerImage,omitempty"`
-	InitContainerCommand []string `json:"initContainerCommand,omitempty"`
+	DataStoreInitSecret         string `json:"datastoreInitSecret"`
+	DataStoreConfigSecret       string `json:"datastoreConfigSecret"`
+	DataStoreInlineConfigSecret string `json:"datastoreInlineConfigSecret"`
+
+	SshEnabled bool `json:"sshEnabled"`
+
+	PVC *PersistentVolumeClaim `json:"pvc,omitempty"`
 }
 
 // +genclient
@@ -130,10 +132,11 @@ type NemoDatastoreList struct {
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
 // Prefers pvc.Name if explicitly set by the user in the NemoDatastore instance
-func (n *NemoDatastore) GetPVCName(pvc PersistentVolumeClaim) string {
+func (n *NemoDatastore) GetPVCName() string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
-	if pvc.Name != "" {
-		pvcName = pvc.Name
+	dsParam := n.Spec.DataStoreParams
+	if dsParam.PVC != nil && dsParam.PVC.Name != "" {
+		pvcName = dsParam.PVC.Name
 	}
 	return pvcName
 }
@@ -157,45 +160,154 @@ func (n *NemoDatastore) GetStandardLabels() map[string]string {
 	}
 }
 
-// GetStandardEnv returns the standard set of env variables for the NemoDatastore container
+// GetMainContainerEnv returns the standard set of env variables for the NemoDatastore main container
 func (n *NemoDatastore) GetStandardEnv() []corev1.EnvVar {
 	// add standard env required for NIM service
 	envVars := []corev1.EnvVar{
 		{
-			Name:  "APP_VERSION",
-			Value: n.Spec.DataStoreParams.AppVersion,
+			Name:  "SSH_LISTEN_PORT",
+			Value: "2222",
 		},
 		{
-			Name:  "GITEA_ENDPOINT",
-			Value: n.Spec.DataStoreParams.GiteaEndpoint,
+			Name:  "SSH_PORT",
+			Value: "22",
 		},
 		{
-			Name: "GITEA_ORG_NAME",
+			Name:  "GITEA_APP_INI",
+			Value: "/data/gitea/conf/app.ini",
+		},
+		{
+			Name:  "GITEA_CUSTOM",
+			Value: "/data/gitea",
+		},
+		{
+			Name:  "GITEA_WORK_DIR",
+			Value: "/data",
+		},
+		{
+			Name:  "TMPDIR",
+			Value: "/tmp/gitea",
+		},
+		{
+			Name:  "GITEA_TEMP",
+			Value: "/tmp/gitea",
+		},
+		{
+			Name:  "HOME",
+			Value: "/data/gitea/git",
+		},
+		{
+			Name: "GITEA__LFS__MINIO_ACCESS_KEY_ID",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: "username",
+					Key: "objectStoreKey",
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.DataStoreParams.GiteaSecret,
+						Name: n.Spec.DataStoreParams.ObjectStoreSecret,
 					},
 				},
 			},
 		},
 		{
-			Name: "GITEA_PASSWORD",
+			Name: "GITEA__LFS__MINIO_SECRET_ACCESS_KEY",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: "password",
+					Key: "objectStoreSecret",
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.DataStoreParams.GiteaSecret,
+						Name: n.Spec.DataStoreParams.ObjectStoreSecret,
 					},
 				},
 			},
 		},
 		{
-			Name: "DB_PASSWORD",
+			Name: "GITEA__SERVER__LFS_JWT_SECRET",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: "password",
+					Key: "jwtSecret",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.LfsJwtSecret,
+					},
+				},
+			},
+		},
+		{
+			Name: "GITEA__DATABASE__PASSWD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "postgresPassword",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.DBSecret,
+					},
+				},
+			},
+		},
+	}
+	return envVars
+}
+
+func (n *NemoDatastore) GetInitContainerEnv() []corev1.EnvVar {
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "GITEA_APP_INI",
+			Value: "/data/gitea/conf/app.ini",
+		},
+		{
+			Name:  "GITEA_CUSTOM",
+			Value: "/data/gitea",
+		},
+		{
+			Name:  "GITEA_WORK_DIR",
+			Value: "/data",
+		},
+		{
+			Name:  "TMPDIR",
+			Value: "/tmp/gitea",
+		},
+		{
+			Name:  "GITEA_TEMP",
+			Value: "/tmp/gitea",
+		},
+		{
+			Name:  "HOME",
+			Value: "/data/gitea/git",
+		},
+		{
+			Name: "GITEA__LFS__MINIO_ACCESS_KEY_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "objectStoreKey",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.ObjectStoreSecret,
+					},
+				},
+			},
+		},
+		{
+			Name: "GITEA__LFS__MINIO_SECRET_ACCESS_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "objectStoreSecret",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.ObjectStoreSecret,
+					},
+				},
+			},
+		},
+		{
+			Name: "GITEA__SERVER__LFS_JWT_SECRET",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "jwtSecret",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.LfsJwtSecret,
+					},
+				},
+			},
+		},
+		{
+			Name: "GITEA__DATABASE__PASSWD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "postgresPassword",
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: n.Spec.DataStoreParams.DBSecret,
 					},
@@ -203,51 +315,129 @@ func (n *NemoDatastore) GetStandardEnv() []corev1.EnvVar {
 			},
 		},
 		{
-			Name:  "DATABASE_URL",
-			Value: n.Spec.DataStoreParams.DatabaseURL,
+			Name: "GITEA_ADMIN_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "GITEA_ADMIN_USERNAME",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.GiteaAdminSecret,
+					},
+				},
+			},
+		},
+		{
+			Name: "GITEA_ADMIN_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "GITEA_ADMIN_PASSWORD",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DataStoreParams.GiteaAdminSecret,
+					},
+				},
+			},
 		},
 	}
 	return envVars
 }
 
-// GetStandardAnnotations returns default annotations to apply to the NemoDatastore instance
-func (n *NemoDatastore) GetEnvFrom() []corev1.EnvFromSource {
-	return []corev1.EnvFromSource{
+// GetVolumes returns volumes for the NemoDatastore container
+func (n *NemoDatastore) GetVolumes() []corev1.Volume {
+	/*volumes:
+	  - name: init
+	    secret:
+	      defaultMode: 110
+	      secretName: datastore-nemo-datastore-init
+	  - name: config
+	    secret:
+	      defaultMode: 110
+	      secretName: datastore-nemo-datastore
+	  - name: inline-config-sources
+	    secret:
+	      defaultMode: 420
+	      secretName: datastore-nemo-datastore-inline-config
+	  - emptyDir: {}
+	    name: temp
+	  - name: data
+	    persistentVolumeClaim:
+	      claimName: datastore-shared-storage
+	*/
+	var initMode = int32(110)
+	var configMode = int32(420)
+
+	volumes := []corev1.Volume{
 		{
-			ConfigMapRef: &corev1.ConfigMapEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: n.Spec.DataStoreParams.EnvConfigMap,
+			Name: "init",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  n.Spec.DataStoreParams.DataStoreInitSecret,
+					DefaultMode: &initMode,
 				},
 			},
 		},
+		{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  n.Spec.DataStoreParams.DataStoreConfigSecret,
+					DefaultMode: &initMode,
+				},
+			},
+		},
+		{
+			Name: "inline-config-sources",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  n.Spec.DataStoreParams.DataStoreInlineConfigSecret,
+					DefaultMode: &configMode,
+				},
+			},
+		},
+		{
+			Name: "temp",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+	}
+
+	if n.Spec.DataStoreParams.PVC != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "data",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: n.GetPVCName(),
+				},
+			},
+		})
+	} else {
+		volumes = append(volumes, corev1.Volume{
+			Name: "data",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+	}
+	return volumes
+}
+
+func (n *NemoDatastore) ShouldCreatePersistentStorage() bool {
+	return n.Spec.DataStoreParams.PVC != nil && n.Spec.DataStoreParams.PVC.Create != nil && *n.Spec.DataStoreParams.PVC.Create
+}
+
+// GetStandardAnnotations returns default annotations to apply to the NemoDatastore instance
+func (n *NemoDatastore) GetEnvFrom() []corev1.EnvFromSource {
+	return []corev1.EnvFromSource{}
+}
+
+// GetStandardAnnotations returns default annotations to apply to the NemoDatastore instance
+func (n *NemoDatastore) GetInitAppIniEnvFrom() []corev1.EnvFromSource {
+	return []corev1.EnvFromSource{
 		{
 			SecretRef: &corev1.SecretEnvSource{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: n.Spec.DataStoreParams.EnvSecret,
+					Name: n.Spec.DataStoreParams.DataStoreSettingsSecret,
 				},
 			},
-		},
-	}
-}
-
-func (n *NemoDatastore) GetInitContainers() []corev1.Container {
-	image := n.Spec.DataStoreParams.InitContainerImage
-	if image == "" {
-		image = "busybox"
-	}
-	cmd := n.Spec.DataStoreParams.InitContainerCommand
-	if len(cmd) == 0 {
-		cmd = []string{
-			"sh",
-			"-c",
-			fmt.Sprintf("until nc -z %s %s; do echo \"PostgreSQL is unavailable. Sleeping for 5 seconds\"; sleep 5; done;", n.Spec.DataStoreParams.DatabaseHost, n.Spec.DataStoreParams.DatabasePort),
-		}
-	}
-	return []corev1.Container{
-		{
-			Name:    "wait-postgres-ready",
-			Image:   image,
-			Command: cmd,
 		},
 	}
 }
@@ -429,15 +619,100 @@ func (n *NemoDatastore) GetDefaultStartupProbe() *corev1.Probe {
 	return &probe
 }
 
-// GetVolumes returns volumes for the NemoDatastore container
-func (n *NemoDatastore) GetVolumes() []corev1.Volume {
-	volumes := []corev1.Volume{}
-	return volumes
-}
-
 // GetVolumeMounts returns volumes for the NemoDatastore container
 func (n *NemoDatastore) GetVolumeMounts() []corev1.VolumeMount {
-	return []corev1.VolumeMount{}
+	mounts := []corev1.VolumeMount{
+		{
+			MountPath: "/tmp",
+			Name:      "temp",
+		},
+	}
+
+	dataMount := corev1.VolumeMount{
+		MountPath: "/data",
+		Name:      "data",
+	}
+
+	if n.Spec.DataStoreParams.PVC != nil {
+		dataMount.SubPath = n.Spec.DataStoreParams.PVC.SubPath
+	}
+	mounts = append(mounts, dataMount)
+	return mounts
+}
+
+func (n *NemoDatastore) GetVolumeMountsInitContainer() []corev1.VolumeMount {
+	mounts := []corev1.VolumeMount{
+		{
+			MountPath: "/usr/sbin",
+			Name:      "config",
+		},
+		{
+			MountPath: "/tmp",
+			Name:      "temp",
+		},
+		{
+			MountPath: "/env-to-ini-mounts/inlines/",
+			Name:      "inline-config-sources",
+		},
+		{
+			MountPath: "/usr/sbin/init",
+			Name:      "init",
+		},
+	}
+	dataMount := corev1.VolumeMount{
+		MountPath: "/data",
+		Name:      "data",
+	}
+
+	if n.Spec.DataStoreParams.PVC != nil {
+		dataMount.SubPath = n.Spec.DataStoreParams.PVC.SubPath
+	}
+	mounts = append(mounts, dataMount)
+	return mounts
+}
+
+func (n *NemoDatastore) GetInitContainers() []corev1.Container {
+	return []corev1.Container{
+		{
+			Name:            "init-directories",
+			Image:           n.GetImage(),
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"/usr/sbin/init/init_directory_structure.sh",
+			},
+			VolumeMounts: n.GetVolumeMountsInitContainer(),
+			Env:          n.GetInitContainerEnv(),
+			EnvFrom:      n.GetInitAppIniEnvFrom(),
+		},
+		{
+			Name:            "init-app-ini",
+			Image:           n.GetImage(),
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"/usr/sbin/config_environment.sh",
+			},
+			VolumeMounts: n.GetVolumeMountsInitContainer(),
+			Env:          n.GetInitContainerEnv(),
+			EnvFrom:      n.GetInitAppIniEnvFrom(),
+		},
+		{
+			Name:            "configure-datastore",
+			Image:           n.GetImage(),
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"/bin/sh", "-c",
+			},
+			Args: []string{
+				"/usr/sbin/init/configure_gitea.sh",
+			},
+			VolumeMounts: n.GetVolumeMountsInitContainer(),
+			Env:          n.GetInitContainerEnv(),
+			EnvFrom:      n.GetInitAppIniEnvFrom(),
+			SecurityContext: &corev1.SecurityContext{
+				RunAsUser: n.GetUserID(),
+			},
+		},
+	}
 }
 
 // GetServiceAccountName returns service account name for the NemoDatastore deployment
@@ -505,14 +780,18 @@ func (n *NemoDatastore) GetServiceType() string {
 
 // GetUserID returns the user ID for the NemoDatastore deployment
 func (n *NemoDatastore) GetUserID() *int64 {
-	return n.Spec.UserID
-
+	if n.Spec.UserID != nil {
+		return n.Spec.UserID
+	}
+	return ptr.To[int64](1000)
 }
 
 // GetGroupID returns the group ID for the NemoDatastore deployment
 func (n *NemoDatastore) GetGroupID() *int64 {
-	return n.Spec.GroupID
-
+	if n.Spec.GroupID != nil {
+		return n.Spec.GroupID
+	}
+	return ptr.To[int64](2000)
 }
 
 // GetServiceAccountParams return params to render ServiceAccount from templates

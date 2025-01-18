@@ -274,6 +274,13 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 				"NemoDatastore %s failed, msg: %s", nemoDatastore.Name, err.Error())
 		}
 	}()
+
+	err = r.reconcilePVC(ctx, nemoDatastore)
+	if err != nil {
+		logger.Error(err, "reconciliation of pvc failed", "pvc", nemoDatastore.GetPVCName())
+		return ctrl.Result{}, err
+	}
+
 	// Generate annotation for the current operator-version and apply to all resources
 	// Get generic name for all resources
 	namespacedName := types.NamespacedName{Name: nemoDatastore.GetName(), Namespace: nemoDatastore.GetNamespace()}
@@ -375,6 +382,10 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 		if len(envFrom) > 0 {
 			result.Spec.Template.Spec.Containers[0].EnvFrom = envFrom
 		}
+		fsGroup := int64(1000)
+		result.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{
+			FSGroup: &fsGroup,
+		}
 		return result, nil
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
@@ -405,6 +416,41 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NemoDatastoreReconciler) reconcilePVC(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore) error {
+	logger := r.GetLogger()
+	pvcName := nemoDatastore.GetPVCName()
+	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nemoDatastore.GetNamespace()}
+	pvc := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, pvcNamespacedName, pvc)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	// If PVC does not exist, create a new one if creation flag is enabled
+	if err != nil {
+		if nemoDatastore.ShouldCreatePersistentStorage() {
+			pvc, err = shared.ConstructPVC(*nemoDatastore.Spec.DataStoreParams.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoDatastore.GetNamespace()})
+			if err != nil {
+				logger.Error(err, "Failed to construct pvc", "name", pvcName)
+				return err
+			}
+			if err := controllerutil.SetControllerReference(nemoDatastore, pvc, r.GetScheme()); err != nil {
+				return err
+			}
+			err = r.Create(ctx, pvc)
+			if err != nil {
+				logger.Error(err, "Failed to create pvc", "name", pvcName)
+				return err
+			}
+			logger.Info("Created PVC for NeMo Datastore", "pvc", pvc.Name)
+		} else {
+			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, NemoDatastore client.Object, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {

@@ -188,17 +188,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = controller.NewNemoDatastoreReconciler(
-		mgr.GetClient(),
-		mgr.GetScheme(),
-		updater,
-		render.NewRenderer("/manifests"),
-		ctrl.Log.WithName("controllers").WithName("NemoDatastore"),
-	).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NemoDatastore")
-		os.Exit(1)
-	}
-
 	if err = controller.NewNemoEvaluatorReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
@@ -221,14 +210,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = controller.NewNemoDatastoreV2Reconciler(
+	if err = controller.NewNemoDatastoreReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
 		render.NewRenderer("/manifests"),
-		ctrl.Log.WithName("controllers").WithName("NemoDatastoreV2"),
+		ctrl.Log.WithName("controllers").WithName("NemoDatastore"),
 	).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NemoDatastoreV2")
+		setupLog.Error(err, "unable to create controller", "controller", "NemoDatastore")
 		os.Exit(1)
 	}
 

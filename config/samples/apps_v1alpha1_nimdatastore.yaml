@@ -1,5 +1,5 @@
 apiVersion: apps.nvidia.com/v1alpha1
-kind: NemoDatastoreV2
+kind: NemoDatastore
 metadata:
   name: nemodatastore
 spec:
@@ -14,13 +14,11 @@ spec:
     lfsJwtSecret: "nemo-ms-nemo-datastore--lfs-jwt" 
     objStoreSecret: "nds-minio-existing-secret" 
     sshEnabled: false
-    persistence:
-      claimName: "pvc-shared-data"
+    pvc:
+      name: "pvc-shared-data"
       create: true
-      enabled: true
       storageClass: "local-path"
-      accessModes:
-        - ReadWriteOnce
+      volumeAccessMode: ReadWriteOnce
       size: "10Gi"
   expose:
     service:

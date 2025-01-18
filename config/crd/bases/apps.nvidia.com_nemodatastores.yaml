@@ -65,40 +65,60 @@ spec:
                 type: array
               dataStoreParams:
                 properties:
-                  appVersion:
+                  datastoreConfigSecret:
                     type: string
-                  databaseHost:
+                  datastoreInitSecret:
                     type: string
-                  databasePort:
+                  datastoreInlineConfigSecret:
                     type: string
-                  databaseURL:
+                  datastoreSettingsSecret:
                     type: string
                   dbSecret:
                     type: string
-                  envConfigmap:
+                  giteaAdminSecret:
                     type: string
-                  envSecret:
+                  lfsJwtSecret:
                     type: string
-                  giteaEndpoint:
+                  objStoreSecret:
                     type: string
-                  giteaSecret:
-                    type: string
-                  initContainerCommand:
-                    items:
-                      type: string
-                    type: array
-                  initContainerImage:
-                    type: string
+                  persistence:
+                    properties:
+                      accessModes:
+                        items:
+                          type: string
+                        type: array
+                      claimName:
+                        type: string
+                      create:
+                        type: boolean
+                      enabled:
+                        type: boolean
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      size:
+                        type: string
+                      storageClass:
+                        type: string
+                    required:
+                    - claimName
+                    - create
+                    - enabled
+                    - size
+                    type: object
+                  sshEnabled:
+                    type: boolean
                 required:
-                - appVersion
-                - databaseHost
-                - databasePort
-                - databaseURL
+                - datastoreConfigSecret
+                - datastoreInitSecret
+                - datastoreInlineConfigSecret
+                - datastoreSettingsSecret
                 - dbSecret
-                - envConfigmap
-                - envSecret
-                - giteaEndpoint
-                - giteaSecret
+                - giteaAdminSecret
+                - lfsJwtSecret
+                - objStoreSecret
+                - sshEnabled
                 type: object
               env:
                 items:

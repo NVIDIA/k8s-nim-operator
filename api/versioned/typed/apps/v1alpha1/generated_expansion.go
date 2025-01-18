@@ -25,8 +25,6 @@ type NIMServiceExpansion interface{}
 
 type NemoDatastoreExpansion interface{}
 
-type NemoDatastoreV2Expansion interface{}
-
 type NemoEntitystoreExpansion interface{}
 
 type NemoEvaluatorExpansion interface{}
