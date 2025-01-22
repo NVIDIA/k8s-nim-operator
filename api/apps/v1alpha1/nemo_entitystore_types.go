@@ -85,54 +85,6 @@ type NemoEntitystoreSpec struct {
 	DatabaseConfig *DatabaseConfig `json:"databaseConfig,omitempty"`
 }
 
-type DatabaseConfig struct {
-	// Host is the hostname of the database.
-	// Required, must not be empty.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	Host string `json:"host,omitempty"`
-	// Port is the port where the database is reachable at.
-	// If specified, this must be a valid port number, 0 < databasePort < 65536.
-	// Defaults to 5432.
-	//
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default:=5432
-	Port int32 `json:"port,omitempty"`
-	// DatabaseName is the database name for NEMO EntityStore.
-	// Required, must not be empty.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	DatabaseName string `json:"databaseName,omitempty"`
-	// DatabaseCredentials stores the configuration to retrieve the database credentials.
-	// Required, must not be nil.
-	//
-	// +kubebuilder:validation:Required
-	Credentials *DatabaseCredentials `json:"credentials,omitempty"`
-}
-
-type DatabaseCredentials struct {
-	// User is the non-root username for NEMO EntityStore in the database.
-	// Required, must not be empty.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	User string `json:"user,omitempty"`
-	// SecretName is the name of the secret which has the database credentials for the NEMO entitystore user.
-	// Required, must not be empty.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	SecretName string `json:"secretName,omitempty"`
-	// PasswordKey is the name of the key in the `CredentialsSecret` secret for the database credentials.
-	// Defaults to "password".
-	//
-	// +kubebuilder:default:="password"
-	PasswordKey string `json:"passwordKey,omitempty"`
-}
-
 // NemoEntitystoreStatus defines the observed state of NemoEntitystore
 type NemoEntitystoreStatus struct {
 	Conditions        []metav1.Condition `json:"conditions,omitempty"`

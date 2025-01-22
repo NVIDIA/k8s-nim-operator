@@ -76,6 +76,65 @@ spec:
                 required:
                 - endpoint
                 type: object
+              databaseConfig:
+                description: |-
+                  DatabaseConfig stores the database configuration for NEMO entitystore.
+                  Required, must not be nil.
+                properties:
+                  credentials:
+                    description: |-
+                      DatabaseCredentials stores the configuration to retrieve the database credentials.
+                      Required, must not be nil.
+                    properties:
+                      passwordKey:
+                        default: password
+                        description: |-
+                          PasswordKey is the name of the key in the `CredentialsSecret` secret for the database credentials.
+                          Defaults to "password".
+                        type: string
+                      secretName:
+                        description: |-
+                          SecretName is the name of the secret which has the database credentials for a NEMO service user.
+                          Required, must not be empty.
+                        minLength: 1
+                        type: string
+                      user:
+                        description: |-
+                          User is the non-root username for a NEMO Service in the database.
+                          Required, must not be empty.
+                        minLength: 1
+                        type: string
+                    required:
+                    - secretName
+                    - user
+                    type: object
+                  databaseName:
+                    description: |-
+                      DatabaseName is the database name for a NEMO Service.
+                      Required, must not be empty.
+                    minLength: 1
+                    type: string
+                  host:
+                    description: |-
+                      Host is the hostname of the database.
+                      Required, must not be empty.
+                    minLength: 1
+                    type: string
+                  port:
+                    default: 5432
+                    description: |-
+                      Port is the port where the database is reachable at.
+                      If specified, this must be a valid port number, 0 < databasePort < 65536.
+                      Defaults to 5432.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                required:
+                - credentials
+                - databaseName
+                - host
+                type: object
               env:
                 items:
                   description: EnvVar represents an environment variable present in
@@ -719,13 +778,6 @@ spec:
                     type: object
                 type: object
               milvus:
-                properties:
-                  endpoint:
-                    type: string
-                required:
-                - endpoint
-                type: object
-              mongodb:
                 properties:
                   endpoint:
                     type: string
@@ -2126,6 +2178,8 @@ spec:
               userID:
                 format: int64
                 type: integer
+            required:
+            - databaseConfig
             type: object
           status:
             description: NemoEvaluatorStatus defines the observed state of NemoEvaluator

@@ -81,13 +81,13 @@ spec:
                         type: string
                       secretName:
                         description: |-
-                          SecretName is the name of the secret which has the database credentials for the NEMO entitystore user.
+                          SecretName is the name of the secret which has the database credentials for a NEMO service user.
                           Required, must not be empty.
                         minLength: 1
                         type: string
                       user:
                         description: |-
-                          User is the non-root username for NEMO EntityStore in the database.
+                          User is the non-root username for a NEMO Service in the database.
                           Required, must not be empty.
                         minLength: 1
                         type: string
@@ -97,7 +97,7 @@ spec:
                     type: object
                   databaseName:
                     description: |-
-                      DatabaseName is the database name for NEMO EntityStore.
+                      DatabaseName is the database name for a NEMO Service.
                       Required, must not be empty.
                     minLength: 1
                     type: string

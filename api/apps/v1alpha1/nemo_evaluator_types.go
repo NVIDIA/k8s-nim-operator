@@ -74,10 +74,14 @@ type NemoEvaluatorSpec struct {
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 
-	Mongodb       *Mongodb       `json:"mongodb,omitempty"`
-	ArgoWorkFlows *ArgoWorkFlows `json:"argoWorkFlows,omitempty"`
-	Milvus        *Milvus        `json:"milvus,omitempty"`
-	DataStore     *DataStore     `json:"dataStore,omitempty"`
+	// DatabaseConfig stores the database configuration for NEMO entitystore.
+	// Required, must not be nil.
+	//
+	// +kubebuilder:validation:Required
+	DatabaseConfig *DatabaseConfig `json:"databaseConfig,omitempty"`
+	ArgoWorkFlows  *ArgoWorkFlows  `json:"argoWorkFlows,omitempty"`
+	Milvus         *Milvus         `json:"milvus,omitempty"`
+	DataStore      *DataStore      `json:"dataStore,omitempty"`
 }
 
 // NemoEvaluatorStatus defines the observed state of NemoEvaluator
@@ -156,12 +160,19 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 			Value: "7331",
 		},
 		{
-			Name:  "DATABASE_URI",
-			Value: n.Spec.Mongodb.Endpoint,
+			Name: "POSTGRES_DB_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: n.Spec.DatabaseConfig.Credentials.PasswordKey,
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DatabaseConfig.Credentials.SecretName,
+					},
+				},
+			},
 		},
 		{
-			Name:  "DATABASE_NAME",
-			Value: "evaluations",
+			Name:  "POSTGRES_URI",
+			Value: fmt.Sprintf("postgresql://%s:$(POSTGRES_DB_PASSWORD)@%s:%d/%s", n.Spec.DatabaseConfig.Credentials.User, n.Spec.DatabaseConfig.Host, n.Spec.DatabaseConfig.Port, n.Spec.DatabaseConfig.DatabaseName),
 		},
 		{
 			Name:  "ARGO_HOST",
@@ -178,19 +189,6 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 		{
 			Name:  "DATA_STORE_HOST",
 			Value: n.Spec.DataStore.Endpoint,
-		},
-		{
-			Name:  "DATABASE_USERNAME",
-			Value: "root",
-		},
-		{
-			Name: "DATABASE_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "mongodb-root-password",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "myrelease-mongodb"},
-				},
-			},
 		},
 		{
 			Name:  "EVAL_CONTAINER",

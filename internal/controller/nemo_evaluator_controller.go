@@ -350,9 +350,6 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, Ne
 }
 
 func validateNemoEvaluator(ctx context.Context, NemoEvaluator *appsv1alpha1.NemoEvaluator) error {
-	if NemoEvaluator.Spec.Mongodb == nil {
-		return fmt.Errorf(" Required field 'Spec.Mongodb' cannot be empty")
-	}
 	if NemoEvaluator.Spec.ArgoWorkFlows == nil {
 		return fmt.Errorf(" Required field 'Spec.ArgoWorkFlows' cannot be empty")
 	}
