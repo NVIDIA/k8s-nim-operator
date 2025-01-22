@@ -274,16 +274,6 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 		}
 	}()
 
-	NemoEntitystore.Normalize()
-	err = NemoEntitystore.Validate()
-	if err != nil {
-		statusError := r.updater.SetConditionsFailed(ctx, NemoEntitystore, conditions.ValidationFailed, err.Error())
-		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoEntitystore", NemoEntitystore.GetName())
-		}
-		return ctrl.Result{}, err
-	}
-
 	// Generate annotation for the current operator-version and apply to all resources
 	// Get generic name for all resources
 	namespacedName := types.NamespacedName{Name: NemoEntitystore.GetName(), Namespace: NemoEntitystore.GetNamespace()}

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strconv"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -51,18 +52,6 @@ const (
 	NemoEntitystoreStatusFailed = "Failed"
 )
 
-// Default values for NEMO entitystore.
-const (
-	defaultDBSecretPasswordKey = "password"
-	defaultDatabasePort        = "5432"
-)
-
-// Various error messages for NEMO entitystore.
-var (
-	nilErrorFmtStr   = "`%s` cannot be nil"
-	emptyErrorFmtStr = "`%s` cannot be empty"
-)
-
 // NemoEntitystoreSpec defines the desired state of NemoEntitystore
 type NemoEntitystoreSpec struct {
 	Image   Image           `json:"image,omitempty"`
@@ -89,19 +78,59 @@ type NemoEntitystoreSpec struct {
 	UserID       *int64 `json:"userID,omitempty"`
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
-	// Database stores the database config for the entity-store service
-	EntityStoreParams *EntityStoreParams `json:"entityStoreParams,omitempty"`
+	// DatabaseConfig stores the database configuration for NEMO entitystore.
+	// Required, must not be nil.
+	//
+	// +kubebuilder:validation:Required
+	DatabaseConfig *DatabaseConfig `json:"databaseConfig,omitempty"`
 }
 
-type EntityStoreParams struct {
-	AppVersion          string `json:"appVersion,omitempty"`
-	DatabaseHost        string `json:"databaseHost,omitempty"`
-	DatabasePort        string `json:"databasePort,omitempty"`
-	DatabaseUser        string `json:"databaseUser,omitempty"`
-	DatabaseName        string `json:"databaseName,omitempty"`
-	DBSecret            string `json:"dbSecret,omitempty"`
-	DBSecretPasswordKey string `json:"dbSecretPasswordKey,omitempty"`
-	EnvConfigMap        string `json:"envConfigMap,omitempty"`
+type DatabaseConfig struct {
+	// Host is the hostname of the database.
+	// Required, must not be empty.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Host string `json:"host,omitempty"`
+	// Port is the port where the database is reachable at.
+	// If specified, this must be a valid port number, 0 < databasePort < 65536.
+	// Defaults to 5432.
+	//
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:default:=5432
+	Port int32 `json:"port,omitempty"`
+	// DatabaseName is the database name for NEMO EntityStore.
+	// Required, must not be empty.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	DatabaseName string `json:"databaseName,omitempty"`
+	// DatabaseCredentials stores the configuration to retrieve the database credentials.
+	// Required, must not be nil.
+	//
+	// +kubebuilder:validation:Required
+	Credentials *DatabaseCredentials `json:"credentials,omitempty"`
+}
+
+type DatabaseCredentials struct {
+	// User is the non-root username for NEMO EntityStore in the database.
+	// Required, must not be empty.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	User string `json:"user,omitempty"`
+	// SecretName is the name of the secret which has the database credentials for the NEMO entitystore user.
+	// Required, must not be empty.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	SecretName string `json:"secretName,omitempty"`
+	// PasswordKey is the name of the key in the `CredentialsSecret` secret for the database credentials.
+	// Defaults to "password".
+	//
+	// +kubebuilder:default:="password"
+	PasswordKey string `json:"passwordKey,omitempty"`
 }
 
 // NemoEntitystoreStatus defines the observed state of NemoEntitystore
@@ -133,52 +162,6 @@ type NemoEntitystoreList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NemoEntitystore `json:"items"`
-}
-
-func (n *EntityStoreParams) Normalize() {
-	if n.DatabasePort == "" {
-		n.DatabasePort = defaultDatabasePort
-	}
-
-	if n.DBSecretPasswordKey == "" {
-		n.DBSecretPasswordKey = defaultDBSecretPasswordKey
-	}
-}
-
-func (n *EntityStoreParams) Validate() error {
-	if n.DatabaseHost == "" {
-		return fmt.Errorf(emptyErrorFmtStr, "spec.entityStoreParams.databaseHost")
-	}
-
-	if n.DatabaseUser == "" {
-		return fmt.Errorf(emptyErrorFmtStr, "spec.entityStoreParams.databaseUser")
-	}
-
-	if n.DatabaseName == "" {
-		return fmt.Errorf(emptyErrorFmtStr, "spec.entityStoreParams.databaseName")
-	}
-
-	if n.DBSecret == "" {
-		return fmt.Errorf(emptyErrorFmtStr, "spec.entityStoreParams.dbSecret")
-	}
-
-	return nil
-}
-
-func (n *NemoEntitystore) Normalize() {
-	if n.Spec.EntityStoreParams == nil {
-		return
-	}
-
-	n.Spec.EntityStoreParams.Normalize()
-}
-
-func (n *NemoEntitystore) Validate() error {
-	if n.Spec.EntityStoreParams == nil {
-		return fmt.Errorf(nilErrorFmtStr, "spec.entityStoreParams")
-	}
-
-	return n.Spec.EntityStoreParams.Validate()
 }
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
@@ -217,34 +200,34 @@ func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "APP_VERSION",
-			Value: n.Spec.EntityStoreParams.AppVersion,
+			Value: n.Spec.Image.Tag,
 		},
 		{
 			Name: "POSTGRES_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: n.Spec.EntityStoreParams.DBSecretPasswordKey,
+					Key: n.Spec.DatabaseConfig.Credentials.PasswordKey,
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.EntityStoreParams.DBSecret,
+						Name: n.Spec.DatabaseConfig.Credentials.SecretName,
 					},
 				},
 			},
 		},
 		{
 			Name:  "POSTGRES_USER",
-			Value: n.Spec.EntityStoreParams.DatabaseUser,
+			Value: n.Spec.DatabaseConfig.Credentials.User,
 		},
 		{
 			Name:  "POSTGRES_HOST",
-			Value: n.Spec.EntityStoreParams.DatabaseHost,
+			Value: n.Spec.DatabaseConfig.Host,
 		},
 		{
 			Name:  "POSTGRES_PORT",
-			Value: n.Spec.EntityStoreParams.DatabasePort,
+			Value: strconv.FormatInt(int64(n.Spec.DatabaseConfig.Port), 10),
 		},
 		{
 			Name:  "POSTGRES_DB",
-			Value: n.Spec.EntityStoreParams.DatabaseName,
+			Value: n.Spec.DatabaseConfig.DatabaseName,
 		},
 	}
 
