@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -378,13 +379,12 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 		if len(initContainers) > 0 {
 			result.Spec.Template.Spec.InitContainers = initContainers
 		}
-		envFrom := nemoDatastore.GetEnvFrom()
-		if len(envFrom) > 0 {
-			result.Spec.Template.Spec.Containers[0].EnvFrom = envFrom
+		fsGroup := ptr.To[int64](1000)
+		if nemoDatastore.Spec.GroupID != nil {
+			fsGroup = nemoDatastore.Spec.GroupID
 		}
-		fsGroup := int64(1000)
 		result.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{
-			FSGroup: &fsGroup,
+			FSGroup: fsGroup,
 		}
 		return result, nil
 	}, "deployment", conditions.ReasonDeploymentFailed)
@@ -431,7 +431,7 @@ func (r *NemoDatastoreReconciler) reconcilePVC(ctx context.Context, nemoDatastor
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nemoDatastore.ShouldCreatePersistentStorage() {
-			pvc, err = shared.ConstructPVC(*nemoDatastore.Spec.DataStoreParams.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoDatastore.GetNamespace()})
+			pvc, err = shared.ConstructPVC(*nemoDatastore.Spec.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoDatastore.GetNamespace()})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return err

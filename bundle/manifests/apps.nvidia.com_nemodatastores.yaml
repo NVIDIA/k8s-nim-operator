@@ -63,63 +63,6 @@ spec:
                 items:
                   type: string
                 type: array
-              dataStoreParams:
-                properties:
-                  datastoreConfigSecret:
-                    type: string
-                  datastoreInitSecret:
-                    type: string
-                  datastoreInlineConfigSecret:
-                    type: string
-                  datastoreSettingsSecret:
-                    type: string
-                  dbSecret:
-                    type: string
-                  giteaAdminSecret:
-                    type: string
-                  lfsJwtSecret:
-                    type: string
-                  objStoreSecret:
-                    type: string
-                  persistence:
-                    properties:
-                      accessModes:
-                        items:
-                          type: string
-                        type: array
-                      claimName:
-                        type: string
-                      create:
-                        type: boolean
-                      enabled:
-                        type: boolean
-                      labels:
-                        additionalProperties:
-                          type: string
-                        type: object
-                      size:
-                        type: string
-                      storageClass:
-                        type: string
-                    required:
-                    - claimName
-                    - create
-                    - enabled
-                    - size
-                    type: object
-                  sshEnabled:
-                    type: boolean
-                required:
-                - datastoreConfigSecret
-                - datastoreInitSecret
-                - datastoreInlineConfigSecret
-                - datastoreSettingsSecret
-                - dbSecret
-                - giteaAdminSecret
-                - lfsJwtSecret
-                - objStoreSecret
-                - sshEnabled
-                type: object
               env:
                 items:
                   description: EnvVar represents an environment variable present in
@@ -545,6 +488,31 @@ spec:
                     - port
                     type: object
                 type: object
+              externalDatabase:
+                properties:
+                  database:
+                    type: string
+                  databaseSecret:
+                    type: string
+                  databaseSecretKey:
+                    type: string
+                  host:
+                    type: string
+                  port:
+                    type: integer
+                  sslMode:
+                    type: string
+                  user:
+                    type: string
+                required:
+                - database
+                - databaseSecret
+                - databaseSecretKey
+                - host
+                - port
+                - sslMode
+                - user
+                type: object
               groupID:
                 format: int64
                 type: integer
@@ -763,6 +731,34 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
+                type: object
+              objectStore:
+                properties:
+                  bucketName:
+                    type: string
+                  endpoint:
+                    type: string
+                  objectStoreSecret:
+                    type: string
+                  objectStoreSecretAccessKey:
+                    type: string
+                  objectStoreSecretAccessSecret:
+                    type: string
+                  region:
+                    type: string
+                  serveDirect:
+                    type: boolean
+                  ssl:
+                    type: boolean
+                required:
+                - bucketName
+                - endpoint
+                - objectStoreSecret
+                - objectStoreSecretAccessKey
+                - objectStoreSecretAccessSecret
+                - region
+                - serveDirect
+                - ssl
                 type: object
               podAffinity:
                 description: Pod affinity is a group of inter pod affinity scheduling
@@ -1119,6 +1115,30 @@ spec:
                       type: object
                     type: array
                     x-kubernetes-list-type: atomic
+                type: object
+              pvc:
+                description: PersistentVolumeClaim defines the attributes of PVC used
+                  as a source for caching NIM model
+                properties:
+                  create:
+                    description: Create indicates to create a new PVC
+                    type: boolean
+                  name:
+                    description: Name is the name of the PVC
+                    type: string
+                  size:
+                    description: Size of the NIM cache in Gi, used during PVC creation
+                    type: string
+                  storageClass:
+                    description: StorageClass to be used for PVC creation. Leave it
+                      as empty if the PVC is already created.
+                    type: string
+                  subPath:
+                    type: string
+                  volumeAccessMode:
+                    description: VolumeAccessMode is the volume access mode of the
+                      PVC
+                    type: string
                 type: object
               readinessProbe:
                 description: Probe defines attributes for startup/liveness/readiness
@@ -1952,6 +1972,25 @@ spec:
                     - maxReplicas
                     type: object
                 type: object
+              secrets:
+                properties:
+                  datastoreConfigSecret:
+                    type: string
+                  datastoreInitSecret:
+                    type: string
+                  datastoreInlineConfigSecret:
+                    type: string
+                  giteaAdminSecret:
+                    type: string
+                  lfsJwtSecret:
+                    type: string
+                required:
+                - datastoreConfigSecret
+                - datastoreInitSecret
+                - datastoreInlineConfigSecret
+                - giteaAdminSecret
+                - lfsJwtSecret
+                type: object
               startupProbe:
                 description: Probe defines attributes for startup/liveness/readiness
                   probes
@@ -2156,7 +2195,9 @@ spec:
                 type: integer
             required:
             - authSecret
-            - dataStoreParams
+            - externalDatabase
+            - objectStore
+            - secrets
             type: object
           status:
             description: NemoDatastoreStatus defines the observed state of NemoDatastore
