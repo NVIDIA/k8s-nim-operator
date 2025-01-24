@@ -157,6 +157,32 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nemoentitystores
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.nvidia.com
+  resources:
+  - nemoentitystores/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.nvidia.com
+  resources:
+  - nemoentitystores/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.nvidia.com
+  resources:
   - nimcaches
   verbs:
   - create
