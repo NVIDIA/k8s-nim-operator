@@ -63,42 +63,62 @@ spec:
                 items:
                   type: string
                 type: array
-              dataStoreParams:
+              databaseConfig:
+                description: ExternalDatabase contains external PostgreSQL configuration
                 properties:
-                  appVersion:
+                  credentials:
+                    description: |-
+                      DatabaseCredentials stores the configuration to retrieve the database credentials.
+                      Required, must not be nil.
+                    properties:
+                      passwordKey:
+                        default: password
+                        description: |-
+                          PasswordKey is the name of the key in the `CredentialsSecret` secret for the database credentials.
+                          Defaults to "password".
+                        type: string
+                      secretName:
+                        description: |-
+                          SecretName is the name of the secret which has the database credentials for a NEMO service user.
+                          Required, must not be empty.
+                        minLength: 1
+                        type: string
+                      user:
+                        description: |-
+                          User is the non-root username for a NEMO Service in the database.
+                          Required, must not be empty.
+                        minLength: 1
+                        type: string
+                    required:
+                    - secretName
+                    - user
+                    type: object
+                  databaseName:
+                    description: |-
+                      DatabaseName is the database name for a NEMO Service.
+                      Required, must not be empty.
+                    minLength: 1
                     type: string
-                  databaseHost:
+                  host:
+                    description: |-
+                      Host is the hostname of the database.
+                      Required, must not be empty.
+                    minLength: 1
                     type: string
-                  databasePort:
-                    type: string
-                  databaseURL:
-                    type: string
-                  dbSecret:
-                    type: string
-                  envConfigmap:
-                    type: string
-                  envSecret:
-                    type: string
-                  giteaEndpoint:
-                    type: string
-                  giteaSecret:
-                    type: string
-                  initContainerCommand:
-                    items:
-                      type: string
-                    type: array
-                  initContainerImage:
-                    type: string
+                  port:
+                    default: 5432
+                    description: |-
+                      Port is the port where the database is reachable at.
+                      If specified, this must be a valid port number, 0 < databasePort < 65536.
+                      Defaults to 5432.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
                 required:
-                - appVersion
-                - databaseHost
-                - databasePort
-                - databaseURL
-                - dbSecret
-                - envConfigmap
-                - envSecret
-                - giteaEndpoint
-                - giteaSecret
+                - credentials
+                - databaseName
+                - host
                 type: object
               env:
                 items:
@@ -744,6 +764,54 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              objectStoreConfig:
+                description: ObjectStore specifies the location and credentials for
+                  accessing the external Object Storage
+                properties:
+                  bucketName:
+                    description: BucketName is the bucket where LFS files will be
+                      stored
+                    type: string
+                  credentials:
+                    description: ObjectStoreCredentials stores the configuration to
+                      retrieve the object store credentials
+                    properties:
+                      passwordKey:
+                        description: PasswordKey is the name of the key in the `CredentialsSecret`
+                          secret for the object store credentials.
+                        type: string
+                      secretName:
+                        description: SecretName is the name of the secret which has
+                          the object credentials for a NEMO service user.
+                        type: string
+                      user:
+                        description: User is the non-root username for a NEMO Service
+                          in the object store.
+                        type: string
+                    required:
+                    - passwordKey
+                    - secretName
+                    - user
+                    type: object
+                  endpoint:
+                    description: endpoint is the fully qualidfied object store endpoint
+                    type: string
+                  region:
+                    description: Region is the region where bucket is hosted
+                    type: string
+                  serveDirect:
+                    default: true
+                    type: boolean
+                  ssl:
+                    description: SSL enable ssl for object store transport
+                    type: boolean
+                required:
+                - bucketName
+                - credentials
+                - endpoint
+                - region
+                - ssl
+                type: object
               podAffinity:
                 description: Pod affinity is a group of inter pod affinity scheduling
                   rules.
@@ -1099,6 +1167,29 @@ spec:
                       type: object
                     type: array
                     x-kubernetes-list-type: atomic
+                type: object
+              pvc:
+                description: PVC defines the PersistentVolumeClaim for the datastore
+                properties:
+                  create:
+                    description: Create indicates to create a new PVC
+                    type: boolean
+                  name:
+                    description: Name is the name of the PVC
+                    type: string
+                  size:
+                    description: Size of the NIM cache in Gi, used during PVC creation
+                    type: string
+                  storageClass:
+                    description: StorageClass to be used for PVC creation. Leave it
+                      as empty if the PVC is already created.
+                    type: string
+                  subPath:
+                    type: string
+                  volumeAccessMode:
+                    description: VolumeAccessMode is the volume access mode of the
+                      PVC
+                    type: string
                 type: object
               readinessProbe:
                 description: Probe defines attributes for startup/liveness/readiness
@@ -1932,6 +2023,27 @@ spec:
                     - maxReplicas
                     type: object
                 type: object
+              secrets:
+                description: secrets contains the pre-requisite secrets that must
+                  be created before deploying the datastore CR
+                properties:
+                  datastoreConfigSecret:
+                    type: string
+                  datastoreInitSecret:
+                    type: string
+                  datastoreInlineConfigSecret:
+                    type: string
+                  giteaAdminSecret:
+                    type: string
+                  lfsJwtSecret:
+                    type: string
+                required:
+                - datastoreConfigSecret
+                - datastoreInitSecret
+                - datastoreInlineConfigSecret
+                - giteaAdminSecret
+                - lfsJwtSecret
+                type: object
               startupProbe:
                 description: Probe defines attributes for startup/liveness/readiness
                   probes
@@ -2136,7 +2248,9 @@ spec:
                 type: integer
             required:
             - authSecret
-            - dataStoreParams
+            - databaseConfig
+            - objectStoreConfig
+            - secrets
             type: object
           status:
             description: NemoDatastoreStatus defines the observed state of NemoDatastore

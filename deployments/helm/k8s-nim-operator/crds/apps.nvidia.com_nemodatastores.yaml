@@ -63,43 +63,6 @@ spec:
                 items:
                   type: string
                 type: array
-              dataStoreParams:
-                properties:
-                  appVersion:
-                    type: string
-                  databaseHost:
-                    type: string
-                  databasePort:
-                    type: string
-                  databaseURL:
-                    type: string
-                  dbSecret:
-                    type: string
-                  envConfigmap:
-                    type: string
-                  envSecret:
-                    type: string
-                  giteaEndpoint:
-                    type: string
-                  giteaSecret:
-                    type: string
-                  initContainerCommand:
-                    items:
-                      type: string
-                    type: array
-                  initContainerImage:
-                    type: string
-                required:
-                - appVersion
-                - databaseHost
-                - databasePort
-                - databaseURL
-                - dbSecret
-                - envConfigmap
-                - envSecret
-                - giteaEndpoint
-                - giteaSecret
-                type: object
               env:
                 items:
                   description: EnvVar represents an environment variable present in
@@ -525,6 +488,31 @@ spec:
                     - port
                     type: object
                 type: object
+              externalDatabase:
+                properties:
+                  database:
+                    type: string
+                  databaseSecret:
+                    type: string
+                  databaseSecretKey:
+                    type: string
+                  host:
+                    type: string
+                  port:
+                    type: integer
+                  sslMode:
+                    type: string
+                  user:
+                    type: string
+                required:
+                - database
+                - databaseSecret
+                - databaseSecretKey
+                - host
+                - port
+                - sslMode
+                - user
+                type: object
               groupID:
                 format: int64
                 type: integer
@@ -743,6 +731,34 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
+                type: object
+              objectStore:
+                properties:
+                  bucketName:
+                    type: string
+                  endpoint:
+                    type: string
+                  objectStoreSecret:
+                    type: string
+                  objectStoreSecretAccessKey:
+                    type: string
+                  objectStoreSecretAccessSecret:
+                    type: string
+                  region:
+                    type: string
+                  serveDirect:
+                    type: boolean
+                  ssl:
+                    type: boolean
+                required:
+                - bucketName
+                - endpoint
+                - objectStoreSecret
+                - objectStoreSecretAccessKey
+                - objectStoreSecretAccessSecret
+                - region
+                - serveDirect
+                - ssl
                 type: object
               podAffinity:
                 description: Pod affinity is a group of inter pod affinity scheduling
@@ -1099,6 +1115,30 @@ spec:
                       type: object
                     type: array
                     x-kubernetes-list-type: atomic
+                type: object
+              pvc:
+                description: PersistentVolumeClaim defines the attributes of PVC used
+                  as a source for caching NIM model
+                properties:
+                  create:
+                    description: Create indicates to create a new PVC
+                    type: boolean
+                  name:
+                    description: Name is the name of the PVC
+                    type: string
+                  size:
+                    description: Size of the NIM cache in Gi, used during PVC creation
+                    type: string
+                  storageClass:
+                    description: StorageClass to be used for PVC creation. Leave it
+                      as empty if the PVC is already created.
+                    type: string
+                  subPath:
+                    type: string
+                  volumeAccessMode:
+                    description: VolumeAccessMode is the volume access mode of the
+                      PVC
+                    type: string
                 type: object
               readinessProbe:
                 description: Probe defines attributes for startup/liveness/readiness
@@ -1932,6 +1972,25 @@ spec:
                     - maxReplicas
                     type: object
                 type: object
+              secrets:
+                properties:
+                  datastoreConfigSecret:
+                    type: string
+                  datastoreInitSecret:
+                    type: string
+                  datastoreInlineConfigSecret:
+                    type: string
+                  giteaAdminSecret:
+                    type: string
+                  lfsJwtSecret:
+                    type: string
+                required:
+                - datastoreConfigSecret
+                - datastoreInitSecret
+                - datastoreInlineConfigSecret
+                - giteaAdminSecret
+                - lfsJwtSecret
+                type: object
               startupProbe:
                 description: Probe defines attributes for startup/liveness/readiness
                   probes
@@ -2136,7 +2195,9 @@ spec:
                 type: integer
             required:
             - authSecret
-            - dataStoreParams
+            - externalDatabase
+            - objectStore
+            - secrets
             type: object
           status:
             description: NemoDatastoreStatus defines the observed state of NemoDatastore

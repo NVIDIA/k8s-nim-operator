@@ -1,0 +1,77 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NemoDatastore
+metadata:
+  name: nemodatastore
+spec:
+  authSecret: ngc-image-pull-secret
+  secrets:
+    datastoreConfigSecret: "nemo-ms-nemo-datastore"
+    datastoreInitSecret: "nemo-ms-nemo-datastore-init"
+    datastoreInlineConfigSecret: "nemo-ms-nemo-datastore-inline-config"
+    giteaAdminSecret: "gitea-admin-credentials"
+    lfsJwtSecret: "nemo-ms-nemo-datastore--lfs-jwt" 
+  objectStoreConfig:
+    credentials:
+      user: minioUser
+      secretName: nds-minio-existing-secret
+      passwordKey: objectStoreSecret
+    serveDirect: true
+    endpoint: minio.k8s-nim-operator-system.svc.cluster.local:9000
+    bucketName: datastore-dev
+    region: object-store-region
+    ssl: false
+  databaseConfig:
+    credentials:
+      user: ndsuser
+      secretName: nds-pg-existing-secret
+      passwordKey: postgresPassword
+    host: nds-pg-postgresql
+    port: 5432
+    databaseName: ndsdb
+  pvc:
+    name: "pvc-shared-data"
+    create: true
+    storageClass: "local-path"
+    volumeAccessMode: ReadWriteOnce
+    size: "10Gi"
+  expose:
+    service:
+      port: 3000
+      type: ClusterIP
+  image:
+    repository: "nvcr.io/nvidian/nemo-llm/datastore"
+    tag: "25.01-rc8"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "500m"
+    limits:
+      memory: "512Mi"
+      cpu: "1"
+  livenessProbe:
+    enabled: true
+    probe:
+      httpGet:
+        path: /v1/health
+        port: 3000
+        scheme: HTTP
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+  readinessProbe:
+    enabled: true
+    probe:
+      httpGet:
+        path: /v1/health
+        port: 3000
+        scheme: HTTP
+      initialDelaySeconds: 5
+      timeoutSeconds: 3
+  # metrics:
+  #   enabled: true
+  #   serviceMonitor:
+  #     additionalLabels:
+  #       app: sample-nemodatastore
+  #     interval: "30s"
+  #     scrapeTimeout: "10s"

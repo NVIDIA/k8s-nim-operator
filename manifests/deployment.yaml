@@ -78,6 +78,11 @@ spec:
         configMap:
           name: {{ .ConfigMap.Name }}
         {{- end }}
+        {{- if .Secret }}
+        secret:
+          secretName: {{ .Secret.SecretName }}
+          defaultMode: {{ .Secret.DefaultMode }}
+        {{- end }}
         {{- if .EmptyDir }}
         emptyDir:
           medium: {{ .EmptyDir.Medium }}
