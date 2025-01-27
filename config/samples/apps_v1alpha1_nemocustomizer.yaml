@@ -1,0 +1,147 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NemoCustomizer
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-nim-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: nemocustomizer-sample
+spec:
+  wandbSecret:
+    name: wandb-secret
+    apiKeyKey: encryption_key
+  otel:
+    enabled: true
+    loggingEnabled: true
+    exporterOtlpEndpoint: http://<otel-collector-service>:4317
+  databaseConfig:
+    credentials:
+      user: ncsuser
+      secretName: ncs-pg-existing-secret
+      passwordKey: password
+    host: <db-service>
+    port: 5432
+    databaseName: ncsdb
+  expose:
+    service:
+      type: ClusterIP
+      ports:
+        - name: api
+          port: 8000
+          protocol: TCP
+        - name: internal
+          port: 9009
+          protocol: TCP
+  image:
+    repository: "nvidian/nemo-llm/customizer"
+    tag: "25.02-rc1"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-image-pull-secret
+  replicas: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "500m"
+    limits:
+      memory: "512Mi"
+      cpu: "1"
+  livenessProbe:
+    enabled: true
+    probe:
+      failureThreshold: 5
+      httpGet:
+        path: /v1/health/live
+        port: api
+        scheme: HTTP
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 10
+  readinessProbe:
+    enabled: true
+    probe:
+      failureThreshold: 5
+      httpGet:
+        path: /v1/health/ready
+        port: api
+        scheme: HTTP
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+  customizerConfig: |
+    namespace: default
+    entity_store_url: http://<entity-store-service>:8000
+    nemo_data_store_url: http://<data-store-service>:3000
+    mlflow_tracking_url: http://<mlflow-tracking-service>:80
+
+    training:
+      queue: "default"
+      image: "nvcr.io/nvidian/nemo-llm/customizer:25.02-rc1"
+      imagePullSecrets:
+        - name: ngc-image-pull-secret
+      pvc:
+        storageClass: local-path
+        size: 5Gi
+        volumeAccessMode: ReadWriteOnce
+      env:
+        - name: LOG_LEVEL
+          value: INFO
+
+      workspace_dir: /pvc/workspace
+      # volumes reference pre-existing PVCs
+      volumes:
+        # Model cache PVC
+        - name: models
+          persistentVolumeClaim:
+            claimName: finetuning-ms-models-pvc
+            readOnly: True
+        - name: dshm
+          emptyDir:
+            medium: Memory
+      volumeMounts:
+        - name: models
+          mountPath: "/mount/models"
+          readOnly: True
+        - name: dshm
+          mountPath: "/dev/shm"
+
+      # Network configuration for multi node training specific to CSP
+      training_networking:
+        - name: "NCCL_IB_SL"
+          value: 0
+        - name: "NCCL_IB_TC"
+          value: 41
+        - name: "NCCL_IB_QPS_PER_CONNECTION"
+          value: 4
+        - name: "UCX_TLS"
+          value: TCP
+        - name: "UCX_NET_DEVICES"
+          value: eth0
+        - name: "HCOLL_ENABLE_MCAST_ALL"
+          value: 0
+        - name: "NCCL_IB_GID_INDEX"
+          value: 3
+
+      tolerations:
+          []
+
+      container_defaults:
+          imagePullPolicy: IfNotPresent
+
+    models:
+          meta/llama3-8b-instruct:
+            enabled: true
+            max_seq_length: 4096
+            micro_batch_size: 2
+            model_path: llama3-8b-bf16
+            num_parameters: 8000000000
+            precision: bf16
+            training_job_resources:
+            - finetuning_type: lora
+              num_gpus: 2
+              training_type: sft
+
+    nemo_data_store_tools:
+      image: nvcr.io/nvidian/nemo-llm/nds-v2-huggingface-cli:278bb5cd0fde8ad46842daf6d2471134624ae891
+      imagePullSecret: ngc-image-pull-secret

@@ -3,4 +3,5 @@ resources:
 - apps_v1alpha1_nimservice.yaml
 - apps_v1alpha1_nimcache.yaml
 - apps_v1alpha1_nimpipeline.yaml
+- apps_v1alpha1_nemocustomizer.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

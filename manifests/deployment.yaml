@@ -50,6 +50,7 @@ spec:
         - name: {{ .Name }}
           mountPath: {{ .MountPath }}
           subPath: {{ .SubPath }}
+          readOnly: {{ .ReadOnly }}
         {{- end }}
         env:
         {{- if .Env }}
@@ -77,6 +78,13 @@ spec:
         {{- if .ConfigMap }}
         configMap:
           name: {{ .ConfigMap.Name }}
+          {{- if .ConfigMap.Items }}
+          items:
+            {{- range .ConfigMap.Items }}
+            - key: {{ .Key }}
+              path: {{ .Path }}
+            {{- end }}
+          {{- end }}
         {{- end }}
         {{- if .Secret }}
         secret:
