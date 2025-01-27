@@ -117,12 +117,14 @@ type StatefulSetParams struct {
 
 // ServiceParams holds the parameters for rendering a Service template
 type ServiceParams struct {
-	Name           string
-	Namespace      string
-	Port           int32
-	TargetPort     int32
-	PortName       string
-	Protocol       string
+	Name       string
+	Namespace  string
+	Port       int32
+	TargetPort int32
+	PortName   string
+	Protocol   string
+	// Defines multiple ports for the service
+	Ports          []corev1.ServicePort
 	Type           string
 	Labels         map[string]string
 	Annotations    map[string]string

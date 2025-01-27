@@ -76,3 +76,68 @@ type DatabaseCredentials struct {
 	// +kubebuilder:default:="password"
 	PasswordKey string `json:"passwordKey,omitempty"`
 }
+
+// WandBSecret represents the secret and key details for the Weights and Biases service.
+type WandBSecret struct {
+	// Name is the name of the Kubernetes Secret containing the WandB API key.
+	// Required, must not be empty.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name,omitempty"`
+
+	// APIKeyKey is the key in the Secret that holds the WandB API key.
+	// Defaults to "apiKey".
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default="apiKey"
+	APIKeyKey string `json:"apiKeyKey,omitempty"`
+
+	// EncryptionKey is an optional key in the secret used for encrypting WandB credentials.
+	// This can be used for additional security layers if required.
+	// Defaults to "encryptionKey".
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="encryptionKey"
+	EncryptionKey string `json:"encryptionKey,omitempty"`
+}
+
+// OTelSpec defines the settings for OpenTelemetry
+type OTelSpec struct {
+	// Enabled indicates whether OpenTelemetry is enabled
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ExporterOtlpEndpoint is the OTLP collector endpoint.
+	// +kubebuilder:validation:Required
+	ExporterOtlpEndpoint string `json:"exporterOtlpEndpoint,omitempty"`
+
+	// LoggingEnabled indicates whether Python logging auto-instrumentation is enabled.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	LoggingEnabled *bool `json:"loggingEnabled,omitempty"`
+
+	// TracesExporter sets the traces exporter: (otlp, console, none).
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="otlp"
+	TracesExporter string `json:"tracesExporter,omitempty"`
+
+	// MetricsExporter sets the metrics exporter: (otlp, console, none).
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="otlp"
+	MetricsExporter string `json:"metricsExporter,omitempty"`
+
+	// LogsExporter sets the logs exporter: (otlp, console, none).
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="otlp"
+	LogsExporter string `json:"logsExporter,omitempty"`
+
+	// ExcludedUrls defines URLs to be excluded from tracing.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="health"
+	ExcludedUrls string `json:"excludedUrls,omitempty"`
+
+	// LogLevel defines the log level (e.g., INFO, DEBUG).
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="INFO"
+	LogLevel string `json:"logLevel,omitempty"`
+}

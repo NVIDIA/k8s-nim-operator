@@ -79,6 +79,32 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nemocustomizers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.nvidia.com
+  resources:
+  - nemocustomizers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.nvidia.com
+  resources:
+  - nemocustomizers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.nvidia.com
+  resources:
   - nemoguardrails
   verbs:
   - create
@@ -398,6 +424,53 @@ rules:
   - subjectaccessreviews
   verbs:
   - create
+- apiGroups:
+  - batch.volcano.sh
+  resources:
+  - jobs
+  - jobs/status
+  verbs:
+  - get
+  - list
+  - watch
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nvidia.com
+  resources:
+  - nemoentityhandlers
+  - nemotrainingjobs
+  - nemotrainingjobs/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - scheduling.incubator.k8s.io
+  - scheduling.volcano.sh
+  resources:
+  - podgroups
+  - queues
+  - queues/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nodeinfo.volcano.sh
+  resources:
+  - numatopologies
+  verbs:
+  - get
+  - list
+  - watch
+
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

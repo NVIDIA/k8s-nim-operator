@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.2
-  name: nemoentitystores.apps.nvidia.com
+  name: nemocustomizers.apps.nvidia.com
 spec:
   group: apps.nvidia.com
   names:
-    kind: NemoEntitystore
-    listKind: NemoEntitystoreList
-    plural: nemoentitystores
-    singular: nemoentitystore
+    kind: NemoCustomizer
+    listKind: NemoCustomizerList
+    plural: nemocustomizers
+    singular: nemocustomizer
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -25,7 +25,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NemoEntitystore is the Schema for the NemoEntitystore API
+        description: NemoCustomizer is the Schema for the NemoCustomizer API
         properties:
           apiVersion:
             description: |-
@@ -45,7 +45,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: NemoEntitystoreSpec defines the desired state of NemoEntitystore
+            description: NemoCustomizerSpec defines the desired state of NemoCustomizer
             properties:
               annotations:
                 additionalProperties:
@@ -59,10 +59,11 @@ spec:
                 items:
                   type: string
                 type: array
+              customizerConfig:
+                description: CustomizerConfig stores the customizer configuration
+                type: string
               databaseConfig:
-                description: |-
-                  DatabaseConfig stores the database configuration for NEMO entitystore.
-                  Required, must not be nil.
+                description: DatabaseConfig stores the database configuration
                 properties:
                   credentials:
                     description: |-
@@ -833,6 +834,48 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
+                type: object
+              otel:
+                description: OpenTelemetry Settings
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled indicates whether OpenTelemetry is enabled
+                    type: boolean
+                  excludedUrls:
+                    default: health
+                    description: ExcludedUrls defines URLs to be excluded from tracing.
+                    type: string
+                  exporterOtlpEndpoint:
+                    description: ExporterOtlpEndpoint is the OTLP collector endpoint.
+                    type: string
+                  logLevel:
+                    default: INFO
+                    description: LogLevel defines the log level (e.g., INFO, DEBUG).
+                    type: string
+                  loggingEnabled:
+                    default: true
+                    description: LoggingEnabled indicates whether Python logging auto-instrumentation
+                      is enabled.
+                    type: boolean
+                  logsExporter:
+                    default: otlp
+                    description: 'LogsExporter sets the logs exporter: (otlp, console,
+                      none).'
+                    type: string
+                  metricsExporter:
+                    default: otlp
+                    description: 'MetricsExporter sets the metrics exporter: (otlp,
+                      console, none).'
+                    type: string
+                  tracesExporter:
+                    default: otlp
+                    description: 'TracesExporter sets the traces exporter: (otlp,
+                      console, none).'
+                    type: string
+                required:
+                - enabled
+                - exporterOtlpEndpoint
                 type: object
               podAffinity:
                 description: Pod affinity is a group of inter pod affinity scheduling
@@ -2022,6 +2065,36 @@ spec:
                     - maxReplicas
                     type: object
                 type: object
+              scheduler:
+                description: Scheduler Configuration
+                properties:
+                  runai:
+                    description: RunAI scheduler configuration
+                    properties:
+                      enabled:
+                        description: Enabled indicates whether Run.AI scheduler is
+                          enabled
+                        type: boolean
+                    type: object
+                  type:
+                    default: volcano
+                    description: Type is the scheduler type (volcano, runai)
+                    enum:
+                    - volcano
+                    - runai
+                    type: string
+                  volcano:
+                    description: Volcano scheduler configuration
+                    properties:
+                      admissionURL:
+                        description: AdmissionURL for the Volcano admission controller
+                        type: string
+                      enabled:
+                        description: Enabled indicates whether Volcano scheduler is
+                          enabled
+                        type: boolean
+                    type: object
+                type: object
               startupProbe:
                 description: Probe defines attributes for startup/liveness/readiness
                   probes
@@ -2183,6 +2256,40 @@ spec:
                         type: integer
                     type: object
                 type: object
+              storage:
+                description: Persistent Volume Claims for storage
+                properties:
+                  model:
+                    description: StorageSpec defines the persistent volume claim configuration
+                      for storage
+                    properties:
+                      create:
+                        type: boolean
+                      name:
+                        type: string
+                      size:
+                        type: string
+                      storageClass:
+                        type: string
+                      volumeAccessMode:
+                        type: string
+                    type: object
+                  workspace:
+                    description: StorageSpec defines the persistent volume claim configuration
+                      for storage
+                    properties:
+                      create:
+                        type: boolean
+                      name:
+                        type: string
+                      size:
+                        type: string
+                      storageClass:
+                        type: string
+                      volumeAccessMode:
+                        type: string
+                    type: object
+                type: object
               tolerations:
                 items:
                   description: |-
@@ -2224,11 +2331,36 @@ spec:
               userID:
                 format: int64
                 type: integer
-            required:
-            - databaseConfig
+              wandbSecret:
+                description: WandBSecret stores the secret and encryption key for
+                  the Weights and Biases service.
+                properties:
+                  apiKeyKey:
+                    default: apiKey
+                    description: |-
+                      APIKeyKey is the key in the Secret that holds the WandB API key.
+                      Defaults to "apiKey".
+                    type: string
+                  encryptionKey:
+                    default: encryptionKey
+                    description: |-
+                      EncryptionKey is an optional key in the secret used for encrypting WandB credentials.
+                      This can be used for additional security layers if required.
+                      Defaults to "encryptionKey".
+                    type: string
+                  name:
+                    description: |-
+                      Name is the name of the Kubernetes Secret containing the WandB API key.
+                      Required, must not be empty.
+                    minLength: 1
+                    type: string
+                required:
+                - apiKeyKey
+                - name
+                type: object
             type: object
           status:
-            description: NemoEntitystoreStatus defines the observed state of NemoEntitystore
+            description: NemoCustomizerStatus defines the observed state of NemoCustomizer
             properties:
               availableReplicas:
                 format: int32

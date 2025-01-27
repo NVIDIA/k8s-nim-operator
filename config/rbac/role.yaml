@@ -62,6 +62,7 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nemocustomizers
   - nemodatastores
   - nemoentitystores
   - nemoevaluators
@@ -80,6 +81,7 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nemocustomizers/finalizers
   - nemodatastores/finalizers
   - nemoentitystores/finalizers
   - nemoevaluators/finalizers
@@ -92,6 +94,7 @@ rules:
 - apiGroups:
   - apps.nvidia.com
   resources:
+  - nemocustomizers/status
   - nemodatastores/status
   - nemoentitystores/status
   - nemoevaluators/status
@@ -129,6 +132,15 @@ rules:
   - update
   - watch
 - apiGroups:
+  - batch.volcano.sh
+  resources:
+  - jobs
+  - jobs/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - config.openshift.io
   resources:
   - clusterversions
@@ -163,6 +175,28 @@ rules:
   - update
   - watch
 - apiGroups:
+  - nodeinfo.volcano.sh
+  resources:
+  - numatopologies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nvidia.com
+  resources:
+  - nemoentityhandlers
+  - nemotrainingjobs
+  - nemotrainingjobs/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings
@@ -186,6 +220,17 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - scheduling.incubator.k8s.io
+  - scheduling.volcano.sh
+  resources:
+  - podgroups
+  - queues
+  - queues/status
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - scheduling.k8s.io

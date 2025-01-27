@@ -163,8 +163,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 				Tolerations: []corev1.Toleration{
 					{
 						Key:      "key1",
-						Operator: corev1.TolerationOpEqual,
-						Value:    "value1",
+						Operator: corev1.TolerationOpExists,
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
@@ -231,8 +230,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 				Tolerations: []corev1.Toleration{
 					{
 						Key:      "key1",
-						Operator: corev1.TolerationOpEqual,
-						Value:    "value1",
+						Operator: corev1.TolerationOpExists,
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},

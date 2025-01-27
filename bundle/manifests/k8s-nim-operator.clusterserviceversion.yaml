@@ -321,6 +321,26 @@ spec:
             kind: ConfigMap
         specDescriptors: [ ]
         statusDescriptors: [ ]
+      - name: nemocustomizers.apps.nvidia.com
+        displayName: NemoCustomizer
+        kind: NemoCustomizer
+        version: v1alpha1
+        description: NEMO Customizer Service
+        resources:
+          - version: v1
+            kind: Deployment
+          - version: v1
+            kind: Service
+          - version: v1
+            kind: ReplicaSet
+          - version: v1
+            kind: Pod
+          - version: v1
+            kind: Secret
+          - version: v1
+            kind: ConfigMap
+        specDescriptors: [ ]
+        statusDescriptors: [ ]
     required: []
   install:
     strategy: deployment
@@ -586,6 +606,32 @@ spec:
                 - apps.nvidia.com
               resources:
                 - nemoevaluators/status
+              verbs:
+                - get
+                - patch
+                - update
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nemocustomizers
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nemocustomizers/finalizers
+              verbs:
+                - update
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nemocustomizers/status
               verbs:
                 - get
                 - patch

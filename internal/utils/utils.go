@@ -18,6 +18,7 @@ package utils
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -278,4 +279,10 @@ func SortHPAMetricsSpec(metrics []autoscalingv2.MetricSpec) []autoscalingv2.Metr
 		return iMetricsType < jMetricsType
 	})
 	return metrics
+}
+
+// CalculateHash calculates a SHA256 hash for the given data
+func CalculateHash(data string) string {
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:])
 }
