@@ -82,9 +82,9 @@ type NemoDatastoreSpec struct {
 
 	// ObjectStore specifies the location and credentials for accessing the external Object Storage
 	ObjectStoreConfig ObjectStoreConfig `json:"objectStoreConfig"` // e.g. minio
-	// ExternalDatabase contains external PostgreSQL configuration
+	// DatabaseConfig contains external PostgreSQL configuration
 	DatabaseConfig DatabaseConfig `json:"databaseConfig"` // e.g. postgres
-	// secrets contains the pre-requisite secrets that must be created before deploying the datastore CR
+	// Secrets contains the pre-requisite secrets that must be created before deploying the datastore CR
 	Secrets Secrets `json:"secrets"`
 	// PVC defines the PersistentVolumeClaim for the datastore
 	PVC *PersistentVolumeClaim `json:"pvc,omitempty"`

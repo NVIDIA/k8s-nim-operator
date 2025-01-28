@@ -63,6 +63,63 @@ spec:
                 items:
                   type: string
                 type: array
+              databaseConfig:
+                description: DatabaseConfig contains external PostgreSQL configuration
+                properties:
+                  credentials:
+                    description: |-
+                      DatabaseCredentials stores the configuration to retrieve the database credentials.
+                      Required, must not be nil.
+                    properties:
+                      passwordKey:
+                        default: password
+                        description: |-
+                          PasswordKey is the name of the key in the `CredentialsSecret` secret for the database credentials.
+                          Defaults to "password".
+                        type: string
+                      secretName:
+                        description: |-
+                          SecretName is the name of the secret which has the database credentials for a NEMO service user.
+                          Required, must not be empty.
+                        minLength: 1
+                        type: string
+                      user:
+                        description: |-
+                          User is the non-root username for a NEMO Service in the database.
+                          Required, must not be empty.
+                        minLength: 1
+                        type: string
+                    required:
+                    - secretName
+                    - user
+                    type: object
+                  databaseName:
+                    description: |-
+                      DatabaseName is the database name for a NEMO Service.
+                      Required, must not be empty.
+                    minLength: 1
+                    type: string
+                  host:
+                    description: |-
+                      Host is the hostname of the database.
+                      Required, must not be empty.
+                    minLength: 1
+                    type: string
+                  port:
+                    default: 5432
+                    description: |-
+                      Port is the port where the database is reachable at.
+                      If specified, this must be a valid port number, 0 < databasePort < 65536.
+                      Defaults to 5432.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                required:
+                - credentials
+                - databaseName
+                - host
+                type: object
               env:
                 items:
                   description: EnvVar represents an environment variable present in
@@ -488,31 +545,6 @@ spec:
                     - port
                     type: object
                 type: object
-              externalDatabase:
-                properties:
-                  database:
-                    type: string
-                  databaseSecret:
-                    type: string
-                  databaseSecretKey:
-                    type: string
-                  host:
-                    type: string
-                  port:
-                    type: integer
-                  sslMode:
-                    type: string
-                  user:
-                    type: string
-                required:
-                - database
-                - databaseSecret
-                - databaseSecretKey
-                - host
-                - port
-                - sslMode
-                - user
-                type: object
               groupID:
                 format: int64
                 type: integer
@@ -732,32 +764,52 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
-              objectStore:
+              objectStoreConfig:
+                description: ObjectStore specifies the location and credentials for
+                  accessing the external Object Storage
                 properties:
                   bucketName:
+                    description: BucketName is the bucket where LFS files will be
+                      stored
                     type: string
+                  credentials:
+                    description: ObjectStoreCredentials stores the configuration to
+                      retrieve the object store credentials
+                    properties:
+                      passwordKey:
+                        description: PasswordKey is the name of the key in the `CredentialsSecret`
+                          secret for the object store credentials.
+                        type: string
+                      secretName:
+                        description: SecretName is the name of the secret which has
+                          the object credentials for a NEMO service user.
+                        type: string
+                      user:
+                        description: User is the non-root username for a NEMO Service
+                          in the object store.
+                        type: string
+                    required:
+                    - passwordKey
+                    - secretName
+                    - user
+                    type: object
                   endpoint:
-                    type: string
-                  objectStoreSecret:
-                    type: string
-                  objectStoreSecretAccessKey:
-                    type: string
-                  objectStoreSecretAccessSecret:
+                    description: endpoint is the fully qualidfied object store endpoint
                     type: string
                   region:
+                    description: Region is the region where bucket is hosted
                     type: string
                   serveDirect:
+                    default: true
                     type: boolean
                   ssl:
+                    description: SSL enable ssl for object store transport
                     type: boolean
                 required:
                 - bucketName
+                - credentials
                 - endpoint
-                - objectStoreSecret
-                - objectStoreSecretAccessKey
-                - objectStoreSecretAccessSecret
                 - region
-                - serveDirect
                 - ssl
                 type: object
               podAffinity:
@@ -1117,8 +1169,7 @@ spec:
                     x-kubernetes-list-type: atomic
                 type: object
               pvc:
-                description: PersistentVolumeClaim defines the attributes of PVC used
-                  as a source for caching NIM model
+                description: PVC defines the PersistentVolumeClaim for the datastore
                 properties:
                   create:
                     description: Create indicates to create a new PVC
@@ -1973,6 +2024,8 @@ spec:
                     type: object
                 type: object
               secrets:
+                description: Secrets contains the pre-requisite secrets that must
+                  be created before deploying the datastore CR
                 properties:
                   datastoreConfigSecret:
                     type: string
@@ -2195,8 +2248,8 @@ spec:
                 type: integer
             required:
             - authSecret
-            - externalDatabase
-            - objectStore
+            - databaseConfig
+            - objectStoreConfig
             - secrets
             type: object
           status:
