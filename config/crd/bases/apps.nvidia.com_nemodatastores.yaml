@@ -64,7 +64,7 @@ spec:
                   type: string
                 type: array
               databaseConfig:
-                description: ExternalDatabase contains external PostgreSQL configuration
+                description: DatabaseConfig contains external PostgreSQL configuration
                 properties:
                   credentials:
                     description: |-
@@ -2024,7 +2024,7 @@ spec:
                     type: object
                 type: object
               secrets:
-                description: secrets contains the pre-requisite secrets that must
+                description: Secrets contains the pre-requisite secrets that must
                   be created before deploying the datastore CR
                 properties:
                   datastoreConfigSecret:
