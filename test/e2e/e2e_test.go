@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
@@ -49,11 +50,13 @@ import (
 )
 
 const (
-	gpuOpHelm                   = "https://helm.ngc.nvidia.com/nvidia"
+	nvidiaHelm                  = "https://helm.ngc.nvidia.com/nvidia"
 	rancherLocalPathProvisioner = "https://github.com/rancher/local-path-provisioner.git"
+	bitnamiHelm                 = "https://charts.bitnami.com/bitnami"
 	nfd                         = "nfd"
 	gpuOperator                 = "gpu-operator"
 	localPathProvisioner        = "local-path-provisioner"
+	postgresql                  = "postgresql"
 
 	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
 	DefaultNamespaceDeletionTimeout = 10 * time.Minute
@@ -69,6 +72,7 @@ var (
 	EnableNFD                  bool
 	EnableGPUOperator          bool
 	EnableLocalPathProvisioner bool
+	EnableNemoMicroservices    bool
 	LogArtifactDir             string
 	ImageRepo                  string
 	ImageTag                   string
@@ -103,6 +107,10 @@ var (
 		"deployments",
 		"daemonsets",
 	}
+
+	// NEMO microservice variables
+	NemoEntityStoreRepo    string
+	NemoEntityStoreVersion string
 )
 
 func TestMain(t *testing.T) {
@@ -142,13 +150,15 @@ var _ = BeforeSuite(func() {
 		collectLogsFrom = strings.Split(CollectLogsFrom, ",")
 	}
 
+	createPullSecrets()
 	deployDependencies(ctx)
 })
 
 // AfterSuite runs after the test suite
 var _ = AfterSuite(func() {
 	// Clean up CRs so they are garbage collected by their controllers
-	cleanupCRs()
+	cleanupNIMCRs()
+	cleanupNEMOCRs()
 	// Clean up Helm deployments
 	cleanup()
 	// Remove CRDs
@@ -157,7 +167,7 @@ var _ = AfterSuite(func() {
 	DeleteNamespace()
 })
 
-// cleanup cleans up the test environment
+// deployDependencies installs all the dependent helm charts
 func deployDependencies(ctx context.Context) {
 	// Install dependencies if needed
 	if EnableNFD {
@@ -190,7 +200,7 @@ func deployDependencies(ctx context.Context) {
 		// Add or Update Helm repo
 		helmRepo := repo.Entry{
 			Name: "nvidia",
-			URL:  gpuOpHelm,
+			URL:  nvidiaHelm,
 		}
 		err := helmClient.AddOrUpdateChartRepo(helmRepo)
 		Expect(err).NotTo(HaveOccurred())
@@ -304,6 +314,7 @@ func getTestEnv() {
 	EnableNFD = getBoolEnvVar("ENABLE_NFD", false)
 	EnableGPUOperator = getBoolEnvVar("ENABLE_GPU_OPERATOR", false)
 	EnableLocalPathProvisioner = getBoolEnvVar("ENABLE_LOCAL_PATH_PROVISIONER", false)
+	EnableNemoMicroservices = getBoolEnvVar("ENABLE_NEMO_MICROSERVICES", false)
 	Timeout = time.Duration(getIntEnvVar("E2E_TIMEOUT_SECONDS", 1800)) * time.Second
 
 	helmChart = os.Getenv("HELM_CHART")
@@ -321,6 +332,14 @@ func getTestEnv() {
 	Expect(ImagePullPolicy).NotTo(BeEmpty(), "IMAGE_PULL_POLICY must be set")
 
 	CollectLogsFrom = os.Getenv("COLLECT_LOGS_FROM")
+
+	if EnableNemoMicroservices {
+		// Entitystore env variables.
+		NemoEntityStoreRepo = os.Getenv("NEMO_ENTITYSTORE_REPO")
+		Expect(NemoEntityStoreRepo).NotTo(BeEmpty(), "NEMO_ENTITYSTORE_REPO must be set")
+		NemoEntityStoreVersion = os.Getenv("NEMO_ENTITYSTORE_VERSION")
+		Expect(NemoEntityStoreVersion).NotTo(BeEmpty(), "NEMO_ENTITYSTORE_VERSION must be set")
+	}
 
 	// Get current working directory
 	cwd, err = os.Getwd()
@@ -432,4 +451,57 @@ func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeou
 // RandomSuffix provides a random sequence to append to pods,services,rcs.
 func RandomSuffix() string {
 	return strconv.Itoa(rand.Intn(10000))
+}
+
+func createPullSecrets() {
+	// Get the NGC_API_KEY
+	NGC_API_KEY := os.Getenv("NGC_API_KEY")
+
+	// Create a secret for pulling the image
+	ngcAPIsecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ngc-api-secret",
+			Namespace: testNamespace.Name,
+		},
+		Type: corev1.SecretTypeOpaque,
+		StringData: map[string]string{
+			"NGC_API_KEY": NGC_API_KEY,
+		},
+	}
+
+	_, err := clientSet.CoreV1().Secrets(testNamespace.Name).Create(ctx, ngcAPIsecret, metav1.CreateOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create the dockerconfigjson type secret
+	dockerServer := "nvcr.io"
+	dockerUsername := `$oauthtoken`
+	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", dockerUsername, NGC_API_KEY)))
+
+	dockerConfigJson := `{
+		"auths": {
+			"` + dockerServer + `": {
+				"username": "` + dockerUsername + `",
+				"password": "` + NGC_API_KEY + `",
+				"auth": "` + auth + `"
+			}
+		}
+	}`
+
+	ngcSecret := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "ngc-secret",
+			Namespace:         testNamespace.Name,
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+		},
+		Data: map[string][]byte{
+			corev1.DockerConfigJsonKey: []byte(dockerConfigJson),
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+	}
+	_, err = clientSet.CoreV1().Secrets(testNamespace.Name).Create(ctx, ngcSecret, metav1.CreateOptions{})
+	Expect(err).NotTo(HaveOccurred())
 }
