@@ -403,7 +403,7 @@ func (n *NemoGuardrail) GetVolumes() []corev1.Volume {
 func (n *NemoGuardrail) GetVolumeMounts() []corev1.VolumeMount {
 	volumeMount := corev1.VolumeMount{
 		Name:      "config-store",
-		MountPath: "/config-store",
+		MountPath: "/config-store/default",
 	}
 	if n.Spec.ConfigStore.PVC != nil {
 		volumeMount.SubPath = n.Spec.ConfigStore.PVC.SubPath
