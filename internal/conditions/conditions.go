@@ -54,7 +54,7 @@ const (
 	// ReasonServiceMonitorFailed indicates that the creation of Service Monitor has failed
 	ReasonServiceMonitorFailed = "ServiceMonitorFailed"
 	// ReasonConfigMapFailed indicates that the creation of configmap has failed
-	ReasonConfigMapFailed = "ServiceAccountFailed"
+	ReasonConfigMapFailed = "ConfigMapFailed"
 	// ReasonDeploymentFailed indicates that the creation of deployment has failed
 	ReasonDeploymentFailed = "DeploymentFailed"
 	// ReasonStatefulSetFailed indicates that the creation of statefulset has failed
