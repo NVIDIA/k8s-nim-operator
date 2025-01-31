@@ -5,7 +5,14 @@ resources:
 - bases/apps.nvidia.com_nimservices.yaml
 - bases/apps.nvidia.com_nimcaches.yaml
 - bases/apps.nvidia.com_nimpipelines.yaml
+<<<<<<< HEAD
 - bases/apps.nvidia.com_nemocustomizers.yaml
+=======
+- bases/apps.nvidia.com_nemoguardrails.yaml
+- bases/apps.nvidia.com_nemoevaluators.yaml
+- bases/apps.nvidia.com_nemodatastores.yaml
+- bases/apps.nvidia.com_nemoentitystores.yaml
+>>>>>>> 4cb6b28 (Fix project scaffolding for all microservices)
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
@@ -19,7 +26,14 @@ patches:
 #- path: patches/cainjection_in_nimworkflows.yaml
 #- path: patches/cainjection_in_nimcaches.yaml
 #- path: patches/cainjection_in_nimpipelines.yaml
+<<<<<<< HEAD
 #- path: patches/cainjection_in_nemocustomizers.yaml
+=======
+#- path: patches/cainjection_in_nemoguardrails.yaml
+#- path: patches/cainjection_in_nemoevaluators.yaml
+#- path: patches/cainjection_in_nemodatastores.yaml
+#- path: patches/cainjection_in_nemoentitystores.yaml
+>>>>>>> 4cb6b28 (Fix project scaffolding for all microservices)
 # +kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section
