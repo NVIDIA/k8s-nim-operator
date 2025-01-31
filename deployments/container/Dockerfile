@@ -30,7 +30,7 @@ RUN if [ "$TARGETARCH" = "x86_64" ]; then OS_ARCH="amd64"; elif [ "$TARGETARCH" 
     && chmod +x ./kubectl
 
 # Use distroless as minimal base image to package the manager binary
-FROM nvcr.io/nvidia/distroless/go:v3.1.4
+FROM nvcr.io/nvidia/distroless/go:v3.1.5
 
 ARG VERSION="unknown"
 
