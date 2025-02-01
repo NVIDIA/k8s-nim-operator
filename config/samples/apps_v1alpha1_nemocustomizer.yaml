@@ -10,8 +10,6 @@ spec:
     name: wandb-secret
     apiKeyKey: encryption_key
   otel:
-    enabled: true
-    loggingEnabled: true
     exporterOtlpEndpoint: http://<otel-collector-service>:4317
   databaseConfig:
     credentials:

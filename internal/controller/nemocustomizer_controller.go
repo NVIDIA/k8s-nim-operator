@@ -35,7 +35,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -399,12 +398,12 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 
 	if !ready {
 		// Update status as NotReady
-		err = r.SetConditionsNotReady(ctx, NemoCustomizer, conditions.NotReady, msg)
+		err = r.updater.SetConditionsNotReady(ctx, NemoCustomizer, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeNormal, conditions.NotReady,
 			"NemoCustomizer %s not ready yet, msg: %s", NemoCustomizer.Name, msg)
 	} else {
 		// Update status as ready
-		err = r.SetConditionsReady(ctx, NemoCustomizer, conditions.Ready, msg)
+		err = r.updater.SetConditionsReady(ctx, NemoCustomizer, conditions.Ready, msg)
 		r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeNormal, conditions.Ready,
 			"NemoCustomizer %s ready, msg: %s", NemoCustomizer.Name, msg)
 	}
@@ -592,73 +591,5 @@ func (r *NemoCustomizerReconciler) cleanupResource(ctx context.Context, obj clie
 		return err
 	}
 	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
-	return nil
-}
-
-func (r *NemoCustomizerReconciler) SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NemoCustomizer, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Failed,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Ready,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoCustomizerStatusReady
-	return r.updateNemoCustomizerStatus(ctx, cr)
-}
-
-func (r *NemoCustomizerReconciler) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NemoCustomizer, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionFalse,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionFalse,
-		Reason:  conditions.Ready,
-		Message: message,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoCustomizerStatusNotReady
-	return r.updateNemoCustomizerStatus(ctx, cr)
-}
-
-func (r *NemoCustomizerReconciler) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NemoCustomizer, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Ready,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Failed,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-	cr.Status.State = appsv1alpha1.NemoCustomizerStatusFailed
-	return r.updateNemoCustomizerStatus(ctx, cr)
-}
-
-func (r *NemoCustomizerReconciler) updateNemoCustomizerStatus(ctx context.Context, cr *appsv1alpha1.NemoCustomizer) error {
-
-	obj := &appsv1alpha1.NemoCustomizer{}
-	errGet := r.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := r.Status().Update(ctx, obj); err != nil {
-		return err
-	}
 	return nil
 }

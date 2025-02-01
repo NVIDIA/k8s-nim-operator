@@ -21,6 +21,7 @@ import (
 	"maps"
 	"os"
 	"strconv"
+	"strings"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -47,6 +48,11 @@ const (
 	NemoCustomizerStatusReady = "Ready"
 	// NemoCustomizerStatusFailed indicates that NEMO CustomizerService has failed
 	NemoCustomizerStatusFailed = "Failed"
+
+	// SchedulerTypeVolcano indicates if the scheduler is volcano
+	SchedulerTypeVolcano = "volcano"
+	// SchedulerTypeRunAI indicates if the scheduler is run.ai
+	SchedulerTypeRunAI = "runai"
 )
 
 // NemoCustomizerSpec defines the desired state of NemoCustomizer
@@ -75,23 +81,21 @@ type NemoCustomizerSpec struct {
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 
-	// CustomizerConfig stores the customizer configuration
-	CustomizerConfig string `json:"customizerConfig,omitempty"`
+	// CustomizerConfig stores the customizer configuration for training and models
+	// +kubebuilder:validation:MinLength=1
+	CustomizerConfig string `json:"customizerConfig"`
 
 	// Scheduler Configuration
 	Scheduler Scheduler `json:"scheduler,omitempty"`
 
 	// OpenTelemetry Settings
-	OpenTelemetry OTelSpec `json:"otel,omitempty"`
-
-	// Persistent Volume Claims for storage
-	Storage StorageSpecs `json:"storage,omitempty"`
+	OpenTelemetry OTelSpec `json:"otel"`
 
 	// DatabaseConfig stores the database configuration
-	DatabaseConfig *DatabaseConfig `json:"databaseConfig,omitempty"`
+	DatabaseConfig DatabaseConfig `json:"databaseConfig"`
 
 	// WandBSecret stores the secret and encryption key for the Weights and Biases service.
-	WandBSecret *WandBSecret `json:"wandbSecret,omitempty"`
+	WandBSecret WandBSecret `json:"wandbSecret"`
 }
 
 // Scheduler defines the configuration for the scheduler
@@ -100,46 +104,6 @@ type Scheduler struct {
 	// +kubebuilder:validation:Enum=volcano;runai
 	// +kubebuilder:default:=volcano
 	Type string `json:"type,omitempty"`
-	// Volcano scheduler configuration
-	Volcano *VolcanoConfig `json:"volcano,omitempty"`
-	// RunAI scheduler configuration
-	RunAI *RunAIConfig `json:"runai,omitempty"`
-}
-
-// StorageSpecs defines workspace and model storage configurations
-type StorageSpecs struct {
-	Workspace StorageSpec `json:"workspace,omitempty"`
-	Model     StorageSpec `json:"model,omitempty"`
-}
-
-// StorageSpec defines the persistent volume claim configuration for storage
-type StorageSpec struct {
-	Create           bool   `json:"create,omitempty"`
-	Name             string `json:"name,omitempty"`
-	StorageClass     string `json:"storageClass,omitempty"`
-	Size             string `json:"size,omitempty"`
-	VolumeAccessMode string `json:"volumeAccessMode,omitempty"`
-}
-
-// RunAIConfig defines the configuration for Run.AI scheduler
-type RunAIConfig struct {
-	// Enabled indicates whether Run.AI scheduler is enabled
-	Enabled bool `json:"enabled,omitempty"`
-}
-
-const (
-	// SchedulerTypeVolcano indicates if the scheduler is volcano
-	SchedulerTypeVolcano = "volcano"
-	// SchedulerTypeRunAI indicates if the scheduler is run.ai
-	SchedulerTypeRunAI = "runai"
-)
-
-// VolcanoConfig defines the configuration for Volcano scheduler
-type VolcanoConfig struct {
-	// Enabled indicates whether Volcano scheduler is enabled
-	Enabled bool `json:"enabled,omitempty"`
-	// AdmissionURL for the Volcano admission controller
-	AdmissionURL string `json:"admissionURL,omitempty"`
 }
 
 // NemoCustomizerStatus defines the observed state of NemoCustomizer
@@ -251,43 +215,43 @@ func (n *NemoCustomizer) GetStandardEnv() []corev1.EnvVar {
 	return envVars
 }
 
-// IsOtelEnabled return true if Open Telemetry is enabled
+// IsOtelEnabled returns true if Open Telemetry Collector is enabled
 func (n *NemoCustomizer) IsOtelEnabled() bool {
 	return n.Spec.OpenTelemetry.Enabled != nil && *n.Spec.OpenTelemetry.Enabled
 }
 
-// GetOtelEnv generates the OpenTelemetry-related environment variables.
+// GetOtelEnv generates OpenTelemetry-related environment variables.
 func (n *NemoCustomizer) GetOtelEnv() []corev1.EnvVar {
-	return []corev1.EnvVar{
-		{
-			Name:  "OTEL_EXPORTER_OTLP_ENDPOINT",
-			Value: n.Spec.OpenTelemetry.ExporterOtlpEndpoint,
-		},
-		{
-			Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
-			Value: strconv.FormatBool(*n.Spec.OpenTelemetry.LoggingEnabled),
-		},
-		{
-			Name:  "OTEL_TRACES_EXPORTER",
-			Value: n.Spec.OpenTelemetry.TracesExporter,
-		},
-		{
-			Name:  "OTEL_METRICS_EXPORTER",
-			Value: n.Spec.OpenTelemetry.MetricsExporter,
-		},
-		{
-			Name:  "OTEL_LOGS_EXPORTER",
-			Value: n.Spec.OpenTelemetry.LogsExporter,
-		},
-		{
+	var otelEnvVars []corev1.EnvVar
+
+	otelEnvVars = append(otelEnvVars,
+		corev1.EnvVar{Name: "OTEL_EXPORTER_OTLP_ENDPOINT", Value: n.Spec.OpenTelemetry.ExporterOtlpEndpoint},
+		corev1.EnvVar{Name: "OTEL_TRACES_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.TracesExporter},
+		corev1.EnvVar{Name: "OTEL_METRICS_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.MetricsExporter},
+		corev1.EnvVar{Name: "OTEL_LOGS_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.LogsExporter},
+		corev1.EnvVar{Name: "OTEL_LOG_LEVEL", Value: n.Spec.OpenTelemetry.LogLevel},
+	)
+
+	if len(n.Spec.OpenTelemetry.ExcludedUrls) > 0 {
+		otelEnvVars = append(otelEnvVars, corev1.EnvVar{
 			Name:  "OTEL_PYTHON_EXCLUDED_URLS",
-			Value: n.Spec.OpenTelemetry.ExcludedUrls,
-		},
-		{
-			Name:  "OTEL_LOG_LEVEL",
-			Value: n.Spec.OpenTelemetry.LogLevel,
-		},
+			Value: strings.Join(n.Spec.OpenTelemetry.ExcludedUrls, ","),
+		})
 	}
+
+	if n.Spec.OpenTelemetry.DisableLogging != nil {
+		otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+			Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
+			Value: strconv.FormatBool(!*n.Spec.OpenTelemetry.DisableLogging),
+		})
+	} else {
+		otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+			Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
+			Value: strconv.FormatBool(true),
+		})
+	}
+
+	return otelEnvVars
 }
 
 // GetPostgresEnv returns the PostgreSQL environment variables for a Kubernetes pod.
