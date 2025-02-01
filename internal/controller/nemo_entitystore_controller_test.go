@@ -63,35 +63,35 @@ var _ = Describe("NemoEntitystore Controller", func() {
 			Message: "Required value",
 			Field:   "spec.databaseConfig",
 		}
-		requiredDatabaseHostCause = metav1.StatusCause{
+		requiredCredentialsCause = metav1.StatusCause{
 			Type:    "FieldValueRequired",
 			Message: "Required value",
+			Field:   "spec.databaseConfig.credentials",
+		}
+		invalidDatabaseHostCause = metav1.StatusCause{
+			Type:    "FieldValueInvalid",
+			Message: "Invalid value: \"\": spec.databaseConfig.host in body should be at least 1 chars long",
 			Field:   "spec.databaseConfig.host",
 		}
-		requiredDatabaseNameCause = metav1.StatusCause{
-			Type:    "FieldValueRequired",
-			Message: "Required value",
+		invalidUserCause = metav1.StatusCause{
+			Type:    "FieldValueInvalid",
+			Message: "Invalid value: \"\": spec.databaseConfig.credentials.user in body should be at least 1 chars long",
+			Field:   "spec.databaseConfig.credentials.user",
+		}
+		invalidSecretNameCause = metav1.StatusCause{
+			Type:    "FieldValueInvalid",
+			Message: "Invalid value: \"\": spec.databaseConfig.credentials.secretName in body should be at least 1 chars long",
+			Field:   "spec.databaseConfig.credentials.secretName",
+		}
+		invalidDatabaseNameCause = metav1.StatusCause{
+			Type:    "FieldValueInvalid",
+			Message: "Invalid value: \"\": spec.databaseConfig.databaseName in body should be at least 1 chars long",
 			Field:   "spec.databaseConfig.databaseName",
 		}
 		invalidDatabasePortCause = metav1.StatusCause{
 			Type:    "FieldValueInvalid",
 			Message: "Invalid value: 65536: spec.databaseConfig.port in body should be less than or equal to 65535",
 			Field:   "spec.databaseConfig.port",
-		}
-		requiredCredentialsCause = metav1.StatusCause{
-			Type:    "FieldValueRequired",
-			Message: "Required value",
-			Field:   "spec.databaseConfig.credentials",
-		}
-		requiredUserCause = metav1.StatusCause{
-			Type:    "FieldValueRequired",
-			Message: "Required value",
-			Field:   "spec.databaseConfig.credentials.user",
-		}
-		requiredSecretNameCause = metav1.StatusCause{
-			Type:    "FieldValueRequired",
-			Message: "Required value",
-			Field:   "spec.databaseConfig.credentials.secretName",
 		}
 	)
 
@@ -192,7 +192,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalid(err)).To(BeTrue())
 			statusErr := err.(*errors.StatusError)
-			Expect(statusErr.ErrStatus.Details.Causes).To(ContainElements(requiredDatabaseHostCause, requiredDatabaseNameCause, requiredCredentialsCause))
+			Expect(statusErr.ErrStatus.Details.Causes).To(ContainElements(invalidDatabaseHostCause, invalidDatabaseNameCause, requiredCredentialsCause))
 		})
 
 		It("should reject the resource if databasePort is invalid", func() {
@@ -241,7 +241,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalid(err)).To(BeTrue())
 			statusErr := err.(*errors.StatusError)
-			Expect(statusErr.ErrStatus.Details.Causes).To(ContainElements(requiredSecretNameCause, requiredUserCause))
+			Expect(statusErr.ErrStatus.Details.Causes).To(ContainElements(invalidSecretNameCause, invalidUserCause))
 		})
 
 		It("should reject the resource if databaseConfig credentials is invalid", func() {
@@ -266,7 +266,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalid(err)).To(BeTrue())
 			statusErr := err.(*errors.StatusError)
-			Expect(statusErr.ErrStatus.Details.Causes).To(ContainElements(requiredSecretNameCause, requiredUserCause))
+			Expect(statusErr.ErrStatus.Details.Causes).To(ContainElements(invalidSecretNameCause, invalidUserCause))
 		})
 
 		It("should successfully reconcile the NemoEntityStore resource", func() {

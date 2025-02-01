@@ -117,17 +117,17 @@ var _ = Describe("NemoCustomizer Controller", func() {
 					},
 				},
 				CustomizerConfig: "test-training-data",
-				WandBSecret: &appsv1alpha1.WandBSecret{
+				WandBSecret: appsv1alpha1.WandBSecret{
 					Name:          "wandb-secret",
 					APIKeyKey:     "api_key",
 					EncryptionKey: "encryption_key",
 				},
 				OpenTelemetry: appsv1alpha1.OTelSpec{
 					Enabled:              ptr.To[bool](true),
-					LoggingEnabled:       ptr.To[bool](true),
+					DisableLogging:       ptr.To[bool](false),
 					ExporterOtlpEndpoint: "http://opentelemetry-collector.default.svc.cluster.local:4317",
 				},
-				DatabaseConfig: &appsv1alpha1.DatabaseConfig{
+				DatabaseConfig: appsv1alpha1.DatabaseConfig{
 					Credentials: &appsv1alpha1.DatabaseCredentials{
 						User:        "ncsuser",
 						SecretName:  "ncs-pg-existing-secret",

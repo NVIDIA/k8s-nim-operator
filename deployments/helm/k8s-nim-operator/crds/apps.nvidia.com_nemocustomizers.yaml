@@ -61,6 +61,8 @@ spec:
                 type: array
               customizerConfig:
                 description: CustomizerConfig stores the customizer configuration
+                  for training and models
+                minLength: 1
                 type: string
               databaseConfig:
                 description: DatabaseConfig stores the database configuration
@@ -838,43 +840,58 @@ spec:
               otel:
                 description: OpenTelemetry Settings
                 properties:
+                  disableLogging:
+                    description: DisableLogging indicates whether Python logging auto-instrumentation
+                      should be disabled.
+                    type: boolean
                   enabled:
-                    default: true
-                    description: Enabled indicates whether OpenTelemetry is enabled
+                    description: Enabled indicates if opentelemetry collector and
+                      tracing are enabled
                     type: boolean
                   excludedUrls:
-                    default: health
+                    default:
+                    - health
                     description: ExcludedUrls defines URLs to be excluded from tracing.
-                    type: string
+                    items:
+                      type: string
+                    type: array
+                  exporterConfig:
+                    description: ExporterConfig defines configuration for different
+                      OTel exporters
+                    properties:
+                      logsExporter:
+                        default: otlp
+                        description: 'LogsExporter sets the logs exporter: (otlp,
+                          console, none).'
+                        enum:
+                        - otlp
+                        - console
+                        - none
+                        type: string
+                      metricsExporter:
+                        default: otlp
+                        description: 'MetricsExporter sets the metrics exporter: (otlp,
+                          console, none).'
+                        enum:
+                        - otlp
+                        - console
+                        - none
+                        type: string
+                      tracesExporter:
+                        default: otlp
+                        description: 'TracesExporter sets the traces exporter: (otlp,
+                          console, none).'
+                        type: string
+                    type: object
                   exporterOtlpEndpoint:
                     description: ExporterOtlpEndpoint is the OTLP collector endpoint.
+                    minLength: 1
                     type: string
                   logLevel:
                     default: INFO
                     description: LogLevel defines the log level (e.g., INFO, DEBUG).
                     type: string
-                  loggingEnabled:
-                    default: true
-                    description: LoggingEnabled indicates whether Python logging auto-instrumentation
-                      is enabled.
-                    type: boolean
-                  logsExporter:
-                    default: otlp
-                    description: 'LogsExporter sets the logs exporter: (otlp, console,
-                      none).'
-                    type: string
-                  metricsExporter:
-                    default: otlp
-                    description: 'MetricsExporter sets the metrics exporter: (otlp,
-                      console, none).'
-                    type: string
-                  tracesExporter:
-                    default: otlp
-                    description: 'TracesExporter sets the traces exporter: (otlp,
-                      console, none).'
-                    type: string
                 required:
-                - enabled
                 - exporterOtlpEndpoint
                 type: object
               podAffinity:
@@ -2068,14 +2085,6 @@ spec:
               scheduler:
                 description: Scheduler Configuration
                 properties:
-                  runai:
-                    description: RunAI scheduler configuration
-                    properties:
-                      enabled:
-                        description: Enabled indicates whether Run.AI scheduler is
-                          enabled
-                        type: boolean
-                    type: object
                   type:
                     default: volcano
                     description: Type is the scheduler type (volcano, runai)
@@ -2083,17 +2092,6 @@ spec:
                     - volcano
                     - runai
                     type: string
-                  volcano:
-                    description: Volcano scheduler configuration
-                    properties:
-                      admissionURL:
-                        description: AdmissionURL for the Volcano admission controller
-                        type: string
-                      enabled:
-                        description: Enabled indicates whether Volcano scheduler is
-                          enabled
-                        type: boolean
-                    type: object
                 type: object
               startupProbe:
                 description: Probe defines attributes for startup/liveness/readiness
@@ -2256,40 +2254,6 @@ spec:
                         type: integer
                     type: object
                 type: object
-              storage:
-                description: Persistent Volume Claims for storage
-                properties:
-                  model:
-                    description: StorageSpec defines the persistent volume claim configuration
-                      for storage
-                    properties:
-                      create:
-                        type: boolean
-                      name:
-                        type: string
-                      size:
-                        type: string
-                      storageClass:
-                        type: string
-                      volumeAccessMode:
-                        type: string
-                    type: object
-                  workspace:
-                    description: StorageSpec defines the persistent volume claim configuration
-                      for storage
-                    properties:
-                      create:
-                        type: boolean
-                      name:
-                        type: string
-                      size:
-                        type: string
-                      storageClass:
-                        type: string
-                      volumeAccessMode:
-                        type: string
-                    type: object
-                type: object
               tolerations:
                 items:
                   description: |-
@@ -2340,6 +2304,7 @@ spec:
                     description: |-
                       APIKeyKey is the key in the Secret that holds the WandB API key.
                       Defaults to "apiKey".
+                    minLength: 1
                     type: string
                   encryptionKey:
                     default: encryptionKey
@@ -2358,6 +2323,11 @@ spec:
                 - apiKeyKey
                 - name
                 type: object
+            required:
+            - customizerConfig
+            - databaseConfig
+            - otel
+            - wandbSecret
             type: object
           status:
             description: NemoCustomizerStatus defines the observed state of NemoCustomizer
