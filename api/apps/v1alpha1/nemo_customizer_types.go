@@ -721,7 +721,7 @@ func (n *NemoCustomizer) GetServiceParams() *rendertypes.ServiceParams {
 	params.SelectorLabels = n.GetSelectorLabels()
 
 	// Set service type
-	params.Type = "ClusterIP"
+	params.Type = n.GetServiceType()
 
 	servicePorts := n.GetServicePorts()
 	if len(servicePorts) != 0 {
