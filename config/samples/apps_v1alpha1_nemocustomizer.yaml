@@ -34,39 +34,7 @@ spec:
     tag: "25.02-rc1"
     pullPolicy: IfNotPresent
     pullSecrets:
-      - ngc-image-pull-secret
-  replicas: 1
-  resources:
-    requests:
-      memory: "256Mi"
-      cpu: "500m"
-    limits:
-      memory: "512Mi"
-      cpu: "1"
-  livenessProbe:
-    enabled: true
-    probe:
-      failureThreshold: 5
-      httpGet:
-        path: /v1/health/live
-        port: api
-        scheme: HTTP
-      initialDelaySeconds: 15
-      periodSeconds: 10
-      successThreshold: 1
-      timeoutSeconds: 10
-  readinessProbe:
-    enabled: true
-    probe:
-      failureThreshold: 5
-      httpGet:
-        path: /v1/health/ready
-        port: api
-        scheme: HTTP
-      initialDelaySeconds: 15
-      periodSeconds: 10
-      successThreshold: 1
-      timeoutSeconds: 1
+      - ngc-secret
   customizerConfig: |
     namespace: default
     entity_store_url: http://<entity-store-service>:8000
@@ -77,9 +45,9 @@ spec:
       queue: "default"
       image: "nvcr.io/nvidian/nemo-llm/customizer:25.02-rc1"
       imagePullSecrets:
-        - name: ngc-image-pull-secret
+        - name: ngc-secret
       pvc:
-        storageClass: local-path
+        storageClass: ""
         size: 5Gi
         volumeAccessMode: ReadWriteOnce
       env:
@@ -142,4 +110,4 @@ spec:
 
     nemo_data_store_tools:
       image: nvcr.io/nvidian/nemo-llm/nds-v2-huggingface-cli:278bb5cd0fde8ad46842daf6d2471134624ae891
-      imagePullSecret: ngc-image-pull-secret
+      imagePullSecret: ngc-secret

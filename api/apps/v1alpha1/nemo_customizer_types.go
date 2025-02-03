@@ -420,6 +420,36 @@ func (n *NemoCustomizer) GetResources() *corev1.ResourceRequirements {
 	return n.Spec.Resources
 }
 
+// GetStartupProbe returns startup probe for the NemoCustomizer container
+func (n *NemoCustomizer) GetStartupProbe() *corev1.Probe {
+	if n.Spec.StartupProbe.Probe == nil {
+		return n.GetDefaultStartupProbe()
+	}
+	return n.Spec.StartupProbe.Probe
+}
+
+// GetDefaultStartupProbe returns the default startup probe for the NemoCustomizer container
+func (n *NemoCustomizer) GetDefaultStartupProbe() *corev1.Probe {
+	probe := corev1.Probe{
+		FailureThreshold:    5,
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		TimeoutSeconds:      1,
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/v1/health/ready",
+				Port: intstr.IntOrString{
+					Type:   intstr.Type(1),
+					StrVal: "api",
+				},
+			},
+		},
+	}
+
+	return &probe
+}
+
 // GetLivenessProbe returns liveness probe for the NemoCustomizer container
 func (n *NemoCustomizer) GetLivenessProbe() *corev1.Probe {
 	if n.Spec.LivenessProbe.Probe == nil {
@@ -431,7 +461,7 @@ func (n *NemoCustomizer) GetLivenessProbe() *corev1.Probe {
 // GetDefaultLivenessProbe returns the default liveness probe for the NemoCustomizer container
 func (n *NemoCustomizer) GetDefaultLivenessProbe() *corev1.Probe {
 	probe := corev1.Probe{
-		FailureThreshold:    3,
+		FailureThreshold:    5,
 		InitialDelaySeconds: 10,
 		PeriodSeconds:       10,
 		SuccessThreshold:    1,
@@ -478,11 +508,6 @@ func (n *NemoCustomizer) GetDefaultReadinessProbe() *corev1.Probe {
 	}
 
 	return &probe
-}
-
-// GetStartupProbe returns startup probe for the NemoCustomizer container
-func (n *NemoCustomizer) GetStartupProbe() *corev1.Probe {
-	return n.Spec.StartupProbe.Probe
 }
 
 // GetServiceAccountName returns service account name for the NemoCustomizer deployment
