@@ -281,8 +281,8 @@ func SortHPAMetricsSpec(metrics []autoscalingv2.MetricSpec) []autoscalingv2.Metr
 	return metrics
 }
 
-// CalculateHash calculates a SHA256 hash for the given data
-func CalculateHash(data string) string {
+// CalculateSHA256 calculates a SHA256 hash for the given data
+func CalculateSHA256(data string) string {
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:])
 }
