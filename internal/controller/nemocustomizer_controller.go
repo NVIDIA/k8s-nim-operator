@@ -328,7 +328,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 			return ctrl.Result{}, err
 		}
 	} else {
-		err = r.cleanupResource(ctx, &networkingv1.Ingress{}, namespacedName)
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
 		if err != nil && !errors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
@@ -344,7 +344,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		}
 	} else {
 		// If autoscaling is disabled, ensure the HPA is deleted
-		err = r.cleanupResource(ctx, &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -397,7 +397,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Wait for deployment
-	msg, ready, err := r.isDeploymentReady(ctx, &namespacedName)
+	msg, ready, err := k8sutil.IsDeploymentReady(ctx, r.GetClient(), &namespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -463,7 +463,7 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, Ne
 		return err
 	}
 
-	err = r.syncResource(ctx, obj, resource, namespacedName)
+	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource, namespacedName)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, NemoCustomizer, reason, err.Error())
@@ -472,91 +472,5 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, Ne
 		}
 		return err
 	}
-	return nil
-}
-
-// CheckDeploymentReadiness checks if the Deployment is ready
-func (r *NemoCustomizerReconciler) isDeploymentReady(ctx context.Context, namespacedName *types.NamespacedName) (string, bool, error) {
-	deployment := &appsv1.Deployment{}
-	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, deployment)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return "", false, nil
-		}
-		return "", false, err
-	}
-
-	cond := getDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
-	if cond != nil && cond.Reason == "ProgressDeadlineExceeded" {
-		return fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name), false, nil
-	}
-	if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil
-	}
-	if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\n", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil
-	}
-	if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
-	}
-	return fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name), true, nil
-}
-
-func (r *NemoCustomizerReconciler) syncResource(ctx context.Context, obj client.Object, desired client.Object, namespacedName types.NamespacedName) error {
-	logger := log.FromContext(ctx)
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if !utils.IsSpecChanged(obj, desired) {
-		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
-		return nil
-	}
-	logger.V(2).Info("Object spec has changed, updating")
-
-	if errors.IsNotFound(err) {
-		err = r.Create(ctx, desired)
-		if err != nil {
-			return err
-		}
-	} else {
-		err = r.Update(ctx, desired)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// cleanupResource deletes the given Kubernetes resource if it exists.
-// If the resource does not exist or an error occurs during deletion, the function returns nil or the error.
-//
-// Parameters:
-// ctx (context.Context): The context for the operation.
-// obj (client.Object): The Kubernetes resource to delete.
-// namespacedName (types.NamespacedName): The namespaced name of the resource.
-//
-// Returns:
-// error: An error if the resource deletion fails, or nil if the resource is not found or deletion is successful.
-func (r *NemoCustomizerReconciler) cleanupResource(ctx context.Context, obj client.Object, namespacedName types.NamespacedName) error {
-
-	logger := log.FromContext(ctx)
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if errors.IsNotFound(err) {
-		return nil
-	}
-
-	err = r.Delete(ctx, obj)
-	if err != nil {
-		return err
-	}
-	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
 	return nil
 }

@@ -26,15 +26,14 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -313,6 +312,47 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, Ne
 		return ctrl.Result{}, err
 	}
 
+	// Sync ingress
+	if NemoEvaluator.IsIngressEnabled() {
+		err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
+			return renderer.Ingress(NemoEvaluator.GetIngressParams())
+		}, "ingress", conditions.ReasonIngressFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
+		if err != nil && !errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Sync HPA
+	if NemoEvaluator.IsAutoScalingEnabled() {
+		err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
+			return renderer.HPA(NemoEvaluator.GetHPAParams())
+		}, "hpa", conditions.ReasonHPAFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		// If autoscaling is disabled, ensure the HPA is deleted
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Sync Service Monitor
+	if NemoEvaluator.IsServiceMonitorEnabled() {
+		err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
+			return renderer.ServiceMonitor(NemoEvaluator.GetServiceMonitorParams())
+		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	deploymentParams := NemoEvaluator.GetDeploymentParams()
 
 	// Sync deployment
@@ -324,19 +364,19 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, Ne
 	}
 
 	// Wait for deployment
-	msg, ready, err := r.isDeploymentReady(ctx, &namespacedName)
+	msg, ready, err := k8sutil.IsDeploymentReady(ctx, r.GetClient(), &namespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	if !ready {
 		// Update status as NotReady
-		err = r.SetConditionsNotReady(ctx, NemoEvaluator, conditions.NotReady, msg)
+		err = r.updater.SetConditionsNotReady(ctx, NemoEvaluator, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(NemoEvaluator, corev1.EventTypeNormal, conditions.NotReady,
 			"NemoEvaluator %s not ready yet, msg: %s", NemoEvaluator.Name, msg)
 	} else {
 		// Update status as ready
-		err = r.SetConditionsReady(ctx, NemoEvaluator, conditions.Ready, msg)
+		err = r.updater.SetConditionsReady(ctx, NemoEvaluator, conditions.Ready, msg)
 		r.GetEventRecorder().Eventf(NemoEvaluator, corev1.EventTypeNormal, conditions.Ready,
 			"NemoEvaluator %s ready, msg: %s", NemoEvaluator.Name, msg)
 	}
@@ -403,136 +443,13 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, Nem
 		return err
 	}
 
-	err = r.syncResource(ctx, obj, resource, namespacedName)
+	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource, namespacedName)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, NemoEvaluator, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoEvaluator", NemoEvaluator.GetName())
 		}
-		return err
-	}
-	return nil
-}
-
-// CheckDeploymentReadiness checks if the Deployment is ready
-func (r *NemoEvaluatorReconciler) isDeploymentReady(ctx context.Context, namespacedName *types.NamespacedName) (string, bool, error) {
-	deployment := &appsv1.Deployment{}
-	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, deployment)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return "", false, nil
-		}
-		return "", false, err
-	}
-
-	cond := getDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
-	if cond != nil && cond.Reason == "ProgressDeadlineExceeded" {
-		return fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name), false, nil
-	}
-	if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil
-	}
-	if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\n", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil
-	}
-	if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
-	}
-	return fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name), true, nil
-}
-
-func (r *NemoEvaluatorReconciler) syncResource(ctx context.Context, obj client.Object, desired client.Object, namespacedName types.NamespacedName) error {
-	logger := log.FromContext(ctx)
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if !utils.IsSpecChanged(obj, desired) {
-		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
-		return nil
-	}
-	logger.V(2).Info("Object spec has changed, updating")
-
-	if errors.IsNotFound(err) {
-		err = r.Create(ctx, desired)
-		if err != nil {
-			return err
-		}
-	} else {
-		err = r.Update(ctx, desired)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *NemoEvaluatorReconciler) SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NemoEvaluator, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Failed,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Ready,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoEvaluatorStatusReady
-	return r.updateNemoEvaluatorStatus(ctx, cr)
-}
-
-func (r *NemoEvaluatorReconciler) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NemoEvaluator, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionFalse,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionFalse,
-		Reason:  conditions.Ready,
-		Message: message,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoEvaluatorStatusNotReady
-	return r.updateNemoEvaluatorStatus(ctx, cr)
-}
-
-func (r *NemoEvaluatorReconciler) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NemoEvaluator, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Ready,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Failed,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-	cr.Status.State = appsv1alpha1.NemoEvaluatorStatusFailed
-	return r.updateNemoEvaluatorStatus(ctx, cr)
-}
-
-func (r *NemoEvaluatorReconciler) updateNemoEvaluatorStatus(ctx context.Context, cr *appsv1alpha1.NemoEvaluator) error {
-
-	obj := &appsv1alpha1.NemoEvaluator{}
-	errGet := r.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := r.Status().Update(ctx, obj); err != nil {
 		return err
 	}
 	return nil

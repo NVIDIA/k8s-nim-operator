@@ -62,7 +62,6 @@ const (
 )
 
 // Updater is the condition updater
-
 type Updater interface {
 	SetConditionsReady(ctx context.Context, cr client.Object, reason, message string) error
 	SetConditionsNotReady(ctx context.Context, cr client.Object, reason, message string) error
@@ -88,6 +87,8 @@ func (u *updater) SetConditionsReady(ctx context.Context, obj client.Object, rea
 		return u.SetConditionsReadyNemoEntitystore(ctx, cr, reason, message)
 	case *appsv1alpha1.NemoCustomizer:
 		return u.SetConditionsReadyNemoCustomizer(ctx, cr, reason, message)
+	case *appsv1alpha1.NemoDatastore:
+		return u.SetConditionsReadyNemoDatastore(ctx, cr, reason, message)
 	default:
 		return fmt.Errorf("unknown CRD type for %v", obj)
 	}
@@ -144,6 +145,23 @@ func (u *updater) SetConditionsReadyNemoEntitystore(ctx context.Context, cr *app
 	return u.updateNemoEntitystoreStatus(ctx, cr)
 }
 
+func (u *updater) SetConditionsReadyNemoDatastore(ctx context.Context, cr *appsv1alpha1.NemoDatastore, reason, message string) error {
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:    Ready,
+		Status:  metav1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	})
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:   Failed,
+		Status: metav1.ConditionFalse,
+		Reason: Ready,
+	})
+	cr.Status.State = v1alpha1.NemoDatastoreStatusReady
+	return u.updateNemoDatastoreStatus(ctx, cr)
+}
+
 func (u *updater) SetConditionsReadyNemoCustomizer(ctx context.Context, cr *appsv1alpha1.NemoCustomizer, reason, message string) error {
 	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 		Type:    Ready,
@@ -169,6 +187,8 @@ func (u *updater) SetConditionsNotReady(ctx context.Context, obj client.Object, 
 		return u.SetConditionsNotReadyNemoGuardrail(ctx, cr, reason, message)
 	case *appsv1alpha1.NemoEntitystore:
 		return u.SetConditionsNotReadyNemoEntitystore(ctx, cr, reason, message)
+	case *appsv1alpha1.NemoDatastore:
+		return u.SetConditionsNotReadyNemoDatastore(ctx, cr, reason, message)
 	case *appsv1alpha1.NemoCustomizer:
 		return u.SetConditionsNotReadyNemoCustomizer(ctx, cr, reason, message)
 	default:
@@ -230,6 +250,24 @@ func (u *updater) SetConditionsNotReadyNemoEntitystore(ctx context.Context, cr *
 	return u.updateNemoEntitystoreStatus(ctx, cr)
 }
 
+func (u *updater) SetConditionsNotReadyNemoDatastore(ctx context.Context, cr *appsv1alpha1.NemoDatastore, reason, message string) error {
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:    Ready,
+		Status:  metav1.ConditionFalse,
+		Reason:  reason,
+		Message: message,
+	})
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:    Failed,
+		Status:  metav1.ConditionFalse,
+		Reason:  Ready,
+		Message: message,
+	})
+	cr.Status.State = v1alpha1.NemoDatastoreStatusNotReady
+	return u.updateNemoDatastoreStatus(ctx, cr)
+}
+
 func (u *updater) SetConditionsNotReadyNemoCustomizer(ctx context.Context, cr *appsv1alpha1.NemoCustomizer, reason, message string) error {
 	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 		Type:    Ready,
@@ -256,6 +294,8 @@ func (u *updater) SetConditionsFailed(ctx context.Context, obj client.Object, re
 		return u.SetConditionsFailedNemoGuardrail(ctx, cr, reason, message)
 	case *appsv1alpha1.NemoEntitystore:
 		return u.SetConditionsFailedNemoEntitystore(ctx, cr, reason, message)
+	case *appsv1alpha1.NemoDatastore:
+		return u.SetConditionsFailedNemoDatastore(ctx, cr, reason, message)
 	case *appsv1alpha1.NemoCustomizer:
 		return u.SetConditionsFailedNemoCustomizer(ctx, cr, reason, message)
 	default:
@@ -312,6 +352,23 @@ func (u *updater) SetConditionsFailedNemoEntitystore(ctx context.Context, cr *ap
 	})
 	cr.Status.State = v1alpha1.NemoEntitystoreStatusFailed
 	return u.updateNemoEntitystoreStatus(ctx, cr)
+}
+
+func (u *updater) SetConditionsFailedNemoDatastore(ctx context.Context, cr *appsv1alpha1.NemoDatastore, reason, message string) error {
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:   Ready,
+		Status: metav1.ConditionFalse,
+		Reason: Failed,
+	})
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:    Failed,
+		Status:  metav1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	})
+	cr.Status.State = v1alpha1.NemoDatastoreStatusFailed
+	return u.updateNemoDatastoreStatus(ctx, cr)
 }
 
 func (u *updater) SetConditionsFailedNemoCustomizer(ctx context.Context, cr *appsv1alpha1.NemoCustomizer, reason, message string) error {
@@ -371,6 +428,19 @@ func (u *updater) updateNemoEntitystoreStatus(ctx context.Context, cr *appsv1alp
 	return nil
 }
 
+func (u *updater) updateNemoDatastoreStatus(ctx context.Context, cr *appsv1alpha1.NemoDatastore) error {
+	obj := &appsv1alpha1.NemoDatastore{}
+	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
+	if errGet != nil {
+		return errGet
+	}
+	obj.Status = cr.Status
+	if err := u.client.Status().Update(ctx, obj); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (u *updater) updateNemoCustomizerStatus(ctx context.Context, cr *appsv1alpha1.NemoCustomizer) error {
 	obj := &appsv1alpha1.NemoCustomizer{}
 	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
@@ -408,6 +478,7 @@ func UpdateCondition(conditions *[]metav1.Condition, conditionType string, statu
 	// condition updated
 }
 
+// IfPresentUpdateCondition updates an already existing condition
 func IfPresentUpdateCondition(conditions *[]metav1.Condition, conditionType string, status metav1.ConditionStatus, reason, message string) {
 	for i := range *conditions {
 		if (*conditions)[i].Type == conditionType {
