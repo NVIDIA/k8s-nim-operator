@@ -41,9 +41,6 @@ resources:
   controller: true
   domain: nvidia.com
   group: apps
-<<<<<<< HEAD
-  kind: NemoCustomizer
-=======
   kind: NemoEvaluator
   path: github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1
   version: v1alpha1
@@ -72,7 +69,15 @@ resources:
   domain: nvidia.com
   group: apps
   kind: NemoGuardrails
->>>>>>> 4cb6b28 (Fix project scaffolding for all microservices)
+  path: github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: nvidia.com
+  group: apps
+  kind: NemoCustomizer
   path: github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1
   version: v1alpha1
 version: "3"
