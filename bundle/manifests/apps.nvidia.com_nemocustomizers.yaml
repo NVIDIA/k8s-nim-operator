@@ -881,6 +881,10 @@ spec:
                         default: otlp
                         description: 'TracesExporter sets the traces exporter: (otlp,
                           console, none).'
+                        enum:
+                        - otlp
+                        - console
+                        - none
                         type: string
                     type: object
                   exporterOtlpEndpoint:
@@ -890,6 +894,9 @@ spec:
                   logLevel:
                     default: INFO
                     description: LogLevel defines the log level (e.g., INFO, DEBUG).
+                    enum:
+                    - INFO
+                    - DEBUG
                     type: string
                 required:
                 - exporterOtlpEndpoint

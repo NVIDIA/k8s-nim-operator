@@ -48,8 +48,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// NemoCustomizerFinalizer is the finalizer annotation
-const NemoCustomizerFinalizer = "finalizer.nemocustomizer.apps.nvidia.com"
+const (
+	// NemoCustomizerFinalizer is the finalizer annotation
+	NemoCustomizerFinalizer = "finalizer.nemocustomizer.apps.nvidia.com"
+	// ConfigHashAnnotationKey is the annotation key for storing hash of the training configuration
+	ConfigHashAnnotationKey = "apps.nvidia.com/training-config-hash"
+)
 
 // NemoCustomizerReconciler reconciles a NemoCustomizer object
 type NemoCustomizerReconciler struct {
@@ -357,7 +361,9 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Sync Customizer ConfigMap
-	err = r.createOrUpdateConfig(ctx, NemoCustomizer)
+	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &corev1.ConfigMap{}, func() (client.Object, error) {
+		return renderer.ConfigMap(NemoCustomizer.GetConfigMapParams())
+	}, "configmap", conditions.ReasonConfigMapFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -373,8 +379,8 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Check if the hash has changed
-	if annotations["config-hash"] != configHash {
-		annotations["config-hash"] = configHash
+	if annotations[ConfigHashAnnotationKey] != configHash {
+		annotations[ConfigHashAnnotationKey] = configHash
 		deploymentParams.Annotations = annotations
 	}
 
@@ -416,53 +422,12 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	return ctrl.Result{}, nil
 }
 
-func (r *NemoCustomizerReconciler) createOrUpdateConfig(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer) error {
-	logger := log.FromContext(ctx)
-
-	namespacedName := types.NamespacedName{Name: nemoCustomizer.GetConfigName(), Namespace: nemoCustomizer.GetNamespace()}
-	// Define the ConfigMap object
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      nemoCustomizer.GetConfigName(),
-			Namespace: nemoCustomizer.GetNamespace(),
-		},
-	}
-
-	// Initialize the ConfigMap data
-	configMap.Data = map[string]string{
-		"config.yaml": nemoCustomizer.Spec.CustomizerConfig,
-	}
-
-	if err := controllerutil.SetControllerReference(nemoCustomizer, configMap, r.GetScheme()); err != nil {
-		logger.Error(err, "failed to set owner", namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, conditions.ReasonConfigMapFailed, err.Error())
-		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
-		}
-		return err
-	}
-
-	err := r.syncResource(ctx, &corev1.ConfigMap{}, configMap, namespacedName)
-	if err != nil {
-		logger.Error(err, "failed to sync", namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, conditions.ReasonConfigMapFailed, err.Error())
-		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
-		}
-		return err
-	}
-
-	return nil
-}
-
 func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, NemoCustomizer client.Object, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: NemoCustomizer.GetName(), Namespace: NemoCustomizer.GetNamespace()}
-
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, namespacedName)
+		logger.Error(err, "failed to render", conditionType, NemoCustomizer.GetName(), NemoCustomizer.GetNamespace())
 		statusError := r.updater.SetConditionsFailed(ctx, NemoCustomizer, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoCustomizer", NemoCustomizer.GetName())
@@ -486,6 +451,8 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, Ne
 		logger.V(2).Info("rendered un-initialized resource")
 		return nil
 	}
+
+	namespacedName := types.NamespacedName{Name: metaAccessor.GetName(), Namespace: metaAccessor.GetNamespace()}
 
 	if err = controllerutil.SetControllerReference(NemoCustomizer, resource, r.GetScheme()); err != nil {
 		logger.Error(err, "failed to set owner", conditionType, namespacedName)

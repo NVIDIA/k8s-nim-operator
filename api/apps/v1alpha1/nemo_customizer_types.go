@@ -239,17 +239,14 @@ func (n *NemoCustomizer) GetOtelEnv() []corev1.EnvVar {
 		})
 	}
 
+	var enableLog bool = true
 	if n.Spec.OpenTelemetry.DisableLogging != nil {
-		otelEnvVars = append(otelEnvVars, corev1.EnvVar{
-			Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
-			Value: strconv.FormatBool(!*n.Spec.OpenTelemetry.DisableLogging),
-		})
-	} else {
-		otelEnvVars = append(otelEnvVars, corev1.EnvVar{
-			Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
-			Value: strconv.FormatBool(true),
-		})
+		enableLog = !*n.Spec.OpenTelemetry.DisableLogging
 	}
+	otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+		Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
+		Value: strconv.FormatBool(enableLog),
+	})
 
 	return otelEnvVars
 }
@@ -943,6 +940,24 @@ func (n *NemoCustomizer) GetServiceMonitorAnnotations() map[string]string {
 		return utils.MergeMaps(NemoCustomizerAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
 	return NemoCustomizerAnnotations
+}
+
+// GetConfigMapParams returns params to render NemoCustomizer config from templates
+func (n *NemoCustomizer) GetConfigMapParams() *rendertypes.ConfigMapParams {
+	params := &rendertypes.ConfigMapParams{}
+
+	// Set metadata
+	params.Name = n.GetConfigName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetLabels()
+	params.Annotations = n.GetAnnotations()
+
+	// Initialize the ConfigMap data
+	params.ConfigMapData = map[string]string{
+		"config.yaml": n.Spec.CustomizerConfig,
+	}
+
+	return params
 }
 
 func init() {

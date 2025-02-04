@@ -207,3 +207,13 @@ type ServiceMonitorParams struct {
 	ScrapeTimeout int32
 	SMSpec        monitoringv1.ServiceMonitorSpec
 }
+
+// ConfigMapParams holds the parameters for rendering a ConfigMap template
+type ConfigMapParams struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	// Key-value pairs representing filenames and their content
+	ConfigMapData map[string]string
+}

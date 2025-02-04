@@ -59,7 +59,7 @@ var _ = Describe("NemoDatastore Controller", func() {
 				DatabaseConfig: appsv1alpha1.DatabaseConfig{
 					Host:         "test-pg-host",
 					DatabaseName: "test-pg-database",
-					Credentials: &appsv1alpha1.DatabaseCredentials{
+					Credentials: appsv1alpha1.DatabaseCredentials{
 						User:       "test-pg-user",
 						SecretName: "test-pg-secret",
 					},
