@@ -3,12 +3,9 @@ resources:
 - apps_v1alpha1_nimservice.yaml
 - apps_v1alpha1_nimcache.yaml
 - apps_v1alpha1_nimpipeline.yaml
-<<<<<<< HEAD
 - apps_v1alpha1_nemocustomizer.yaml
-=======
 - apps_v1alpha1_nemoguardrails.yaml
 - apps_v1alpha1_nemoevaluator.yaml
 - apps_v1alpha1_nemodatastore.yaml
 - apps_v1alpha1_nemoentitystore.yaml
->>>>>>> 4cb6b28 (Fix project scaffolding for all microservices)
 # +kubebuilder:scaffold:manifestskustomizesamples
