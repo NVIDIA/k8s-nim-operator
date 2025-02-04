@@ -20,8 +20,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // OrchestratorType is the underlying container orchestrator type
@@ -106,4 +111,101 @@ func GetOrchestratorType(k8sClient client.Client) (OrchestratorType, error) {
 
 	// Default to Upstream Kubernetes if no specific platform labels are found
 	return K8s, nil
+}
+
+// CleanupResource deletes the given Kubernetes resource if it exists.
+// If the resource does not exist or an error occurs during deletion, the function returns nil or the error.
+//
+// Parameters:
+// ctx (context.Context): The context for the operation.
+// obj (client.Object): The Kubernetes resource to delete.
+// namespacedName (types.NamespacedName): The namespaced name of the resource.
+//
+// Returns:
+// error: An error if the resource deletion fails, or nil if the resource is not found or deletion is successful.
+func CleanupResource(ctx context.Context, k8sClient client.Client, obj client.Object, namespacedName types.NamespacedName) error {
+
+	logger := log.FromContext(ctx)
+
+	err := k8sClient.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	if errors.IsNotFound(err) {
+		return nil
+	}
+
+	err = k8sClient.Delete(ctx, obj)
+	if err != nil {
+		return err
+	}
+	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
+	return nil
+}
+
+// SyncResource sync the current object with the desired object spec
+func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Object, desired client.Object, namespacedName types.NamespacedName) error {
+	logger := log.FromContext(ctx)
+
+	err := k8sClient.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	if !utils.IsSpecChanged(obj, desired) {
+		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
+		return nil
+	}
+	logger.V(2).Info("Object spec has changed, updating")
+
+	if errors.IsNotFound(err) {
+		err = k8sClient.Create(ctx, desired)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = k8sClient.Update(ctx, desired)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// IsDeploymentReady checks if the Deployment is ready
+func IsDeploymentReady(ctx context.Context, k8sClient client.Client, namespacedName *types.NamespacedName) (string, bool, error) {
+	deployment := &appsv1.Deployment{}
+	err := k8sClient.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, deployment)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+
+	cond := getDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
+	if cond != nil && cond.Reason == "ProgressDeadlineExceeded" {
+		return fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name), false, nil
+	}
+	if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
+		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil
+	}
+	if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
+		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\n", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil
+	}
+	if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
+		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
+	}
+	return fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name), true, nil
+}
+
+func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.DeploymentConditionType) *appsv1.DeploymentCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
 }
