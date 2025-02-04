@@ -372,7 +372,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	deploymentParams := NemoCustomizer.GetDeploymentParams()
 
 	// Calculate the hash of the config data
-	configHash := utils.CalculateHash(NemoCustomizer.Spec.CustomizerConfig)
+	configHash := utils.CalculateSHA256(NemoCustomizer.Spec.CustomizerConfig)
 	annotations := deploymentParams.Annotations
 	if annotations == nil {
 		annotations = make(map[string]string)
