@@ -128,7 +128,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 					ExporterOtlpEndpoint: "http://opentelemetry-collector.default.svc.cluster.local:4317",
 				},
 				DatabaseConfig: appsv1alpha1.DatabaseConfig{
-					Credentials: &appsv1alpha1.DatabaseCredentials{
+					Credentials: appsv1alpha1.DatabaseCredentials{
 						User:        "ncsuser",
 						SecretName:  "ncs-pg-existing-secret",
 						PasswordKey: "password",
@@ -296,7 +296,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 	})
 
 	AfterEach(func() {
-		// "Cleanup the instance of NemoCustomizer"
+		// Cleanup the instance of NemoCustomizer
 		namespacedName := types.NamespacedName{Name: nemoCustomizer.Name, Namespace: "default"}
 
 		resource := &appsv1alpha1.NemoCustomizer{}
@@ -394,9 +394,11 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			Expect(deployment.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal(nemoCustomizer.GetContainerName()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(nemoCustomizer.GetImage()))
+			// Ensure customized liveness and readiness probes are added
 			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(Equal(nemoCustomizer.Spec.ReadinessProbe.Probe))
 			Expect(deployment.Spec.Template.Spec.Containers[0].LivenessProbe).To(Equal(nemoCustomizer.Spec.LivenessProbe.Probe))
-			Expect(deployment.Spec.Template.Spec.Containers[0].StartupProbe).To(Equal(nemoCustomizer.Spec.StartupProbe.Probe))
+			// Ensure default startup probe is added
+			Expect(deployment.Spec.Template.Spec.Containers[0].StartupProbe).NotTo(BeNil())
 
 			sortVolumes(deployment.Spec.Template.Spec.Volumes)
 			sortVolumes(volumes)

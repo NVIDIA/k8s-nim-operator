@@ -52,7 +52,7 @@ type DatabaseConfig struct {
 	// DatabaseCredentials stores the configuration to retrieve the database credentials.
 	// Required, must not be nil.
 	//
-	Credentials *DatabaseCredentials `json:"credentials"`
+	Credentials DatabaseCredentials `json:"credentials"`
 }
 
 // DatabaseCredentials are the external database credentials
@@ -120,6 +120,7 @@ type OTelSpec struct {
 
 	// LogLevel defines the log level (e.g., INFO, DEBUG).
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=INFO;DEBUG
 	// +kubebuilder:default="INFO"
 	LogLevel string `json:"logLevel,omitempty"`
 }
@@ -128,6 +129,7 @@ type OTelSpec struct {
 type ExporterConfig struct {
 	// TracesExporter sets the traces exporter: (otlp, console, none).
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=otlp;console;none
 	// +kubebuilder:default="otlp"
 	TracesExporter string `json:"tracesExporter,omitempty"`
 

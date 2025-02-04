@@ -63,11 +63,6 @@ var _ = Describe("NemoEntitystore Controller", func() {
 			Message: "Required value",
 			Field:   "spec.databaseConfig",
 		}
-		requiredCredentialsCause = metav1.StatusCause{
-			Type:    "FieldValueRequired",
-			Message: "Required value",
-			Field:   "spec.databaseConfig.credentials",
-		}
 		invalidDatabaseHostCause = metav1.StatusCause{
 			Type:    "FieldValueInvalid",
 			Message: "Invalid value: \"\": spec.databaseConfig.host in body should be at least 1 chars long",
@@ -192,7 +187,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalid(err)).To(BeTrue())
 			statusErr := err.(*errors.StatusError)
-			Expect(statusErr.ErrStatus.Details.Causes).To(ContainElements(invalidDatabaseHostCause, invalidDatabaseNameCause, requiredCredentialsCause))
+			Expect(statusErr.ErrStatus.Details.Causes).To(ContainElements(invalidDatabaseHostCause, invalidDatabaseNameCause, invalidUserCause, invalidSecretNameCause))
 		})
 
 		It("should reject the resource if databasePort is invalid", func() {
@@ -206,7 +201,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 						Host:         "test-pg-host",
 						DatabaseName: "test-pg-database",
 						Port:         65536,
-						Credentials: &appsv1alpha1.DatabaseCredentials{
+						Credentials: appsv1alpha1.DatabaseCredentials{
 							User:       "test-pg-user",
 							SecretName: "test-pg-secret",
 						},
@@ -232,7 +227,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 					DatabaseConfig: &appsv1alpha1.DatabaseConfig{
 						Host:         "test-pg-host",
 						DatabaseName: "test-pg-database",
-						Credentials:  &appsv1alpha1.DatabaseCredentials{},
+						Credentials:  appsv1alpha1.DatabaseCredentials{},
 					},
 				},
 			}
@@ -254,7 +249,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 					DatabaseConfig: &appsv1alpha1.DatabaseConfig{
 						Host:         "test-pg-host",
 						DatabaseName: "test-pg-database",
-						Credentials: &appsv1alpha1.DatabaseCredentials{
+						Credentials: appsv1alpha1.DatabaseCredentials{
 							User:       "",
 							SecretName: "",
 						},
@@ -284,7 +279,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 					DatabaseConfig: &appsv1alpha1.DatabaseConfig{
 						Host:         "test-pg-host",
 						DatabaseName: "test-pg-database",
-						Credentials: &appsv1alpha1.DatabaseCredentials{
+						Credentials: appsv1alpha1.DatabaseCredentials{
 							User:       "test-pg-user",
 							SecretName: "test-pg-secret",
 						},
