@@ -16,16 +16,22 @@ limitations under the License.
 
 package v1alpha1
 
-type ArgoWorkFlows struct {
+// ArgoWorkflows defines configuration to connect to Argo Workflows service
+type ArgoWorkflows struct {
+	// +kubebuilder:validation:MinLength=1
 	Endpoint       string `json:"endpoint"`
 	ServiceAccount string `json:"serviceAccount"`
 }
 
-type Milvus struct {
+// VectorDB defines configuration for connecting to external VectorDB
+type VectorDB struct {
+	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
 
-type DataStore struct {
+// Datastore defines configuration for connecting to NeMo Datastore service
+type Datastore struct {
+	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
 

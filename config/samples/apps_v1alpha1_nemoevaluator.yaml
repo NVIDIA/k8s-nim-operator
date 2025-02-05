@@ -12,12 +12,15 @@ spec:
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
-  argoWorkFlows:
+  expose:
+    service:
+      port: 7331
+  argoWorkflows:
     endpoint: "http://argo-workflows-server:2746"
     serviceAccount: "argo-workflows-executor"
-  milvus:
+  vectorDB:
     endpoint: "http://milvus-eval:19530"
-  dataStore:
+  datastore:
     endpoint: "http://datastore.default.svc.cluster.local:3000/v1/hf"
   databaseConfig:
     host: "evaluator-pg-postgresql"
