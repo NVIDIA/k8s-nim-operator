@@ -48,7 +48,7 @@ import (
 )
 
 // NemoEvaluatorFinalizer is the finalizer annotation
-const NemoEvaluatorFinalizer = "finalizer.NemoEvaluator.apps.nvidia.com"
+const NemoEvaluatorFinalizer = "finalizer.nemoevaluator.apps.nvidia.com"
 
 // NemoEvaluatorReconciler reconciles a NemoEvaluator object
 type NemoEvaluatorReconciler struct {
@@ -274,10 +274,6 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, Ne
 	// Generate annotation for the current operator-version and apply to all resources
 	// Get generic name for all resources
 	namespacedName := types.NamespacedName{Name: NemoEvaluator.GetName(), Namespace: NemoEvaluator.GetNamespace()}
-	err = validateNemoEvaluator(ctx, NemoEvaluator)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
 	renderer := r.GetRenderer()
 
 	// Sync serviceaccount
@@ -387,19 +383,6 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, Ne
 	}
 
 	return ctrl.Result{}, nil
-}
-
-func validateNemoEvaluator(ctx context.Context, NemoEvaluator *appsv1alpha1.NemoEvaluator) error {
-	if NemoEvaluator.Spec.ArgoWorkFlows == nil {
-		return fmt.Errorf(" Required field 'Spec.ArgoWorkFlows' cannot be empty")
-	}
-	if NemoEvaluator.Spec.Milvus == nil {
-		return fmt.Errorf(" Required field 'Spec.Milvus' cannot be empty")
-	}
-	if NemoEvaluator.Spec.DataStore == nil {
-		return fmt.Errorf(" Required field 'Spec.DataStore' cannot be empty")
-	}
-	return nil
 }
 
 func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, NemoEvaluator client.Object, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {

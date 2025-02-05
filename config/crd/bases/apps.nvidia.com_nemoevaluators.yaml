@@ -51,9 +51,11 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
-              argoWorkFlows:
+              argoWorkflows:
+                description: ArgoWorkflows stores the argo workflow service endpoint.
                 properties:
                   endpoint:
+                    minLength: 1
                     type: string
                   serviceAccount:
                     type: string
@@ -69,17 +71,17 @@ spec:
                 items:
                   type: string
                 type: array
-              dataStore:
-                properties:
-                  endpoint:
-                    type: string
-                required:
-                - endpoint
-                type: object
+              consoleLogLevel:
+                default: INFO
+                description: ConsoleLogLevel defines the console log level (e.g.,
+                  INFO, DEBUG).
+                enum:
+                - INFO
+                - DEBUG
+                type: string
               databaseConfig:
-                description: |-
-                  DatabaseConfig stores the database configuration for NEMO entitystore.
-                  Required, must not be nil.
+                description: DatabaseConfig stores the database configuration for
+                  NeMo entitystore.
                 properties:
                   credentials:
                     description: |-
@@ -135,6 +137,19 @@ spec:
                 - databaseName
                 - host
                 type: object
+              datastore:
+                description: Datastore stores the datastore endpoint.
+                properties:
+                  endpoint:
+                    minLength: 1
+                    type: string
+                required:
+                - endpoint
+                type: object
+              enableValidation:
+                description: EnableValidation indicates that the validation jobs to
+                  be enabled
+                type: boolean
               env:
                 items:
                   description: EnvVar represents an environment variable present in
@@ -252,6 +267,14 @@ spec:
                   - name
                   type: object
                 type: array
+              evalLogLevel:
+                default: INFO
+                description: EvalLogLevel defines the evaluator log level (e.g., INFO,
+                  DEBUG).
+                enum:
+                - INFO
+                - DEBUG
+                type: string
               expose:
                 description: Expose defines attributes to expose the service
                 properties:
@@ -816,6 +839,14 @@ spec:
                         type: integer
                     type: object
                 type: object
+              logHandlers:
+                default: console
+                description: LogHandlers defines the log sink handlers (e.g., INFO,
+                  DEBUG).
+                enum:
+                - console
+                - file
+                type: string
               metrics:
                 description: Metrics defines attributes to setup metrics collection
                 properties:
@@ -849,16 +880,73 @@ spec:
                         type: string
                     type: object
                 type: object
-              milvus:
-                properties:
-                  endpoint:
-                    type: string
-                required:
-                - endpoint
-                type: object
               nodeSelector:
                 additionalProperties:
                   type: string
+                type: object
+              otel:
+                description: OpenTelemetry Settings
+                properties:
+                  disableLogging:
+                    description: DisableLogging indicates whether Python logging auto-instrumentation
+                      should be disabled.
+                    type: boolean
+                  enabled:
+                    description: Enabled indicates if opentelemetry collector and
+                      tracing are enabled
+                    type: boolean
+                  excludedUrls:
+                    default:
+                    - health
+                    description: ExcludedUrls defines URLs to be excluded from tracing.
+                    items:
+                      type: string
+                    type: array
+                  exporterConfig:
+                    description: ExporterConfig defines configuration for different
+                      OTel exporters
+                    properties:
+                      logsExporter:
+                        default: otlp
+                        description: 'LogsExporter sets the logs exporter: (otlp,
+                          console, none).'
+                        enum:
+                        - otlp
+                        - console
+                        - none
+                        type: string
+                      metricsExporter:
+                        default: otlp
+                        description: 'MetricsExporter sets the metrics exporter: (otlp,
+                          console, none).'
+                        enum:
+                        - otlp
+                        - console
+                        - none
+                        type: string
+                      tracesExporter:
+                        default: otlp
+                        description: 'TracesExporter sets the traces exporter: (otlp,
+                          console, none).'
+                        enum:
+                        - otlp
+                        - console
+                        - none
+                        type: string
+                    type: object
+                  exporterOtlpEndpoint:
+                    description: ExporterOtlpEndpoint is the OTLP collector endpoint.
+                    minLength: 1
+                    type: string
+                  logLevel:
+                    default: INFO
+                    description: LogLevel defines the log level (e.g., INFO, DEBUG).
+                    enum:
+                    - INFO
+                    - DEBUG
+                    type: string
+                required:
+                - exporterOtlpEndpoint
                 type: object
               podAffinity:
                 description: Pod affinity is a group of inter pod affinity scheduling
@@ -2250,8 +2338,20 @@ spec:
               userID:
                 format: int64
                 type: integer
+              vectorDB:
+                description: VectorDB stores the vector db endpoint.
+                properties:
+                  endpoint:
+                    minLength: 1
+                    type: string
+                required:
+                - endpoint
+                type: object
             required:
+            - argoWorkflows
             - databaseConfig
+            - datastore
+            - vectorDB
             type: object
           status:
             description: NemoEvaluatorStatus defines the observed state of NemoEvaluator

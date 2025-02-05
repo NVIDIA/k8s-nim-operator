@@ -49,7 +49,7 @@ import (
 )
 
 // NemoDatastoreFinalizer is the finalizer annotation
-const NemoDatastoreFinalizer = "finalizer.NemoDatastore.apps.nvidia.com"
+const NemoDatastoreFinalizer = "finalizer.nemodatastore.apps.nvidia.com"
 
 // NemoDatastoreReconciler reconciles a NemoDatastore object
 type NemoDatastoreReconciler struct {

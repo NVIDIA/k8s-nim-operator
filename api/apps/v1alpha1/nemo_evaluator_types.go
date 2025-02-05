@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strconv"
+	"strings"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -74,14 +76,39 @@ type NemoEvaluatorSpec struct {
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 
-	// DatabaseConfig stores the database configuration for NEMO entitystore.
-	// Required, must not be nil.
-	//
-	// +kubebuilder:validation:Required
-	DatabaseConfig *DatabaseConfig `json:"databaseConfig,omitempty"`
-	ArgoWorkFlows  *ArgoWorkFlows  `json:"argoWorkFlows,omitempty"`
-	Milvus         *Milvus         `json:"milvus,omitempty"`
-	DataStore      *DataStore      `json:"dataStore,omitempty"`
+	// DatabaseConfig stores the database configuration for NeMo entitystore.
+	DatabaseConfig *DatabaseConfig `json:"databaseConfig"`
+	// ArgoWorkflows stores the argo workflow service endpoint.
+	ArgoWorkflows ArgoWorkflows `json:"argoWorkflows"`
+	// VectorDB stores the vector db endpoint.
+	VectorDB VectorDB `json:"vectorDB"`
+	// Datastore stores the datastore endpoint.
+	Datastore Datastore `json:"datastore"`
+
+	// OpenTelemetry Settings
+	// +kubebuilder:validation:Optional
+	OpenTelemetry OTelSpec `json:"otel,omitempty"`
+
+	// EvalLogLevel defines the evaluator log level (e.g., INFO, DEBUG).
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=INFO;DEBUG
+	// +kubebuilder:default="INFO"
+	EvalLogLevel string `json:"evalLogLevel,omitempty"`
+
+	// LogHandlers defines the log sink handlers (e.g., INFO, DEBUG).
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=console;file
+	// +kubebuilder:default="console"
+	LogHandlers string `json:"logHandlers,omitempty"`
+
+	// ConsoleLogLevel defines the console log level (e.g., INFO, DEBUG).
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=INFO;DEBUG
+	// +kubebuilder:default="INFO"
+	ConsoleLogLevel string `json:"consoleLogLevel,omitempty"`
+
+	// EnableValidation indicates that the validation jobs to be enabled
+	EnableValidation *bool `json:"enableValidation,omitempty"`
 }
 
 // NemoEvaluatorStatus defines the observed state of NemoEvaluator
@@ -157,8 +184,106 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "EVALUATOR_PORT",
-			Value: "7331",
+			Value: fmt.Sprintf("%d", n.GetServicePort()),
 		},
+		{
+			Name:  "ARGO_HOST",
+			Value: n.Spec.ArgoWorkflows.Endpoint,
+		},
+		{
+			Name:  "MILVUS_URL",
+			Value: n.Spec.VectorDB.Endpoint,
+		},
+		{
+			Name:  "SERVICE_ACCOUNT",
+			Value: n.Spec.ArgoWorkflows.ServiceAccount,
+		},
+		{
+			Name:  "DATA_STORE_HOST",
+			Value: n.Spec.Datastore.Endpoint,
+		},
+		{
+			Name:  "EVAL_CONTAINER",
+			Value: n.GetImage(),
+		},
+		{
+			Name:  "LOG_HANDLERS",
+			Value: n.Spec.LogHandlers,
+		},
+		{
+			Name:  "CONSOLE_LOG_LEVEL",
+			Value: n.Spec.ConsoleLogLevel,
+		},
+		{
+			Name:  "EVAL_LOG_LEVEL",
+			Value: n.Spec.EvalLogLevel,
+		},
+	}
+
+	if n.IsValidationEnabled() {
+		envVars = append(envVars,
+			corev1.EnvVar{Name: "EVAL_ENABLE_VALIDATION", Value: "True"})
+	}
+
+	// Append the environment variables for Postgres
+	envVars = append(envVars, n.GetPostgresEnv()...)
+
+	// Append the environment variables for OTel
+	if n.IsOtelEnabled() {
+		envVars = append(envVars, n.GetOtelEnv()...)
+	}
+
+	return envVars
+}
+
+// IsValidationEnabled returns if the validation jobs are enabled by default
+func (n *NemoEvaluator) IsValidationEnabled() bool {
+	if n.Spec.EnableValidation == nil {
+		// validation jobs are enabled by default
+		return true
+	}
+	return *n.Spec.EnableValidation
+}
+
+// IsOtelEnabled returns true if Open Telemetry Collector is enabled
+func (n *NemoEvaluator) IsOtelEnabled() bool {
+	return n.Spec.OpenTelemetry.Enabled != nil && *n.Spec.OpenTelemetry.Enabled
+}
+
+// GetOtelEnv generates OpenTelemetry-related environment variables.
+func (n *NemoEvaluator) GetOtelEnv() []corev1.EnvVar {
+	var otelEnvVars []corev1.EnvVar
+
+	otelEnvVars = append(otelEnvVars,
+		corev1.EnvVar{Name: "OTEL_EXPORTER_OTLP_ENDPOINT", Value: n.Spec.OpenTelemetry.ExporterOtlpEndpoint},
+		corev1.EnvVar{Name: "OTEL_TRACES_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.TracesExporter},
+		corev1.EnvVar{Name: "OTEL_METRICS_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.MetricsExporter},
+		corev1.EnvVar{Name: "OTEL_LOGS_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.LogsExporter},
+		corev1.EnvVar{Name: "OTEL_LOG_LEVEL", Value: n.Spec.OpenTelemetry.LogLevel},
+	)
+
+	if len(n.Spec.OpenTelemetry.ExcludedUrls) > 0 {
+		otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+			Name:  "OTEL_PYTHON_EXCLUDED_URLS",
+			Value: strings.Join(n.Spec.OpenTelemetry.ExcludedUrls, ","),
+		})
+	}
+
+	var enableLog bool = true
+	if n.Spec.OpenTelemetry.DisableLogging != nil {
+		enableLog = !*n.Spec.OpenTelemetry.DisableLogging
+	}
+	otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+		Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
+		Value: strconv.FormatBool(enableLog),
+	})
+
+	return otelEnvVars
+}
+
+// GetPostgresEnv returns the PostgreSQL environment variables for a Kubernetes pod.
+func (n *NemoEvaluator) GetPostgresEnv() []corev1.EnvVar {
+	envVars := []corev1.EnvVar{
 		{
 			Name: "POSTGRES_DB_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
@@ -172,63 +297,26 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "POSTGRES_URI",
-			Value: fmt.Sprintf("postgresql://%s:$(POSTGRES_DB_PASSWORD)@%s:%d/%s", n.Spec.DatabaseConfig.Credentials.User, n.Spec.DatabaseConfig.Host, n.Spec.DatabaseConfig.Port, n.Spec.DatabaseConfig.DatabaseName),
-		},
-		{
-			Name:  "ARGO_HOST",
-			Value: n.Spec.ArgoWorkFlows.Endpoint,
-		},
-		{
-			Name:  "MILVUS_URL",
-			Value: n.Spec.Milvus.Endpoint,
-		},
-		{
-			Name:  "SERVICE_ACCOUNT",
-			Value: n.Spec.ArgoWorkFlows.ServiceAccount,
-		},
-		{
-			Name:  "DATA_STORE_HOST",
-			Value: n.Spec.DataStore.Endpoint,
-		},
-		{
-			Name:  "EVAL_CONTAINER",
-			Value: n.GetImage(),
-		},
-		{
-			Name:  "EVAL_ENABLE_VALIDATION",
-			Value: "True",
-		},
-		{
-			Name:  "OTEL_TRACES_EXPORTER",
-			Value: "none",
-		},
-		{
-			Name:  "OTEL_METRICS_EXPORTER",
-			Value: "none",
-		},
-		{
-			Name:  "OTEL_LOGS_EXPORTER",
-			Value: "none",
-		},
-		{
-			Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
-			Value: "false",
-		},
-		{
-			Name:  "LOG_HANDLERS",
-			Value: "console",
-		},
-		{
-			Name:  "CONSOLE_LOG_LEVEL",
-			Value: "INFO",
-		},
-		{
-			Name:  "EVAL_LOG_LEVEL",
-			Value: "INFO",
+			Value: n.GeneratePostgresConnString(),
 		},
 	}
 
 	return envVars
+}
+
+// GeneratePostgresConnString generates a PostgreSQL connection string using the database config.
+func (n *NemoEvaluator) GeneratePostgresConnString() string {
+	// Construct the connection string
+	connString := fmt.Sprintf(
+		"postgresql://%s:%s@%s:%d/%s",
+		n.Spec.DatabaseConfig.Credentials.User,
+		"$(POSTGRES_DB_PASSWORD)",
+		n.Spec.DatabaseConfig.Host,
+		n.Spec.DatabaseConfig.Port,
+		n.Spec.DatabaseConfig.DatabaseName,
+	)
+
+	return connString
 }
 
 // GetStandardAnnotations returns default annotations to apply to the NemoEvaluator instance
@@ -521,7 +609,7 @@ func (n *NemoEvaluator) GetDeploymentParams() *rendertypes.DeploymentParams {
 	// Set runtime class
 	params.RuntimeClassName = n.GetRuntimeClass()
 
-	params.Ports = []corev1.ContainerPort{{Name: "http", Protocol: corev1.ProtocolTCP, ContainerPort: 7331}}
+	params.Ports = []corev1.ContainerPort{{Name: "http", Protocol: corev1.ProtocolTCP, ContainerPort: n.GetServicePort()}}
 	return params
 }
 
@@ -588,8 +676,8 @@ func (n *NemoEvaluator) GetServiceParams() *rendertypes.ServiceParams {
 	params.Type = "ClusterIP"
 
 	// Set service ports
-	params.Port = 7331
-	params.TargetPort = 7331
+	params.Port = n.GetServicePort()
+	params.TargetPort = n.GetServicePort()
 	params.PortName = "http"
 	return params
 }

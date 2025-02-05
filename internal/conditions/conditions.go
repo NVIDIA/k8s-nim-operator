@@ -89,6 +89,8 @@ func (u *updater) SetConditionsReady(ctx context.Context, obj client.Object, rea
 		return u.SetConditionsReadyNemoCustomizer(ctx, cr, reason, message)
 	case *appsv1alpha1.NemoDatastore:
 		return u.SetConditionsReadyNemoDatastore(ctx, cr, reason, message)
+	case *appsv1alpha1.NemoEvaluator:
+		return u.SetConditionsReadyNemoEvaluator(ctx, cr, reason, message)
 	default:
 		return fmt.Errorf("unknown CRD type for %v", obj)
 	}
@@ -179,6 +181,23 @@ func (u *updater) SetConditionsReadyNemoCustomizer(ctx context.Context, cr *apps
 	return u.updateNemoCustomizerStatus(ctx, cr)
 }
 
+func (u *updater) SetConditionsReadyNemoEvaluator(ctx context.Context, cr *appsv1alpha1.NemoEvaluator, reason, message string) error {
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:    Ready,
+		Status:  metav1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	})
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:   Failed,
+		Status: metav1.ConditionFalse,
+		Reason: Ready,
+	})
+	cr.Status.State = v1alpha1.NemoEvaluatorStatusReady
+	return u.updateNemoEvaluatorStatus(ctx, cr)
+}
+
 func (u *updater) SetConditionsNotReady(ctx context.Context, obj client.Object, reason, message string) error {
 	switch cr := obj.(type) {
 	case *appsv1alpha1.NIMService:
@@ -191,6 +210,8 @@ func (u *updater) SetConditionsNotReady(ctx context.Context, obj client.Object, 
 		return u.SetConditionsNotReadyNemoDatastore(ctx, cr, reason, message)
 	case *appsv1alpha1.NemoCustomizer:
 		return u.SetConditionsNotReadyNemoCustomizer(ctx, cr, reason, message)
+	case *appsv1alpha1.NemoEvaluator:
+		return u.SetConditionsNotReadyNemoEvaluator(ctx, cr, reason, message)
 	default:
 		return fmt.Errorf("unknown CRD type for %v", obj)
 	}
@@ -286,6 +307,24 @@ func (u *updater) SetConditionsNotReadyNemoCustomizer(ctx context.Context, cr *a
 	return u.updateNemoCustomizerStatus(ctx, cr)
 }
 
+func (u *updater) SetConditionsNotReadyNemoEvaluator(ctx context.Context, cr *appsv1alpha1.NemoEvaluator, reason, message string) error {
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:    Ready,
+		Status:  metav1.ConditionFalse,
+		Reason:  reason,
+		Message: message,
+	})
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:    Failed,
+		Status:  metav1.ConditionFalse,
+		Reason:  Ready,
+		Message: message,
+	})
+	cr.Status.State = v1alpha1.NemoEvaluatorStatusNotReady
+	return u.updateNemoEvaluatorStatus(ctx, cr)
+}
+
 func (u *updater) SetConditionsFailed(ctx context.Context, obj client.Object, reason, message string) error {
 	switch cr := obj.(type) {
 	case *appsv1alpha1.NIMService:
@@ -298,6 +337,8 @@ func (u *updater) SetConditionsFailed(ctx context.Context, obj client.Object, re
 		return u.SetConditionsFailedNemoDatastore(ctx, cr, reason, message)
 	case *appsv1alpha1.NemoCustomizer:
 		return u.SetConditionsFailedNemoCustomizer(ctx, cr, reason, message)
+	case *appsv1alpha1.NemoEvaluator:
+		return u.SetConditionsFailedNemoEvaluator(ctx, cr, reason, message)
 	default:
 		return fmt.Errorf("unknown CRD type for %v", obj)
 	}
@@ -388,6 +429,23 @@ func (u *updater) SetConditionsFailedNemoCustomizer(ctx context.Context, cr *app
 	return u.updateNemoCustomizerStatus(ctx, cr)
 }
 
+func (u *updater) SetConditionsFailedNemoEvaluator(ctx context.Context, cr *appsv1alpha1.NemoEvaluator, reason, message string) error {
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:   Ready,
+		Status: metav1.ConditionFalse,
+		Reason: Failed,
+	})
+
+	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+		Type:    Failed,
+		Status:  metav1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	})
+	cr.Status.State = v1alpha1.NemoEvaluatorStatusFailed
+	return u.updateNemoEvaluatorStatus(ctx, cr)
+}
+
 func (u *updater) updateNIMServiceStatus(ctx context.Context, cr *appsv1alpha1.NIMService) error {
 
 	obj := &appsv1alpha1.NIMService{}
@@ -443,6 +501,19 @@ func (u *updater) updateNemoDatastoreStatus(ctx context.Context, cr *appsv1alpha
 
 func (u *updater) updateNemoCustomizerStatus(ctx context.Context, cr *appsv1alpha1.NemoCustomizer) error {
 	obj := &appsv1alpha1.NemoCustomizer{}
+	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
+	if errGet != nil {
+		return errGet
+	}
+	obj.Status = cr.Status
+	if err := u.client.Status().Update(ctx, obj); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *updater) updateNemoEvaluatorStatus(ctx context.Context, cr *appsv1alpha1.NemoEvaluator) error {
+	obj := &appsv1alpha1.NemoEvaluator{}
 	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
 	if errGet != nil {
 		return errGet
