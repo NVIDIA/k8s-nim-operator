@@ -30,8 +30,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -824,6 +826,71 @@ func (n *NemoEvaluator) GetServiceMonitorAnnotations() map[string]string {
 		return utils.MergeMaps(NemoEvaluatorAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
 	return NemoEvaluatorAnnotations
+}
+
+// GetInitContainers returns the init containers for the NemoEvaluator.
+//
+// It creates and returns a slice of corev1.Container.
+// The init containers include a busybox container to wait for Postgres to start,
+// and an evaluator-db-migration container to run the database migration.
+//
+// Returns a slice of corev1.Container.
+func (n *NemoEvaluator) GetInitContainers() []corev1.Container {
+
+	connCmd := fmt.Sprintf(
+		"until nc -z %s %d; do echo \"Waiting for Postgres to start \"; sleep 5; done",
+		n.Spec.DatabaseConfig.Host,
+		n.Spec.DatabaseConfig.Port)
+
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "NAMESPACE",
+			Value: n.Namespace,
+		},
+		{
+			Name:  "ARGO_HOST",
+			Value: n.Spec.ArgoWorkflows.Endpoint,
+		},
+		{
+			Name:  "EVAL_CONTAINER",
+			Value: n.GetImage(),
+		},
+		{
+			Name:  "DATA_STORE_HOST",
+			Value: n.Spec.Datastore.Endpoint,
+		},
+	}
+	// Append the environment variables for Postgres
+	envVars = append(envVars, n.GetPostgresEnv()...)
+
+	return []corev1.Container{
+		{
+			Name:            "wait-for-postgres",
+			Image:           "busybox",
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"sh", "-c", connCmd, "do echo \"Waiting for Postgres to start\"", "sleep 5", "done",
+			},
+		},
+		{
+			Name:            "evaluator-db-migration",
+			Image:           n.GetImage(),
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"sh", "-c", "/app/scripts/run-db-migration.sh",
+			},
+			SecurityContext: &corev1.SecurityContext{
+				RunAsUser: ptr.To[int64](0),
+			},
+			Env: envVars,
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
 }
 
 func init() {

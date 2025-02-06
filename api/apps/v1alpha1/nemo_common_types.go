@@ -108,7 +108,7 @@ type OTelSpec struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// ExporterOtlpEndpoint is the OTLP collector endpoint.
-	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Optional
 	ExporterOtlpEndpoint string `json:"exporterOtlpEndpoint"`
 
 	// DisableLogging indicates whether Python logging auto-instrumentation should be disabled.

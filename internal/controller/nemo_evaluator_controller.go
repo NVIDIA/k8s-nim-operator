@@ -263,56 +263,56 @@ func (r *NemoEvaluatorReconciler) refreshMetrics(ctx context.Context) {
 	refreshNemoEvaluatorMetrics(NemoEvaluatorList)
 }
 
-func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, NemoEvaluator *appsv1alpha1.NemoEvaluator) (ctrl.Result, error) {
+func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, nemoEvaluator *appsv1alpha1.NemoEvaluator) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	var err error
 	defer func() {
 		if err != nil {
-			r.GetEventRecorder().Eventf(NemoEvaluator, corev1.EventTypeWarning, conditions.Failed,
-				"NemoEvaluator %s failed, msg: %s", NemoEvaluator.Name, err.Error())
+			r.GetEventRecorder().Eventf(nemoEvaluator, corev1.EventTypeWarning, conditions.Failed,
+				"NemoEvaluator %s failed, msg: %s", nemoEvaluator.Name, err.Error())
 		}
 	}()
 	// Generate annotation for the current operator-version and apply to all resources
 	// Get generic name for all resources
-	namespacedName := types.NamespacedName{Name: NemoEvaluator.GetName(), Namespace: NemoEvaluator.GetNamespace()}
+	namespacedName := types.NamespacedName{Name: nemoEvaluator.GetName(), Namespace: nemoEvaluator.GetNamespace()}
 	renderer := r.GetRenderer()
 
 	// Sync serviceaccount
-	err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
-		return renderer.ServiceAccount(NemoEvaluator.GetServiceAccountParams())
+	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
+		return renderer.ServiceAccount(nemoEvaluator.GetServiceAccountParams())
 	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Sync role
-	err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(NemoEvaluator.GetRoleParams())
+	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+		return renderer.Role(nemoEvaluator.GetRoleParams())
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
-		return renderer.RoleBinding(NemoEvaluator.GetRoleBindingParams())
+	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+		return renderer.RoleBinding(nemoEvaluator.GetRoleBindingParams())
 	}, "rolebinding", conditions.ReasonRoleBindingFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Sync service
-	err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &corev1.Service{}, func() (client.Object, error) {
-		return renderer.Service(NemoEvaluator.GetServiceParams())
+	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &corev1.Service{}, func() (client.Object, error) {
+		return renderer.Service(nemoEvaluator.GetServiceParams())
 	}, "service", conditions.ReasonServiceFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Sync ingress
-	if NemoEvaluator.IsIngressEnabled() {
-		err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
-			return renderer.Ingress(NemoEvaluator.GetIngressParams())
+	if nemoEvaluator.IsIngressEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
+			return renderer.Ingress(nemoEvaluator.GetIngressParams())
 		}, "ingress", conditions.ReasonIngressFailed)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -325,9 +325,9 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, Ne
 	}
 
 	// Sync HPA
-	if NemoEvaluator.IsAutoScalingEnabled() {
-		err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
-			return renderer.HPA(NemoEvaluator.GetHPAParams())
+	if nemoEvaluator.IsAutoScalingEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
+			return renderer.HPA(nemoEvaluator.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -341,20 +341,29 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, Ne
 	}
 
 	// Sync Service Monitor
-	if NemoEvaluator.IsServiceMonitorEnabled() {
-		err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
-			return renderer.ServiceMonitor(NemoEvaluator.GetServiceMonitorParams())
+	if nemoEvaluator.IsServiceMonitorEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
+			return renderer.ServiceMonitor(nemoEvaluator.GetServiceMonitorParams())
 		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
-	deploymentParams := NemoEvaluator.GetDeploymentParams()
+	deploymentParams := nemoEvaluator.GetDeploymentParams()
 
 	// Sync deployment
-	err = r.renderAndSyncResource(ctx, NemoEvaluator, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
-		return renderer.Deployment(deploymentParams)
+	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
+
+		result, err := renderer.Deployment(deploymentParams)
+		if err != nil {
+			return nil, err
+		}
+		initContainers := nemoEvaluator.GetInitContainers()
+		if len(initContainers) > 0 {
+			result.Spec.Template.Spec.InitContainers = initContainers
+		}
+		return result, err
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -368,14 +377,14 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, Ne
 
 	if !ready {
 		// Update status as NotReady
-		err = r.updater.SetConditionsNotReady(ctx, NemoEvaluator, conditions.NotReady, msg)
-		r.GetEventRecorder().Eventf(NemoEvaluator, corev1.EventTypeNormal, conditions.NotReady,
-			"NemoEvaluator %s not ready yet, msg: %s", NemoEvaluator.Name, msg)
+		err = r.updater.SetConditionsNotReady(ctx, nemoEvaluator, conditions.NotReady, msg)
+		r.GetEventRecorder().Eventf(nemoEvaluator, corev1.EventTypeNormal, conditions.NotReady,
+			"NemoEvaluator %s not ready yet, msg: %s", nemoEvaluator.Name, msg)
 	} else {
 		// Update status as ready
-		err = r.updater.SetConditionsReady(ctx, NemoEvaluator, conditions.Ready, msg)
-		r.GetEventRecorder().Eventf(NemoEvaluator, corev1.EventTypeNormal, conditions.Ready,
-			"NemoEvaluator %s ready, msg: %s", NemoEvaluator.Name, msg)
+		err = r.updater.SetConditionsReady(ctx, nemoEvaluator, conditions.Ready, msg)
+		r.GetEventRecorder().Eventf(nemoEvaluator, corev1.EventTypeNormal, conditions.Ready,
+			"NemoEvaluator %s ready, msg: %s", nemoEvaluator.Name, msg)
 	}
 
 	if err != nil {
