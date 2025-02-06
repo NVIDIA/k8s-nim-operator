@@ -936,7 +936,6 @@ spec:
                     type: object
                   exporterOtlpEndpoint:
                     description: ExporterOtlpEndpoint is the OTLP collector endpoint.
-                    minLength: 1
                     type: string
                   logLevel:
                     default: INFO
@@ -945,8 +944,6 @@ spec:
                     - INFO
                     - DEBUG
                     type: string
-                required:
-                - exporterOtlpEndpoint
                 type: object
               podAffinity:
                 description: Pod affinity is a group of inter pod affinity scheduling
