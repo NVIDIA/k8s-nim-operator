@@ -1,3 +1,4 @@
+---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NemoEntitystore
 metadata:
@@ -5,24 +6,25 @@ metadata:
     app.kubernetes.io/name: k8s-nim-operator
     app.kubernetes.io/managed-by: kustomize
   name: nemoentitystore-sample
+  namespace: default
 spec:
   image:
     repository: <registry>/<nemo-entity-store>
     tag: "<version>"
     pullPolicy: IfNotPresent
     pullSecrets:
-      - <ngc-image-pull-secret>
-  authSecret: <ngc-api-secret>
+      - <image-pull-secret>
   env:
     - name: BASE_URL_DATASTORE
       value: http://<DATASTORE_SVC_NAME>.<DATASTORE_SVC_NAMESPACE>:3000
   expose:
     service:
       port: 8000
-  entityStoreParams:
-    appVersion: "<version>"
+  databaseConfig:
     databaseName: gateway
-    databaseUser: esuser
-    databaseHost: <postgresql-endpoint>
-    databasePort: "5432"
-    dbSecret: <entity-store-db-secret>
+    host: <postgresql-endpoint>
+    port: 5432
+    credentials:
+      user: esuser
+      secretName: <entity-store-db-secret>
+      passwordKey: password
