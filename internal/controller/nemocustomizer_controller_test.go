@@ -404,7 +404,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			Expect(sm.Namespace).To(Equal(nemoCustomizer.GetNamespace()))
 			Expect(sm.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(sm.Annotations["annotation-key-specific"]).To(Equal("service-monitor"))
-			Expect(sm.Spec.Endpoints[0].Port).To(Equal("service-port"))
+			Expect(sm.Spec.Endpoints[0].Port).To(Equal("api"))
 			Expect(sm.Spec.Endpoints[0].ScrapeTimeout).To(Equal(monitoringv1.Duration("30s")))
 			Expect(sm.Spec.Endpoints[0].Interval).To(Equal(monitoringv1.Duration("1m")))
 

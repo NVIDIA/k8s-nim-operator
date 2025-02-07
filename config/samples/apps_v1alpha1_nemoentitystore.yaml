@@ -19,7 +19,10 @@ spec:
       value: http://nemodatastore-sample.nemo.svc.cluster.local:3000
   expose:
     service:
-      port: 8000
+      type: ClusterIP
+      ports:
+        - name: api
+          port: 8000
   databaseConfig:
     databaseName: nesdb
     host: entity-store-pg-postgresql.nemo.svc.cluster.local
