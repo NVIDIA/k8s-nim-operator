@@ -11,39 +11,21 @@ spec:
     configMap: gr-config
   env:
     - name: NIM_ENDPOINT_URL
-      value: "http://<NIM_SERVICE_ENDPOINT>:<NIM_SERVICE_PORT>/v1"
+      value: http://<NIM_SERVICE_ENDPOINT>:<NIM_SERVICE_PORT>/v1
     - name: NIM_ENDPOINT_API_KEY
       value: dummy
   expose:
-    ingress:
-      spec: {}
     service:
-      port: 7331
       type: ClusterIP
+      ports:
+        - name: api
+          port: 8000
   image:
+    repository: nvcr.io/nvidian/nemo-llm/nemo-guardrails-microservice
+    tag: "25.02-rc4"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
-    repository: nvcr.io/nvidian/nemo-llm/nemo-guardrails-microservice
-    tag: "25.02-rc4"
-  livenessProbe:
-    enabled: true
-    probe:
-      httpGet:
-        path: /v1/health
-        port: 7331
-      initialDelaySeconds: 5
-      timeoutSeconds: 30
-  metrics:
-    serviceMonitor: {}
-  readinessProbe:
-    enabled: true
-    probe:
-      httpGet:
-        path: /v1/health
-        port: 7331
-      initialDelaySeconds: 5
-      timeoutSeconds: 30
   replicas: 1
   resources:
     limits:
