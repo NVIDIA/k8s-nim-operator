@@ -36,6 +36,8 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
+	// GuardrailAPIPort is the default port that the guardrail serves on
+	GuardrailAPIPort = 8000
 	// NemoGuardrailConditionReady indicates that the NEMO GuardrailService is ready.
 	NemoGuardrailConditionReady = "Ready"
 	// NemoGuardrailConditionFailed indicates that the NEMO GuardrailService has failed.
@@ -189,7 +191,7 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "GUARDRAILS_PORT",
-			Value: "7331",
+			Value: fmt.Sprintf("%d", n.GetContainerPort()),
 		},
 		{
 			Name:  "DEMO",
@@ -361,11 +363,11 @@ func (n *NemoGuardrail) GetStartupProbe() *corev1.Probe {
 // GetDefaultStartupProbe returns the default startup probe for the NemoGuardrail container
 func (n *NemoGuardrail) GetDefaultStartupProbe() *corev1.Probe {
 	probe := corev1.Probe{
-		InitialDelaySeconds: 40,
+		InitialDelaySeconds: 30,
 		TimeoutSeconds:      1,
 		PeriodSeconds:       10,
 		SuccessThreshold:    1,
-		FailureThreshold:    180,
+		FailureThreshold:    30,
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health",
@@ -474,9 +476,27 @@ func (n *NemoGuardrail) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
 }
 
-// GetServicePort returns the service port for the NemoGuardrail deployment
-func (n *NemoGuardrail) GetServicePort() int32 {
-	return n.Spec.Expose.Service.Port
+// GetServicePorts returns the service ports for the NemoGuardrail deployment
+func (n *NemoGuardrail) GetServicePorts() []corev1.ServicePort {
+	return n.Spec.Expose.Service.Ports
+}
+
+// GetContainerPort returns the serving port for the NemoGuardrail deployment.
+func (n *NemoGuardrail) GetContainerPort() int32 {
+	servicePorts := n.GetServicePorts()
+
+	// Return default if there are no service ports
+	if len(servicePorts) == 0 {
+		return GuardrailAPIPort
+	}
+
+	servicePort := servicePorts[0]
+	if servicePort.TargetPort.Type == intstr.Int {
+		return int32(servicePort.TargetPort.IntValue())
+	}
+
+	// If TargetPort is empty or a string, return Port
+	return servicePort.Port
 }
 
 // GetServiceType returns the service type for the NemoGuardrail deployment
@@ -557,6 +577,17 @@ func (n *NemoGuardrail) GetDeploymentParams() *rendertypes.DeploymentParams {
 
 	// Set runtime class
 	params.RuntimeClassName = n.GetRuntimeClass()
+
+	// Setup container ports for guardrails
+	containerPorts := []corev1.ContainerPort{
+		{
+			Name:          DefaultNamedPortAPI,
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: GuardrailAPIPort,
+		},
+	}
+	params.Ports = containerPorts
+
 	return params
 }
 
@@ -623,8 +654,18 @@ func (n *NemoGuardrail) GetServiceParams() *rendertypes.ServiceParams {
 	params.Type = n.GetServiceType()
 
 	// Set service ports
-	params.Port = n.GetServicePort()
-	params.PortName = "service-port"
+	servicePorts := n.GetServicePorts()
+	if len(servicePorts) != 0 {
+		params.Ports = servicePorts
+	} else {
+		// add default api port
+		params.Ports = []corev1.ServicePort{{
+			Name:       DefaultNamedPortAPI,
+			Port:       GuardrailAPIPort,
+			TargetPort: intstr.FromInt32(n.GetContainerPort()),
+			Protocol:   corev1.ProtocolTCP,
+		}}
+	}
 	return params
 }
 
@@ -727,11 +768,20 @@ func (n *NemoGuardrail) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 	params.Labels = svcLabels
 	params.Annotations = n.GetServiceMonitorAnnotations()
 
+	// Determine the appropriate port for monitoring
+	metricsPort := getMetricsPort(n.Spec.Expose.Service)
+
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
 		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
 		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
-		Endpoints:         []monitoringv1.Endpoint{{Port: "service-port", ScrapeTimeout: serviceMonitor.ScrapeTimeout, Interval: serviceMonitor.Interval}},
+		Endpoints: []monitoringv1.Endpoint{
+			{
+				Port:          metricsPort.StrVal,
+				ScrapeTimeout: serviceMonitor.ScrapeTimeout,
+				Interval:      serviceMonitor.Interval,
+			},
+		},
 	}
 	params.SMSpec = smSpec
 	return params
