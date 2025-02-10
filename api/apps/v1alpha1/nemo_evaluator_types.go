@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -878,9 +877,6 @@ func (n *NemoEvaluator) GetInitContainers() []corev1.Container {
 			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
 			Command: []string{
 				"sh", "-c", "/app/scripts/run-db-migration.sh",
-			},
-			SecurityContext: &corev1.SecurityContext{
-				RunAsUser: ptr.To[int64](0),
 			},
 			Env: envVars,
 			Resources: corev1.ResourceRequirements{
