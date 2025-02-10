@@ -13,6 +13,8 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- nemoservice_editor_role.yaml
+- nemoservice_viewer_role.yaml
 - nemocustomizer_editor_role.yaml
 - nemocustomizer_viewer_role.yaml
 - nemoentitystore_editor_role.yaml

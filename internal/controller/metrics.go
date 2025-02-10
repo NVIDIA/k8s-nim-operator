@@ -71,6 +71,20 @@ var (
 		},
 		[]string{"status"},
 	)
+
+	nemoServiceStatusValues = []string{
+		appsv1alpha1.NemoServiceStatusFailed,
+		appsv1alpha1.NemoServiceStatusReady,
+		appsv1alpha1.NemoServiceStatusNotReady,
+		statusUnknown,
+	}
+	nemoServiceStatusMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "nemoService_status_total",
+			Help: "Total number of NemoServices with specific status value.",
+		},
+		[]string{"status"},
+	)
 )
 
 func init() {
@@ -152,5 +166,30 @@ func refreshNIMPipelineMetrics(nimPipelineList *appsv1alpha1.NIMPipelineList) {
 	}
 	for status, val := range counts {
 		nimPipelineStatusMetric.WithLabelValues(status).Set(float64(val))
+	}
+}
+
+func refresNemoServiceMetrics(nemoServiceList *appsv1alpha1.NemoServiceList) {
+	nemoServiceStatusMetric.WithLabelValues("all").Set(float64(len(nemoServiceList.Items)))
+	counts := make(map[string]int)
+	for _, item := range nemoServiceList.Items {
+		status := item.Status.State
+		if status == "" {
+			status = statusUnknown
+		}
+
+		if _, ok := counts[status]; !ok {
+			counts[status] = 1
+		} else {
+			counts[status] = counts[status] + 1
+		}
+	}
+	for _, status := range nemoServiceStatusValues {
+		if _, ok := counts[status]; !ok {
+			nemoServiceStatusMetric.WithLabelValues(status).Set(float64(0))
+		}
+	}
+	for status, val := range counts {
+		nemoServiceStatusMetric.WithLabelValues(status).Set(float64(val))
 	}
 }

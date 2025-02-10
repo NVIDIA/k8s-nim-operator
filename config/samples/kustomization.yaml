@@ -8,4 +8,5 @@ resources:
 - apps_v1alpha1_nemoevaluator.yaml
 - apps_v1alpha1_nemodatastore.yaml
 - apps_v1alpha1_nemoentitystore.yaml
+- apps_v1alpha1_nemoservice.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

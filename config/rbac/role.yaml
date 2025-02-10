@@ -67,6 +67,7 @@ rules:
   - nemoentitystores
   - nemoevaluators
   - nemoguardrails
+  - nemoservices
   - nimcaches
   - nimpipelines
   - nimservices
@@ -86,6 +87,7 @@ rules:
   - nemoentitystores/finalizers
   - nemoevaluators/finalizers
   - nemoguardrails/finalizers
+  - nemoservices/finalizers
   - nimcaches/finalizers
   - nimpipelines/finalizers
   - nimservices/finalizers
@@ -99,6 +101,7 @@ rules:
   - nemoentitystores/status
   - nemoevaluators/status
   - nemoguardrails/status
+  - nemoservices/status
   - nimcaches/status
   - nimpipelines/status
   - nimservices/status
