@@ -19,6 +19,7 @@ spec:
     endpoint: minio.k8s-nim-operator-system.svc.cluster.local:9000
     bucketName: datastore-dev
     region: object-store-region
+    ssl: false
   databaseConfig:
     credentials:
       user: ndsuser
