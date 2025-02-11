@@ -260,7 +260,7 @@ func (r *NemoEntitystoreReconciler) refreshMetrics(ctx context.Context) {
 		logger.Error(err, "unable to list NemoEntitystores in the cluster")
 		return
 	}
-	//refreshNemoEntitystoreMetrics(NemoEntitystoreList)
+	refreshNemoEntitystoreMetrics(NemoEntitystoreList)
 }
 
 func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context, NemoEntitystore *appsv1alpha1.NemoEntitystore) (ctrl.Result, error) {

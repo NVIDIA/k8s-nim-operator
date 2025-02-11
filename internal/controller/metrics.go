@@ -71,6 +71,76 @@ var (
 		},
 		[]string{"status"},
 	)
+
+	nemoDatastoreStatusValues = []string{
+		appsv1alpha1.NemoDatastoreStatusFailed,
+		appsv1alpha1.NemoDatastoreStatusReady,
+		appsv1alpha1.NemoDatastoreStatusNotReady,
+		statusUnknown,
+	}
+	nemoDatastoreStatusMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "nemo_datastore_status_total",
+			Help: "Total number of Nemo Datastores with specific status value.",
+		},
+		[]string{"status"},
+	)
+
+	nemoEvaluatorStatusValues = []string{
+		appsv1alpha1.NemoEvaluatorStatusFailed,
+		appsv1alpha1.NemoEvaluatorStatusReady,
+		appsv1alpha1.NemoEvaluatorStatusNotReady,
+		statusUnknown,
+	}
+	nemoEvaluatorStatusMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "nemo_evaluator_status_total",
+			Help: "Total number of Nemo Evaluators with specific status value.",
+		},
+		[]string{"status"},
+	)
+
+	nemoEntitystoreStatusValues = []string{
+		appsv1alpha1.NemoEntitystoreStatusFailed,
+		appsv1alpha1.NemoEntitystoreStatusReady,
+		appsv1alpha1.NemoEntitystoreStatusNotReady,
+		statusUnknown,
+	}
+	nemoEntitystoreStatusMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "nemo_entitystore_status_total",
+			Help: "Total number of Nemo Entitystores with specific status value.",
+		},
+		[]string{"status"},
+	)
+
+	nemoCustomizerStatusValues = []string{
+		appsv1alpha1.NemoCustomizerStatusFailed,
+		appsv1alpha1.NemoCustomizerStatusReady,
+		appsv1alpha1.NemoCustomizerStatusNotReady,
+		statusUnknown,
+	}
+	nemoCustomizerStatusMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "nemo_customizer_status_total",
+			Help: "Total number of Nemo Customizers with specific status value.",
+		},
+		[]string{"status"},
+	)
+
+	nemoGuardrailStatusValues = []string{
+		appsv1alpha1.NemoGuardrailStatusFailed,
+		appsv1alpha1.NemoGuardrailStatusReady,
+		appsv1alpha1.NemoGuardrailStatusNotReady,
+		statusUnknown,
+	}
+	nemoGuardrailStatusMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "nemo_guardrail_status_total",
+			Help: "Total number of Nemo Guardrails with specific status value.",
+		},
+		[]string{"status"},
+	)
 )
 
 func init() {
@@ -152,5 +222,130 @@ func refreshNIMPipelineMetrics(nimPipelineList *appsv1alpha1.NIMPipelineList) {
 	}
 	for status, val := range counts {
 		nimPipelineStatusMetric.WithLabelValues(status).Set(float64(val))
+	}
+}
+
+func refreshNemoDatastoreMetrics(nemoDatastoreList *appsv1alpha1.NemoDatastoreList) {
+	nimPipelineStatusMetric.WithLabelValues("all").Set(float64(len(nemoDatastoreList.Items)))
+	counts := make(map[string]int)
+	for _, item := range nemoDatastoreList.Items {
+		status := item.Status.State
+		if status == "" {
+			status = statusUnknown
+		}
+
+		if _, ok := counts[status]; !ok {
+			counts[status] = 1
+		} else {
+			counts[status] = counts[status] + 1
+		}
+	}
+	for _, status := range nemoDatastoreStatusValues {
+		if _, ok := counts[status]; !ok {
+			nemoDatastoreStatusMetric.WithLabelValues(status).Set(float64(0))
+		}
+	}
+	for status, val := range counts {
+		nemoDatastoreStatusMetric.WithLabelValues(status).Set(float64(val))
+	}
+}
+
+func refreshNemoEvaluatorMetrics(nemoEvaluatorList *appsv1alpha1.NemoEvaluatorList) {
+	nemoEvaluatorStatusMetric.WithLabelValues("all").Set(float64(len(nemoEvaluatorList.Items)))
+	counts := make(map[string]int)
+	for _, item := range nemoEvaluatorList.Items {
+		status := item.Status.State
+		if status == "" {
+			status = statusUnknown
+		}
+
+		if _, ok := counts[status]; !ok {
+			counts[status] = 1
+		} else {
+			counts[status] = counts[status] + 1
+		}
+	}
+	for _, status := range nemoEvaluatorStatusValues {
+		if _, ok := counts[status]; !ok {
+			nemoEvaluatorStatusMetric.WithLabelValues(status).Set(float64(0))
+		}
+	}
+	for status, val := range counts {
+		nemoEvaluatorStatusMetric.WithLabelValues(status).Set(float64(val))
+	}
+}
+
+func refreshNemoCustomizerMetrics(nemoCustomizerList *appsv1alpha1.NemoCustomizerList) {
+	nemoCustomizerStatusMetric.WithLabelValues("all").Set(float64(len(nemoCustomizerList.Items)))
+	counts := make(map[string]int)
+	for _, item := range nemoCustomizerList.Items {
+		status := item.Status.State
+		if status == "" {
+			status = statusUnknown
+		}
+
+		if _, ok := counts[status]; !ok {
+			counts[status] = 1
+		} else {
+			counts[status] = counts[status] + 1
+		}
+	}
+	for _, status := range nemoCustomizerStatusValues {
+		if _, ok := counts[status]; !ok {
+			nemoCustomizerStatusMetric.WithLabelValues(status).Set(float64(0))
+		}
+	}
+	for status, val := range counts {
+		nemoCustomizerStatusMetric.WithLabelValues(status).Set(float64(val))
+	}
+}
+
+func refreshNemoEntitystoreMetrics(nemoEntitystoreList *appsv1alpha1.NemoEntitystoreList) {
+	nemoEntitystoreStatusMetric.WithLabelValues("all").Set(float64(len(nemoEntitystoreList.Items)))
+	counts := make(map[string]int)
+	for _, item := range nemoEntitystoreList.Items {
+		status := item.Status.State
+		if status == "" {
+			status = statusUnknown
+		}
+
+		if _, ok := counts[status]; !ok {
+			counts[status] = 1
+		} else {
+			counts[status] = counts[status] + 1
+		}
+	}
+	for _, status := range nemoEntitystoreStatusValues {
+		if _, ok := counts[status]; !ok {
+			nemoEntitystoreStatusMetric.WithLabelValues(status).Set(float64(0))
+		}
+	}
+	for status, val := range counts {
+		nemoEntitystoreStatusMetric.WithLabelValues(status).Set(float64(val))
+	}
+}
+
+func refreshNemoGuardrailMetrics(nemoGuardrailList *appsv1alpha1.NemoGuardrailList) {
+	nemoGuardrailStatusMetric.WithLabelValues("all").Set(float64(len(nemoGuardrailList.Items)))
+	counts := make(map[string]int)
+	for _, item := range nemoGuardrailList.Items {
+		status := item.Status.State
+		if status == "" {
+			status = statusUnknown
+		}
+
+		if _, ok := counts[status]; !ok {
+			counts[status] = 1
+		} else {
+			counts[status] = counts[status] + 1
+		}
+	}
+	for _, status := range nemoGuardrailStatusValues {
+		if _, ok := counts[status]; !ok {
+			nemoGuardrailStatusMetric.WithLabelValues(status).Set(float64(0))
+		}
+	}
+	for status, val := range counts {
+		nemoGuardrailStatusMetric.WithLabelValues(status).Set(float64(val))
 	}
 }

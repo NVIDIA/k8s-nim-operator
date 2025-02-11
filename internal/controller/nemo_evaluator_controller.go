@@ -253,13 +253,14 @@ func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *NemoEvaluatorReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
-	// List all nodes
+	// List all evaluator instances
 	NemoEvaluatorList := &appsv1alpha1.NemoEvaluatorList{}
 	err := r.Client.List(ctx, NemoEvaluatorList, &client.ListOptions{})
 	if err != nil {
-		logger.Error(err, "unable to list NemoEvaluatorrails in the cluster")
+		logger.Error(err, "unable to list NemoEvaluators in the cluster")
 		return
 	}
+	refreshNemoEvaluatorMetrics(NemoEvaluatorList)
 }
 
 func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, NemoEvaluator *appsv1alpha1.NemoEvaluator) (ctrl.Result, error) {

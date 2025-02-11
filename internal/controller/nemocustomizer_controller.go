@@ -264,13 +264,14 @@ func (r *NemoCustomizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *NemoCustomizerReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
-	// List all instances
+	// List all customizer instances
 	NemoCustomizerList := &appsv1alpha1.NemoCustomizerList{}
 	err := r.Client.List(ctx, NemoCustomizerList, &client.ListOptions{})
 	if err != nil {
-		logger.Error(err, "unable to list NemoCustomizer in the cluster")
+		logger.Error(err, "unable to list NemoCustomizers in the cluster")
 		return
 	}
+	refreshNemoCustomizerMetrics(NemoCustomizerList)
 }
 
 func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, NemoCustomizer *appsv1alpha1.NemoCustomizer) (ctrl.Result, error) {

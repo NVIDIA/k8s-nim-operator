@@ -254,14 +254,14 @@ func (r *NemoDatastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *NemoDatastoreReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
-	// List all nodes
+	// List all datastore instances
 	NemoDatastoreList := &appsv1alpha1.NemoDatastoreList{}
 	err := r.Client.List(ctx, NemoDatastoreList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list NemoDatastores in the cluster")
 		return
 	}
-	//refreshNemoDatastoreMetrics(NemoDatastoreList)
+	refreshNemoDatastoreMetrics(NemoDatastoreList)
 }
 
 func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore) (ctrl.Result, error) {

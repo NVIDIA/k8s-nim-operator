@@ -254,14 +254,14 @@ func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *NemoGuardrailReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
-	// List all nodes
+	// List all guardrail instances
 	NemoGuardrailList := &appsv1alpha1.NemoGuardrailList{}
 	err := r.Client.List(ctx, NemoGuardrailList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list NemoGuardrails in the cluster")
 		return
 	}
-	//refreshNemoGuardrailMetrics(NemoGuardrailList)
+	refreshNemoGuardrailMetrics(NemoGuardrailList)
 }
 
 func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, NemoGuardrail *appsv1alpha1.NemoGuardrail) (ctrl.Result, error) {
