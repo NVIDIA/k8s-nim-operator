@@ -313,6 +313,46 @@ var _ = Describe("NemoEvaluator Controller", func() {
 			Expect(deployment.Name).To(Equal(nemoEvaluator.GetName()))
 			Expect(deployment.Namespace).To(Equal(nemoEvaluator.GetNamespace()))
 			Expect(deployment.Annotations["annotation-key"]).To(Equal("annotation-value"))
+
+			connCmd := fmt.Sprintf(
+				"until nc -z %s %d; do echo \"Waiting for Postgres to start \"; sleep 5; done",
+				nemoEvaluator.Spec.DatabaseConfig.Host,
+				nemoEvaluator.Spec.DatabaseConfig.Port)
+
+			Expect(deployment.Spec.Template.Spec.InitContainers).To(HaveLen(2))
+			Expect(deployment.Spec.Template.Spec.InitContainers[0].Name).To(Equal("wait-for-postgres"))
+			Expect(deployment.Spec.Template.Spec.InitContainers[0].Image).To(Equal("busybox"))
+			Expect(deployment.Spec.Template.Spec.InitContainers[0].Command).To(Equal([]string{"sh", "-c", connCmd}))
+
+			Expect(deployment.Spec.Template.Spec.InitContainers[1].Name).To(Equal("evaluator-db-migration"))
+			Expect(deployment.Spec.Template.Spec.InitContainers[1].Image).To(Equal(nemoEvaluator.GetImage()))
+			Expect(deployment.Spec.Template.Spec.InitContainers[1].Command).To(Equal([]string{"sh", "-c", "/app/scripts/run-db-migration.sh"}))
+			initContainerEnvVars := deployment.Spec.Template.Spec.InitContainers[1].Env
+			Expect(initContainerEnvVars).To(ContainElements(
+				corev1.EnvVar{Name: "NAMESPACE", Value: nemoEvaluator.GetNamespace()},
+				corev1.EnvVar{Name: "ARGO_HOST", Value: nemoEvaluator.Spec.ArgoWorkflows.Endpoint},
+				corev1.EnvVar{Name: "EVAL_CONTAINER", Value: nemoEvaluator.GetImage()},
+				corev1.EnvVar{Name: "DATA_STORE_HOST", Value: nemoEvaluator.Spec.Datastore.Endpoint},
+			))
+
+			Expect(initContainerEnvVars).To(ContainElement(corev1.EnvVar{
+				Name: "POSTGRES_DB_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						Key: nemoEvaluator.Spec.DatabaseConfig.Credentials.PasswordKey,
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: nemoEvaluator.Spec.DatabaseConfig.Credentials.SecretName,
+						},
+					},
+				},
+			}))
+
+			Expect(initContainerEnvVars).To(ContainElement(corev1.EnvVar{
+				Name:  "POSTGRES_URI",
+				Value: nemoEvaluator.GeneratePostgresConnString(),
+			}))
+
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal(nemoEvaluator.GetContainerName()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(nemoEvaluator.GetImage()))
 			// Ensure customized liveness and readiness probes are added

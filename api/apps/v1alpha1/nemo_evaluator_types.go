@@ -868,7 +868,7 @@ func (n *NemoEvaluator) GetInitContainers() []corev1.Container {
 			Image:           "busybox",
 			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
 			Command: []string{
-				"sh", "-c", connCmd, "do echo \"Waiting for Postgres to start\"", "sleep 5", "done",
+				"sh", "-c", connCmd,
 			},
 		},
 		{
