@@ -634,6 +634,9 @@ spec:
                     type: string
                   tag:
                     type: string
+                required:
+                - repository
+                - tag
                 type: object
               labels:
                 additionalProperties:
@@ -2330,6 +2333,8 @@ spec:
             required:
             - customizerConfig
             - databaseConfig
+            - expose
+            - image
             - otel
             - wandbSecret
             type: object

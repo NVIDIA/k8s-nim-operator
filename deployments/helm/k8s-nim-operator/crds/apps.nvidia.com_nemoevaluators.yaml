@@ -671,6 +671,9 @@ spec:
                     type: string
                   tag:
                     type: string
+                required:
+                - repository
+                - tag
                 type: object
               labels:
                 additionalProperties:
@@ -2348,6 +2351,8 @@ spec:
             - argoWorkflows
             - databaseConfig
             - datastore
+            - expose
+            - image
             - vectorDB
             type: object
           status:

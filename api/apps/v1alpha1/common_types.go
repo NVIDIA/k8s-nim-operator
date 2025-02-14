@@ -75,9 +75,9 @@ type HorizontalPodAutoscalerSpec struct {
 
 // Image defines image attributes
 type Image struct {
-	Repository  string   `json:"repository,omitempty"`
+	Repository  string   `json:"repository"`
 	PullPolicy  string   `json:"pullPolicy,omitempty"`
-	Tag         string   `json:"tag,omitempty"`
+	Tag         string   `json:"tag"`
 	PullSecrets []string `json:"pullSecrets,omitempty"`
 }
 
