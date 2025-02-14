@@ -55,7 +55,7 @@ const (
 
 // NemoDatastoreSpec defines the desired state of NemoDatastore
 type NemoDatastoreSpec struct {
-	Image   Image           `json:"image,omitempty"`
+	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
@@ -67,7 +67,7 @@ type NemoDatastoreSpec struct {
 	Tolerations    []corev1.Toleration          `json:"tolerations,omitempty"`
 	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
 	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Expose         Expose                       `json:"expose,omitempty"`
+	Expose         Expose                       `json:"expose"`
 	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
 	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
 	StartupProbe   Probe                        `json:"startupProbe,omitempty"`

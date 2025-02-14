@@ -607,6 +607,9 @@ spec:
                     type: string
                   tag:
                     type: string
+                required:
+                - repository
+                - tag
                 type: object
               labels:
                 additionalProperties:
@@ -2202,6 +2205,8 @@ spec:
                 type: integer
             required:
             - authSecret
+            - expose
+            - image
             type: object
           status:
             description: NemoGuardrailStatus defines the observed state of NemoGuardrail
