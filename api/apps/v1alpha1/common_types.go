@@ -48,8 +48,25 @@ type Service struct {
 	// +kubebuilder:deprecatedversion
 	Port int32 `json:"port,omitempty"`
 	// Defines multiple ports for the service
-	Ports       []corev1.ServicePort `json:"ports,omitempty"`
-	Annotations map[string]string    `json:"annotations,omitempty"`
+	Ports       []ServicePort     `json:"ports,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// ServicePort defines attributes to setup the service ports
+type ServicePort struct {
+	// The name of this port within the service.
+	Name string `json:"name,omitempty"`
+
+	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
+	// Default is TCP.
+	// +kubebuilder:validation:Enum=TCP;UDP;SCTP
+	// +kubebuilder:default="TCP"
+	Protocol corev1.Protocol `json:"protocol,omitempty"`
+
+	// The port that will be exposed by this service.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	Port int32 `json:"port"`
 }
 
 // Metrics defines attributes to setup metrics collection
