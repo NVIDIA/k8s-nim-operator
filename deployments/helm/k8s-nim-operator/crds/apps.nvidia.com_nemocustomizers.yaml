@@ -535,7 +535,6 @@ spec:
                         description: override the default service name
                         type: string
                       port:
-                        default: 8000
                         description: 'Deprecated: Use Ports instead.'
                         format: int32
                         type: integer
@@ -617,6 +616,8 @@ spec:
                           for a service
                         type: string
                     type: object
+                required:
+                - service
                 type: object
               groupID:
                 format: int64
