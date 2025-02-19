@@ -69,14 +69,7 @@ func (manifest NIMManifest) MatchProfiles(modelSpec appsv1alpha1.ModelSpec, disc
 		}
 
 		// Check LoRA configuration
-		if modelSpec.Lora == nil && profile.Tags["feat_lora"] == "true" {
-			continue
-		}
 		if modelSpec.Lora != nil && profile.Tags["feat_lora"] != strconv.FormatBool(*modelSpec.Lora) {
-			continue
-		}
-
-		if modelSpec.Buildable == nil && profile.Tags["trtllm_buildable"] == "true" {
 			continue
 		}
 
