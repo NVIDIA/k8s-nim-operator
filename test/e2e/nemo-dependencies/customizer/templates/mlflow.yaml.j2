@@ -1,0 +1,21 @@
+global:
+  storageClass: {{ '"local-path"' if localPathProvisioner.enabled else '""' }}
+
+postgresql:
+  enabled: true
+  auth:
+    username: {{ mlflow.postgresql_username }}
+    password: {{ mlflow.postgresql_password }}
+
+tracking:
+  enabled: true
+  auth:
+    enabled: false
+  runUpgradeDB: false
+  service:
+    type: ClusterIP
+  resourcesPreset: medium
+
+run:
+  enabled: false
+

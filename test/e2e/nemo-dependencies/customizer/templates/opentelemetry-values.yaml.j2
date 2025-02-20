@@ -1,0 +1,38 @@
+mode: deployment
+image:
+  repository: "otel/opentelemetry-collector-k8s"
+  tag: "0.102.1"
+mode: deployment
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc: {}
+        http:
+          cors:
+            allowed_origins:
+              - "*"
+  exporters:
+    debug:
+      verbosity: detailed
+  extensions:
+    health_check: {}
+    zpages:
+      endpoint: 0.0.0.0:55679
+  processors:
+    batch: {}
+  service:
+    extensions: [zpages, health_check]
+    pipelines:
+      traces:
+        receivers: [otlp]
+        exporters: [debug]
+        processors: [batch]
+      metrics:
+        receivers: [otlp]
+        exporters: [debug]
+        processors: [batch]
+      logs:
+        receivers: [otlp]
+        exporters: [debug]
+        processors: [batch]

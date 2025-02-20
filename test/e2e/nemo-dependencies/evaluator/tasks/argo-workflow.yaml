@@ -1,0 +1,66 @@
+---
+- name: Add Argo Helm repository
+  ansible.builtin.command:
+    cmd: helm repo add {{ argo.helm_repo_name }} {{ argo.helm_repo_url }}
+
+- name: Update Helm repositories
+  ansible.builtin.command:
+    cmd: helm repo update
+
+- name: Template values file
+  ansible.builtin.template:
+    src: argo-sa.yaml.j2
+    dest: argo-sa.yaml
+
+- name: Create Argo service account
+  command: kubectl apply -f argo-sa.yaml -n "{{ namespace }}"
+  register: sa_result
+  changed_when: sa_result.rc == 0
+
+- name: Template values file
+  ansible.builtin.template:
+    src: argo-values.yaml.j2
+    dest: argo-values.yaml
+
+- name: Install Argo Workflows Helm chart
+  shell: >
+    helm upgrade --install {{ argo.release_name }}
+    {{ argo.chart_name }}
+    --namespace {{ namespace }}
+    --version {{ argo.chart_version }}
+    --values argo-values.yaml
+  register: helm_install_result
+  changed_when: "'STATUS: deployed' in helm_install_result.stdout"
+
+- name: Run Argo validation if enabled
+  block:
+    - name: Template validation file
+      ansible.builtin.template:
+        src: argo-validation.yaml.j2
+        dest: argo-validation.yaml
+
+    - name: Create Argo Workflow
+      shell: sleep 15; kubectl create -f argo-validation.yaml -n "{{ namespace }}"
+
+    - name: Verify Argo Workflow
+      shell: sleep 40; kubectl get workflows -n "{{ namespace }}" | awk '{print $2}' | grep -v STATUS
+      register: workflow_result
+
+    - name: Workflow status
+      debug:
+        msg: "{{ workflow_result.stdout }}"
+
+    - name: Get the Argo Workflow pod if failed
+      shell: kubectl describe workflows -n nemo | tail -10f
+      when: workflow_result.stdout == "Failed"
+      register: workflow_pod
+
+    - name: Workflow details if it failed
+      debug:
+        msg: "{{ workflow_pod.stdout }}"
+      when: workflow_result.stdout == "Failed"
+
+    - name: Delete the Argo Workflow
+      shell: kubectl delete workflowtemplate -n "{{ namespace }}" --all; kubectl delete workflow -n "{{ namespace }}" --all
+      ignore_errors: yes
+  when: argo.validate | default(false) | bool

@@ -1,0 +1,30 @@
+serviceName: milvus
+
+cluster:
+  enabled: false
+etcd:
+  enabled: false
+pulsar:
+  enabled: false
+minio:
+  enabled: false
+  tls:
+    enabled: false
+standalone:
+  persistence:
+    enabled: true
+    persistentVolumeClaim:
+      size: 50Gi
+      storageClass: {{ '"local-path"' if localPathProvisioner.enabled else '""' }}
+  extraEnv:
+    - name: LOG_LEVEL
+      value: debug
+extraConfigFiles:
+  user.yaml: |+
+    etcd:
+      use:
+        embed: true
+      data:
+        dir: /var/lib/milvus/etcd
+    common:
+      storageType: local

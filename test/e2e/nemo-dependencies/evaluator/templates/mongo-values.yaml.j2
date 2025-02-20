@@ -1,0 +1,15 @@
+architecture: standalone
+port: 27017
+database: "{{ mongodb.database }}"
+username: "{{ mongodb.username }}"
+auth:
+  enabled: true
+  rootPassword: "{{ mongodb.password }}"
+persistence:
+  enabled: true
+  resourcePolicy: keep
+  accessModes:
+    - "ReadWriteOnce"
+  size: 5Gi
+  storageClass: {{ '"local-path"' if localPathProvisioner.enabled else '""' }}
+

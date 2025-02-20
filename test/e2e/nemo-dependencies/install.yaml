@@ -1,0 +1,95 @@
+---
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  roles:
+    - role: customizer
+      vars:
+        namespace: "{{ installation_namespace }}"
+        volcano:
+          enabled: true
+          helm_repo_name: volcano
+          helm_repo_url: https://volcano-sh.github.io/helm-charts
+          chart_name: volcano/volcano
+          chart_version: 1.9.0
+      when: install.customizer == true
+  tasks:
+    - name: Customizer DB Details
+      debug:
+        msg: 
+          - "Customizer DB Password: {{ postgresql.password }}"
+          - "Customizer DB Username: {{ postgresql.username }}"
+          - "Customizer DB Name: {{ postgresql.database }}"
+      when: install.customizer == true
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  roles:
+    - role: datastore
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: install.datastore == true
+  tasks:
+    - name: Datastore Details
+      debug:
+        msg: 
+          - "Datastore DB Password: {{ postgresql.password }}"
+          - "Datastore DB Username: {{ postgresql.username }}"
+          - "Datastore DB Name: {{ postgresql.database }}"  
+          - "Datastore minio Password: {{ minio.password }}"
+          - "Datastore minio Username: {{ minio.username }}"
+      when: install.datastore == true
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  roles:
+    - role: embedding
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: install.embedding == true
+    - role: ranking
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: install.ranking == true
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  roles: 
+    - role: entity-store
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: install.entity_store == true
+  tasks:
+  - name: Entity Store DB Details
+    debug:
+      msg: 
+        - "Entity Store DB Password: {{ postgresql.password }}"
+        - "Entity Store DB Username: {{ postgresql.username }}"
+        - "Entiry Store DB Name: {{ postgresql.database }}"  
+    when: install.entity_store == true
+  
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  roles:
+    - role: evaluator
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: install.evaluator == true
+  tasks:
+  - name: Evaluator Details
+    debug:
+      msg: 
+        - "Evaluator DB Password: {{ postgresql.password }}"
+        - "Evaluator DB Username: {{ postgresql.username }}"
+        - "Evaluator DB Name: {{ postgresql.database }}"      
+        - "Evaluator Milvus Password: {{ milvus.password }}"
+        - "Evaluator Milvus Username: {{ milvus.username }}"
+        - "Evaluator MongoDB Password: {{ mongodb.password }}"
+        - "Evaluator MongoDB Username: {{ mongodb.username }}"
+        - "Evaluator MongoDB Name: {{ mongodb.database }}"
+    when: install.evaluator == true

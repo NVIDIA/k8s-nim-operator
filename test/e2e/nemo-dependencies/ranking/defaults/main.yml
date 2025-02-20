@@ -1,0 +1,19 @@
+---
+# defaults file for ranking
+namespace: "ranking"
+
+# OpenTelemetry Helm chart details
+opentelemetry:
+  enabled: true
+  helm_repo_name: "open-telemetry"
+  helm_repo_url: "https://open-telemetry.github.io/opentelemetry-helm-charts"
+  chart_name: "open-telemetry/opentelemetry-collector"
+  chart_version: "0.78.1"
+
+# Zipkin Helm chart details
+zipkin:
+  enabled: false
+  helm_repo_name: "zipkin"
+  helm_repo_url: "https://zipkin.io/zipkin-helm"
+  chart_name: "zipkin/zipkin"
+  chart_version: "0.1.2"

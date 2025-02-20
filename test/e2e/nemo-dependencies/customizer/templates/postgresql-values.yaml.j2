@@ -1,0 +1,12 @@
+auth:
+  username: {{ postgresql.username }}
+  password: {{ postgresql.password }}
+  database: {{ postgresql.database }}
+architecture: standalone
+primary:
+  persistence:
+    storageClass: {{ '"local-path"' if localPathProvisioner.enabled else '""' }}
+    accessModes:
+      - ReadWriteOnce
+    enabled: true
+    size: 500Mi

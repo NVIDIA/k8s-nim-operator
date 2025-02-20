@@ -1,0 +1,39 @@
+---
+- name: Add Volcano Helm repository
+  ansible.builtin.command:
+    cmd: helm repo add {{ volcano.helm_repo_name }} {{ volcano.helm_repo_url }}
+
+- name: Update Helm repositories cache
+  command: helm repo update
+
+- name: Install Volcano Helm chart in Kubernetes cluster
+  shell: |
+    helm upgrade --install {{ volcano.helm_repo_name }} {{ volcano.chart_name }} \
+      --namespace {{ namespace }} \
+      --version {{ volcano.chart_version }}
+
+- name: Wait for Volcano pods to be created (timeout = 300s)
+  shell: |
+    timeout 300s bash -c 'until kubectl get pods -n {{ namespace }} | grep -q volcano; do sleep 1; done'
+  register: wait_result
+
+- name: Run Volcano Job if validation is enabled
+  block:
+    - name: Template values file
+      ansible.builtin.template:
+        src: volcano-job.yaml.j2
+        dest: volcano-job.yaml
+
+    - name: Submit Sample Volcano Job
+      shell: kubectl apply -f volcano-job.yaml -n {{ namespace }}; sleep 30
+
+    - name: Volcano Job logs
+      command: kubectl logs -n {{ namespace }} -l volcano.sh/job-name=volcano-test-job
+      register: job_logs
+
+    - name: Volcano Job Verification
+      debug:
+        msg: "Volcano Job completed successfully"
+      when: "{{ 'Volcano!' in job_logs.stdout }}"
+
+  when: volcano.validate | default(false) | bool

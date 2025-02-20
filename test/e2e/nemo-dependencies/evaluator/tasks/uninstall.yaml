@@ -1,0 +1,18 @@
+- name: check if Evaluator is installed
+  shell: helm list -n {{ namespace }} | grep 'evaluator' | awk '{print $1}' | wc -l | tr -d '\n'
+  register: evaluator_installed
+  ignore_errors: true
+
+- name: Uninstall Evaluator helm charts
+  shell: helm list -n {{ namespace }} | awk '{print $1}' | grep -v NAME | egrep 'evaluator|argo|milvus|mongodb' | xargs helm del -n {{ namespace }}
+  ignore_errors: true
+
+- name: Delete Evaluator PVCs
+  shell: kubectl get pvc -n {{ namespace }} | egrep 'evaluator|volcano|milvus|mongodb' | awk '{print $1}' | xargs kubectl delete pvc -n {{ namespace }}
+  ignore_errors: true
+
+- name: Delete Argo Kubernetes resources
+  shell: kubectl get {{ item }} | grep argoproj | awk '{print $1}' | xargs kubectl delete {{ item }}
+  loop:
+    - crd
+  ignore_errors: true
