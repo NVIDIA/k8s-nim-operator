@@ -1,0 +1,9 @@
+- name: check if Ranking is installed
+  shell: helm list -n {{ namespace }} | grep 'ranking' | awk '{print $1}' | wc -l | tr -d '\n'
+  register: ranking_installed
+  ignore_errors: true
+
+- name: Uninstall Ranking
+  shell: helm list -n {{ namespace }} | awk '{print $1}' | grep -v NAME | grep 'ranking' | xargs helm del -n {{ namespace }}
+  when: ranking_installed.stdout | int >= 1
+  ignore_errors: true

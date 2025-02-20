@@ -1,0 +1,67 @@
+---
+- name: Template values file
+  ansible.builtin.template:
+    src: postgresql-values.yaml.j2
+    dest: entity-store-db-values.yaml
+
+- name: Install PostgreSQL Helm chart
+  shell: >
+    helm upgrade --install {{ postgresql.helm_release_name}}
+    {{ postgresql.helm_oci_registry }} 
+    --namespace {{ namespace }}
+    -f entity-store-db-values.yaml
+  register: helm_install_result
+  changed_when: "'STATUS: deployed' in helm_install_result.stdout"
+
+- name: Verify PostgreSQL installation
+  command: kubectl get pods -n {{ namespace }}
+  register: postgres_pod_check
+  changed_when: false
+
+- name: Debug PostgreSQL pod list
+  debug:
+    var: postgres_pod_check.stdout
+
+- name: Wait for PostgreSQL pod to be ready
+  command: kubectl wait --for=condition=Ready pod -n {{ namespace }} -l app.kubernetes.io/instance={{ postgresql.helm_release_name }} --timeout=120s
+
+- name: Get PostgreSQL pod name
+  shell: |
+    kubectl get pods -n {{ namespace }} -l app.kubernetes.io/instance={{ postgresql.helm_release_name }} -o jsonpath='{.items[0].metadata.name}'
+  register: postgresql_pod_name
+  failed_when: postgresql_pod_name.stdout == ""
+  changed_when: false
+
+- name: Debug PostgreSQL pod name
+  debug:
+    msg: "PostgreSQL pod name is {{ postgresql_pod_name.stdout }}"
+
+- name: Get the IP of the running PostgreSQL pod
+  shell: |
+    kubectl get pod -n {{ namespace }} {{ postgresql_pod_name.stdout }} -o jsonpath='{.status.podIP}'
+  register: postgresql_pod_ip
+  failed_when: postgresql_pod_ip.stdout == ""
+  changed_when: false
+
+- name: Debug PostgreSQL Pod IP
+  debug:
+    msg: "PostgreSQL Pod IP is {{ postgresql_pod_ip.stdout }}"
+
+- name: Validate connection to PostgreSQL using psql shell command.
+  shell: |
+    kubectl exec -n {{ namespace }} {{ postgresql_pod_name.stdout }} -- \
+      pg_isready -d "postgresql://{{ postgresql.username }}:{{ postgresql.password }}@{{ postgresql_pod_ip.stdout }}:5432/{{ postgresql.database }}"
+  register: postgres_validation_output
+  changed_when: false
+  retries: 12
+  delay: 5
+  until: postgres_validation_output.rc == 0
+
+- name: Display validation output.
+  debug:
+    msg: "{{ postgres_validation_output.stdout }}"
+
+- name: Print Validation status.
+  debug:
+    msg: "PostgreSQL validation successful!"
+  when: "'accepting' in postgres_validation_output.stdout"

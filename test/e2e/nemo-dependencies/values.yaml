@@ -1,0 +1,17 @@
+install:
+  customizer: no
+  datastore: no
+  embedding: no
+  ranking: no
+  entity_store: no
+  evaluator: no
+
+uninstall:
+  customizer: no
+  datastore: no
+  embedding: no
+  ranking: no
+  entity_store: no
+  evaluator: no
+
+installation_namespace: nemo

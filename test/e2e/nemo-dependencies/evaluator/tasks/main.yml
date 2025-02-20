@@ -1,0 +1,18 @@
+---
+# tasks file for evaluator
+- include_tasks: namespace.yaml
+- include_tasks: local-path-provisioner.yaml
+- include_tasks: secrets.yaml
+  when: localPathProvisioner.enabled
+- include_tasks: argo-workflow.yaml
+  when: argo.enabled
+- include_tasks: mongodb.yaml
+  when: mongodb.enabled
+- include_tasks: milvus.yaml
+  when: milvus.enabled
+- include_tasks: opentelemetry.yaml
+  when: opentelemetry.enabled
+- include_tasks: zipkin.yaml
+  when: zipkin.enabled
+- include_tasks: postgresql.yaml
+  when: postgresql.enabled

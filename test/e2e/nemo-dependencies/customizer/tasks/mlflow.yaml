@@ -1,0 +1,14 @@
+- name: Template values file
+  ansible.builtin.template:
+    src: mlflow.yaml.j2
+    dest: mlflow.yaml
+
+- name: Install MLflow
+  shell: >
+    helm upgrade --install {{ mlflow.helm_release_name}}
+    {{ mlflow.helm_oci_registry }} 
+    --namespace {{ namespace }}
+    --version {{ mlflow.version }}
+    -f mlflow.yaml
+  register: helm_install_result
+  changed_when: "'STATUS: deployed' in helm_install_result.stdout"

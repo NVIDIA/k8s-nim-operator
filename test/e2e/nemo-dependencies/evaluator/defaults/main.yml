@@ -1,0 +1,62 @@
+---
+# defaults file for evaluator
+namespace: "evaluator"
+
+# Argo Workflows Helm chart details
+argo:
+  enabled: true
+  validate: false
+  chart_version: 0.40.11
+  release_name: "argo-workflows"
+  helm_repo_name: "argo"
+  helm_repo_url: "https://argoproj.github.io/argo-helm"
+  chart_name: "argo/argo-workflows"
+
+# MongoDB Helm chart details
+mongodb:
+  enabled: true
+  helm_repo_name: "mongodb"
+  helm_repo_url: "https://charts.bitnami.com/bitnami"
+  chart_name: "mongodb/mongodb"
+  chart_version: "14.8.2"
+  username: "root"
+  password: "examplepassword"
+  database: "evaluations"
+
+# Milvus Helm chart details
+milvus:
+  enabled: true
+  helm_repo_name: "milvus"
+  helm_repo_url: "https://zilliztech.github.io/milvus-helm/"
+  chart_name: "milvus/milvus"
+  chart_version: "4.1.11"
+  username: "root"
+  password: "Milvus"
+
+# OpenTelemetry Helm chart details
+opentelemetry:
+  enabled: true
+  helm_repo_name: "open-telemetry"
+  helm_repo_url: "https://open-telemetry.github.io/opentelemetry-helm-charts"
+  chart_name: "open-telemetry/opentelemetry-collector"
+  chart_version: "0.78.1"
+
+# Zipkin Helm chart details
+zipkin:
+  enabled: false
+  helm_repo_name: "zipkin"
+  helm_repo_url: "https://zipkin.io/zipkin-helm"
+  chart_name: "zipkin/zipkin"
+  chart_version: "0.1.2"
+
+postgresql:
+  enabled: true
+  helm_release_name: evaluator-pg
+  helm_oci_registry: oci://registry-1.docker.io/bitnamicharts/postgresql
+  username: evaluser
+  password: evalpass
+  database: evaldb
+
+localPathProvisioner:
+  enabled: true
+  version: v0.0.31
