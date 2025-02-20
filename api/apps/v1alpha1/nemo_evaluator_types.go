@@ -709,8 +709,8 @@ func (n *NemoEvaluator) GetRoleParams() *rendertypes.RoleParams {
 	params.Rules = []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{""},
-			Resources: []string{"secrets"},
-			Verbs:     []string{"create"},
+			Resources: []string{"secrets", "pods"},
+			Verbs:     []string{"get", "watch", "list", "create"},
 		},
 	}
 
