@@ -802,6 +802,48 @@ spec:
               - subjectaccessreviews
               verbs:
               - create
+            - apiGroups:
+              - batch.volcano.sh
+              resources:
+              - jobs
+              - jobs/status
+              verbs:
+              - get
+              - list
+              - watch
+            - apiGroups:
+              - nodeinfo.volcano.sh
+              resources:
+              - numatopologies
+              verbs:
+              - get
+              - list
+              - watch
+            - apiGroups:
+              - nvidia.com
+              resources:
+              - nemoentityhandlers
+              - nemotrainingjobs
+              - nemotrainingjobs/status
+              verbs:
+              - create
+              - delete
+              - get
+              - list
+              - patch
+              - update
+              - watch
+            - apiGroups:
+              - scheduling.incubator.k8s.io
+              - scheduling.volcano.sh
+              resources:
+              - podgroups
+              - queues
+              - queues/status
+              verbs:
+              - get
+              - list
+              - watch
       deployments:
         - name: k8s-nim-operator
           spec:
