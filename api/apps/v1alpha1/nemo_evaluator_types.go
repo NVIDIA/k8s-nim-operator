@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"encoding/base64"
 	"fmt"
 	"maps"
 	"os"
@@ -835,7 +834,7 @@ func (n *NemoEvaluator) GetServiceMonitorAnnotations() map[string]string {
 	return NemoEvaluatorAnnotations
 }
 
-func (n *NemoEvaluator) GetSecretParams(secretValue string) *rendertypes.SecretParams {
+func (n *NemoEvaluator) GetSecretParams(secretMapData map[string]string) *rendertypes.SecretParams {
 	params := &rendertypes.SecretParams{}
 
 	// Set metadata
@@ -844,14 +843,7 @@ func (n *NemoEvaluator) GetSecretParams(secretValue string) *rendertypes.SecretP
 	params.Labels = n.GetLabels()
 	params.Annotations = n.GetAnnotations()
 
-	// Initialize the Secret data
-	data := n.GeneratePostgresConnString(secretValue)
-	// Encode to base64
-	encoded := base64.StdEncoding.EncodeToString([]byte(data))
-
-	params.SecretMapData = map[string]string{
-		"uri": encoded,
-	}
+	params.SecretMapData = secretMapData
 
 	return params
 }

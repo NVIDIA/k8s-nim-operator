@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 
@@ -350,14 +351,21 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, ne
 		}
 	}
 
-	secretValue, err := r.getKubernetesSecret(ctx, nemoEvaluator.GetNamespace(), nemoEvaluator.Spec.DatabaseConfig.Credentials.SecretName, nemoEvaluator.Spec.DatabaseConfig.Credentials.PasswordKey)
+	secretValue, err := r.getValueFromSecret(ctx, nemoEvaluator.GetNamespace(), nemoEvaluator.Spec.DatabaseConfig.Credentials.SecretName, nemoEvaluator.Spec.DatabaseConfig.Credentials.PasswordKey)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+	data := nemoEvaluator.GeneratePostgresConnString(secretValue)
+	// Encode to base64
+	encoded := base64.StdEncoding.EncodeToString([]byte(data))
+
+	secretMapData := map[string]string{
+		"uri": encoded,
 	}
 
 	// Sync Evaluator Secret
 	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &corev1.Secret{}, func() (client.Object, error) {
-		return renderer.Secret(nemoEvaluator.GetSecretParams(secretValue))
+		return renderer.Secret(nemoEvaluator.GetSecretParams(secretMapData))
 	}, "secret", conditions.ReasonSecretFailed)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -461,7 +469,7 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, Nem
 	return nil
 }
 
-func (r *NemoEvaluatorReconciler) getKubernetesSecret(ctx context.Context, namespace, secretName, key string) (string, error) {
+func (r *NemoEvaluatorReconciler) getValueFromSecret(ctx context.Context, namespace, secretName, key string) (string, error) {
 
 	// Get the secret
 	secret := &corev1.Secret{}
