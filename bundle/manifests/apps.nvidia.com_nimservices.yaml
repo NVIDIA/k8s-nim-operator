@@ -2284,6 +2284,17 @@ spec:
                   - type
                   type: object
                 type: array
+              model:
+                description: ModelStatus defines the configuration of the NIMService
+                  model.
+                properties:
+                  endpointAddress:
+                    type: string
+                  engine:
+                    type: string
+                  name:
+                    type: string
+                type: object
               state:
                 type: string
             type: object
