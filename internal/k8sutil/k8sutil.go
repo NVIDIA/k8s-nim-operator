@@ -158,7 +158,6 @@ func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Objec
 		return nil
 	}
 	logger.V(2).Info("Object spec has changed, updating")
-
 	if errors.IsNotFound(err) {
 		err = k8sClient.Create(ctx, desired)
 		if err != nil {

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -70,6 +71,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		volumeMounts   []corev1.VolumeMount
 		volumes        []corev1.Volume
 		ctx            context.Context
+		secrets        *corev1.Secret
 	)
 
 	BeforeEach(func() {
@@ -293,6 +295,18 @@ var _ = Describe("NemoCustomizer Controller", func() {
 				ReadOnly:  true,
 			},
 		}
+
+		encoded := base64.StdEncoding.EncodeToString([]byte("password-word"))
+
+		secrets = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ncs-pg-existing-secret",
+				Namespace: "default",
+			},
+			Data: map[string][]byte{
+				"password": []byte(encoded),
+			},
+		}
 	})
 
 	AfterEach(func() {
@@ -304,12 +318,21 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		if err == nil {
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		}
+
+		namespacedName = types.NamespacedName{Name: "ncs-pg-existing-secret", Namespace: "default"}
+		secret := &corev1.Secret{}
+		err = k8sClient.Get(ctx, namespacedName, secret)
+		if err == nil {
+			Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
+		}
 	})
 
 	Describe("Reconcile", func() {
 		It("should create all resources for the NemoCustomizer", func() {
 			namespacedName := types.NamespacedName{Name: nemoCustomizer.Name, Namespace: "default"}
 			err := client.Create(context.TODO(), nemoCustomizer)
+			Expect(err).NotTo(HaveOccurred())
+			err = client.Create(context.TODO(), secrets)
 			Expect(err).NotTo(HaveOccurred())
 
 			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespacedName})
@@ -453,8 +476,15 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			}))
 
 			Expect(envVars).To(ContainElement(corev1.EnvVar{
-				Name:  "POSTGRES_DB_DSN",
-				Value: nemoCustomizer.GeneratePostgresConnString(),
+				Name: "POSTGRES_DB_DSN",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						Key: "dsn",
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: nemoCustomizer.Name,
+						},
+					},
+				},
 			}))
 
 			// Verify OTEL environment variables
@@ -467,6 +497,8 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		It("should delete HPA when NemoCustomizer is updated", func() {
 			namespacedName := types.NamespacedName{Name: nemoCustomizer.Name, Namespace: "default"}
 			err := client.Create(context.TODO(), nemoCustomizer)
+			Expect(err).NotTo(HaveOccurred())
+			err = client.Create(context.TODO(), secrets)
 			Expect(err).NotTo(HaveOccurred())
 
 			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespacedName})

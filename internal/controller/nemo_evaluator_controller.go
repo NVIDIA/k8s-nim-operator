@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 
@@ -350,6 +351,26 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, ne
 		}
 	}
 
+	secretValue, err := r.getValueFromSecret(ctx, nemoEvaluator.GetNamespace(), nemoEvaluator.Spec.DatabaseConfig.Credentials.SecretName, nemoEvaluator.Spec.DatabaseConfig.Credentials.PasswordKey)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	data := nemoEvaluator.GeneratePostgresConnString(secretValue)
+	// Encode to base64
+	encoded := base64.StdEncoding.EncodeToString([]byte(data))
+
+	secretMapData := map[string]string{
+		"uri": encoded,
+	}
+
+	// Sync Evaluator Secret
+	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &corev1.Secret{}, func() (client.Object, error) {
+		return renderer.Secret(nemoEvaluator.GetSecretParams(secretMapData))
+	}, "secret", conditions.ReasonSecretFailed)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	deploymentParams := nemoEvaluator.GetDeploymentParams()
 
 	// Sync deployment
@@ -446,4 +467,22 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, Nem
 		return err
 	}
 	return nil
+}
+
+func (r *NemoEvaluatorReconciler) getValueFromSecret(ctx context.Context, namespace, secretName, key string) (string, error) {
+
+	// Get the secret
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: namespace}, secret)
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret: %w", err)
+	}
+
+	// Extract the secret value
+	value, exists := secret.Data[key]
+
+	if !exists {
+		return "", fmt.Errorf("key '%s' not found in secret '%s'", key, secretName)
+	}
+	return string(value), nil
 }
