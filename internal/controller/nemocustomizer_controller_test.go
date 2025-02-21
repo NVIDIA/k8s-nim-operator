@@ -319,7 +319,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		}
 
-		namespacedName = types.NamespacedName{Name: "eval-pg-existing-secret", Namespace: "default"}
+		namespacedName = types.NamespacedName{Name: "ncs-pg-existing-secret", Namespace: "default"}
 		secret := &corev1.Secret{}
 		err = k8sClient.Get(ctx, namespacedName, secret)
 		if err == nil {
