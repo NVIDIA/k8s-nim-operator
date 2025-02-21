@@ -650,6 +650,12 @@ func (n *NemoGuardrail) GetRoleParams() *rendertypes.RoleParams {
 			ResourceNames: []string{"nonroot"},
 			Verbs:         []string{"use"},
 		},
+		{
+			APIGroups:     []string{"security.openshift.io"},
+			Resources:     []string{"securitycontextconstraints"},
+			ResourceNames: []string{"anyuid"},
+			Verbs:         []string{"use"},
+		},
 	}
 
 	return params
