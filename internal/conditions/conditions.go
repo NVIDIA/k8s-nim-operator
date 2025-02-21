@@ -59,6 +59,8 @@ const (
 	ReasonDeploymentFailed = "DeploymentFailed"
 	// ReasonStatefulSetFailed indicates that the creation of statefulset has failed
 	ReasonStatefulSetFailed = "StatefulsetFailed"
+	// ReasonSecretFailed indicates that the creation of secret has failed
+	ReasonSecretFailed = "SecretFailed"
 )
 
 // Updater is the condition updater

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"encoding/base64"
 	"fmt"
 	"maps"
 	"os"
@@ -297,8 +298,15 @@ func (n *NemoEvaluator) GetPostgresEnv() []corev1.EnvVar {
 			},
 		},
 		{
-			Name:  "POSTGRES_URI",
-			Value: n.GeneratePostgresConnString(),
+			Name: "POSTGRES_URI",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "uri",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Name,
+					},
+				},
+			},
 		},
 	}
 
@@ -306,12 +314,12 @@ func (n *NemoEvaluator) GetPostgresEnv() []corev1.EnvVar {
 }
 
 // GeneratePostgresConnString generates a PostgreSQL connection string using the database config.
-func (n *NemoEvaluator) GeneratePostgresConnString() string {
+func (n *NemoEvaluator) GeneratePostgresConnString(secretValue string) string {
 	// Construct the connection string
 	connString := fmt.Sprintf(
 		"postgresql://%s:%s@%s:%d/%s",
 		n.Spec.DatabaseConfig.Credentials.User,
-		"$(POSTGRES_DB_PASSWORD)",
+		secretValue,
 		n.Spec.DatabaseConfig.Host,
 		n.Spec.DatabaseConfig.Port,
 		n.Spec.DatabaseConfig.DatabaseName,
@@ -825,6 +833,27 @@ func (n *NemoEvaluator) GetServiceMonitorAnnotations() map[string]string {
 		return utils.MergeMaps(NemoEvaluatorAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
 	return NemoEvaluatorAnnotations
+}
+
+func (n *NemoEvaluator) GetSecretParams(secretValue string) *rendertypes.SecretParams {
+	params := &rendertypes.SecretParams{}
+
+	// Set metadata
+	params.Name = n.Name
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetLabels()
+	params.Annotations = n.GetAnnotations()
+
+	// Initialize the Secret data
+	data := n.GeneratePostgresConnString(secretValue)
+	// Encode to base64
+	encoded := base64.StdEncoding.EncodeToString([]byte(data))
+
+	params.SecretMapData = map[string]string{
+		"uri": encoded,
+	}
+
+	return params
 }
 
 // GetInitContainers returns the init containers for the NemoEvaluator.

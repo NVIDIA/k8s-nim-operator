@@ -217,3 +217,13 @@ type ConfigMapParams struct {
 	// Key-value pairs representing filenames and their content
 	ConfigMapData map[string]string
 }
+
+// SecretParams holds the parameters for rendering a Secret template
+type SecretParams struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	// Key-value pairs representing filenames and their content
+	SecretMapData map[string]string
+}
