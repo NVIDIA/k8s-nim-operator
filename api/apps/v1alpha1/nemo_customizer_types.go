@@ -266,8 +266,15 @@ func (n *NemoCustomizer) GetPostgresEnv() []corev1.EnvVar {
 			},
 		},
 		{
-			Name:  "POSTGRES_DB_DSN",
-			Value: n.GeneratePostgresConnString(),
+			Name: "POSTGRES_DB_DSN",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "dsn",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Name,
+					},
+				},
+			},
 		},
 	}
 
@@ -275,12 +282,12 @@ func (n *NemoCustomizer) GetPostgresEnv() []corev1.EnvVar {
 }
 
 // GeneratePostgresConnString generates a PostgreSQL connection string using the database config.
-func (n *NemoCustomizer) GeneratePostgresConnString() string {
+func (n *NemoCustomizer) GeneratePostgresConnString(secretValue string) string {
 	// Construct the connection string
 	connString := fmt.Sprintf(
 		"postgresql://%s:%s@%s:%d/%s",
 		n.Spec.DatabaseConfig.Credentials.User,
-		"$(POSTGRES_DB_PASSWORD)",
+		secretValue,
 		n.Spec.DatabaseConfig.Host,
 		n.Spec.DatabaseConfig.Port,
 		n.Spec.DatabaseConfig.DatabaseName,
@@ -956,6 +963,20 @@ func (n *NemoCustomizer) GetConfigMapParams() *rendertypes.ConfigMapParams {
 	params.ConfigMapData = map[string]string{
 		"config.yaml": n.Spec.CustomizerConfig,
 	}
+
+	return params
+}
+
+func (n *NemoCustomizer) GetSecretParams(secretMapData map[string]string) *rendertypes.SecretParams {
+	params := &rendertypes.SecretParams{}
+
+	// Set metadata
+	params.Name = n.Name
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetLabels()
+	params.Annotations = n.GetAnnotations()
+
+	params.SecretMapData = secretMapData
 
 	return params
 }

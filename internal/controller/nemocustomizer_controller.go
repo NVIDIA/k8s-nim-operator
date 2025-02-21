@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 
@@ -369,6 +370,25 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		return ctrl.Result{}, err
 	}
 
+	secretValue, err := r.getValueFromSecret(ctx, NemoCustomizer.GetNamespace(), NemoCustomizer.Spec.DatabaseConfig.Credentials.SecretName, NemoCustomizer.Spec.DatabaseConfig.Credentials.PasswordKey)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	data := NemoCustomizer.GeneratePostgresConnString(secretValue)
+	// Encode to base64
+	encoded := base64.StdEncoding.EncodeToString([]byte(data))
+
+	secretMapData := map[string]string{
+		"dsn": encoded,
+	}
+	// Sync Customizer Secret
+	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &corev1.Secret{}, func() (client.Object, error) {
+		return renderer.Secret(NemoCustomizer.GetSecretParams(secretMapData))
+	}, "secret", conditions.ReasonSecretFailed)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Get params to render Deployment resource
 	deploymentParams := NemoCustomizer.GetDeploymentParams()
 
@@ -474,4 +494,22 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, Ne
 		return err
 	}
 	return nil
+}
+
+func (r *NemoCustomizerReconciler) getValueFromSecret(ctx context.Context, namespace, secretName, key string) (string, error) {
+
+	// Get the secret
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: namespace}, secret)
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret: %w", err)
+	}
+
+	// Extract the secret value
+	value, exists := secret.Data[key]
+
+	if !exists {
+		return "", fmt.Errorf("key '%s' not found in secret '%s'", key, secretName)
+	}
+	return string(value), nil
 }
