@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
@@ -261,6 +262,12 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
 			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
 	} else {
+		// Update NIMServiceStatus with model config.
+		err = r.updateModelStatus(ctx, nimService)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
 		// Update status as ready
 		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
 		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
@@ -273,6 +280,42 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *v1alpha1.NIMService) error {
+	modelName, err := r.getNIMModelName(ctx, nimService)
+	if err != nil {
+		return err
+	}
+	nimService.Status.Model = v1alpha1.ModelStatus{
+		Name:            modelName,
+		EndpointAddress: fmt.Sprintf("%s.%s.svc.cluster.local:%d", nimService.GetName(), nimService.GetNamespace(), nimService.GetServicePort()),
+		Engine:          v1alpha1.ModelEngineNIM,
+	}
+
+	return nil
+}
+
+func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, error) {
+	logger := log.FromContext(ctx)
+
+	if nimService.GetNIMCacheName() == "" {
+		// NIM cache is not used
+		return "", nil
+	}
+
+	// Lookup NIMCache instance in the same namespace as the NIMService instance
+	nimCache := &appsv1alpha1.NIMCache{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetNIMCacheName(), Namespace: nimService.Namespace}, nimCache); err != nil {
+		logger.Error(err, "unable to fetch nimcache", "nimcache", nimService.GetNIMCacheName(), "nimservice", nimService.Name)
+		return "", err
+	}
+
+	if nimCache.Spec.Source.DataStore != nil && nimCache.Spec.Source.DataStore.ModelName != nil {
+		return *nimCache.Spec.Source.DataStore.ModelName, nil
+	}
+
+	return "", nil
 }
 
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
