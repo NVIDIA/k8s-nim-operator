@@ -14,10 +14,10 @@ git clone https://github.com/NVIDIA/k8s-nim-operator.git
 
 ## Installing Dependencies
 
-Enter into `k8s-nim-operator/deployments/nemo-dependencies` directory
+Enter into `k8s-nim-operator/test/e2e/nemo-dependencies` directory
 
 ```
-cd k8s-nim-operator/deployments/nemo-dependencies
+cd k8s-nim-operator/test/e2e/nemo-dependencies
 ```
 
 Update the `values.yaml` with required NeMo Services to install under `install`
