@@ -89,7 +89,4 @@
         - "Evaluator DB Name: {{ postgresql.database }}"      
         - "Evaluator Milvus Password: {{ milvus.password }}"
         - "Evaluator Milvus Username: {{ milvus.username }}"
-        - "Evaluator MongoDB Password: {{ mongodb.password }}"
-        - "Evaluator MongoDB Username: {{ mongodb.username }}"
-        - "Evaluator MongoDB Name: {{ mongodb.database }}"
     when: install.evaluator == true

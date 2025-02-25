@@ -4,7 +4,7 @@ install:
   embedding: no
   ranking: no
   entity_store: no
-  evaluator: no
+  evaluator: yes
 
 uninstall:
   customizer: no
