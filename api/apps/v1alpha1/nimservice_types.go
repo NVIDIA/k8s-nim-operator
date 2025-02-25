@@ -98,7 +98,7 @@ type NIMServiceStatus struct {
 	Conditions        []metav1.Condition `json:"conditions,omitempty"`
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
 	State             string             `json:"state,omitempty"`
-	Model             ModelStatus        `json:"model,omitempty"`
+	Model             *ModelStatus       `json:"model,omitempty"`
 }
 
 // ModelStatus defines the configuration of the NIMService model.

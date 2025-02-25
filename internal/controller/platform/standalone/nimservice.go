@@ -18,11 +18,7 @@ package standalone
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
 
 	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -296,7 +292,7 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 	if err != nil {
 		return err
 	}
-	nimService.Status.Model = v1alpha1.ModelStatus{
+	nimService.Status.Model = &v1alpha1.ModelStatus{
 		Name:            modelName,
 		EndpointAddress: endpoint,
 		Engine:          v1alpha1.ModelEngineNIM,
@@ -306,39 +302,14 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 }
 
 func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEndpoint string) (string, error) {
-	logger := log.FromContext(ctx)
-
-	httpClient := http.Client{
-		Timeout: 30 * time.Second,
-	}
-	modelsURL := nimmodels.GetV1ModelsURL(nimServiceEndpoint)
-	modelsReq, err := http.NewRequest(http.MethodGet, modelsURL, nil)
+	modelsList, err := nimmodels.ListModelsV1(ctx, nimServiceEndpoint)
 	if err != nil {
-		logger.Error(err, "failed to prepare request for models endpoint", "endpoint", nimServiceEndpoint)
 		return "", err
 	}
-	modelsReq.Header.Set("Content-Type", "application/json")
 
-	modelsResp, err := httpClient.Do(modelsReq)
-	if err != nil {
-		logger.Error(err, "failed to make request for models endpoint", "url", modelsURL)
-		return "", err
-	}
-	modelsData, err := io.ReadAll(modelsResp.Body)
-	logger.Info("got models response", "data", string(modelsData))
-
-	var modelsList nimmodels.ModelsV1List
-	err = json.Unmarshal(modelsData, &modelsList)
-	if err != nil {
-		logger.Error(err, "failed to unmarshal models response", "url", modelsURL)
-		return "", err
-	}
 	if modelsList.Object == nimmodels.ObjectTypeList {
 		for _, model := range modelsList.Data {
 			if model.Object != nimmodels.ObjectTypeModel {
-				continue
-			}
-			if model.Parent == nil {
 				continue
 			}
 			return model.Id, nil
