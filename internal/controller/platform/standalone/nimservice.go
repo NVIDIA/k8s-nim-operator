@@ -313,6 +313,9 @@ func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEn
 			if model.Object != nimmodels.ObjectTypeModel {
 				continue
 			}
+			if model.Root == nil || *model.Root != model.Id {
+				continue
+			}
 			return model.Id, nil
 		}
 	}
