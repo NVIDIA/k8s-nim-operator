@@ -21,6 +21,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"path"
 	"sort"
 	"strings"
@@ -71,15 +74,46 @@ func sortVolumes(volumes []corev1.Volume) {
 	})
 }
 
+// Custom transport that redirects requests to a specific host
+type mockTransport struct {
+	targetHost        string
+	testServer        *httptest.Server
+	originalTransport http.RoundTripper
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Check if this request is going to our target IP
+	if req.URL.Host == m.targetHost {
+		// Create a new URL pointing to our test server
+		testURL, _ := url.Parse(m.testServer.URL)
+		testURL.Path = req.URL.Path
+		testURL.RawQuery = req.URL.RawQuery
+
+		// Create a new request to our test server
+		newReq := req.Clone(req.Context())
+		newReq.URL = testURL
+		newReq.Host = m.targetHost // Preserve the original Host header
+
+		// Send the request to our test server
+		return http.DefaultClient.Do(newReq)
+	}
+
+	// For all other requests, use the original transport
+	return m.originalTransport.RoundTrip(req)
+}
+
 var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 	var (
-		client       client.Client
-		reconciler   *NIMServiceReconciler
-		scheme       *runtime.Scheme
-		nimService   *appsv1alpha1.NIMService
-		nimCache     *appsv1alpha1.NIMCache
-		volumeMounts []corev1.VolumeMount
-		volumes      []corev1.Volume
+		client            client.Client
+		reconciler        *NIMServiceReconciler
+		scheme            *runtime.Scheme
+		nimService        *appsv1alpha1.NIMService
+		nimCache          *appsv1alpha1.NIMCache
+		volumeMounts      []corev1.VolumeMount
+		volumes           []corev1.Volume
+		testServerHandler http.HandlerFunc
+		testServer        *httptest.Server
+		originalTransport = http.DefaultTransport
 	)
 	BeforeEach(func() {
 		scheme = runtime.NewScheme()
@@ -352,9 +386,26 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			log.SetOutput(os.Stderr)
 		}()
 
+		// Start mock test server to serve nimservice endpoint.
+		testServerHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
+		})
+		testServer = httptest.NewServer(testServerHandler)
+		/*testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
+		}))*/
+		http.DefaultTransport = &mockTransport{
+			targetHost:        ":8123",
+			testServer:        testServer,
+			originalTransport: originalTransport,
+		}
 	})
 
 	AfterEach(func() {
+		defer func() { http.DefaultTransport = originalTransport }()
+		defer testServer.Close()
 		// Clean up the NIMService instance
 		nimService := &appsv1alpha1.NIMService{
 			ObjectMeta: metav1.ObjectMeta{
@@ -655,6 +706,122 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(Equal(true))
 			Expect(msg).To(Equal(fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name)))
+		})
+	})
+
+	Describe("update model status on NIMService", func() {
+		AfterEach(func() {
+			// Clean up the Service instance
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+			}
+			_ = client.Delete(context.TODO(), svc)
+		})
+
+		It("should fail when NIMService is unreachable", func() {
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					Type:      corev1.ServiceTypeClusterIP,
+					ClusterIP: "bad.host", // not intercepted by testServer.
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8123,
+							Name: "service-port",
+						},
+					},
+				},
+			}
+			_ = client.Create(context.TODO(), svc)
+			err := reconciler.updateModelStatus(context.Background(), nimService)
+			Expect(err).To(HaveOccurred())
+			Expect(nimService.Status.Model).To(BeNil())
+		})
+
+		It("should fail when models response is unmarshallable", func() {
+			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"value": "invalid response"}`))
+			})
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8123,
+							Name: "service-port",
+						},
+					},
+				},
+			}
+			_ = client.Create(context.TODO(), svc)
+			err := reconciler.updateModelStatus(context.Background(), nimService)
+			Expect(err).To(HaveOccurred())
+			Expect(nimService.Status.Model).To(BeNil())
+		})
+
+		It("should fail when model name cannot be inferred", func() {
+			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				// Set dummy object type for model.
+				w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "dummy", "root": "dummy-model", "parent": null}]}`))
+			})
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8123,
+							Name: "service-port",
+						},
+					},
+				},
+			}
+			_ = client.Create(context.TODO(), svc)
+			err := reconciler.updateModelStatus(context.Background(), nimService)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("failed to detect model name from nimservice endpoint ':8123'"))
+			Expect(nimService.Status.Model).To(BeNil())
+		})
+
+		It("should set model status on NIMService", func() {
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8123,
+							Name: "service-port",
+						},
+					},
+				},
+			}
+			_ = client.Create(context.TODO(), svc)
+			err := reconciler.updateModelStatus(context.Background(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			modelStatus := nimService.Status.Model
+			Expect(modelStatus).ToNot(BeNil())
+			Expect(modelStatus.EndpointAddress).To(Equal(":8123"))
+			Expect(modelStatus.Name).To(Equal("dummy-model"))
+			Expect(modelStatus.Engine).To(Equal(appsv1alpha1.ModelEngineNIM))
 		})
 	})
 
