@@ -822,6 +822,39 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(modelStatus.Name).To(Equal("dummy-model"))
 			Expect(modelStatus.Engine).To(Equal(appsv1alpha1.ModelEngineNIM))
 		})
+
+		It("should succeed when nimservice has lora adapter models attached", func() {
+			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				// Set dummy object type for model.
+				w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model-adapter1", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model-adapter2", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
+			})
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					Type:      corev1.ServiceTypeClusterIP,
+					ClusterIP: "127.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8123,
+							Name: "service-port",
+						},
+					},
+				},
+			}
+			_ = client.Create(context.TODO(), svc)
+			err := reconciler.updateModelStatus(context.Background(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			modelStatus := nimService.Status.Model
+			Expect(modelStatus).ToNot(BeNil())
+			Expect(modelStatus.ClusterEndpoint).To(Equal("127.0.0.1:8123"))
+			Expect(modelStatus.Name).To(Equal("dummy-model"))
+			Expect(modelStatus.Engine).To(Equal(appsv1alpha1.ModelEngineNIM))
+		})
+
 	})
 
 	Describe("getNIMCacheProfile", func() {
