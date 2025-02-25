@@ -83,7 +83,8 @@ type mockTransport struct {
 
 func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Check if this request is going to our target IP
-	if req.URL.Host == m.targetHost {
+	hostname := strings.Split(req.URL.Host, ":")[0]
+	if hostname == "" || req.URL.Host == m.targetHost {
 		// Create a new URL pointing to our test server
 		testURL, _ := url.Parse(m.testServer.URL)
 		testURL.Path = req.URL.Path
@@ -92,7 +93,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		// Create a new request to our test server
 		newReq := req.Clone(req.Context())
 		newReq.URL = testURL
-		newReq.Host = m.targetHost // Preserve the original Host header
+		newReq.Host = req.URL.Host // Preserve the original Host header
 
 		// Send the request to our test server
 		return http.DefaultClient.Do(newReq)
@@ -392,12 +393,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
 		})
 		testServer = httptest.NewServer(testServerHandler)
-		/*testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
-		}))*/
 		http.DefaultTransport = &mockTransport{
-			targetHost:        ":8123",
+			targetHost:        "127.0.0.1:8123",
 			testServer:        testServer,
 			originalTransport: originalTransport,
 		}
@@ -591,7 +588,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 	})
 
 	Describe("isDeploymentReady for setting status on NIMService", func() {
-
 		AfterEach(func() {
 			// Clean up the Deployment instance
 			deployment := &appsv1.Deployment{
@@ -755,7 +751,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Namespace: "default",
 				},
 				Spec: corev1.ServiceSpec{
-					Type: corev1.ServiceTypeClusterIP,
+					Type:      corev1.ServiceTypeClusterIP,
+					ClusterIP: "127.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
 							Port: 8123,
@@ -782,7 +779,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Namespace: "default",
 				},
 				Spec: corev1.ServiceSpec{
-					Type: corev1.ServiceTypeClusterIP,
+					Type:      corev1.ServiceTypeClusterIP,
+					ClusterIP: "127.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
 							Port: 8123,
@@ -794,7 +792,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			_ = client.Create(context.TODO(), svc)
 			err := reconciler.updateModelStatus(context.Background(), nimService)
 			Expect(err).To(HaveOccurred())
-			Expect(err).To(MatchError("failed to detect model name from nimservice endpoint ':8123'"))
+			Expect(err).To(MatchError("failed to detect model name from nimservice endpoint '127.0.0.1:8123'"))
 			Expect(nimService.Status.Model).To(BeNil())
 		})
 
@@ -805,7 +803,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Namespace: "default",
 				},
 				Spec: corev1.ServiceSpec{
-					Type: corev1.ServiceTypeClusterIP,
+					Type:      corev1.ServiceTypeClusterIP,
+					ClusterIP: "127.0.0.1",
 					Ports: []corev1.ServicePort{
 						{
 							Port: 8123,
@@ -819,7 +818,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).ToNot(HaveOccurred())
 			modelStatus := nimService.Status.Model
 			Expect(modelStatus).ToNot(BeNil())
-			Expect(modelStatus.EndpointAddress).To(Equal(":8123"))
+			Expect(modelStatus.ClusterEndpoint).To(Equal("127.0.0.1:8123"))
 			Expect(modelStatus.Name).To(Equal("dummy-model"))
 			Expect(modelStatus.Engine).To(Equal(appsv1alpha1.ModelEngineNIM))
 		})

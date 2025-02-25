@@ -103,9 +103,10 @@ type NIMServiceStatus struct {
 
 // ModelStatus defines the configuration of the NIMService model.
 type ModelStatus struct {
-	Name            string      `json:"name,omitempty"`
-	EndpointAddress string      `json:"endpointAddress,omitempty"`
-	Engine          ModelEngine `json:"engine,omitempty"`
+	Name             string      `json:"name"`
+	ClusterEndpoint  string      `json:"clusterEndpoint"`
+	ExternalEndpoint string      `json:"externalEndpoint"`
+	Engine           ModelEngine `json:"engine"`
 }
 
 // +genclient

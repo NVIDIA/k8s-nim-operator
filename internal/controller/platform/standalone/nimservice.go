@@ -284,18 +284,19 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 }
 
 func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *v1alpha1.NIMService) error {
-	endpoint, err := r.getNIMModelEndpoint(ctx, nimService)
+	clusterEndpoint, externalEndpoint, err := r.getNIMModelEndpoints(ctx, nimService)
 	if err != nil {
 		return err
 	}
-	modelName, err := r.getNIMModelName(ctx, endpoint)
+	modelName, err := r.getNIMModelName(ctx, clusterEndpoint)
 	if err != nil {
 		return err
 	}
 	nimService.Status.Model = &v1alpha1.ModelStatus{
-		Name:            modelName,
-		EndpointAddress: endpoint,
-		Engine:          v1alpha1.ModelEngineNIM,
+		Name:             modelName,
+		ClusterEndpoint:  clusterEndpoint,
+		ExternalEndpoint: externalEndpoint,
+		Engine:           v1alpha1.ModelEngineNIM,
 	}
 
 	return nil
@@ -319,17 +320,22 @@ func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEn
 	return "", fmt.Errorf("failed to detect model name from nimservice endpoint '%s'", nimServiceEndpoint)
 }
 
-func (r *NIMServiceReconciler) getNIMModelEndpoint(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, error) {
+func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, string, error) {
 	logger := log.FromContext(ctx)
 
 	// Lookup NIMCache instance in the same namespace as the NIMService instance
 	svc := &corev1.Service{}
 	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}, svc); err != nil {
 		logger.Error(err, "unable to fetch k8s service", "nimservice", nimService.GetName())
-		return "", err
+		return "", "", err
 	}
 
-	return fmt.Sprintf("%s:%v", svc.Spec.ClusterIP, nimService.GetServicePort()), nil
+	var externalIP string
+	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		externalIP = svc.Spec.LoadBalancerIP
+	}
+	port := nimService.GetServicePort()
+	return utils.FormatEndpoint(svc.Spec.ClusterIP, port), utils.FormatEndpoint(externalIP, port), nil
 }
 
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
