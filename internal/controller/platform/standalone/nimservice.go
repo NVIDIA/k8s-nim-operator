@@ -287,9 +287,13 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 	if err != nil {
 		return err
 	}
+	endpoint, err := r.getNIMModelEndpoint(ctx, nimService)
+	if err != nil {
+		return err
+	}
 	nimService.Status.Model = v1alpha1.ModelStatus{
 		Name:            modelName,
-		EndpointAddress: fmt.Sprintf("%s.%s.svc.cluster.local:%d", nimService.GetName(), nimService.GetNamespace(), nimService.GetServicePort()),
+		EndpointAddress: endpoint,
 		Engine:          v1alpha1.ModelEngineNIM,
 	}
 
@@ -306,8 +310,8 @@ func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimService *
 
 	// Lookup NIMCache instance in the same namespace as the NIMService instance
 	nimCache := &appsv1alpha1.NIMCache{}
-	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetNIMCacheName(), Namespace: nimService.Namespace}, nimCache); err != nil {
-		logger.Error(err, "unable to fetch nimcache", "nimcache", nimService.GetNIMCacheName(), "nimservice", nimService.Name)
+	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetNIMCacheName(), Namespace: nimService.GetNamespace()}, nimCache); err != nil {
+		logger.Error(err, "unable to fetch nimcache", "nimcache", nimService.GetNIMCacheName(), "nimservice", nimService.GetName())
 		return "", err
 	}
 
@@ -316,6 +320,19 @@ func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimService *
 	}
 
 	return "", nil
+}
+
+func (r *NIMServiceReconciler) getNIMModelEndpoint(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, error) {
+	logger := log.FromContext(ctx)
+
+	// Lookup NIMCache instance in the same namespace as the NIMService instance
+	svc := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}, svc); err != nil {
+		logger.Error(err, "unable to fetch k8s service", "nimservice", nimService.GetName())
+		return "", err
+	}
+
+	return fmt.Sprintf("%s:%v", svc.Spec.ClusterIP, nimService.GetServicePort()), nil
 }
 
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
