@@ -2288,12 +2288,19 @@ spec:
                 description: ModelStatus defines the configuration of the NIMService
                   model.
                 properties:
-                  endpointAddress:
+                  clusterEndpoint:
                     type: string
                   engine:
                     type: string
+                  externalEndpoint:
+                    type: string
                   name:
                     type: string
+                required:
+                - clusterEndpoint
+                - engine
+                - externalEndpoint
+                - name
                 type: object
               state:
                 type: string
