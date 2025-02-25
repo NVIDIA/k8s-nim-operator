@@ -286,3 +286,10 @@ func CalculateSHA256(data string) string {
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:])
 }
+
+func FormatEndpoint(ip string, port int32) string {
+	if ip == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", ip, port)
+}
