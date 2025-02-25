@@ -18,12 +18,17 @@ package standalone
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"time"
 
 	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
@@ -283,11 +288,11 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 }
 
 func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *v1alpha1.NIMService) error {
-	modelName, err := r.getNIMModelName(ctx, nimService)
+	endpoint, err := r.getNIMModelEndpoint(ctx, nimService)
 	if err != nil {
 		return err
 	}
-	endpoint, err := r.getNIMModelEndpoint(ctx, nimService)
+	modelName, err := r.getNIMModelName(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -300,26 +305,47 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 	return nil
 }
 
-func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, error) {
+func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEndpoint string) (string, error) {
 	logger := log.FromContext(ctx)
 
-	if nimService.GetNIMCacheName() == "" {
-		// NIM cache is not used
-		return "", nil
+	httpClient := http.Client{
+		Timeout: 30 * time.Second,
 	}
-
-	// Lookup NIMCache instance in the same namespace as the NIMService instance
-	nimCache := &appsv1alpha1.NIMCache{}
-	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetNIMCacheName(), Namespace: nimService.GetNamespace()}, nimCache); err != nil {
-		logger.Error(err, "unable to fetch nimcache", "nimcache", nimService.GetNIMCacheName(), "nimservice", nimService.GetName())
+	modelsURL := nimmodels.GetV1ModelsURL(nimServiceEndpoint)
+	modelsReq, err := http.NewRequest(http.MethodGet, modelsURL, nil)
+	if err != nil {
+		logger.Error(err, "failed to prepare request for models endpoint", "endpoint", nimServiceEndpoint)
 		return "", err
 	}
+	modelsReq.Header.Set("Content-Type", "application/json")
 
-	if nimCache.Spec.Source.DataStore != nil && nimCache.Spec.Source.DataStore.ModelName != nil {
-		return *nimCache.Spec.Source.DataStore.ModelName, nil
+	modelsResp, err := httpClient.Do(modelsReq)
+	if err != nil {
+		logger.Error(err, "failed to make request for models endpoint", "url", modelsURL)
+		return "", err
+	}
+	modelsData, err := io.ReadAll(modelsResp.Body)
+	logger.Info("got models response", "data", string(modelsData))
+
+	var modelsList nimmodels.ModelsV1List
+	err = json.Unmarshal(modelsData, &modelsList)
+	if err != nil {
+		logger.Error(err, "failed to unmarshal models response", "url", modelsURL)
+		return "", err
+	}
+	if modelsList.Object == nimmodels.ObjectTypeList {
+		for _, model := range modelsList.Data {
+			if model.Object != nimmodels.ObjectTypeModel {
+				continue
+			}
+			if model.Parent == nil {
+				continue
+			}
+			return model.Id, nil
+		}
 	}
 
-	return "", nil
+	return "", fmt.Errorf("failed to detect model name from nimservice endpoint '%s'", nimServiceEndpoint)
 }
 
 func (r *NIMServiceReconciler) getNIMModelEndpoint(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, error) {
