@@ -6,8 +6,6 @@
   when: localPathProvisioner.enabled
 - include_tasks: argo-workflow.yaml
   when: argo.enabled
-- include_tasks: mongodb.yaml
-  when: mongodb.enabled
 - include_tasks: milvus.yaml
   when: milvus.enabled
 - include_tasks: opentelemetry.yaml
