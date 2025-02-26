@@ -2290,15 +2290,12 @@ spec:
                 properties:
                   clusterEndpoint:
                     type: string
-                  engine:
-                    type: string
                   externalEndpoint:
                     type: string
                   name:
                     type: string
                 required:
                 - clusterEndpoint
-                - engine
                 - externalEndpoint
                 - name
                 type: object
