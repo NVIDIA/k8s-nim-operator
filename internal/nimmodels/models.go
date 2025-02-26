@@ -62,23 +62,27 @@ func ListModelsV1(ctx context.Context, nimServiceEndpoint string) (*ModelsV1List
 	modelsURL := getModelsV1URL(nimServiceEndpoint)
 	modelsReq, err := http.NewRequest(http.MethodGet, modelsURL, nil)
 	if err != nil {
-		logger.Error(err, "failed to prepare request for models endpoint", "url", modelsURL)
+		logger.Error(err, "Failed to prepare request for models endpoint", "url", modelsURL)
 		return nil, err
 	}
 
 	modelsResp, err := httpClient.Do(modelsReq)
 	if err != nil {
-		logger.Error(err, "failed to make request for models endpoint", "url", modelsURL)
+		logger.Error(err, "Failed to make request for models endpoint", "url", modelsURL)
 		return nil, err
 	}
 	defer modelsResp.Body.Close()
 
 	modelsData, err := io.ReadAll(modelsResp.Body)
+	if err != nil {
+		logger.Error(err, "Failed to read models api response", "url", modelsURL)
+		return nil, err
+	}
 
 	var modelsList ModelsV1List
 	err = json.Unmarshal(modelsData, &modelsList)
 	if err != nil {
-		logger.Error(err, "failed to unmarshal models response", "url", modelsURL)
+		logger.Error(err, "Failed to unmarshal models response", "url", modelsURL)
 		return nil, err
 	}
 

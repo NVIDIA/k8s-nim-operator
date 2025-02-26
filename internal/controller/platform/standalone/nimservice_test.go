@@ -390,7 +390,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		// Start mock test server to serve nimservice endpoint.
 		testServerHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
+			_, err := w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
+			Expect(err).ToNot(HaveOccurred())
 		})
 		testServer = httptest.NewServer(testServerHandler)
 		http.DefaultTransport = &mockTransport{
@@ -743,7 +744,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		It("should fail when models response is unmarshallable", func() {
 			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"value": "invalid response"}`))
+				_, err := w.Write([]byte(`{"value": "invalid response"}`))
+				Expect(err).ToNot(HaveOccurred())
 			})
 			svc := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -771,7 +773,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				// Set dummy object type for model.
-				w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "dummy", "root": "dummy-model", "parent": null}]}`))
+				_, err := w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "dummy", "root": "dummy-model", "parent": null}]}`))
+				Expect(err).ToNot(HaveOccurred())
 			})
 			svc := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -827,7 +830,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				// Set dummy object type for model.
-				w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model-adapter1", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model-adapter2", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
+				_, err := w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model-adapter1", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model-adapter2", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
+				Expect(err).ToNot(HaveOccurred())
 			})
 			svc := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
