@@ -87,12 +87,6 @@ type NIMCacheVolSpec struct {
 	Profile string `json:"profile,omitempty"`
 }
 
-type ModelEngine string
-
-const (
-	ModelEngineNIM ModelEngine = "nim"
-)
-
 // NIMServiceStatus defines the observed state of NIMService
 type NIMServiceStatus struct {
 	Conditions        []metav1.Condition `json:"conditions,omitempty"`
@@ -103,10 +97,9 @@ type NIMServiceStatus struct {
 
 // ModelStatus defines the configuration of the NIMService model.
 type ModelStatus struct {
-	Name             string      `json:"name"`
-	ClusterEndpoint  string      `json:"clusterEndpoint"`
-	ExternalEndpoint string      `json:"externalEndpoint"`
-	Engine           ModelEngine `json:"engine"`
+	Name             string `json:"name"`
+	ClusterEndpoint  string `json:"clusterEndpoint"`
+	ExternalEndpoint string `json:"externalEndpoint"`
 }
 
 // +genclient

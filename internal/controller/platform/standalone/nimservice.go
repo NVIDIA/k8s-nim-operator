@@ -296,7 +296,6 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 		Name:             modelName,
 		ClusterEndpoint:  clusterEndpoint,
 		ExternalEndpoint: externalEndpoint,
-		Engine:           v1alpha1.ModelEngineNIM,
 	}
 
 	return nil
@@ -333,12 +332,36 @@ func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimServ
 		return "", "", err
 	}
 
-	var externalIP string
-	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
-		externalIP = svc.Spec.LoadBalancerIP
-	}
+	var externalEndpoint string
 	port := nimService.GetServicePort()
-	return utils.FormatEndpoint(svc.Spec.ClusterIP, port), utils.FormatEndpoint(externalIP, port), nil
+	if nimService.IsIngressEnabled() {
+		ingress := &networkingv1.Ingress{}
+		if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}, ingress); err != nil {
+			logger.Error(err, "unable to fetch ingress", "nimservice", nimService.GetName())
+			return "", "", err
+		}
+
+		var found bool
+		for _, rule := range ingress.Spec.Rules {
+			if rule.HTTP == nil {
+				continue
+			}
+			for _, path := range rule.HTTP.Paths {
+				if path.Backend.Service != nil && path.Backend.Service.Name == nimService.GetName() {
+					externalEndpoint = rule.Host
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+	} else if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		externalEndpoint = utils.FormatEndpoint(svc.Spec.LoadBalancerIP, port)
+	}
+
+	return utils.FormatEndpoint(svc.Spec.ClusterIP, port), externalEndpoint, nil
 }
 
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {

@@ -707,6 +707,16 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 	})
 
 	Describe("update model status on NIMService", func() {
+		BeforeEach(func() {
+			ingress := &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: nimService.GetIngressSpec(),
+			}
+			_ = client.Create(context.TODO(), ingress)
+		})
 		AfterEach(func() {
 			// Clean up the Service instance
 			svc := &corev1.Service{
@@ -822,8 +832,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			modelStatus := nimService.Status.Model
 			Expect(modelStatus).ToNot(BeNil())
 			Expect(modelStatus.ClusterEndpoint).To(Equal("127.0.0.1:8123"))
+			Expect(modelStatus.ExternalEndpoint).To(Equal("test-nimservice.default.example.com"))
 			Expect(modelStatus.Name).To(Equal("dummy-model"))
-			Expect(modelStatus.Engine).To(Equal(appsv1alpha1.ModelEngineNIM))
 		})
 
 		It("should succeed when nimservice has lora adapter models attached", func() {
@@ -855,8 +865,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			modelStatus := nimService.Status.Model
 			Expect(modelStatus).ToNot(BeNil())
 			Expect(modelStatus.ClusterEndpoint).To(Equal("127.0.0.1:8123"))
+			Expect(modelStatus.ExternalEndpoint).To(Equal("test-nimservice.default.example.com"))
 			Expect(modelStatus.Name).To(Equal("dummy-model"))
-			Expect(modelStatus.Engine).To(Equal(appsv1alpha1.ModelEngineNIM))
 		})
 
 	})
