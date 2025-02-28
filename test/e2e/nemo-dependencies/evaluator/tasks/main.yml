@@ -1,9 +1,9 @@
 ---
 # tasks file for evaluator
-- include_tasks: namespace.yaml
 - include_tasks: local-path-provisioner.yaml
-- include_tasks: secrets.yaml
   when: localPathProvisioner.enabled
+- include_tasks: namespace.yaml
+- include_tasks: secrets.yaml
 - include_tasks: argo-workflow.yaml
   when: argo.enabled
 - include_tasks: milvus.yaml
