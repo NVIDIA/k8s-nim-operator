@@ -14,7 +14,10 @@ spec:
       - ngc-secret
   expose:
     service:
-      port: 7331
+      type: ClusterIP
+      ports:
+        - name: api
+          port: 8000
   argoWorkflows:
     endpoint: "http://argo-workflows-server:2746"
     serviceAccount: "argo-workflows-executor"

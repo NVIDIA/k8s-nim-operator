@@ -304,7 +304,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 			Expect(ingress.Namespace).To(Equal(nemoEvaluator.GetNamespace()))
 			Expect(ingress.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(ingress.Annotations["annotation-key-specific"]).To(Equal("ingress"))
-			Expect(service.Spec.Ports[0].Name).To(Equal("http"))
+			Expect(service.Spec.Ports[0].Name).To(Equal("api"))
 			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8000)))
 
 			// HPA should be deployed
@@ -326,7 +326,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 			Expect(sm.Namespace).To(Equal(nemoEvaluator.GetNamespace()))
 			Expect(sm.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(sm.Annotations["annotation-key-specific"]).To(Equal("service-monitor"))
-			Expect(sm.Spec.Endpoints[0].Port).To(Equal("service-port"))
+			Expect(sm.Spec.Endpoints[0].Port).To(Equal("api"))
 			Expect(sm.Spec.Endpoints[0].ScrapeTimeout).To(Equal(monitoringv1.Duration("30s")))
 			Expect(sm.Spec.Endpoints[0].Interval).To(Equal(monitoringv1.Duration("1m")))
 
@@ -398,7 +398,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 			// Verify evaluator environment variables
 			Expect(envVars).To(ContainElements(
 				corev1.EnvVar{Name: "EVALUATOR_HOST", Value: "0.0.0.0"},
-				corev1.EnvVar{Name: "EVALUATOR_PORT", Value: fmt.Sprintf("%d", nemoEvaluator.GetServicePort())},
+				corev1.EnvVar{Name: "EVALUATOR_PORT", Value: fmt.Sprintf("%d", nemoEvaluator.GetContainerPort())},
 				corev1.EnvVar{Name: "EVAL_CONTAINER", Value: nemoEvaluator.GetImage()},
 				corev1.EnvVar{Name: "EVAL_ENABLE_VALIDATION", Value: "True"},
 			))
