@@ -43,7 +43,7 @@ spec:
       type: ClusterIP
   image:
     repository: "nvcr.io/nvidian/nemo-llm/datastore"
-    tag: "25.01-rc8"
+    tag: "25.03-rc11"
     pullPolicy: IfNotPresent
   replicas: 1
   resources:
