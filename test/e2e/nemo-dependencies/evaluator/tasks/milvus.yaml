@@ -57,7 +57,7 @@
   when: milvus_pod_ip | length > 0
 
 - name: Check Milvus service is responding
-  command: "nc -zv {{ milvus_pod_ip.stdout }} 19530"
+  command: kubectl run milvus-check --image=busybox --restart=Never --attach --rm=true -- nc -w 10 -zv {{ milvus_pod_ip.stdout }} 19530
   register: milvus_status
 
 - name: Display Milvus connectivity status
