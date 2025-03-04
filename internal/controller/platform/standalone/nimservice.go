@@ -558,7 +558,7 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 		if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
 			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace()})
 			if err != nil {
-				logger.Error(err, "Failed to construct pvc", "name", pvc.Name)
+				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return nil, err
 			}
 			if err := controllerutil.SetControllerReference(nimService, pvc, r.GetScheme()); err != nil {
