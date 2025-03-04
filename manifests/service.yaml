@@ -3,18 +3,18 @@ kind: Service
 metadata:
   name: {{ .Name }}
   namespace: {{ .Namespace }}
-  labels:
   {{- if .Labels }}
+  labels:
     {{- .Labels | yaml | nindent 4 }}
   {{- end }}
-  annotations:
   {{- if .Annotations }}
+  annotations:
     {{- .Annotations | yaml | nindent 4 }}
   {{- end }}
 spec:
-  type: {{ .Type }}
-  selector:
+  type: {{ .Type | default "ClusterIP" }}
   {{- if .SelectorLabels }}
+  selector:
     {{- .SelectorLabels | yaml | nindent 4 }}
   {{- end }}
   ports:
@@ -22,18 +22,17 @@ spec:
       {{- range .Ports }}
     - port: {{ .Port }}
       targetPort: {{ .TargetPort }}
-      protocol: {{ .Protocol }}
+      protocol: {{ .Protocol | default "TCP" }}
       name: {{ .Name }}
       {{- end }}
-    {{- else }}
+    {{- else if .Port }}
     - port: {{ .Port }}
       {{- if .TargetPort }}
       targetPort: {{ .TargetPort }}
       {{- end }}
-      {{- if .Protocol }}
-      protocol: {{ .Protocol }}
-      {{- end }}
-      {{- if .PortName }}
-      name: {{ .PortName }}
+      protocol: {{ .Protocol | default "TCP" }}
+      {{- if .Name }}
+      name: {{ .Name }}
       {{- end }}
     {{- end }}
+

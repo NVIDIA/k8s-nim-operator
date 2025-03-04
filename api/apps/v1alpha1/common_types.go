@@ -21,11 +21,21 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+const (
+	// DefaultAPIPort is the default API  port
+	DefaultAPIPort = 8000
+	// DefaultNamedPortAPI is the default named API port
+	DefaultNamedPortAPI = "api"
+	// DefaultNamedPortMetrics is the default named Metrics port
+	DefaultNamedPortMetrics = "metrics"
 )
 
 // Expose defines attributes to expose the service
 type Expose struct {
-	Service Service `json:"service,omitempty"`
+	Service Service `json:"service"`
 	Ingress Ingress `json:"ingress,omitempty"`
 }
 
@@ -36,7 +46,6 @@ type Service struct {
 	Name string `json:"name,omitempty"`
 	// Deprecated: Use Ports instead.
 	// +kubebuilder:deprecatedversion
-	// +kubebuilder:default=8000
 	Port int32 `json:"port,omitempty"`
 	// Defines multiple ports for the service
 	Ports       []corev1.ServicePort `json:"ports,omitempty"`
@@ -114,4 +123,60 @@ type CertConfig struct {
 	Name string `json:"name"`
 	// MountPath is the path where the certificates should be mounted in the container.
 	MountPath string `json:"mountPath"`
+}
+
+// selectNamedPort returns the first occurrence of a given named port, or an empty string if not found.
+func selectNamedPort(serviceSpec Service, portNames ...string) string {
+	for _, name := range portNames {
+		for _, port := range serviceSpec.Ports {
+			if port.Name == name {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+// getProbePort determines the appropriate port for probes based on the service spec.
+func getProbePort(serviceSpec Service) intstr.IntOrString {
+	switch len(serviceSpec.Ports) {
+	case 1:
+		port := serviceSpec.Ports[0]
+		if port.Name != "" {
+			return intstr.FromString(port.Name)
+		}
+		return intstr.FromInt(int(port.Port))
+	case 0:
+		// Default to "api" as the operator always adds a default named port with 8000
+		return intstr.FromString(DefaultNamedPortAPI)
+	default:
+		// Multiple ports: Prefer "api"
+		if portName := selectNamedPort(serviceSpec, DefaultNamedPortAPI); portName != "" {
+			return intstr.FromString(portName)
+		}
+		// Default when multiple ports exist
+		return intstr.FromString(DefaultNamedPortAPI)
+	}
+}
+
+// getMetricsPort determines the appropriate port for metrics based on the service spec.
+func getMetricsPort(serviceSpec Service) intstr.IntOrString {
+	switch len(serviceSpec.Ports) {
+	case 1:
+		port := serviceSpec.Ports[0]
+		if port.Name != "" {
+			return intstr.FromString(port.Name)
+		}
+		return intstr.FromInt(int(port.Port))
+	case 0:
+		// Default to "api" as the operator always adds a default named port with 8000
+		return intstr.FromString(DefaultNamedPortAPI)
+	default:
+		// Multiple ports: Prefer "metrics", fallback to "api"
+		if portName := selectNamedPort(serviceSpec, DefaultNamedPortMetrics, DefaultNamedPortAPI); portName != "" {
+			return intstr.FromString(portName)
+		}
+		// Default when multiple ports exist
+		return intstr.FromString(DefaultNamedPortMetrics)
+	}
 }

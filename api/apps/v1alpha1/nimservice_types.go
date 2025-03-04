@@ -190,7 +190,7 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_SERVER_PORT",
-			Value: fmt.Sprint(n.Spec.Expose.Service.Port),
+			Value: fmt.Sprintf("%d", n.GetContainerPort()),
 		},
 		{
 			Name:  "NIM_JSONL_LOGGING",
@@ -322,10 +322,7 @@ func (n *NIMService) GetDefaultLivenessProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health/live",
-				Port: intstr.IntOrString{
-					Type:   intstr.Type(0),
-					IntVal: n.Spec.Expose.Service.Port,
-				},
+				Port: getProbePort(n.Spec.Expose.Service),
 			},
 		},
 	}
@@ -352,10 +349,7 @@ func (n *NIMService) GetDefaultReadinessProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health/ready",
-				Port: intstr.IntOrString{
-					Type:   intstr.Type(0),
-					IntVal: n.Spec.Expose.Service.Port,
-				},
+				Port: getProbePort(n.Spec.Expose.Service),
 			},
 		},
 	}
@@ -374,18 +368,15 @@ func (n *NIMService) GetStartupProbe() *corev1.Probe {
 // GetDefaultStartupProbe returns the default startup probe for the NIMService container
 func (n *NIMService) GetDefaultStartupProbe() *corev1.Probe {
 	probe := corev1.Probe{
-		InitialDelaySeconds: 40,
+		InitialDelaySeconds: 30,
 		TimeoutSeconds:      1,
 		PeriodSeconds:       10,
 		SuccessThreshold:    1,
-		FailureThreshold:    180,
+		FailureThreshold:    30,
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health/ready",
-				Port: intstr.IntOrString{
-					Type:   intstr.Type(0),
-					IntVal: n.Spec.Expose.Service.Port,
-				},
+				Port: getProbePort(n.Spec.Expose.Service),
 			},
 		},
 	}
@@ -505,9 +496,35 @@ func (n *NIMService) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
 }
 
-// GetServicePort returns the service port for the NIMService deployment
+// GetServicePorts returns the service ports for the NIMService deployment
+func (n *NIMService) GetServicePorts() []corev1.ServicePort {
+	return n.Spec.Expose.Service.Ports
+}
+
+// GetServicePort returns the deprecated service port for the NIMService deployment or default port: 8000
 func (n *NIMService) GetServicePort() int32 {
+	if n.Spec.Expose.Service.Port == 0 {
+		return DefaultAPIPort
+	}
 	return n.Spec.Expose.Service.Port
+}
+
+// GetContainerPort returns the serving port for the NIMService deployment.
+func (n *NIMService) GetContainerPort() int32 {
+	servicePorts := n.GetServicePorts()
+
+	// Fall back to deprecated .Port param
+	if len(servicePorts) == 0 {
+		return n.GetServicePort()
+	}
+
+	servicePort := servicePorts[0]
+	if servicePort.TargetPort.Type == intstr.Int {
+		return int32(servicePort.TargetPort.IntValue())
+	}
+
+	// If TargetPort is empty or a string, return Port
+	return servicePort.Port
 }
 
 // GetServiceType returns the service type for the NIMService deployment
@@ -596,6 +613,16 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	// Set runtime class
 	params.RuntimeClassName = n.GetRuntimeClassName()
 
+	// Setup container ports for nimservice
+	containerPorts := []corev1.ContainerPort{
+		{
+			Name:          DefaultNamedPortAPI,
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: n.GetContainerPort(),
+		},
+	}
+	params.Ports = containerPorts
+
 	return params
 }
 
@@ -662,8 +689,18 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 	params.Type = n.GetServiceType()
 
 	// Set service ports
-	params.Port = n.GetServicePort()
-	params.PortName = "service-port"
+	servicePorts := n.GetServicePorts()
+	if len(servicePorts) != 0 {
+		params.Ports = servicePorts
+	} else {
+		// Use corev1.ServicePort instead of deprecated params.Port
+		params.Ports = []corev1.ServicePort{{
+			Name:       DefaultNamedPortAPI,
+			Port:       n.GetServicePort(),
+			TargetPort: intstr.FromInt32(n.GetServicePort()),
+			Protocol:   corev1.ProtocolTCP,
+		}}
+	}
 	return params
 }
 
@@ -766,24 +803,21 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 	params.Labels = svcLabels
 	params.Annotations = n.GetServiceMonitorAnnotations()
 
+	// Determine the appropriate port for monitoring
+	metricsPort := getMetricsPort(n.Spec.Expose.Service)
+
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
-		NamespaceSelector: monitoringv1.NamespaceSelector{
-			MatchNames: []string{n.Namespace},
-		},
-		Selector: metav1.LabelSelector{
-			MatchLabels: n.GetServiceLabels(),
-		},
+		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
+		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
 		Endpoints: []monitoringv1.Endpoint{
 			{
-				Port:          "service-port",
-				Path:          "/v1/metrics",
+				Port:          metricsPort.StrVal,
 				ScrapeTimeout: serviceMonitor.ScrapeTimeout,
 				Interval:      serviceMonitor.Interval,
 			},
 		},
 	}
-
 	params.SMSpec = smSpec
 	return params
 }
