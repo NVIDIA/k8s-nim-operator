@@ -5,6 +5,7 @@ metadata:
     app.kubernetes.io/name: k8s-nim-operator
     app.kubernetes.io/managed-by: k8s-nim-operator
   name: nemodatastore-sample
+  namespace: nemo
 spec:
   authSecret: ngc-image-pull-secret
   secrets:
@@ -28,7 +29,7 @@ spec:
       user: ndsuser
       secretName: nds-pg-existing-secret
       passwordKey: password
-    host: nds-pg-postgresql
+    host: nds-pg-postgresql.nemo.svc.cluster.local
     port: 5432
     databaseName: ndsdb
   pvc:
