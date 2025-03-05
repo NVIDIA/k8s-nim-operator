@@ -582,8 +582,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			nimService := &appsv1alpha1.NIMService{}
 			err = client.Get(context.TODO(), namespacedName, nimService)
 			Expect(err).NotTo(HaveOccurred())
-			nimService.Spec.Scale.Enabled = ptr.To[bool](false)
-			nimService.Spec.Expose.Ingress.Enabled = ptr.To[bool](false)
+			nimService.Spec.Scale.Enabled = ptr.To(false)
+			nimService.Spec.Expose.Ingress.Enabled = ptr.To(false)
 			err = client.Update(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
 

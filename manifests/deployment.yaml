@@ -31,8 +31,8 @@ spec:
         {{- .Labels | yaml | nindent 8 }}
       {{- end }}
       annotations:
-      {{- if .Annotations }}
-        {{- .Annotations | yaml | nindent 8 }}
+      {{- if .PodAnnotations }}
+        {{- .PodAnnotations | yaml | nindent 8 }}
       {{- end }}
     spec:
       serviceAccountName: {{ .ServiceAccountName }}
