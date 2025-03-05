@@ -3,31 +3,31 @@ kind: NemoEvaluator
 metadata:
   labels:
     app.kubernetes.io/name: k8s-nim-operator
-    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/managed-by: k8s-nim-operator
   name: nemoevaluator-sample
+  namespace: nemo
 spec:
   image:
     repository: nvcr.io/nvidia/nemo-microservices/evaluation-ms
-    tag: "25.01"
+    tag: "25.02"
     pullPolicy: IfNotPresent
-    pullSecrets:
-      - ngc-secret
+    pullSecrets: []
   expose:
     service:
       port: 7331
   argoWorkflows:
-    endpoint: "http://argo-workflows-server:2746"
-    serviceAccount: "argo-workflows-executor"
+    endpoint: https://argo-workflows-server.nemo.svc.cluster.local:2746
+    serviceAccount: argo-workflows-executor
   vectorDB:
-    endpoint: "http://milvus-eval:19530"
+    endpoint: http://milvus.nemo.svc.cluster.local:19530
   datastore:
-    endpoint: "http://datastore.default.svc.cluster.local:3000/v1/hf"
+    endpoint: http://datastore-sample.nemo.svc.cluster.local:3000/v1/hf
   databaseConfig:
-    host: "evaluator-pg-postgresql"
+    host: evaluator-pg-postgresql.nemo.svc.cluster.local
     port: 5432
-    databaseName: "evaluation"
+    databaseName: evaldb
     credentials:
-      user: "nemo"
-      secretName: "evaluator-pg-postgresql"
-      passwordKey: "password"
+      user: evaluser
+      secretName: nev-pg-existing-secret
+      passwordKey: password
   replicas: 1
