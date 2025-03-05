@@ -28,8 +28,13 @@ import (
 	"sort"
 	"strings"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -37,6 +42,9 @@ import (
 const (
 	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by the operator
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
+
+	// NvidiaAnnotationParentSpecHashKey indicates annotation name for applied hash by the operator
+	NvidiaAnnotationParentSpecHashKey = "nvidia.com/parent-spec-hash"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
@@ -101,18 +109,17 @@ func MergeMaps(m1, m2 map[string]string) map[string]string {
 
 // MergeEnvVars merges two slices of environment variables, giving precedence to the second slice in case of duplicates
 func MergeEnvVars(env1, env2 []corev1.EnvVar) []corev1.EnvVar {
-	envMap := make(map[string]corev1.EnvVar)
-	for _, env := range env1 {
-		envMap[env.Name] = env
-	}
-
-	for _, env := range env2 {
-		envMap[env.Name] = env
-	}
-
 	var mergedEnv []corev1.EnvVar
-	for _, env := range envMap {
+	envMap := make(map[string]bool)
+	for _, env := range env2 {
 		mergedEnv = append(mergedEnv, env)
+		envMap[env.Name] = true
+	}
+
+	for _, env := range env1 {
+		if _, found := envMap[env.Name]; !found {
+			mergedEnv = append(mergedEnv, env)
+		}
 	}
 
 	return mergedEnv
@@ -248,14 +255,17 @@ func IsSpecChanged(current client.Object, desired client.Object) bool {
 	return false
 }
 
-// ContainsElement checks if an element exists in a slice
-func ContainsElement[T comparable](slice []T, element T) bool {
-	for _, value := range slice {
-		if value == element {
-			return true
-		}
+func IsParentSpecChanged(obj client.Object, desiredHash string) bool {
+	if obj == nil {
+		return true
 	}
-	return false
+
+	currentHash, ok := obj.GetAnnotations()[NvidiaAnnotationParentSpecHashKey]
+	if !ok {
+		return true
+	}
+
+	return currentHash != desiredHash
 }
 
 // IsEqual compares two Kubernetes objects based on their relevant fields.
@@ -292,4 +302,110 @@ func FormatEndpoint(ip string, port int32) string {
 		return ""
 	}
 	return fmt.Sprintf("%s:%d", ip, port)
+}
+
+func DeepHashObject(objToWrite any) string {
+	hasher := fnv.New32a()
+	hasher.Reset()
+	fmt.Fprintf(hasher, "%v", dump.ForHash(objToWrite))
+	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
+}
+
+func UpdateObject(obj client.Object, desired client.Object) client.Object {
+	if obj == nil || desired == nil || !reflect.DeepEqual(obj.GetObjectKind(), desired.GetObjectKind()) || obj.GetName() != desired.GetName() || obj.GetNamespace() != desired.GetNamespace() {
+		panic("invalid input to UpdateObject")
+	}
+
+	switch castedObj := obj.(type) {
+	case *corev1.ServiceAccount:
+		return updateServiceAccount(castedObj, desired.(*corev1.ServiceAccount))
+	case *rbacv1.Role:
+		return updateRole(castedObj, desired.(*rbacv1.Role))
+	case *rbacv1.RoleBinding:
+		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding))
+	case *corev1.Service:
+		return updateService(castedObj, desired.(*corev1.Service))
+	case *networkingv1.Ingress:
+		return updateIngress(castedObj, desired.(*networkingv1.Ingress))
+	case *autoscalingv2.HorizontalPodAutoscaler:
+		return updateHPA(castedObj, desired.(*autoscalingv2.HorizontalPodAutoscaler))
+	case *monitoringv1.ServiceMonitor:
+		return updateServiceMonitor(castedObj, desired.(*monitoringv1.ServiceMonitor))
+	case *appsv1.Deployment:
+		return updateDeployment(castedObj, desired.(*appsv1.Deployment))
+	case *appsv1.StatefulSet:
+		return updateStatefulSet(castedObj, desired.(*appsv1.StatefulSet))
+	default:
+		panic("unsupported obj type")
+	}
+}
+
+func updateServiceAccount(obj, desired *corev1.ServiceAccount) *corev1.ServiceAccount {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Secrets = desired.Secrets
+	obj.ImagePullSecrets = desired.ImagePullSecrets
+	obj.AutomountServiceAccountToken = desired.AutomountServiceAccountToken
+	return obj
+}
+
+func updateRole(obj, desired *rbacv1.Role) *rbacv1.Role {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	rules := make([]rbacv1.PolicyRule, 0)
+	for _, rule := range desired.Rules {
+		rules = append(rules, *rule.DeepCopy())
+	}
+	obj.Rules = rules
+	return obj
+}
+
+func updateRoleBinding(obj, desired *rbacv1.RoleBinding) *rbacv1.RoleBinding {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Subjects = desired.Subjects
+	obj.RoleRef = desired.RoleRef
+	return obj
+}
+
+func updateService(obj, desired *corev1.Service) *corev1.Service {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateIngress(obj, desired *networkingv1.Ingress) *networkingv1.Ingress {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateHPA(obj, desired *autoscalingv2.HorizontalPodAutoscaler) *autoscalingv2.HorizontalPodAutoscaler {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateServiceMonitor(obj, desired *monitoringv1.ServiceMonitor) *monitoringv1.ServiceMonitor {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateDeployment(obj, desired *appsv1.Deployment) *appsv1.Deployment {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateStatefulSet(obj, desired *appsv1.StatefulSet) *appsv1.StatefulSet {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
 }

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -751,7 +752,7 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 			return fmt.Errorf("failed to get selected profiles: %w", err)
 		}
 
-		if len(selectedProfiles) > 0 && !utils.ContainsElement(selectedProfiles, AllProfiles) {
+		if len(selectedProfiles) > 0 && !slices.Contains(selectedProfiles, AllProfiles) {
 			nimManifest, err := r.extractNIMManifest(ctx, getManifestConfigName(nimCache), nimCache.GetNamespace())
 			if err != nil {
 				return fmt.Errorf("failed to get model manifest config file: %w", err)
@@ -1180,7 +1181,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 
 		if len(selectedProfiles) > 0 {
-			if utils.ContainsElement(selectedProfiles, AllProfiles) {
+			if slices.Contains(selectedProfiles, AllProfiles) {
 				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, "--all")
 			} else {
 				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, "--profiles")

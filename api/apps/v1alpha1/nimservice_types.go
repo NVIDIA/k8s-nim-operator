@@ -210,7 +210,8 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 // GetStandardAnnotations returns default annotations to apply to the NIMService instance
 func (n *NIMService) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc": "nonroot",
+		"openshift.io/scc":                      "nonroot",
+		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
 }
@@ -551,6 +552,8 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetNIMServiceAnnotations()
+	params.PodAnnotations = n.GetNIMServiceAnnotations()
+	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {
