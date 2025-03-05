@@ -1132,7 +1132,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			{
 				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.NGC.ModelPuller,
-				Args:    []string{"download-to-cache"},
+				Command: []string{"download-to-cache"},
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
 				Env: []corev1.EnvVar{
 					{
