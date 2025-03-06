@@ -355,13 +355,22 @@ func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimServ
 			}
 			for _, path := range rule.HTTP.Paths {
 				if path.Backend.Service != nil && path.Backend.Service.Name == nimService.GetName() {
-					externalEndpoint = rule.Host
-					found = true
-					break
+					if rule.Host != "" {
+						externalEndpoint = rule.Host
+						found = true
+						break
+					}
 				}
 			}
 			if found {
 				break
+			}
+		}
+		if !found && len(ingress.Status.LoadBalancer.Ingress) > 0 {
+			ing := ingress.Status.LoadBalancer.Ingress[0]
+			externalEndpoint = ing.IP
+			if ing.Hostname != "" {
+				externalEndpoint = ing.Hostname
 			}
 		}
 	} else if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {

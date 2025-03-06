@@ -871,6 +871,113 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 	})
 
+	Describe("getNIMModelEndpoints", func() {
+		var (
+			svc     *corev1.Service
+			ingress *networkingv1.Ingress
+		)
+		BeforeEach(func() {
+			svc = &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					Type:           corev1.ServiceTypeLoadBalancer,
+					ClusterIP:      "127.0.0.1",
+					LoadBalancerIP: "10.1.1.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8123,
+							Name: "service-port",
+						},
+					},
+				},
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{{IP: "10.1.1.1"}},
+					},
+				},
+			}
+			_ = client.Create(context.TODO(), svc)
+			ingress = &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: nimService.GetIngressSpec(),
+				Status: networkingv1.IngressStatus{
+					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+						Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "10.1.1.2", Hostname: ""}},
+					},
+				},
+			}
+			_ = client.Create(context.TODO(), ingress)
+		})
+
+		AfterEach(func() {
+			_ = client.Delete(context.TODO(), svc)
+			_ = client.Delete(context.TODO(), ingress)
+		})
+
+		It("should return err when service is missing", func() {
+			_ = client.Delete(context.TODO(), svc)
+			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+			Expect(err).Should(MatchError("services \"test-nimservice\" not found"))
+		})
+
+		It("should return err when ingress is missing", func() {
+			_ = client.Delete(context.TODO(), ingress)
+			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+			Expect(err).Should(MatchError("ingresses.networking.k8s.io \"test-nimservice\" not found"))
+		})
+
+		It("should return only svc endpoints when ingress is disabled", func() {
+			nimService.Spec.Expose.Ingress.Enabled = ptr.To(false)
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(internal).To(Equal("127.0.0.1:8123"))
+			Expect(external).To(Equal("10.1.1.1:8123"))
+		})
+
+		It("should return hostname from ingress rules as external endpoint", func() {
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(internal).To(Equal("127.0.0.1:8123"))
+			Expect(external).To(Equal("test-nimservice.default.example.com"))
+		})
+
+		It("should return ingress loadbalancer ip as external endpoint", func() {
+			nimService.Spec.Expose.Ingress.Spec.Rules[0].Host = ""
+			ingress.Spec.Rules[0].Host = ""
+			_ = client.Update(context.TODO(), ingress)
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(internal).To(Equal("127.0.0.1:8123"))
+			Expect(external).To(Equal("10.1.1.2"))
+		})
+
+		It("should return ingress loadbalancer hostname as external endpoint", func() {
+			nimService.Spec.Expose.Ingress.Spec.Rules[0].Host = ""
+			ingress.Spec.Rules[0].Host = ""
+			_ = client.Update(context.TODO(), ingress)
+			ingress.Status = networkingv1.IngressStatus{
+				LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+					Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "", Hostname: "test-nimservice.default.example.com"}},
+				},
+			}
+			_ = client.Status().Update(context.TODO(), ingress)
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(internal).To(Equal("127.0.0.1:8123"))
+			Expect(external).To(Equal("test-nimservice.default.example.com"))
+		})
+	})
+
 	Describe("getNIMCacheProfile", func() {
 		It("should return nil when NIMCache is not used", func() {
 			nimService.Spec.Storage.NIMCache.Name = ""
