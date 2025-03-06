@@ -46,7 +46,7 @@ type ModelsV1Info struct {
 }
 type ModelsV1List struct {
 	Object ObjectType     `json:"object"`
-	Data   []ModelsV1Info `json:"data,omitempty"`
+	Data   []ModelsV1Info `json:"data"`
 }
 
 func getModelsV1URL(nimServiceEndpoint string) string {
@@ -78,6 +78,7 @@ func ListModelsV1(ctx context.Context, nimServiceEndpoint string) (*ModelsV1List
 		logger.Error(err, "Failed to read models api response", "url", modelsURL)
 		return nil, err
 	}
+	logger.V(2).Info("DEBUG: /v1/models API response", "data", string(modelsData))
 
 	var modelsList ModelsV1List
 	err = json.Unmarshal(modelsData, &modelsList)

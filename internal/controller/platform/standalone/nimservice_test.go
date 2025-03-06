@@ -754,7 +754,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		It("should fail when models response is unmarshallable", func() {
 			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				_, err := w.Write([]byte(`{"value": "invalid response"}`))
+				_, err := w.Write([]byte(`{"data": "invalid response"}`))
 				Expect(err).ToNot(HaveOccurred())
 			})
 			svc := &corev1.Service{
@@ -779,7 +779,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(nimService.Status.Model).To(BeNil())
 		})
 
-		It("should fail when model name cannot be inferred", func() {
+		It("should have empty model name when it cannot be inferred", func() {
 			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				// Set dummy object type for model.
@@ -804,9 +804,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			}
 			_ = client.Create(context.TODO(), svc)
 			err := reconciler.updateModelStatus(context.Background(), nimService)
-			Expect(err).To(HaveOccurred())
-			Expect(err).To(MatchError("failed to detect model name from nimservice endpoint '127.0.0.1:8123'"))
-			Expect(nimService.Status.Model).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(nimService.Status.Model).ToNot(BeNil())
+			Expect(nimService.Status.Model.Name).ToNot(BeEmpty())
 		})
 
 		It("should set model status on NIMService", func() {
