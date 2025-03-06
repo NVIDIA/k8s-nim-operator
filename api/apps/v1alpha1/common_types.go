@@ -34,9 +34,13 @@ type Service struct {
 	Type corev1.ServiceType `json:"type,omitempty"`
 	// override the default service name
 	Name string `json:"name,omitempty"`
+	// Deprecated: Use Ports instead.
+	// +kubebuilder:deprecatedversion
 	// +kubebuilder:default=8000
-	Port        int32             `json:"port"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+	Port int32 `json:"port,omitempty"`
+	// Defines multiple ports for the service
+	Ports       []corev1.ServicePort `json:"ports,omitempty"`
+	Annotations map[string]string    `json:"annotations,omitempty"`
 }
 
 // Metrics defines attributes to setup metrics collection
@@ -71,9 +75,9 @@ type HorizontalPodAutoscalerSpec struct {
 
 // Image defines image attributes
 type Image struct {
-	Repository  string   `json:"repository,omitempty"`
+	Repository  string   `json:"repository"`
 	PullPolicy  string   `json:"pullPolicy,omitempty"`
-	Tag         string   `json:"tag,omitempty"`
+	Tag         string   `json:"tag"`
 	PullSecrets []string `json:"pullSecrets,omitempty"`
 }
 

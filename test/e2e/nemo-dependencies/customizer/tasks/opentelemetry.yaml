@@ -1,0 +1,23 @@
+---
+- name: Add Helm repository for OpenTelemetry
+  ansible.builtin.command:
+    cmd: helm repo add {{ opentelemetry.helm_repo_name }} {{ opentelemetry.helm_repo_url }}
+
+- name: Update Helm repositories
+  ansible.builtin.command:
+    cmd: helm repo update
+
+- name: Template values file
+  ansible.builtin.template:
+    src: opentelemetry-values.yaml.j2
+    dest: customizer-opentelemetry-values.yaml
+
+- name: Install OpenTelemetry Helm chart
+  shell: >
+    helm upgrade --install customizer-otel
+    {{ opentelemetry.chart_name }}
+    --namespace {{ namespace }}
+    --version {{ opentelemetry.chart_version }}
+    --values customizer-opentelemetry-values.yaml
+  register: helm_install_result
+  changed_when: "'STATUS: deployed' in helm_install_result.stdout"

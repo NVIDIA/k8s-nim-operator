@@ -111,7 +111,7 @@ func (s *Standalone) Sync(ctx context.Context, r shared.Reconciler, resource cli
 	if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
 		reconciler := NewNIMServiceReconciler(r)
 		reconciler.renderer = render.NewRenderer(ManifestsDir)
-		logger.Info("Reconciling NIMService instance")
+		logger.Info("Reconciling NIMService instance", "nimservice", nimService.GetName())
 		result, err := reconciler.reconcileNIMService(ctx, nimService)
 		if err != nil {
 			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, "ReconcileFailed",

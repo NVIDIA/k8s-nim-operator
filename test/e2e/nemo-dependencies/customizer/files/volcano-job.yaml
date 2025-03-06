@@ -1,0 +1,22 @@
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: volcano-test-job
+spec:
+  minAvailable: 1
+  schedulerName: volcano
+  policies:
+    - event: PodEvicted
+      action: RestartJob
+  maxRetry: 5
+  queue: default
+  tasks:
+    - replicas: 1
+      name: busybox
+      template:
+        spec:
+          containers:
+            - name: busybox
+              image: busybox:latest
+              command: ["sh", "-c", "echo Hello Volcano! && sleep 10"]
+          restartPolicy: Never

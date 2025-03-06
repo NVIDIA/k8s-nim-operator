@@ -1,0 +1,17 @@
+---
+- name: Install common Helm chart
+  hosts: localhost
+  tasks:
+    - name: Add Bitnami Helm repository
+      ansible.builtin.command:
+        cmd: helm repo add bitnami oci://registry-1.docker.io/bitnamicharts
+      register: helm_repo_add
+
+    - name: Update Helm repositories
+      ansible.builtin.command:
+        cmd: helm repo update
+      when: helm_repo_add.changed
+
+    - name: Install common Helm chart
+      ansible.builtin.command:
+        cmd: helm upgrade --install my-common-chart bitnami/common

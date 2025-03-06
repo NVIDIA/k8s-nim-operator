@@ -27,12 +27,11 @@ import (
 
 // ConstructPVC constructs a PVC from the custom spec from the user
 func ConstructPVC(pvc appsv1alpha1.PersistentVolumeClaim, pvcMeta metav1.ObjectMeta) (*corev1.PersistentVolumeClaim, error) {
-	storageClassName := pvc.StorageClass
 	size, err := resource.ParseQuantity(pvc.Size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse size for pvc creation %s, err %v", pvcMeta.Name, err)
 	}
-	return &corev1.PersistentVolumeClaim{
+	claim := &corev1.PersistentVolumeClaim{
 		ObjectMeta: pvcMeta,
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{pvc.VolumeAccessMode},
@@ -41,7 +40,12 @@ func ConstructPVC(pvc appsv1alpha1.PersistentVolumeClaim, pvcMeta metav1.ObjectM
 					corev1.ResourceStorage: size,
 				},
 			},
-			StorageClassName: &storageClassName,
 		},
-	}, nil
+	}
+
+	if pvc.StorageClass != "" {
+		claim.Spec.StorageClassName = &pvc.StorageClass
+	}
+
+	return claim, nil
 }

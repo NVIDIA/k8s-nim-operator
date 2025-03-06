@@ -188,6 +188,28 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = controller.NewNemoEvaluatorReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		updater,
+		render.NewRenderer("/manifests"),
+		ctrl.Log.WithName("controllers").WithName("NemoEvaluator"),
+	).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NemoEvaluator")
+		os.Exit(1)
+	}
+
+	if err = controller.NewNemoEntitystoreReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		updater,
+		render.NewRenderer("/manifests"),
+		ctrl.Log.WithName("controllers").WithName("NemoEntitystore"),
+	).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NemoEntitystore")
+		os.Exit(1)
+	}
+
 	if err = controller.NewNemoDatastoreReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
@@ -196,6 +218,17 @@ func main() {
 		ctrl.Log.WithName("controllers").WithName("NemoDatastore"),
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NemoDatastore")
+		os.Exit(1)
+	}
+
+	if err = controller.NewNemoCustomizerReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		updater,
+		render.NewRenderer("/manifests"),
+		ctrl.Log.WithName("controllers").WithName("NemoCustomizer"),
+	).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NemoCustomizer")
 		os.Exit(1)
 	}
 

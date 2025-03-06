@@ -39,8 +39,20 @@ func (c *FakeAppsV1alpha1) NIMServices(namespace string) v1alpha1.NIMServiceInte
 	return &FakeNIMServices{c, namespace}
 }
 
+func (c *FakeAppsV1alpha1) NemoCustomizers(namespace string) v1alpha1.NemoCustomizerInterface {
+	return &FakeNemoCustomizers{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) NemoDatastores(namespace string) v1alpha1.NemoDatastoreInterface {
 	return &FakeNemoDatastores{c, namespace}
+}
+
+func (c *FakeAppsV1alpha1) NemoEntitystores(namespace string) v1alpha1.NemoEntitystoreInterface {
+	return &FakeNemoEntitystores{c, namespace}
+}
+
+func (c *FakeAppsV1alpha1) NemoEvaluators(namespace string) v1alpha1.NemoEvaluatorInterface {
+	return &FakeNemoEvaluators{c, namespace}
 }
 
 func (c *FakeAppsV1alpha1) NemoGuardrails(namespace string) v1alpha1.NemoGuardrailInterface {

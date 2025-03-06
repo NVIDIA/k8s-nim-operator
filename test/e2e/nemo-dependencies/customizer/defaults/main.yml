@@ -1,0 +1,43 @@
+---
+# defaults file for customizer
+namespace: "customizer"
+
+# Helm chart details
+postgresql:
+  enabled: true
+  helm_release_name: customizer-pg
+  helm_oci_registry: oci://registry-1.docker.io/bitnamicharts/postgresql
+  username: ncsuser
+  password: ncspassword
+  database: ncsdb
+
+volcano:
+  helm_repo_name: volcano
+  helm_repo_url: https://volcano-sh.github.io/helm-charts
+  chart_name: volcano/volcano
+  chart_version: 1.9.0
+  enabled: false
+  validate: false
+
+opentelemetry:
+  enabled: true
+  helm_repo_name: open-telemetry
+  helm_repo_url: https://open-telemetry.github.io/opentelemetry-helm-charts
+  chart_name: open-telemetry/opentelemetry-collector
+  chart_version: 0.93.3
+
+localPathProvisioner:
+  enabled: true
+  version: v0.0.31
+
+wandb:
+  apikey: testapikey
+  encryptionkey: encryptionkey
+
+mlflow:
+  enabled: true
+  helm_oci_registry: oci://registry-1.docker.io/bitnamicharts/mlflow
+  helm_release_name: mlflow
+  postgresql_username: bn_mlflow
+  postgresql_password: bn_mlflow
+  version: 1.0.6

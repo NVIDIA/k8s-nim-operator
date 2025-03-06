@@ -63,42 +63,62 @@ spec:
                 items:
                   type: string
                 type: array
-              dataStoreParams:
+              databaseConfig:
+                description: DatabaseConfig contains external PostgreSQL configuration
                 properties:
-                  appVersion:
+                  credentials:
+                    description: |-
+                      DatabaseCredentials stores the configuration to retrieve the database credentials.
+                      Required, must not be nil.
+                    properties:
+                      passwordKey:
+                        default: password
+                        description: |-
+                          PasswordKey is the name of the key in the `CredentialsSecret` secret for the database credentials.
+                          Defaults to "password".
+                        type: string
+                      secretName:
+                        description: |-
+                          SecretName is the name of the secret which has the database credentials for a NEMO service user.
+                          Required, must not be empty.
+                        minLength: 1
+                        type: string
+                      user:
+                        description: |-
+                          User is the non-root username for a NEMO Service in the database.
+                          Required, must not be empty.
+                        minLength: 1
+                        type: string
+                    required:
+                    - secretName
+                    - user
+                    type: object
+                  databaseName:
+                    description: |-
+                      DatabaseName is the database name for a NEMO Service.
+                      Required, must not be empty.
+                    minLength: 1
                     type: string
-                  databaseHost:
+                  host:
+                    description: |-
+                      Host is the hostname of the database.
+                      Required, must not be empty.
+                    minLength: 1
                     type: string
-                  databasePort:
-                    type: string
-                  databaseURL:
-                    type: string
-                  dbSecret:
-                    type: string
-                  envConfigmap:
-                    type: string
-                  envSecret:
-                    type: string
-                  giteaEndpoint:
-                    type: string
-                  giteaSecret:
-                    type: string
-                  initContainerCommand:
-                    items:
-                      type: string
-                    type: array
-                  initContainerImage:
-                    type: string
+                  port:
+                    default: 5432
+                    description: |-
+                      Port is the port where the database is reachable at.
+                      If specified, this must be a valid port number, 0 < databasePort < 65536.
+                      Defaults to 5432.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
                 required:
-                - appVersion
-                - databaseHost
-                - databasePort
-                - databaseURL
-                - dbSecret
-                - envConfigmap
-                - envSecret
-                - giteaEndpoint
-                - giteaSecret
+                - credentials
+                - databaseName
+                - host
                 type: object
               env:
                 items:
@@ -515,14 +535,86 @@ spec:
                         type: string
                       port:
                         default: 8000
+                        description: 'Deprecated: Use Ports instead.'
                         format: int32
                         type: integer
+                      ports:
+                        description: Defines multiple ports for the service
+                        items:
+                          description: ServicePort contains information on service's
+                            port.
+                          properties:
+                            appProtocol:
+                              description: |-
+                                The application protocol for this port.
+                                This is used as a hint for implementations to offer richer behavior for protocols that they understand.
+                                This field follows standard Kubernetes label syntax.
+                                Valid values are either:
+
+                                * Un-prefixed protocol names - reserved for IANA standard service names (as per
+                                RFC-6335 and https://www.iana.org/assignments/service-names).
+
+                                * Kubernetes-defined prefixed names:
+                                  * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
+                                  * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
+                                  * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
+
+                                * Other protocols should use implementation-defined prefixed names such as
+                                mycompany.com/my-custom-protocol.
+                              type: string
+                            name:
+                              description: |-
+                                The name of this port within the service. This must be a DNS_LABEL.
+                                All ports within a ServiceSpec must have unique names. When considering
+                                the endpoints for a Service, this must match the 'name' field in the
+                                EndpointPort.
+                                Optional if only one ServicePort is defined on this service.
+                              type: string
+                            nodePort:
+                              description: |-
+                                The port on each node on which this service is exposed when type is
+                                NodePort or LoadBalancer.  Usually assigned by the system. If a value is
+                                specified, in-range, and not in use it will be used, otherwise the
+                                operation will fail.  If not specified, a port will be allocated if this
+                                Service requires one.  If this field is specified when creating a
+                                Service which does not need it, creation will fail. This field will be
+                                wiped when updating a Service to no longer need it (e.g. changing type
+                                from NodePort to ClusterIP).
+                                More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+                              format: int32
+                              type: integer
+                            port:
+                              description: The port that will be exposed by this service.
+                              format: int32
+                              type: integer
+                            protocol:
+                              default: TCP
+                              description: |-
+                                The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
+                                Default is TCP.
+                              type: string
+                            targetPort:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Number or name of the port to access on the pods targeted by the service.
+                                Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
+                                If this is a string, it will be looked up as a named port in the
+                                target Pod's container ports. If this is not specified, the value
+                                of the 'port' field is used (an identity map).
+                                This field is ignored for services with clusterIP=None, and should be
+                                omitted or set equal to the 'port' field.
+                                More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+                              x-kubernetes-int-or-string: true
+                          required:
+                          - port
+                          type: object
+                        type: array
                       type:
                         description: Service Type string describes ingress methods
                           for a service
                         type: string
-                    required:
-                    - port
                     type: object
                 type: object
               groupID:
@@ -541,6 +633,9 @@ spec:
                     type: string
                   tag:
                     type: string
+                required:
+                - repository
+                - tag
                 type: object
               labels:
                 additionalProperties:
@@ -743,6 +838,54 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
+                type: object
+              objectStoreConfig:
+                description: ObjectStore specifies the location and credentials for
+                  accessing the external Object Storage
+                properties:
+                  bucketName:
+                    description: BucketName is the bucket where LFS files will be
+                      stored
+                    type: string
+                  credentials:
+                    description: ObjectStoreCredentials stores the configuration to
+                      retrieve the object store credentials
+                    properties:
+                      passwordKey:
+                        description: PasswordKey is the name of the key in the `CredentialsSecret`
+                          secret for the object store credentials.
+                        type: string
+                      secretName:
+                        description: SecretName is the name of the secret which has
+                          the object credentials for a NEMO service user.
+                        type: string
+                      user:
+                        description: User is the non-root username for a NEMO Service
+                          in the object store.
+                        type: string
+                    required:
+                    - passwordKey
+                    - secretName
+                    - user
+                    type: object
+                  endpoint:
+                    description: endpoint is the fully qualidfied object store endpoint
+                    type: string
+                  region:
+                    description: Region is the region where bucket is hosted
+                    type: string
+                  serveDirect:
+                    default: true
+                    type: boolean
+                  ssl:
+                    description: SSL enable ssl for object store transport
+                    type: boolean
+                required:
+                - bucketName
+                - credentials
+                - endpoint
+                - region
+                - ssl
                 type: object
               podAffinity:
                 description: Pod affinity is a group of inter pod affinity scheduling
@@ -1099,6 +1242,29 @@ spec:
                       type: object
                     type: array
                     x-kubernetes-list-type: atomic
+                type: object
+              pvc:
+                description: PVC defines the PersistentVolumeClaim for the datastore
+                properties:
+                  create:
+                    description: Create indicates to create a new PVC
+                    type: boolean
+                  name:
+                    description: Name is the name of the PVC
+                    type: string
+                  size:
+                    description: Size of the NIM cache in Gi, used during PVC creation
+                    type: string
+                  storageClass:
+                    description: StorageClass to be used for PVC creation. Leave it
+                      as empty if the PVC is already created.
+                    type: string
+                  subPath:
+                    type: string
+                  volumeAccessMode:
+                    description: VolumeAccessMode is the volume access mode of the
+                      PVC
+                    type: string
                 type: object
               readinessProbe:
                 description: Probe defines attributes for startup/liveness/readiness
@@ -1932,6 +2098,27 @@ spec:
                     - maxReplicas
                     type: object
                 type: object
+              secrets:
+                description: Secrets contains the pre-requisite secrets that must
+                  be created before deploying the datastore CR
+                properties:
+                  datastoreConfigSecret:
+                    type: string
+                  datastoreInitSecret:
+                    type: string
+                  datastoreInlineConfigSecret:
+                    type: string
+                  giteaAdminSecret:
+                    type: string
+                  lfsJwtSecret:
+                    type: string
+                required:
+                - datastoreConfigSecret
+                - datastoreInitSecret
+                - datastoreInlineConfigSecret
+                - giteaAdminSecret
+                - lfsJwtSecret
+                type: object
               startupProbe:
                 description: Probe defines attributes for startup/liveness/readiness
                   probes
@@ -2136,7 +2323,11 @@ spec:
                 type: integer
             required:
             - authSecret
-            - dataStoreParams
+            - databaseConfig
+            - expose
+            - image
+            - objectStoreConfig
+            - secrets
             type: object
           status:
             description: NemoDatastoreStatus defines the observed state of NemoDatastore

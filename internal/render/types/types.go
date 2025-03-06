@@ -81,6 +81,7 @@ type DeploymentParams struct {
 	GroupID            *int64
 	RuntimeClassName   string
 	OrchestratorType   string
+	Ports              []corev1.ContainerPort
 }
 
 // StatefulSetParams holds the parameters for rendering a StatefulSet template
@@ -116,12 +117,14 @@ type StatefulSetParams struct {
 
 // ServiceParams holds the parameters for rendering a Service template
 type ServiceParams struct {
-	Name           string
-	Namespace      string
-	Port           int32
-	TargetPort     int32
-	PortName       string
-	Protocol       string
+	Name       string
+	Namespace  string
+	Port       int32
+	TargetPort int32
+	PortName   string
+	Protocol   string
+	// Defines multiple ports for the service
+	Ports          []corev1.ServicePort
 	Type           string
 	Labels         map[string]string
 	Annotations    map[string]string
@@ -203,4 +206,24 @@ type ServiceMonitorParams struct {
 	Interval      int32
 	ScrapeTimeout int32
 	SMSpec        monitoringv1.ServiceMonitorSpec
+}
+
+// ConfigMapParams holds the parameters for rendering a ConfigMap template
+type ConfigMapParams struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	// Key-value pairs representing filenames and their content
+	ConfigMapData map[string]string
+}
+
+// SecretParams holds the parameters for rendering a Secret template
+type SecretParams struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	// Key-value pairs representing filenames and their content
+	SecretMapData map[string]string
 }

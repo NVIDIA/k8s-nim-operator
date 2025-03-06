@@ -26,7 +26,6 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -35,12 +34,12 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -50,7 +49,7 @@ import (
 )
 
 // NemoDatastoreFinalizer is the finalizer annotation
-const NemoDatastoreFinalizer = "finalizer.NemoDatastore.apps.nvidia.com"
+const NemoDatastoreFinalizer = "finalizer.nemodatastore.apps.nvidia.com"
 
 // NemoDatastoreReconciler reconciles a NemoDatastore object
 type NemoDatastoreReconciler struct {
@@ -93,7 +92,7 @@ func NewNemoDatastoreReconciler(client client.Client, scheme *runtime.Scheme, up
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalars,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -255,14 +254,14 @@ func (r *NemoDatastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *NemoDatastoreReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
-	// List all nodes
+	// List all datastore instances
 	NemoDatastoreList := &appsv1alpha1.NemoDatastoreList{}
 	err := r.Client.List(ctx, NemoDatastoreList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list NemoDatastores in the cluster")
 		return
 	}
-	//refreshNemoDatastoreMetrics(NemoDatastoreList)
+	refreshNemoDatastoreMetrics(NemoDatastoreList)
 }
 
 func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore) (ctrl.Result, error) {
@@ -274,6 +273,13 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 				"NemoDatastore %s failed, msg: %s", nemoDatastore.Name, err.Error())
 		}
 	}()
+
+	err = r.reconcilePVC(ctx, nemoDatastore)
+	if err != nil {
+		logger.Error(err, "reconciliation of pvc failed", "pvc", nemoDatastore.GetPVCName())
+		return ctrl.Result{}, err
+	}
+
 	// Generate annotation for the current operator-version and apply to all resources
 	// Get generic name for all resources
 	namespacedName := types.NamespacedName{Name: nemoDatastore.GetName(), Namespace: nemoDatastore.GetNamespace()}
@@ -321,7 +327,7 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 			return ctrl.Result{}, err
 		}
 	} else {
-		err = r.cleanupResource(ctx, &networkingv1.Ingress{}, namespacedName)
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
 		if err != nil && !errors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
@@ -337,7 +343,7 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 		}
 	} else {
 		// If autoscaling is disabled, ensure the HPA is deleted
-		err = r.cleanupResource(ctx, &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -371,9 +377,12 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 		if len(initContainers) > 0 {
 			result.Spec.Template.Spec.InitContainers = initContainers
 		}
-		envFrom := nemoDatastore.GetEnvFrom()
-		if len(envFrom) > 0 {
-			result.Spec.Template.Spec.Containers[0].EnvFrom = envFrom
+		fsGroup := ptr.To[int64](1000)
+		if nemoDatastore.Spec.GroupID != nil {
+			fsGroup = nemoDatastore.Spec.GroupID
+		}
+		result.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{
+			FSGroup: fsGroup,
 		}
 		return result, nil
 	}, "deployment", conditions.ReasonDeploymentFailed)
@@ -382,19 +391,19 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 	}
 
 	// Wait for deployment
-	msg, ready, err := r.isDeploymentReady(ctx, &namespacedName)
+	msg, ready, err := k8sutil.IsDeploymentReady(ctx, r.GetClient(), &namespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	if !ready {
 		// Update status as NotReady
-		err = r.SetConditionsNotReady(ctx, nemoDatastore, conditions.NotReady, msg)
+		err = r.updater.SetConditionsNotReady(ctx, nemoDatastore, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(nemoDatastore, corev1.EventTypeNormal, conditions.NotReady,
 			"NemoDatastore %s not ready yet, msg: %s", nemoDatastore.Name, msg)
 	} else {
 		// Update status as ready
-		err = r.SetConditionsReady(ctx, nemoDatastore, conditions.Ready, msg)
+		err = r.updater.SetConditionsReady(ctx, nemoDatastore, conditions.Ready, msg)
 		r.GetEventRecorder().Eventf(nemoDatastore, corev1.EventTypeNormal, conditions.Ready,
 			"NemoDatastore %s ready, msg: %s", nemoDatastore.Name, msg)
 	}
@@ -405,6 +414,41 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NemoDatastoreReconciler) reconcilePVC(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore) error {
+	logger := r.GetLogger()
+	pvcName := nemoDatastore.GetPVCName()
+	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nemoDatastore.GetNamespace()}
+	pvc := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, pvcNamespacedName, pvc)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	// If PVC does not exist, create a new one if creation flag is enabled
+	if err != nil {
+		if nemoDatastore.ShouldCreatePersistentStorage() {
+			pvc, err = shared.ConstructPVC(*nemoDatastore.Spec.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoDatastore.GetNamespace()})
+			if err != nil {
+				logger.Error(err, "Failed to construct pvc", "name", pvcName)
+				return err
+			}
+			if err := controllerutil.SetControllerReference(nemoDatastore, pvc, r.GetScheme()); err != nil {
+				return err
+			}
+			err = r.Create(ctx, pvc)
+			if err != nil {
+				logger.Error(err, "Failed to create pvc", "name", pvcName)
+				return err
+			}
+			logger.Info("Created PVC for NeMo Datastore", "pvc", pvc.Name)
+		} else {
+			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, NemoDatastore client.Object, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
@@ -448,167 +492,13 @@ func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, Nem
 		return err
 	}
 
-	err = r.syncResource(ctx, obj, resource, namespacedName)
+	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource, namespacedName)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, NemoDatastore, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoDatastore", NemoDatastore.GetName())
 		}
-		return err
-	}
-	return nil
-}
-
-// CheckDeploymentReadiness checks if the Deployment is ready
-func (r *NemoDatastoreReconciler) isDeploymentReady(ctx context.Context, namespacedName *types.NamespacedName) (string, bool, error) {
-	deployment := &appsv1.Deployment{}
-	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, deployment)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return "", false, nil
-		}
-		return "", false, err
-	}
-
-	cond := getDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
-	if cond != nil && cond.Reason == "ProgressDeadlineExceeded" {
-		return fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name), false, nil
-	}
-	if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil
-	}
-	if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\n", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil
-	}
-	if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
-	}
-	return fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name), true, nil
-}
-
-func (r *NemoDatastoreReconciler) syncResource(ctx context.Context, obj client.Object, desired client.Object, namespacedName types.NamespacedName) error {
-	logger := log.FromContext(ctx)
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if !utils.IsSpecChanged(obj, desired) {
-		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
-		return nil
-	}
-	logger.V(2).Info("Object spec has changed, updating")
-
-	if errors.IsNotFound(err) {
-		err = r.Create(ctx, desired)
-		if err != nil {
-			return err
-		}
-	} else {
-		err = r.Update(ctx, desired)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// cleanupResource deletes the given Kubernetes resource if it exists.
-// If the resource does not exist or an error occurs during deletion, the function returns nil or the error.
-//
-// Parameters:
-// ctx (context.Context): The context for the operation.
-// obj (client.Object): The Kubernetes resource to delete.
-// namespacedName (types.NamespacedName): The namespaced name of the resource.
-//
-// Returns:
-// error: An error if the resource deletion fails, or nil if the resource is not found or deletion is successful.
-func (r *NemoDatastoreReconciler) cleanupResource(ctx context.Context, obj client.Object, namespacedName types.NamespacedName) error {
-
-	logger := log.FromContext(ctx)
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if errors.IsNotFound(err) {
-		return nil
-	}
-
-	err = r.Delete(ctx, obj)
-	if err != nil {
-		return err
-	}
-	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
-	return nil
-}
-
-func (r *NemoDatastoreReconciler) SetConditionsReady(ctx context.Context, cr *appsv1alpha1.NemoDatastore, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Failed,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Ready,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoDatastoreStatusReady
-	return r.updateNemoDatastoreStatus(ctx, cr)
-}
-
-func (r *NemoDatastoreReconciler) SetConditionsNotReady(ctx context.Context, cr *appsv1alpha1.NemoDatastore, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Ready,
-		Status:  metav1.ConditionFalse,
-		Reason:  reason,
-		Message: message,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionFalse,
-		Reason:  conditions.Ready,
-		Message: message,
-	})
-
-	cr.Status.State = appsv1alpha1.NemoDatastoreStatusNotReady
-	return r.updateNemoDatastoreStatus(ctx, cr)
-}
-
-func (r *NemoDatastoreReconciler) SetConditionsFailed(ctx context.Context, cr *appsv1alpha1.NemoDatastore, reason, message string) error {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:   conditions.Ready,
-		Status: metav1.ConditionFalse,
-		Reason: conditions.Failed,
-	})
-
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:    conditions.Failed,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
-	})
-	cr.Status.State = appsv1alpha1.NemoDatastoreStatusFailed
-	return r.updateNemoDatastoreStatus(ctx, cr)
-}
-
-func (r *NemoDatastoreReconciler) updateNemoDatastoreStatus(ctx context.Context, cr *appsv1alpha1.NemoDatastore) error {
-
-	obj := &appsv1alpha1.NemoDatastore{}
-	errGet := r.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := r.Status().Update(ctx, obj); err != nil {
 		return err
 	}
 	return nil

@@ -1,0 +1,490 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NemoCustomizer
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-nim-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: nemocustomizer-sample
+  namespace: nemo
+spec:
+  wandbSecret:
+    name: wandb-secret
+    apiKeyKey: encryption_key
+  otel:
+    exporterOtlpEndpoint: http://<otel-collector-service>:4317
+  databaseConfig:
+    credentials:
+      user: ncsuser
+      secretName: ncs-pg-existing-secret
+      passwordKey: password
+    host: customizer-pg
+    port: 5432
+    databaseName: ncsdb
+  expose:
+    service:
+      type: ClusterIP
+      ports:
+        - name: api
+          port: 8000
+          protocol: TCP
+        - name: internal
+          port: 9009
+          protocol: TCP
+  image:
+    repository: "nvcr.io/nvidian/nemo-llm/customizer"
+    tag: "25.03-rc11"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  customizerConfig: |
+    namespace: nemo
+    entity_store_url: http://nemoentitystore-sample.nemo.svc.cluster.local:8000
+    nemo_data_store_url: http://nemodatastore-sample.nemo.svc.cluster.local:3000
+    mlflow_tracking_url: http://mlflow-tracking.nemo.svc.cluster.local:80
+
+    training:
+      queue: "default"
+      image: "nvcr.io/nvidian/nemo-llm/customizer-api:25.03-rc11"
+      imagePullSecrets:
+        - name: ngc-secret
+      pvc:
+        storageClass: ""
+        size: 5Gi
+        volumeAccessMode: ReadWriteOnce
+      env:
+        - name: LOG_LEVEL
+          value: INFO
+
+      workspace_dir: /pvc/workspace
+      # volumes reference pre-existing PVCs
+      volumes:
+        # Model cache PVC
+        - name: models
+          persistentVolumeClaim:
+            claimName: finetuning-ms-models-pvc
+            readOnly: True
+        - name: dshm
+          emptyDir:
+            medium: Memory
+      volumeMounts:
+        - name: models
+          mountPath: "/mount/models"
+          readOnly: True
+        - name: dshm
+          mountPath: "/dev/shm"
+
+      # Network configuration for multi node training specific to CSP
+      training_networking:
+        - name: "NCCL_IB_SL"
+          value: 0
+        - name: "NCCL_IB_TC"
+          value: 41
+        - name: "NCCL_IB_QPS_PER_CONNECTION"
+          value: 4
+        - name: "UCX_TLS"
+          value: TCP
+        - name: "UCX_NET_DEVICES"
+          value: eth0
+        - name: "HCOLL_ENABLE_MCAST_ALL"
+          value: 0
+        - name: "NCCL_IB_GID_INDEX"
+          value: 3
+
+      tolerations:
+          []
+
+      container_defaults:
+          imagePullPolicy: IfNotPresent
+
+    model_download_jobs:
+      image: "nvcr.io/nvidian/nemo-llm/customizer-api:25.03-rc11"
+      imagePullPolicy: "IfNotPresent"
+      imagePullSecrets:
+        - name: ngc-secret
+      ngcAPISecret: ngc-api-secret
+      ngcAPISecretKey: "NGC_API_KEY"
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      ttlSecondsAfterFinished: 600
+
+    models:
+      llama-2-7b:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/llama-2-7b:1.0
+        model_path: llama2-7b-bf16
+        training_options:
+          - training_type: sft
+            finetuning_type: p_tuning
+            num_gpus: 2
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 2
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 4
+            tensor_parallel_size: 4
+        micro_batch_size: 1
+        max_seq_length: 4096
+        num_parameters: 7000000000
+        precision: bf16
+
+      meta/llama3-8b-instruct:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/llama-3-8b-instruct-nemo:1.0
+        model_path: llama3-8b-bf16
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 2
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 8
+            tensor_parallel_size: 4
+        micro_batch_size: 2
+        max_seq_length: 4096
+        num_parameters: 8000000000
+        precision: bf16
+        # special_tokens:
+        #   begin_of_text: <|begin_of_text|>
+        #   end_of_text: <|end_of_text|>
+        #   role_start: <|start_header_id|>
+        #   role_end: <|end_header_id|>
+        #   label_start: ""
+        #   label_end: ""
+        #   turn_start: ""
+        #   turn_end: <|eot_id|>
+      meta/llama-3.2-1b-embedding:
+        enabled: true
+        model_uri: ngc://nvidian/nemo-llm/llama-3_2-1b-embedding-base:0.0.1
+        model_path: llama32_1b-embedding
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 1
+            num_nodes: 1
+            tensor_parallel_size: 1
+        micro_batch_size: 8
+        max_seq_length: 2048
+        num_parameters: 1000000000
+        precision: bf16-mixed
+
+      mistral-7b:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/mistral-7b:1.0
+        model_path: mistral-7b
+        training_options:
+          - training_type: sft
+            finetuning_type: p_tuning
+            num_gpus: 2
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 2
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 8
+            tensor_parallel_size: 4
+        micro_batch_size: 1
+        max_seq_length: 4096
+        num_parameters: 7000000000
+        precision: bf16
+
+      mistralai/mistral-7b-instruct-v0.3:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/mistral-7b-instruct-v0.3
+        model_path: mistral-7b-v0.3
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 2
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 8
+            tensor_parallel_size: 4
+        micro_batch_size: 1
+        max_seq_length: 4096
+        num_parameters: 7000000000
+        precision: bf16
+        # tokenizer:
+        #   special_tokens:
+        #     bos_token: "<s>"
+        #     eos_token: "</s>"
+        #     user_start_token: "[INST]"
+        #     user_end_token: "[/INST]"
+        #     tool_call_token: "[TOOL_CALLS]"
+        #     available_tool_start_token: "[AVAILABLE_TOOLS]"
+        #     available_tool_end_token: "[/AVAILABLE_TOOLS]"
+        #     tool_result_start_token: "[TOOL_RESULTS]"
+        #     tool_result_end_token: "[/TOOL_RESULTS]"
+        #   sentencepiece_legacy: true
+        # special_tokens:
+        #   begin_of_text: "<s>"
+        #   end_of_text: "</s>"
+        #   user_turn_start: "[INST]"
+        #   user_turn_end: "[/INST]"
+        #   system_turn_start: ""
+        #   system_turn_end: "\n\n"
+        #   turn_start: ""
+        #   turn_end: "</s>"
+        #   include_roles: false
+        #   supports_system_role: false
+
+      llama-2-13b:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/llama-2-13b:1.0
+        model_path: llama2-13b-bf16
+        training_options:
+          - training_type: sft
+            finetuning_type: p_tuning
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 4
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 4
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 8
+            num_nodes: 2
+            tensor_parallel_size: 8
+        micro_batch_size: 1
+        max_seq_length: 4096
+        num_parameters: 7000000000
+        precision: bf16
+
+      gpt-43b-002:
+        enabled: false
+        model_uri: ngc://gku9emylpays/nemomodel/gpt_43b_002:1.0
+        model_path: gpt-43b-002
+        training_options:
+          - training_type: sft
+            finetuning_type: p_tuning
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+        micro_batch_size: 1
+        max_seq_length: 4096
+        num_parameters: 43000000000
+        precision: bf16
+        sft_prompt_template: 'User: {prompt}\n\nAssistant:{completion}'
+
+      llama-2-70b:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/llama-2-70b:1.0
+        model_path: llama2-70b-bf16
+        training_options:
+          - training_type: sft
+            finetuning_type: p_tuning
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+        max_seq_length: 4096
+        num_parameters: 70000000000
+        micro_batch_size: 1
+        precision: bf16
+
+      meta/llama3-70b-instruct:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/llama-3-70b-instruct-nemo:1.0
+        model_path: llama3-70b-bf16
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+        max_seq_length: 4096
+        num_parameters: 70000000000
+        micro_batch_size: 1
+        precision: bf16
+        # special_tokens:
+        #   begin_of_text: <|begin_of_text|>
+        #   end_of_text: <|end_of_text|>
+        #   role_start: <|start_header_id|>
+        #   role_end: <|end_header_id|>
+        #   label_start: ""
+        #   label_end: ""
+        #   turn_start: ""
+        #   turn_end: <|eot_id|>
+
+      meta/llama-3_1-8b-instruct:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/llama-3_1-8b-instruct-nemo:1.0
+        model_path: llama-3_1-8b-instruct
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 4
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 8
+            num_nodes: 1
+            tensor_parallel_size: 4
+        micro_batch_size: 1
+        max_seq_length: 4096
+        num_parameters: 8000000000
+        precision: bf16
+        tokenizer_path: /home/customizer/.cache/huggingface/hub/models--meta-llama--Meta-Llama-3-8B-instruct/snapshots/c4a54320a52ed5f88b7a2f84496903ea4ff07b45
+        # special_tokens:
+        #   begin_of_text: <|begin_of_text|>
+        #   end_of_text: <|finetune_right_pad_id|>
+        #   role_start: <|start_header_id|>
+        #   role_end: <|end_header_id|>
+        #   label_start: ""
+        #   label_end: ""
+        #   turn_start: ""
+        #   turn_end: <|eot_id|>
+      # for nim release 1.2 and later
+
+      meta/llama-3.1-8b-instruct:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/llama-3_1-8b-instruct-nemo:1.0
+        model_path: llama-3_1-8b-instruct
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 4
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 8
+            num_nodes: 1
+            tensor_parallel_size: 4
+        micro_batch_size: 1
+        max_seq_length: 4096
+        num_parameters: 8000000000
+        precision: bf16
+        tokenizer_path: /home/customizer/.cache/huggingface/hub/models--meta-llama--Meta-Llama-3-8B-instruct/snapshots/c4a54320a52ed5f88b7a2f84496903ea4ff07b45
+        # special_tokens:
+        #   begin_of_text: <|begin_of_text|>
+        #   end_of_text: <|finetune_right_pad_id|>
+        #   role_start: <|start_header_id|>
+        #   role_end: <|end_header_id|>
+        #   label_start: ""
+        #   label_end: ""
+        #   turn_start: ""
+        #   turn_end: <|eot_id|>
+
+      meta/llama-3.1-70b-instruct:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/llama-3_1-70b-instruct-nemo:1.0
+        model_path: llama-3_1-70b-instruct
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+        micro_batch_size: 1
+        max_seq_length: 4096
+        num_parameters: 70000000000
+        precision: bf16
+        # special_tokens:
+        #   begin_of_text: <|begin_of_text|>
+        #   end_of_text: <|finetune_right_pad_id|>
+        #   role_start: <|start_header_id|>
+        #   role_end: <|end_header_id|>
+        #   label_start: ""
+        #   label_end: ""
+        #   turn_start: ""
+        #   turn_end: <|eot_id|>
+
+      gpt8b-4k:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/nemotron-3-8b-base-4k:1.0
+        model_path: nemotron_3_8b_base_4k
+        training_options:
+          - training_type: sft
+            finetuning_type: p_tuning
+            num_gpus: 4
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 4
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 8
+            tensor_parallel_size: 4
+        max_seq_length: 4096
+        num_parameters: 8000000000
+        precision: bf16
+        micro_batch_size: 1
+        multinode_dataset_thresholds:
+          - num_nodes: 2
+            threshold: 80000
+
+      gemma-7b:
+        enabled: false
+        model_uri: ngc://nvidia/nemo/gemma_7b_base:1.1
+        model_path: "gemma-7b"
+        training_options:
+          - training_type: sft
+            finetuning_type: p_tuning
+            num_gpus: 2
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 2
+        micro_batch_size: 4
+        max_seq_length: 8192
+        num_parameters: 7000000000
+        precision: bf16
+
+      codellama-70b:
+        enabled: false
+        model_path: "codellama_70b_bf16"
+        training_options:
+          - training_type: sft
+            finetuning_type: p_tuning
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+        micro_batch_size: 1
+        max_seq_length: 16384
+        num_parameters: 70000000000
+        precision: bf16
+
+      meta/llama3-405b-instruct:
+        enabled: false
+        max_seq_length: 2048
+        num_parameters: 405000000000
+        precision: bf16
+        micro_batch_size: 1
+        model_path: llama-3_1-405b-instruct
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 8
+            num_nodes: 3
+            tensor_parallel_size: 4
+        # pipeline_parallel_size: 6
+        # use_sequence_parallel: false
+        # special_tokens:
+        #   begin_of_text: <|begin_of_text|>
+        #   end_of_text: <|end_of_text|>
+        #   role_start: <|start_header_id|>
+        #   role_end: <|end_header_id|>
+        #   label_start: ""
+        #   label_end: ""
+        #   turn_start: ""
+        #   turn_end: <|eot_id|>
+
+    nemo_data_store_tools:
+      image: nvcr.io/nvidian/nemo-llm/nds-v2-huggingface-cli:25.03-rc11
+      imagePullSecret: ngc-secret

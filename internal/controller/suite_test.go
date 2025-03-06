@@ -1,5 +1,5 @@
 /*
-Copyright 2024.
+Copyright 2024-2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -25,6 +26,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -88,3 +92,25 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func CleanupChildEntities(ctx context.Context, c client.Client, namespacedName types.NamespacedName, gvk schema.GroupVersionKind) error {
+	// List all potential child resources
+	childList := &unstructured.UnstructuredList{}
+	childList.SetGroupVersionKind(gvk)
+	if err := c.List(ctx, childList); err != nil {
+		return err
+	}
+
+	// Delete children with matching owner references
+	for _, child := range childList.Items {
+		for _, owner := range child.GetOwnerReferences() {
+			if owner.Name == namespacedName.Name {
+				if err := c.Delete(ctx, &child); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}

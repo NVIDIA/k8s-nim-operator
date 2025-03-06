@@ -1,0 +1,15 @@
+---
+# defaults file for entity-store
+namespace: "entity-store"
+
+postgresql:
+  enabled: true
+  helm_release_name: entity-store-pg
+  helm_oci_registry: oci://registry-1.docker.io/bitnamicharts/postgresql
+  username: nesuser
+  password: nespass
+  database: nesdb
+
+localPathProvisioner:
+  enabled: true
+  version: v0.0.31

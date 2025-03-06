@@ -71,6 +71,8 @@ type Renderer interface {
 	Ingress(params *types.IngressParams) (*networkingv1.Ingress, error)
 	HPA(params *types.HPAParams) (*autoscalingv2.HorizontalPodAutoscaler, error)
 	ServiceMonitor(params *types.ServiceMonitorParams) (*monitoringv1.ServiceMonitor, error)
+	ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error)
+	Secret(params *types.SecretParams) (*corev1.Secret, error)
 }
 
 // TemplateData is used by the templating engine to render templates
@@ -368,4 +370,38 @@ func (r *textTemplateRenderer) ServiceMonitor(params *types.ServiceMonitorParams
 		return nil, fmt.Errorf("error converting unstructured object to ServiceMonitor: %w", err)
 	}
 	return serviceMonitor, nil
+}
+
+// ConfigMap renders a ConfigMap spec with given templating data
+func (r *textTemplateRenderer) ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "configmap.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	cm := &corev1.ConfigMap{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, cm)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to ConfigMap: %w", err)
+	}
+	return cm, nil
+}
+
+// Secret renders a Secret spec with given templating data
+func (r *textTemplateRenderer) Secret(params *types.SecretParams) (*corev1.Secret, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "secret.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	secret := &corev1.Secret{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, secret)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to Secret: %w", err)
+	}
+	return secret, nil
 }

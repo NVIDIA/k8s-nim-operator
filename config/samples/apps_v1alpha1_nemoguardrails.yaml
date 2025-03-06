@@ -1,0 +1,59 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NemoGuardrails
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-nim-operator
+    app.kubernetes.io/managed-by: k8s-nim-operator
+  name: nemoguardrails-sample
+spec:
+  authSecret: ngc-api-secret
+  configStore:
+    configMap: gr-config
+  env:
+    - name: NIM_ENDPOINT_URL
+      value: "http://<NIM_SERVICE_ENDPOINT>:<NIM_SERVICE_PORT>/v1"
+    - name: NIM_ENDPOINT_API_KEY
+      value: dummy
+  expose:
+    ingress:
+      spec: {}
+    service:
+      port: 7331
+      type: ClusterIP
+  image:
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+    repository: nvcr.io/nvidian/nemo-llm/nemo-guardrails-microservice
+    tag: "25.02-rc4"
+  livenessProbe:
+    enabled: true
+    probe:
+      httpGet:
+        path: /v1/health
+        port: 7331
+      initialDelaySeconds: 5
+      timeoutSeconds: 30
+  metrics:
+    serviceMonitor: {}
+  readinessProbe:
+    enabled: true
+    probe:
+      httpGet:
+        path: /v1/health
+        port: 7331
+      initialDelaySeconds: 5
+      timeoutSeconds: 30
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1"
+      ephemeral-storage: 10Gi
+  startupProbe:
+    enabled: true
+    probe:
+      httpGet:
+        path: /v1/health
+        port: 7331
+      initialDelaySeconds: 5
+      timeoutSeconds: 30

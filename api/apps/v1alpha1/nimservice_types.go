@@ -53,7 +53,7 @@ const (
 
 // NIMServiceSpec defines the desired state of NIMService
 type NIMServiceSpec struct {
-	Image   Image           `json:"image,omitempty"`
+	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
@@ -67,7 +67,7 @@ type NIMServiceSpec struct {
 	Tolerations    []corev1.Toleration          `json:"tolerations,omitempty"`
 	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
 	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Expose         Expose                       `json:"expose,omitempty"`
+	Expose         Expose                       `json:"expose"`
 	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
 	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
 	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
@@ -92,6 +92,14 @@ type NIMServiceStatus struct {
 	Conditions        []metav1.Condition `json:"conditions,omitempty"`
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
 	State             string             `json:"state,omitempty"`
+	Model             *ModelStatus       `json:"model,omitempty"`
+}
+
+// ModelStatus defines the configuration of the NIMService model.
+type ModelStatus struct {
+	Name             string `json:"name"`
+	ClusterEndpoint  string `json:"clusterEndpoint"`
+	ExternalEndpoint string `json:"externalEndpoint"`
 }
 
 // +genclient

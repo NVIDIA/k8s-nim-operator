@@ -18,10 +18,10 @@ package e2e
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -29,7 +29,7 @@ import (
 
 	helm "github.com/mittwald/go-helm-client"
 	helmValues "github.com/mittwald/go-helm-client/values"
-	corev1 "k8s.io/api/core/v1"
+	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 
@@ -38,34 +38,15 @@ import (
 	"github.com/NVIDIA/k8s-test-infra/pkg/diagnostics"
 )
 
+// Regex patterns for string substitution in CRs.
+const (
+	namespacePattern = "{TEST_NAMESPACE}"
+	esRepoPattern    = "{NEMO_ENTITYSTORE_REPO}"
+	esVersionPattern = "{NEMO_ENTITYSTORE_VERSION}"
+)
+
 // Actual test suite
 var _ = Describe("NIM Operator", func() {
-	JustBeforeEach(func(ctx context.Context) {
-		// Values
-		values := helmValues.Options{
-			Values: []string{
-				fmt.Sprintf("operator.image.repository=%s", ImageRepo),
-				fmt.Sprintf("operator.image.tag=%s", ImageTag),
-				fmt.Sprintf("operator.image.pullPolicy=%s", ImagePullPolicy),
-			},
-		}
-
-		// Chart spec
-		chartSpec := &helm.ChartSpec{
-			ReleaseName:     helmReleaseName,
-			ChartName:       helmChart,
-			Namespace:       testNamespace.Name,
-			CreateNamespace: true,
-			Wait:            true,
-			Timeout:         10 * time.Minute, // pull time is long
-			ValuesOptions:   values,
-			CleanupOnFail:   true,
-		}
-
-		By("Installing k8s-nim-operator Helm chart")
-		_, err := helmClient.InstallOrUpgradeChart(ctx, chartSpec, nil)
-		Expect(err).NotTo(HaveOccurred())
-	})
 
 	AfterEach(func(ctx context.Context) {
 		// Run diagnostic collector if test failed
@@ -81,19 +62,58 @@ var _ = Describe("NIM Operator", func() {
 
 			err = diagnosticsCollector.Collect(ctx)
 			Expect(err).NotTo(HaveOccurred())
-
-			cleanup()
 		}
-		// Clean up
-		cleanupCRs()
-		cleanup()
 	})
 
 	When("deploying the K8s-NIM-Operator via Helm", Ordered, func() {
-		It("it should create a NIMCache and NIMService in READY state", func(ctx context.Context) {
-			// Create pull secrets
-			createPullSecrets()
+		It("should be successful", func(ctx context.Context) {
+			// Add or Update Helm repo
+			helmRepo := repo.Entry{
+				Name: "nvidia",
+				URL:  nvidiaHelm,
+			}
+			err := helmClient.AddOrUpdateChartRepo(helmRepo)
+			Expect(err).NotTo(HaveOccurred())
 
+			err = helmClient.UpdateChartRepos()
+			Expect(err).NotTo(HaveOccurred())
+
+			pullSecrets := []string{"ngc-secret"}
+			// Values
+			values := helmValues.Options{
+				Values: []string{
+					fmt.Sprintf("operator.image.repository=%s", ImageRepo),
+					fmt.Sprintf("operator.image.tag=%s", ImageTag),
+					fmt.Sprintf("operator.image.pullPolicy=%s", ImagePullPolicy),
+					fmt.Sprintf("operator.image.pullSecrets={%s}", strings.Join(pullSecrets, ",")),
+				},
+			}
+
+			// Chart spec
+			chartSpec := &helm.ChartSpec{
+				ReleaseName:     helmReleaseName,
+				ChartName:       helmChart,
+				Namespace:       testNamespace.Name,
+				CreateNamespace: true,
+				Wait:            true,
+				Timeout:         10 * time.Minute, // pull time is long
+				ValuesOptions:   values,
+				CleanupOnFail:   true,
+			}
+
+			By("Installing k8s-nim-operator Helm chart")
+			_, err = helmClient.InstallOrUpgradeChart(ctx, chartSpec, nil)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	When("deploying NIMCache and NIMService", Ordered, func() {
+		AfterEach(func() {
+			// Clean up
+			cleanupNIMCRs()
+		})
+
+		It("should go to READY state", func(ctx context.Context) {
 			// Create a NIMCache object
 			By("Creating a NIMCache object")
 			cli, err := versioned.NewForConfig(clientConfig)
@@ -134,6 +154,59 @@ var _ = Describe("NIM Operator", func() {
 			}, Timeout, 5*time.Second).Should(BeTrue())
 		})
 	})
+
+	When("deploying NEMO microservices", func() {
+		BeforeEach(func() {
+			if !EnableNemoMicroservices {
+				Skip("NEMO microservies not requested to be tested")
+			}
+
+			// Install dependencies
+			By("Installing a postgres database")
+			installEntitystoreDependencies()
+
+		})
+		AfterEach(func() {
+			if !EnableNemoMicroservices {
+				return
+			}
+
+			// Clean up CRs
+			cleanupNEMOCRs()
+
+			// Cleanup dependencies
+			err := helmClient.UninstallReleaseByName(fmt.Sprintf("es-%s", postgresql))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("NEMO Entitystore CR should go to READY state", func() {
+			// Create a NemoEntitystore object
+			By("Creating a NemoEntitystore object")
+			cli, err := versioned.NewForConfig(clientConfig)
+			Expect(err).NotTo(HaveOccurred())
+
+			nemoEntitystore := &v1alpha1.NemoEntitystore{}
+			data, err := os.ReadFile(filepath.Join(cwd, "data", "nemoentitystore.yml"))
+			Expect(err).NotTo(HaveOccurred())
+			dataStr := string(data)
+			dataStr = strings.ReplaceAll(dataStr, namespacePattern, testNamespace.Name)
+			dataStr = strings.ReplaceAll(dataStr, esRepoPattern, NemoEntityStoreRepo)
+			dataStr = strings.ReplaceAll(dataStr, esVersionPattern, NemoEntityStoreVersion)
+
+			err = yaml.Unmarshal([]byte(dataStr), nemoEntitystore)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = cli.AppsV1alpha1().NemoEntitystores(testNamespace.Name).Create(ctx, nemoEntitystore, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking the NemoEntitystore object state is ready")
+			Eventually(func() bool {
+				nemoEntitystoreObject, _ := cli.AppsV1alpha1().NemoEntitystores(testNamespace.Name).Get(ctx, nemoEntitystore.Name, metav1.GetOptions{})
+				return nemoEntitystoreObject.Status.State == v1alpha1.NemoEntitystoreStatusReady
+			}, Timeout, 5*time.Second).Should(BeTrue())
+
+		})
+	})
 })
 
 func cleanup() {
@@ -170,8 +243,8 @@ func cleanup() {
 	}
 }
 
-// cleanupCRs deletes all NIMCache, NIMService and NIMPipeline CRs deployed on the test namespace
-func cleanupCRs() {
+// cleanupNIMCRs deletes all NIMCache, NIMService and NIMPipeline CRs deployed on the test namespace
+func cleanupNIMCRs() {
 	cli, err := versioned.NewForConfig(clientConfig)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -213,6 +286,38 @@ func cleanupCRs() {
 			Expect(err).NotTo(HaveOccurred())
 		}
 	}
+
+	// List all NemoEntitystore CRs
+	nemoEntitystoreList, err := cli.AppsV1alpha1().NemoEntitystores(testNamespace.Name).List(ctx, metav1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Delete all NemoEntitystore CRs
+	if len(nemoEntitystoreList.Items) != 0 {
+		By("Deleting all NemoEntitystore CRs")
+		for _, nemoEntitystore := range nemoEntitystoreList.Items {
+			err := cli.AppsV1alpha1().NemoEntitystores(testNamespace.Name).Delete(ctx, nemoEntitystore.Name, metav1.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		}
+	}
+}
+
+// cleanupNEMOCRs deletes all NEMO microservice CRs deployed on the test namespace
+func cleanupNEMOCRs() {
+	cli, err := versioned.NewForConfig(clientConfig)
+	Expect(err).NotTo(HaveOccurred())
+
+	// List all NemoEntitystore CRs
+	nemoEntitystoreList, err := cli.AppsV1alpha1().NemoEntitystores(testNamespace.Name).List(ctx, metav1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Delete all NemoEntitystore CRs
+	if len(nemoEntitystoreList.Items) != 0 {
+		By("Deleting all NemoEntitystore CRs")
+		for _, nemoEntitystore := range nemoEntitystoreList.Items {
+			err := cli.AppsV1alpha1().NemoEntitystores(testNamespace.Name).Delete(ctx, nemoEntitystore.Name, metav1.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		}
+	}
 }
 
 func cleanupCRDs() {
@@ -230,6 +335,10 @@ func cleanupCRDs() {
 		crds = append(crds, "clusterpolicies.nvidia.com", "nvidiadrivers.nvidia.com")
 	}
 
+	if EnableNemoMicroservices {
+		crds = append(crds, "nemoentitystores.apps.nvidia.com")
+	}
+
 	// Delete CRDs
 	for _, crd := range crds {
 		err := extClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, crd, metav1.DeleteOptions{})
@@ -237,55 +346,39 @@ func cleanupCRDs() {
 	}
 }
 
-func createPullSecrets() {
-	// Get the NGC_API_KEY
-	NGC_API_KEY := os.Getenv("NGC_API_KEY")
-
-	// Create a secret for pulling the image
-	ngcAPIsecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ngc-api-secret",
-			Namespace: testNamespace.Name,
-		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			"NGC_API_KEY": NGC_API_KEY,
-		},
+func installEntitystoreDependencies() {
+	// Add or Update Helm repo
+	helmRepo := repo.Entry{
+		Name: "bitnami",
+		URL:  bitnamiHelm,
 	}
-
-	_, err := clientSet.CoreV1().Secrets(testNamespace.Name).Create(ctx, ngcAPIsecret, metav1.CreateOptions{})
+	err := helmClient.AddOrUpdateChartRepo(helmRepo)
 	Expect(err).NotTo(HaveOccurred())
 
-	// Create the dockerconfigjson type secret
-	dockerServer := "nvcr.io"
-	dockerUsername := `$oauthtoken`
-	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", dockerUsername, NGC_API_KEY)))
+	err = helmClient.UpdateChartRepos()
+	Expect(err).NotTo(HaveOccurred())
 
-	dockerConfigJson := `{
-		"auths": {
-			"` + dockerServer + `": {
-				"username": "` + dockerUsername + `",
-				"password": "` + NGC_API_KEY + `",
-				"auth": "` + auth + `"
-			}
-		}
-	}`
-
-	ngcSecret := &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
+	// Install Database dependencies for entitystore.
+	values := helmValues.Options{
+		Values: []string{
+			"architecture=standalone",
+			fmt.Sprintf("auth.username=%s", "esuser"),
+			fmt.Sprintf("auth.database=%s", "gateway"),
+			fmt.Sprintf("auth.exitingSecret=%s", "es-postgresql"),
+			fmt.Sprintf("global.storageClass=%s", "local-path"),
+			fmt.Sprintf("global.size=%s", "10GB"),
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "ngc-secret",
-			Namespace:         testNamespace.Name,
-			CreationTimestamp: metav1.Time{Time: time.Now()},
-		},
-		Data: map[string][]byte{
-			corev1.DockerConfigJsonKey: []byte(dockerConfigJson),
-		},
-		Type: corev1.SecretTypeDockerConfigJson,
 	}
-	_, err = clientSet.CoreV1().Secrets(testNamespace.Name).Create(ctx, ngcSecret, metav1.CreateOptions{})
+	chartSpec := &helm.ChartSpec{
+		ReleaseName:     fmt.Sprintf("es-%s", postgresql),
+		ChartName:       "bitnami/postgresql",
+		Namespace:       testNamespace.Name,
+		CreateNamespace: false,
+		Wait:            true,
+		WaitForJobs:     true,
+		Timeout:         10 * time.Minute,
+		CleanupOnFail:   true,
+		ValuesOptions:   values}
+	_, err = helmClient.InstallOrUpgradeChart(ctx, chartSpec, nil)
 	Expect(err).NotTo(HaveOccurred())
 }

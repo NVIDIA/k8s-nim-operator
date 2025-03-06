@@ -1,0 +1,65 @@
+---
+- name: Add Helm repository for Milvus
+  command: helm repo add {{ milvus.helm_repo_name }} {{ milvus.helm_repo_url }}
+
+- name: Update Helm repositories
+  command: helm repo update
+
+- name: Template values file
+  ansible.builtin.template:
+    src: milvus-values.yaml.j2
+    dest: milvus-values.yaml
+
+- name: Install Milvus Helm chart
+  shell: >
+    helm upgrade --install {{ milvus.helm_repo_name }}
+    {{ milvus.chart_name }}
+    --namespace {{ namespace }}
+    --version {{ milvus.chart_version }}
+    --values milvus-values.yaml
+  register: helm_install_result
+  changed_when: "'STATUS: deployed' in helm_install_result.stdout"
+
+- name: Verify Milvus installation
+  command: kubectl get pods -n {{ namespace }}
+  register: pods
+
+- name: Wait for Milvus pod to be ready
+  command: kubectl wait --for=condition=Ready pod -n {{ namespace }} -l app.kubernetes.io/instance={{ milvus.helm_repo_name }} --timeout=120s
+
+- name: Get Milvus pod details
+  shell: |
+    kubectl get pods -n {{ namespace }} -l app.kubernetes.io/instance={{ milvus.helm_repo_name }} -o json
+  register: milvus_pods
+  changed_when: false
+
+- name: Get Milvus pod name
+  shell: |
+    kubectl get pods -n {{ namespace }} -l app.kubernetes.io/instance={{ milvus.helm_repo_name }} -o jsonpath='{.items[0].metadata.name}'
+  register: milvus_pod_name
+  failed_when: milvus_pod_name.stdout == ""
+  changed_when: false
+
+- name: Debug Milvus pod name
+  debug:
+    msg: "Milvus pod name is {{ milvus_pod_name.stdout }}"
+
+- name: Get the IP of the running Milvus pod
+  shell: |
+    kubectl get pod -n {{ namespace }} {{ milvus_pod_name.stdout }} -o jsonpath='{.status.podIP}'
+  register: milvus_pod_ip
+  failed_when: milvus_pod_ip.stdout == ""
+  changed_when: false
+
+- name: Debug Milvus Pod IP
+  debug:
+    msg: "Milvus Pod IP is {{ milvus_pod_ip.stdout }}"
+  when: milvus_pod_ip | length > 0
+
+- name: Check Milvus service is responding
+  command: kubectl run milvus-check --image=busybox --restart=Never --attach --rm=true -- nc -w 10 -zv {{ milvus_pod_ip.stdout }} 19530
+  register: milvus_status
+
+- name: Display Milvus connectivity status
+  debug:
+    msg: "{{ '✅ Milvus is accessible!' if milvus_status.rc == 0 else '❌ Milvus is not reachable!' }}"

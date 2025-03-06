@@ -1,0 +1,15 @@
+nameOverride: argo-workflows
+serviceName: argo-workflows-server
+server:
+  replicas: 1
+  authModes:
+    - "server"
+  servicePort: 2746
+  secure: true
+crds:
+  install: true
+workflow:
+  rbac:
+    create: true
+controller:
+  replicas: 1

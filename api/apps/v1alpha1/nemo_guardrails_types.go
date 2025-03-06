@@ -53,7 +53,7 @@ const (
 
 // NemoGuardrailSpec defines the desired state of NemoGuardrail
 type NemoGuardrailSpec struct {
-	Image   Image           `json:"image,omitempty"`
+	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
@@ -67,7 +67,7 @@ type NemoGuardrailSpec struct {
 	Tolerations    []corev1.Toleration          `json:"tolerations,omitempty"`
 	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
 	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Expose         Expose                       `json:"expose,omitempty"`
+	Expose         Expose                       `json:"expose"`
 	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
 	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
 	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
@@ -403,9 +403,10 @@ func (n *NemoGuardrail) GetVolumes() []corev1.Volume {
 func (n *NemoGuardrail) GetVolumeMounts() []corev1.VolumeMount {
 	volumeMount := corev1.VolumeMount{
 		Name:      "config-store",
-		MountPath: "/config-store",
+		MountPath: "/config-store/default",
 	}
 	if n.Spec.ConfigStore.PVC != nil {
+		volumeMount.MountPath = "/config-store"
 		volumeMount.SubPath = n.Spec.ConfigStore.PVC.SubPath
 	}
 

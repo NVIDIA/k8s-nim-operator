@@ -163,8 +163,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 				Tolerations: []corev1.Toleration{
 					{
 						Key:      "key1",
-						Operator: corev1.TolerationOpEqual,
-						Value:    "value1",
+						Operator: corev1.TolerationOpExists,
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
@@ -231,8 +230,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 				Tolerations: []corev1.Toleration{
 					{
 						Key:      "key1",
-						Operator: corev1.TolerationOpEqual,
-						Value:    "value1",
+						Operator: corev1.TolerationOpExists,
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
@@ -404,6 +402,26 @@ var _ = Describe("K8s Resources Rendering", func() {
 			Expect(hpa.Spec.MaxReplicas).To(Equal(int32(10)))
 			Expect(hpa.Spec.Metrics[0].Type).To(Equal(autoscalingv2.PodsMetricSourceType))
 			Expect(hpa.Spec.Metrics[1].Type).To(Equal(autoscalingv2.ResourceMetricSourceType))
+		})
+
+		It("should render ConfigMap template correctly", func() {
+			params := types.ConfigMapParams{
+				Name:          "test-config",
+				Namespace:     "default",
+				Labels:        map[string]string{"app": "k8s-nim-operator"},
+				Annotations:   map[string]string{"annotation-key": "annotation-value"},
+				ConfigMapData: map[string]string{"config.yaml": "test-data"},
+			}
+
+			r := render.NewRenderer(templatesDir)
+			cm, err := r.ConfigMap(&params)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm.Name).To(Equal("test-config"))
+			Expect(cm.Namespace).To(Equal("default"))
+			Expect(cm.Labels["app"]).To(Equal("k8s-nim-operator"))
+			Expect(cm.Annotations["annotation-key"]).To(Equal("annotation-value"))
+			// The data is added as a multi-line string, so verify with newline appended
+			Expect(cm.Data["config.yaml"]).To(Equal("test-data\n"))
 		})
 	})
 })

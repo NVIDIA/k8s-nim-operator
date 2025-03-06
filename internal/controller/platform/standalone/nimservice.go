@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
@@ -261,6 +263,12 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
 			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
 	} else {
+		// Update NIMServiceStatus with model config.
+		err = r.updateModelStatus(ctx, nimService)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
 		// Update status as ready
 		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
 		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
@@ -273,6 +281,87 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *v1alpha1.NIMService) error {
+	clusterEndpoint, externalEndpoint, err := r.getNIMModelEndpoints(ctx, nimService)
+	if err != nil {
+		return err
+	}
+	modelName, err := r.getNIMModelName(ctx, clusterEndpoint)
+	if err != nil {
+		return err
+	}
+	nimService.Status.Model = &v1alpha1.ModelStatus{
+		Name:             modelName,
+		ClusterEndpoint:  clusterEndpoint,
+		ExternalEndpoint: externalEndpoint,
+	}
+
+	return nil
+}
+
+func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEndpoint string) (string, error) {
+	modelsList, err := nimmodels.ListModelsV1(ctx, nimServiceEndpoint)
+	if err != nil {
+		return "", err
+	}
+
+	if modelsList.Object == nimmodels.ObjectTypeList {
+		for _, model := range modelsList.Data {
+			if model.Object != nimmodels.ObjectTypeModel {
+				continue
+			}
+			if model.Root == nil || *model.Root != model.Id {
+				continue
+			}
+			return model.Id, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to detect model name from nimservice endpoint '%s'", nimServiceEndpoint)
+}
+
+func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, string, error) {
+	logger := log.FromContext(ctx)
+
+	// Lookup NIMCache instance in the same namespace as the NIMService instance
+	svc := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}, svc); err != nil {
+		logger.Error(err, "unable to fetch k8s service", "nimservice", nimService.GetName())
+		return "", "", err
+	}
+
+	var externalEndpoint string
+	port := nimService.GetServicePort()
+	if nimService.IsIngressEnabled() {
+		ingress := &networkingv1.Ingress{}
+		if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}, ingress); err != nil {
+			logger.Error(err, "unable to fetch ingress", "nimservice", nimService.GetName())
+			return "", "", err
+		}
+
+		var found bool
+		for _, rule := range ingress.Spec.Rules {
+			if rule.HTTP == nil {
+				continue
+			}
+			for _, path := range rule.HTTP.Paths {
+				if path.Backend.Service != nil && path.Backend.Service.Name == nimService.GetName() {
+					externalEndpoint = rule.Host
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+	} else if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		externalEndpoint = utils.FormatEndpoint(svc.Spec.LoadBalancerIP, port)
+	}
+
+	return utils.FormatEndpoint(svc.Spec.ClusterIP, port), externalEndpoint, nil
 }
 
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
@@ -469,7 +558,7 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 		if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
 			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace()})
 			if err != nil {
-				logger.Error(err, "Failed to construct pvc", "name", pvc.Name)
+				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return nil, err
 			}
 			if err := controllerutil.SetControllerReference(nimService, pvc, r.GetScheme()); err != nil {
