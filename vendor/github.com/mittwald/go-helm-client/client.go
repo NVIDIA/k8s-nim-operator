@@ -206,9 +206,11 @@ func (c *HelmClient) UpdateChartRepos() error {
 		}
 
 		chartRepo.CachePath = c.Settings.RepositoryCache
-		_, err = chartRepo.DownloadIndexFile()
-		if err != nil {
-			return err
+		if !registry.IsOCI(entry.URL) {
+			_, err = chartRepo.DownloadIndexFile()
+			if err != nil {
+				return err
+			}
 		}
 
 		c.storage.Update(entry)
@@ -793,7 +795,7 @@ func (c *HelmClient) RunChartTests(releaseName string) (bool, error) {
 	}
 
 	// Check that there are no test failures
-	return checkReleaseForTestFailure(rel) == false, nil
+	return !checkReleaseForTestFailure(rel), nil
 }
 
 // chartExists checks whether a chart is already installed
