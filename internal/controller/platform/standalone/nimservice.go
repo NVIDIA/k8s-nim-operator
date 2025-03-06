@@ -302,24 +302,31 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 }
 
 func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEndpoint string) (string, error) {
+	logger := log.FromContext(ctx)
+
+	// List nimservice /v1/models endpoint.
 	modelsList, err := nimmodels.ListModelsV1(ctx, nimServiceEndpoint)
 	if err != nil {
 		return "", err
 	}
 
 	if modelsList.Object == nimmodels.ObjectTypeList {
+		if len(modelsList.Data) == 1 {
+			return modelsList.Data[0].Id, nil
+		}
+
 		for _, model := range modelsList.Data {
 			if model.Object != nimmodels.ObjectTypeModel {
 				continue
 			}
-			if model.Root == nil || *model.Root != model.Id {
-				continue
+			if model.Root != nil && *model.Root == model.Id {
+				return model.Id, nil
 			}
-			return model.Id, nil
 		}
 	}
 
-	return "", fmt.Errorf("failed to detect model name from nimservice endpoint '%s'", nimServiceEndpoint)
+	logger.Info("WARN: Failed to detect model name from /v1/models API response", "endpoint", nimServiceEndpoint)
+	return "", nil
 }
 
 func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, string, error) {
