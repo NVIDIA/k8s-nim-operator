@@ -26,8 +26,8 @@ spec:
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
-    repository: nvcr.io/nvidian/nemo-llm/nemo-guardrails-microservice
-    tag: "25.02-rc4"
+    repository: nvcr.io/nvidian/nemo-llm/guardrails
+    tag: "25.03-rc16"
   metrics:
     serviceMonitor: {}
   replicas: 1
