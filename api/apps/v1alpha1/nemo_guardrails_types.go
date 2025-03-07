@@ -302,7 +302,7 @@ func (n *NemoGuardrail) GetDefaultLivenessProbe() *corev1.Probe {
 		FailureThreshold:    3,
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/v1/health/live",
+				Path: "/v1/health",
 				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
@@ -329,7 +329,7 @@ func (n *NemoGuardrail) GetDefaultReadinessProbe() *corev1.Probe {
 		FailureThreshold:    3,
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/v1/health/ready",
+				Path: "/v1/health",
 				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
@@ -356,7 +356,7 @@ func (n *NemoGuardrail) GetDefaultStartupProbe() *corev1.Probe {
 		FailureThreshold:    30,
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/v1/health/ready",
+				Path: "/v1/health",
 				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
