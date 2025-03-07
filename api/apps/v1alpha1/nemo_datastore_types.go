@@ -55,12 +55,10 @@ const (
 
 // NemoDatastoreSpec defines the desired state of NemoDatastore
 type NemoDatastoreSpec struct {
-	Image   Image           `json:"image"`
-	Command []string        `json:"command,omitempty"`
-	Args    []string        `json:"args,omitempty"`
-	Env     []corev1.EnvVar `json:"env,omitempty"`
-	// The name of an secret that contains authn for the NGC NIM service API
-	AuthSecret     string                       `json:"authSecret"`
+	Image          Image                        `json:"image"`
+	Command        []string                     `json:"command,omitempty"`
+	Args           []string                     `json:"args,omitempty"`
+	Env            []corev1.EnvVar              `json:"env,omitempty"`
 	Labels         map[string]string            `json:"labels,omitempty"`
 	Annotations    map[string]string            `json:"annotations,omitempty"`
 	NodeSelector   map[string]string            `json:"nodeSelector,omitempty"`
