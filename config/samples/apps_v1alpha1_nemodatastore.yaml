@@ -40,9 +40,7 @@ spec:
   expose:
     service:
       type: ClusterIP
-      ports:
-        - name: api
-          port: 3000
+      port: 8000
   image:
     repository: nvcr.io/nvidia/nemo-microservices/datastore
     tag: "25.03"

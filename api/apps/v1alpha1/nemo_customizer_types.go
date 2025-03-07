@@ -31,11 +31,14 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
 	// CustomizerAPIPort is the default port that customizer serves on
 	CustomizerAPIPort = 8000
+	// DefaultNamedPortInternal is the default name for customizer internal port
+	DefaultNamedPortInternal = "internal"
 	// CustomizerInternalPort is the default port used for syncing training progress
 	CustomizerInternalPort = 9009
 	// NemoCustomizerConditionReady indicates that the NEMO CustomizerService is ready.
@@ -180,7 +183,7 @@ func (n *NemoCustomizer) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "CUSTOMIZATIONS_CALLBACK_URL",
-			Value: fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", n.GetName(), n.GetNamespace(), n.GetInternalServicePort()),
+			Value: fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", n.GetName(), n.GetNamespace(), CustomizerInternalPort),
 		},
 		{
 			Name:  "LOG_LEVEL",
@@ -446,7 +449,7 @@ func (n *NemoCustomizer) GetDefaultStartupProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health/ready",
-				Port: getProbePort(n.Spec.Expose.Service),
+				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
 	}
@@ -473,7 +476,7 @@ func (n *NemoCustomizer) GetDefaultLivenessProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health/live",
-				Port: getProbePort(n.Spec.Expose.Service),
+				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
 	}
@@ -499,7 +502,7 @@ func (n *NemoCustomizer) GetDefaultReadinessProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health/ready",
-				Port: getProbePort(n.Spec.Expose.Service),
+				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
 	}
@@ -558,23 +561,6 @@ func (n *NemoCustomizer) GetIngressSpec() networkingv1.IngressSpec {
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoCustomizer deployment
 func (n *NemoCustomizer) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
-}
-
-// GetInternalServicePort returns the internal service port number for the NemoCustomizer deployment
-func (n *NemoCustomizer) GetInternalServicePort() int32 {
-	for _, port := range n.Spec.Expose.Service.Ports {
-		if port.Name == "internal" {
-			return port.Port
-		}
-	}
-
-	// Default to 9009 if no internal port is found
-	return CustomizerInternalPort
-}
-
-// GetServicePorts returns the service ports for the NemoCustomizer deployment
-func (n *NemoCustomizer) GetServicePorts() []corev1.ServicePort {
-	return n.Spec.Expose.Service.Ports
 }
 
 // GetServiceType returns the service type for the NemoCustomizer deployment
@@ -657,21 +643,27 @@ func (n *NemoCustomizer) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.RuntimeClassName = n.GetRuntimeClass()
 
 	// Setup container ports for customizer
-	// TODO: set these to use defined values in the service spec
-	// once that is allowed by the customizer through env variables
-	containerPorts := []corev1.ContainerPort{
+	params.Ports = []corev1.ContainerPort{
 		{
 			Name:          DefaultNamedPortAPI,
 			Protocol:      corev1.ProtocolTCP,
 			ContainerPort: CustomizerAPIPort,
 		},
 		{
-			Name:          "internal",
+			Name:          DefaultNamedPortInternal,
 			Protocol:      corev1.ProtocolTCP,
 			ContainerPort: CustomizerInternalPort,
 		},
 	}
-	params.Ports = containerPorts
+
+	if n.GetMetricsPort() != 0 {
+		metricsPort := corev1.ContainerPort{
+			Name:          DefaultNamedPortMetrics,
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: n.GetMetricsPort(),
+		}
+		params.Ports = append(params.Ports, metricsPort)
+	}
 
 	return params
 }
@@ -738,23 +730,30 @@ func (n *NemoCustomizer) GetServiceParams() *rendertypes.ServiceParams {
 	// Set service type
 	params.Type = n.GetServiceType()
 
-	servicePorts := n.GetServicePorts()
-	if len(servicePorts) != 0 {
-		params.Ports = servicePorts
-	} else {
-		// Set default ports
-		params.Ports = []corev1.ServicePort{
-			{
-				Name:     DefaultNamedPortAPI,
-				Port:     CustomizerAPIPort,
-				Protocol: corev1.ProtocolTCP,
-			},
-			{
-				Name:     "internal",
-				Port:     CustomizerInternalPort,
-				Protocol: corev1.ProtocolTCP,
-			},
+	// Set service ports
+	params.Ports = []corev1.ServicePort{
+		{
+			Name:       DefaultNamedPortAPI,
+			Port:       n.GetServicePort(),
+			TargetPort: intstr.FromString((DefaultNamedPortAPI)),
+			Protocol:   corev1.ProtocolTCP,
+		},
+		{
+			Name:       DefaultNamedPortInternal,
+			Port:       CustomizerInternalPort,
+			TargetPort: intstr.FromString((DefaultNamedPortInternal)),
+			Protocol:   corev1.ProtocolTCP,
+		},
+	}
+
+	if n.GetMetricsPort() != 0 {
+		metricsPort := corev1.ServicePort{
+			Name:       DefaultNamedPortMetrics,
+			Port:       n.GetMetricsPort(),
+			TargetPort: intstr.FromString((DefaultNamedPortMetrics)),
+			Protocol:   corev1.ProtocolTCP,
 		}
+		params.Ports = append(params.Ports, metricsPort)
 	}
 
 	return params
@@ -892,7 +891,11 @@ func (n *NemoCustomizer) GetServiceMonitorParams() *rendertypes.ServiceMonitorPa
 	params.Annotations = n.GetServiceMonitorAnnotations()
 
 	// Determine the appropriate port for monitoring
-	metricsPort := getMetricsPort(n.Spec.Expose.Service)
+	namedMetricsPort := DefaultNamedPortAPI
+	if n.GetMetricsPort() != 0 {
+		// Use the named port for metrics
+		namedMetricsPort = DefaultNamedPortMetrics
+	}
 
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
@@ -900,7 +903,7 @@ func (n *NemoCustomizer) GetServiceMonitorParams() *rendertypes.ServiceMonitorPa
 		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
 		Endpoints: []monitoringv1.Endpoint{
 			{
-				Port:          metricsPort.StrVal,
+				Port:          namedMetricsPort,
 				ScrapeTimeout: serviceMonitor.ScrapeTimeout,
 				Interval:      serviceMonitor.Interval,
 			},
@@ -908,6 +911,19 @@ func (n *NemoCustomizer) GetServiceMonitorParams() *rendertypes.ServiceMonitorPa
 	}
 	params.SMSpec = smSpec
 	return params
+}
+
+// GetServicePort returns the service port for the NemoCustomizer deployment or default port
+func (n *NemoCustomizer) GetServicePort() int32 {
+	if n.Spec.Expose.Service.Port == 0 {
+		return DefaultAPIPort
+	}
+	return n.Spec.Expose.Service.Port
+}
+
+// GetMetricsPort returns the metrics port for the NemoCustomizer deployment
+func (n *NemoCustomizer) GetMetricsPort() int32 {
+	return n.Spec.Expose.Service.MetricsPort
 }
 
 // GetIngressAnnotations return standard and customized ingress annotations

@@ -16,9 +16,7 @@ spec:
   expose:
     service:
       type: ClusterIP
-      ports:
-        - name: api
-          port: 8000
+      port: 8000
   argoWorkflows:
     endpoint: https://argo-workflows-server.nemo.svc.cluster.local:2746
     serviceAccount: argo-workflows-executor
