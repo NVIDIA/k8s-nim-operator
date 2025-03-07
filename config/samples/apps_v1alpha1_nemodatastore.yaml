@@ -7,7 +7,6 @@ metadata:
   name: nemodatastore-sample
   namespace: nemo
 spec:
-  authSecret: ngc-auth-secret
   secrets:
     datastoreConfigSecret: "nemo-ms-nemo-datastore"
     datastoreInitSecret: "nemo-ms-nemo-datastore-init"
