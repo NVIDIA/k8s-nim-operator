@@ -40,8 +40,8 @@ spec:
     size: "10Gi"
   expose:
     service:
-      port: 3000
       type: ClusterIP
+      port: 8000
   image:
     repository: "nvcr.io/nvidian/nemo-llm/datastore"
     tag: "25.03-rc11"

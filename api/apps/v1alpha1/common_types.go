@@ -23,9 +23,18 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 )
 
+const (
+	// DefaultAPIPort is the default api  port
+	DefaultAPIPort = 8000
+	// DefaultNamedPortAPI is the default name for api port
+	DefaultNamedPortAPI = "api"
+	// DefaultNamedPortMetrics is the default name for metrics port
+	DefaultNamedPortMetrics = "metrics"
+)
+
 // Expose defines attributes to expose the service
 type Expose struct {
-	Service Service `json:"service,omitempty"`
+	Service Service `json:"service"`
 	Ingress Ingress `json:"ingress,omitempty"`
 }
 
@@ -34,13 +43,11 @@ type Service struct {
 	Type corev1.ServiceType `json:"type,omitempty"`
 	// override the default service name
 	Name string `json:"name,omitempty"`
-	// Deprecated: Use Ports instead.
-	// +kubebuilder:deprecatedversion
-	// +kubebuilder:default=8000
-	Port int32 `json:"port,omitempty"`
-	// Defines multiple ports for the service
-	Ports       []corev1.ServicePort `json:"ports,omitempty"`
-	Annotations map[string]string    `json:"annotations,omitempty"`
+	// Port is the main api serving port
+	Port int32 `json:"port"`
+	// MetricsPort is the port to be used for the metrics collection (optional)
+	MetricsPort int32             `json:"metricsPort,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // Metrics defines attributes to setup metrics collection

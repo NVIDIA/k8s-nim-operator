@@ -19,6 +19,7 @@ spec:
       value: http://nemodatastore-sample.nemo.svc.cluster.local:3000
   expose:
     service:
+      type: ClusterIP
       port: 8000
   databaseConfig:
     databaseName: nesdb

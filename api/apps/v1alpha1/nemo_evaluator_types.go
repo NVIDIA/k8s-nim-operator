@@ -36,6 +36,8 @@ import (
 )
 
 const (
+	// EvaluatorAPIPort is the default port that the evaluator serves on
+	EvaluatorAPIPort = 8000
 	// NemoEvaluatorConditionReady indicates that the NEMO EvaluatorService is ready.
 	NemoEvaluatorConditionReady = "Ready"
 	// NemoEvaluatorConditionFailed indicates that the NEMO EvaluatorService has failed.
@@ -185,7 +187,7 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "EVALUATOR_PORT",
-			Value: fmt.Sprintf("%d", n.GetServicePort()),
+			Value: fmt.Sprintf("%d", EvaluatorAPIPort),
 		},
 		{
 			Name:  "ARGO_HOST",
@@ -435,11 +437,7 @@ func (n *NemoEvaluator) GetDefaultLivenessProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/health",
-				Port: intstr.IntOrString{
-					Type:   intstr.Type(1),
-					StrVal: "http",
-				},
-				Scheme: "HTTP",
+				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
 	}
@@ -464,10 +462,7 @@ func (n *NemoEvaluator) GetDefaultReadinessProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/health",
-				Port: intstr.IntOrString{
-					Type:   intstr.Type(1),
-					StrVal: "http",
-				},
+				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
 	}
@@ -477,7 +472,29 @@ func (n *NemoEvaluator) GetDefaultReadinessProbe() *corev1.Probe {
 
 // GetStartupProbe returns startup probe for the NemoEvaluator container
 func (n *NemoEvaluator) GetStartupProbe() *corev1.Probe {
+	if n.Spec.StartupProbe.Probe == nil {
+		return n.GetDefaultStartupProbe()
+	}
 	return n.Spec.StartupProbe.Probe
+}
+
+// GetDefaultStartupProbe returns the default startup probe for the NemoEntitystore container
+func (n *NemoEvaluator) GetDefaultStartupProbe() *corev1.Probe {
+	probe := corev1.Probe{
+		InitialDelaySeconds: 30,
+		TimeoutSeconds:      1,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    30,
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/health",
+				Port: intstr.FromString(DefaultNamedPortAPI),
+			},
+		},
+	}
+
+	return &probe
 }
 
 // GetServiceAccountName returns service account name for the NemoEvaluator deployment
@@ -533,9 +550,17 @@ func (n *NemoEvaluator) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
 }
 
-// GetServicePort returns the service port for the NemoEvaluator deployment
+// GetServicePort returns the service port for the NemoEvaluator deployment or default port
 func (n *NemoEvaluator) GetServicePort() int32 {
+	if n.Spec.Expose.Service.Port == 0 {
+		return DefaultAPIPort
+	}
 	return n.Spec.Expose.Service.Port
+}
+
+// GetMetricsPort returns the metrics port for the NemoEvaluator deployment
+func (n *NemoEvaluator) GetMetricsPort() int32 {
+	return n.Spec.Expose.Service.MetricsPort
 }
 
 // GetServiceType returns the service type for the NemoEvaluator deployment
@@ -617,7 +642,24 @@ func (n *NemoEvaluator) GetDeploymentParams() *rendertypes.DeploymentParams {
 	// Set runtime class
 	params.RuntimeClassName = n.GetRuntimeClass()
 
-	params.Ports = []corev1.ContainerPort{{Name: "http", Protocol: corev1.ProtocolTCP, ContainerPort: n.GetServicePort()}}
+	// Setup container ports for evaluator
+	params.Ports = []corev1.ContainerPort{
+		{
+			Name:          DefaultNamedPortAPI,
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: EvaluatorAPIPort,
+		},
+	}
+
+	if n.GetMetricsPort() != 0 {
+		metricsPort := corev1.ContainerPort{
+			Name:          DefaultNamedPortMetrics,
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: n.GetMetricsPort(),
+		}
+		params.Ports = append(params.Ports, metricsPort)
+	}
+
 	return params
 }
 
@@ -684,9 +726,24 @@ func (n *NemoEvaluator) GetServiceParams() *rendertypes.ServiceParams {
 	params.Type = "ClusterIP"
 
 	// Set service ports
-	params.Port = n.GetServicePort()
-	params.TargetPort = n.GetServicePort()
-	params.PortName = "http"
+	params.Ports = []corev1.ServicePort{
+		{
+			Name:       DefaultNamedPortAPI,
+			Port:       n.GetServicePort(),
+			TargetPort: intstr.FromString((DefaultNamedPortAPI)),
+			Protocol:   corev1.ProtocolTCP,
+		},
+	}
+
+	if n.GetMetricsPort() != 0 {
+		metricsPort := corev1.ServicePort{
+			Name:       DefaultNamedPortMetrics,
+			Port:       n.GetMetricsPort(),
+			TargetPort: intstr.FromString((DefaultNamedPortMetrics)),
+			Protocol:   corev1.ProtocolTCP,
+		}
+		params.Ports = append(params.Ports, metricsPort)
+	}
 	return params
 }
 
@@ -788,11 +845,24 @@ func (n *NemoEvaluator) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 	params.Labels = svcLabels
 	params.Annotations = n.GetServiceMonitorAnnotations()
 
+	// Determine the appropriate port for monitoring
+	namedMetricsPort := DefaultNamedPortAPI
+	if n.GetMetricsPort() != 0 {
+		// Use the named port for metrics
+		namedMetricsPort = DefaultNamedPortMetrics
+	}
+
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
 		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
 		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
-		Endpoints:         []monitoringv1.Endpoint{{Port: "service-port", ScrapeTimeout: serviceMonitor.ScrapeTimeout, Interval: serviceMonitor.Interval}},
+		Endpoints: []monitoringv1.Endpoint{
+			{
+				Port:          namedMetricsPort,
+				ScrapeTimeout: serviceMonitor.ScrapeTimeout,
+				Interval:      serviceMonitor.Interval,
+			},
+		},
 	}
 	params.SMSpec = smSpec
 	return params
