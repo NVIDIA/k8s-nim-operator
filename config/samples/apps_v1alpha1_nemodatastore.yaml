@@ -19,7 +19,7 @@ spec:
       secretName: nds-minio-existing-secret
       passwordKey: objectStoreSecret
     serveDirect: true
-    endpoint: minio.nemo.svc.cluster.local:9000
+    endpoint: datastore-minio.nemo.svc.cluster.local:9000
     bucketName: datastore-dev
     region: object-store-region
     ssl: false
@@ -28,7 +28,7 @@ spec:
       user: ndsuser
       secretName: nds-pg-existing-secret
       passwordKey: password
-    host: nds-pg-postgresql.nemo.svc.cluster.local
+    host: datastore-pg-postgresql.nemo.svc.cluster.local
     port: 5432
     databaseName: ndsdb
   pvc:

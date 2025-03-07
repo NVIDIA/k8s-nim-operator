@@ -9,7 +9,7 @@ metadata:
 spec:
   wandbSecret:
     name: wandb-secret
-    apiKeyKey: encryption_key
+    apiKeyKey: encryptionKey
   otel:
     exporterOtlpEndpoint: http://<otel-collector-service>:4317
   databaseConfig:
@@ -17,7 +17,7 @@ spec:
       user: ncsuser
       secretName: ncs-pg-existing-secret
       passwordKey: password
-    host: customizer-pg
+    host: customizer-pg-postgresql.nemo.svc.cluster.local
     port: 5432
     databaseName: ncsdb
   expose:
