@@ -192,10 +192,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{
 						Type: corev1.ServiceTypeClusterIP,
-						Ports: []corev1.ServicePort{
-							{Name: "api", Port: 8000, Protocol: corev1.ProtocolTCP},
-							{Name: "internal", Port: 9009, Protocol: corev1.ProtocolTCP},
-						},
+						Port: 8000,
 						Annotations: map[string]string{
 							"annotation-key-specific": "service",
 						},
@@ -440,7 +437,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			Expect(envVars).To(ContainElements(
 				corev1.EnvVar{Name: "NAMESPACE", Value: nemoCustomizer.Namespace},
 				corev1.EnvVar{Name: "CONFIG_PATH", Value: "/app/config/config.yaml"},
-				corev1.EnvVar{Name: "CUSTOMIZATIONS_CALLBACK_URL", Value: fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", nemoCustomizer.Name, nemoCustomizer.Namespace, nemoCustomizer.GetInternalServicePort())},
+				corev1.EnvVar{Name: "CUSTOMIZATIONS_CALLBACK_URL", Value: fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", nemoCustomizer.Name, nemoCustomizer.Namespace, appsv1alpha1.CustomizerInternalPort)},
 				corev1.EnvVar{Name: "LOG_LEVEL", Value: "INFO"},
 			))
 

@@ -30,6 +30,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 )
 
@@ -591,7 +592,7 @@ func (n *NemoDatastore) GetDefaultLivenessProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health",
-				Port: getProbePort(n.Spec.Expose.Service),
+				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
 	}
@@ -618,7 +619,7 @@ func (n *NemoDatastore) GetDefaultReadinessProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health",
-				Port: getProbePort(n.Spec.Expose.Service),
+				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
 	}
@@ -645,7 +646,7 @@ func (n *NemoDatastore) GetDefaultStartupProbe() *corev1.Probe {
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health",
-				Port: getProbePort(n.Spec.Expose.Service),
+				Port: intstr.FromString(DefaultNamedPortAPI),
 			},
 		},
 	}
@@ -799,14 +800,17 @@ func (n *NemoDatastore) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
 }
 
-// GetServicePorts returns the service ports for the NemoDatastore deployment
-func (n *NemoDatastore) GetServicePorts() []corev1.ServicePort {
-	return n.Spec.Expose.Service.Ports
+// GetServicePort returns the service port for the NemoDatastore deployment or default port
+func (n *NemoDatastore) GetServicePort() int32 {
+	if n.Spec.Expose.Service.Port == 0 {
+		return DefaultAPIPort
+	}
+	return n.Spec.Expose.Service.Port
 }
 
-// GetServicePort returns the service port for the NemoDatastore deployment
-func (n *NemoDatastore) GetServicePort() int32 {
-	return n.Spec.Expose.Service.Port
+// GetMetricsPort returns the metrics port for the NemoDatastore deployment
+func (n *NemoDatastore) GetMetricsPort() int32 {
+	return n.Spec.Expose.Service.MetricsPort
 }
 
 // GetServiceType returns the service type for the NemoDatastore deployment
@@ -893,16 +897,22 @@ func (n *NemoDatastore) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.RuntimeClassName = n.GetRuntimeClass()
 
 	// Setup container ports for datastore
-	// TODO: set these to use defined values in the service spec
-	// once that is allowed by the datastore through env variables
-	containerPorts := []corev1.ContainerPort{
+	params.Ports = []corev1.ContainerPort{
 		{
 			Name:          DefaultNamedPortAPI,
 			Protocol:      corev1.ProtocolTCP,
 			ContainerPort: DatastoreAPIPort,
 		},
 	}
-	params.Ports = containerPorts
+
+	if n.GetMetricsPort() != 0 {
+		metricsPort := corev1.ContainerPort{
+			Name:          DefaultNamedPortMetrics,
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: n.GetMetricsPort(),
+		}
+		params.Ports = append(params.Ports, metricsPort)
+	}
 
 	return params
 }
@@ -970,17 +980,25 @@ func (n *NemoDatastore) GetServiceParams() *rendertypes.ServiceParams {
 	params.Type = n.GetServiceType()
 
 	// Set service ports
-	servicePorts := n.GetServicePorts()
-	if len(servicePorts) != 0 {
-		params.Ports = servicePorts
-	} else {
-		// Set default port
-		params.Ports = []corev1.ServicePort{{
-			Name:     DefaultNamedPortAPI,
-			Port:     DatastoreAPIPort,
-			Protocol: corev1.ProtocolTCP,
-		}}
+	params.Ports = []corev1.ServicePort{
+		{
+			Name:       DefaultNamedPortAPI,
+			Port:       n.GetServicePort(),
+			TargetPort: intstr.FromString((DefaultNamedPortAPI)),
+			Protocol:   corev1.ProtocolTCP,
+		},
 	}
+
+	if n.GetMetricsPort() != 0 {
+		metricsPort := corev1.ServicePort{
+			Name:       DefaultNamedPortMetrics,
+			Port:       n.GetMetricsPort(),
+			TargetPort: intstr.FromString((DefaultNamedPortMetrics)),
+			Protocol:   corev1.ProtocolTCP,
+		}
+		params.Ports = append(params.Ports, metricsPort)
+	}
+
 	return params
 }
 
@@ -1084,7 +1102,11 @@ func (n *NemoDatastore) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 	params.Annotations = n.GetServiceMonitorAnnotations()
 
 	// Determine the appropriate port for monitoring
-	metricsPort := getMetricsPort(n.Spec.Expose.Service)
+	namedMetricsPort := DefaultNamedPortAPI
+	if n.GetMetricsPort() != 0 {
+		// Use the named port for metrics
+		namedMetricsPort = DefaultNamedPortMetrics
+	}
 
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
@@ -1092,7 +1114,7 @@ func (n *NemoDatastore) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
 		Endpoints: []monitoringv1.Endpoint{
 			{
-				Port:          metricsPort.StrVal,
+				Port:          namedMetricsPort,
 				ScrapeTimeout: serviceMonitor.ScrapeTimeout,
 				Interval:      serviceMonitor.Interval,
 			},

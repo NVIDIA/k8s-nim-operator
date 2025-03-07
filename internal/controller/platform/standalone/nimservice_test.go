@@ -219,7 +219,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 				},
 				Expose: appsv1alpha1.Expose{
-					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: 8123, Annotations: map[string]string{"annotation-key-specific": "service"}},
+					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: 8123, MetricsPort: 9009, Annotations: map[string]string{"annotation-key-specific": "service"}},
 					Ingress: appsv1alpha1.Ingress{
 						Enabled:     ptr.To[bool](true),
 						Annotations: map[string]string{"annotation-key-specific": "ingress"},
@@ -462,6 +462,21 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(service.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(service.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(service.Annotations["annotation-key-specific"]).To(Equal("service"))
+			// Verify the named ports
+			expectedPorts := map[string]int32{
+				"api":     8123,
+				"metrics": 9009,
+			}
+
+			foundPorts := make(map[string]int32)
+			for _, port := range service.Spec.Ports {
+				foundPorts[port.Name] = port.Port
+			}
+
+			for name, expectedPort := range expectedPorts {
+				Expect(foundPorts).To(HaveKeyWithValue(name, expectedPort),
+					fmt.Sprintf("Expected service to have named port %q with port %d", name, expectedPort))
+			}
 
 			// Ingress should be created
 			ingress := &networkingv1.Ingress{}
@@ -493,7 +508,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(sm.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(sm.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(sm.Annotations["annotation-key-specific"]).To(Equal("service-monitor"))
-			Expect(sm.Spec.Endpoints[0].Port).To(Equal("api"))
+			Expect(sm.Spec.Endpoints[0].Port).To(Equal("metrics"))
 			Expect(sm.Spec.Endpoints[0].ScrapeTimeout).To(Equal(monitoringv1.Duration("30s")))
 			Expect(sm.Spec.Endpoints[0].Interval).To(Equal(monitoringv1.Duration("1m")))
 

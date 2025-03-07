@@ -568,46 +568,24 @@ spec:
                         additionalProperties:
                           type: string
                         type: object
+                      metricsPort:
+                        description: MetricsPort is the port to be used for the metrics
+                          collection (optional)
+                        format: int32
+                        type: integer
                       name:
                         description: override the default service name
                         type: string
                       port:
-                        description: 'Deprecated: Use Ports instead.'
+                        description: Port is the main api serving port
                         format: int32
                         type: integer
-                      ports:
-                        description: Defines multiple ports for the service
-                        items:
-                          description: ServicePort defines attributes to setup the
-                            service ports
-                          properties:
-                            name:
-                              description: The name of this port within the service.
-                              type: string
-                            port:
-                              description: The port that will be exposed by this service.
-                              format: int32
-                              maximum: 65535
-                              minimum: 1
-                              type: integer
-                            protocol:
-                              default: TCP
-                              description: |-
-                                The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
-                                Default is TCP.
-                              enum:
-                              - TCP
-                              - UDP
-                              - SCTP
-                              type: string
-                          required:
-                          - port
-                          type: object
-                        type: array
                       type:
                         description: Service Type string describes ingress methods
                           for a service
                         type: string
+                    required:
+                    - port
                     type: object
                 required:
                 - service

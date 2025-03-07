@@ -20,9 +20,7 @@ spec:
   expose:
     service:
       type: ClusterIP
-      ports:
-        - name: api
-          port: 8000
+      port: 8000
   databaseConfig:
     databaseName: nesdb
     host: entity-store-pg-postgresql.nemo.svc.cluster.local

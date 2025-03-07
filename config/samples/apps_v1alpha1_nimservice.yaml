@@ -24,6 +24,4 @@ spec:
   expose:
     service:
       type: ClusterIP
-      ports:
-        - name: api
-          port: 8000
+      port: 8000
