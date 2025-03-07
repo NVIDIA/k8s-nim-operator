@@ -7,7 +7,7 @@ metadata:
   name: nemodatastore-sample
   namespace: nemo
 spec:
-  authSecret: ngc-secret
+  authSecret: ngc-auth-secret
   secrets:
     datastoreConfigSecret: "nemo-ms-nemo-datastore"
     datastoreInitSecret: "nemo-ms-nemo-datastore-init"
@@ -46,6 +46,8 @@ spec:
     repository: "nvcr.io/nvidian/nemo-llm/datastore"
     tag: "25.03-rc11"
     pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
   replicas: 1
   resources:
     requests:
