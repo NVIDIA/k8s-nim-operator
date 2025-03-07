@@ -22,7 +22,7 @@ spec:
       port: 8000
   databaseConfig:
     databaseName: nesdb
-    host: entity-store-pg
+    host: entity-store-pg-postgresql.nemo.svc.cluster.local
     port: 5432
     credentials:
       user: nesuser
