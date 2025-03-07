@@ -1,13 +1,13 @@
 apiVersion: apps.nvidia.com/v1alpha1
-kind: NemoPlatform
+kind: NIMPipeline
 metadata:
   labels:
     app.kubernetes.io/name: k8s-nim-operator
     app.kubernetes.io/managed-by: k8s-nim-operator
-  name: nemo-services
+  name: nimpipeline-sample
 spec:
-  customizer:
-    - name: nemo-customizer
+  services:
+    - name: meta-llama3-8b-instruct
       enabled: true
       spec:
         image:
