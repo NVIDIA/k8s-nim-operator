@@ -8,7 +8,7 @@ metadata:
   namespace: nemo
 spec:
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/evaluator
+    repository: nvcr.io/nvidia/nemo-microservices/evaluation-ms
     tag: "25.02"
     pullPolicy: IfNotPresent
     pullSecrets: []
