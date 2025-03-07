@@ -1,33 +1,31 @@
 apiVersion: apps.nvidia.com/v1alpha1
-kind: NemoPlatform
+kind: NIMPipeline
 metadata:
   labels:
     app.kubernetes.io/name: k8s-nim-operator
     app.kubernetes.io/managed-by: k8s-nim-operator
-  name: nemo-services
+  name: nimpipeline-sample
 spec:
-  customizer:
-    - name: nemo-customizer
+  services:
+    - name: meta-llama3-8b-instruct
       enabled: true
-      config:
-        name: customizer-configmap
-  datastore:
-    - name: nemo-datastore
-      enabled: true
-      config:
-        name: datastore-configmap
-  entitystore:
-    - name: nemo-entitystore
-      enabled: true
-      config:
-        name: entitystore-configmap
-  guardrails:
-    - name: nemo-guardrails
-      enabled: true
-      config:
-        name: guardrails-configmap
-  evaluator:
-    - name: nemo-evaluator
-      enabled: true
-      config:
-        name: evaluator-configmap
+      spec:
+        image:
+          repository: nvcr.io/nim/meta/llama3-8b-instruct
+          tag: 1.0.3
+          pullPolicy: IfNotPresent
+          pullSecrets:
+            - ngc-secret
+        authSecret: ngc-api-secret
+        storage:
+          nimCache:
+            name: meta-llama3-8b-instruct
+            profile: ''
+        replicas: 1
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        expose:
+          service:
+            type: ClusterIP
+            port: 8000
