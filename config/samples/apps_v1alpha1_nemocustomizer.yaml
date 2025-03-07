@@ -11,7 +11,8 @@ spec:
     name: wandb-secret
     apiKeyKey: encryptionKey
   otel:
-    exporterOtlpEndpoint: http://<otel-collector-service>:4317
+    enabled: true
+    exporterOtlpEndpoint: http://customizer-otel-opentelemetry-collector.nemo.svc.cluster.local:4317
   databaseConfig:
     credentials:
       user: ncsuser
