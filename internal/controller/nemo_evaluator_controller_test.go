@@ -398,7 +398,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 			// Verify evaluator environment variables
 			Expect(envVars).To(ContainElements(
 				corev1.EnvVar{Name: "EVALUATOR_HOST", Value: "0.0.0.0"},
-				corev1.EnvVar{Name: "EVALUATOR_PORT", Value: fmt.Sprintf("%d", nemoEvaluator.GetContainerPort())},
+				corev1.EnvVar{Name: "EVALUATOR_PORT", Value: fmt.Sprintf("%d", appsv1alpha1.EvaluatorAPIPort)},
 				corev1.EnvVar{Name: "EVAL_CONTAINER", Value: nemoEvaluator.GetImage()},
 				corev1.EnvVar{Name: "EVAL_ENABLE_VALIDATION", Value: "True"},
 			))

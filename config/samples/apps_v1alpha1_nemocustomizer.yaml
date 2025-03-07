@@ -23,13 +23,7 @@ spec:
   expose:
     service:
       type: ClusterIP
-      ports:
-        - name: api
-          port: 8000
-          protocol: TCP
-        - name: internal
-          port: 9009
-          protocol: TCP
+      port: 8000
   image:
     repository: "nvcr.io/nvidian/nemo-llm/customizer"
     tag: "25.03-rc11"

@@ -17,9 +17,7 @@ spec:
   expose:
     service:
       type: ClusterIP
-      ports:
-        - name: api
-          port: 8000
+      port: 8000
   image:
     repository: nvcr.io/nvidian/nemo-llm/nemo-guardrails-microservice
     tag: "25.02-rc4"

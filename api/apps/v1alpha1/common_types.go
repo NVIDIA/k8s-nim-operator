@@ -21,15 +21,14 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
-	// DefaultAPIPort is the default API  port
+	// DefaultAPIPort is the default api  port
 	DefaultAPIPort = 8000
-	// DefaultNamedPortAPI is the default named API port
+	// DefaultNamedPortAPI is the default name for api port
 	DefaultNamedPortAPI = "api"
-	// DefaultNamedPortMetrics is the default named Metrics port
+	// DefaultNamedPortMetrics is the default name for metrics port
 	DefaultNamedPortMetrics = "metrics"
 )
 
@@ -44,29 +43,11 @@ type Service struct {
 	Type corev1.ServiceType `json:"type,omitempty"`
 	// override the default service name
 	Name string `json:"name,omitempty"`
-	// Deprecated: Use Ports instead.
-	// +kubebuilder:deprecatedversion
-	Port int32 `json:"port,omitempty"`
-	// Defines multiple ports for the service
-	Ports       []ServicePort     `json:"ports,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-// ServicePort defines attributes to setup the service ports
-type ServicePort struct {
-	// The name of this port within the service.
-	Name string `json:"name,omitempty"`
-
-	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
-	// Default is TCP.
-	// +kubebuilder:validation:Enum=TCP;UDP;SCTP
-	// +kubebuilder:default="TCP"
-	Protocol corev1.Protocol `json:"protocol,omitempty"`
-
-	// The port that will be exposed by this service.
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
+	// Port is the main api serving port
 	Port int32 `json:"port"`
+	// MetricsPort is the port to be used for the metrics collection (optional)
+	MetricsPort int32             `json:"metricsPort,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // Metrics defines attributes to setup metrics collection
@@ -140,60 +121,4 @@ type CertConfig struct {
 	Name string `json:"name"`
 	// MountPath is the path where the certificates should be mounted in the container.
 	MountPath string `json:"mountPath"`
-}
-
-// selectNamedPort returns the first occurrence of a given named port, or an empty string if not found.
-func selectNamedPort(serviceSpec Service, portNames ...string) string {
-	for _, name := range portNames {
-		for _, port := range serviceSpec.Ports {
-			if port.Name == name {
-				return name
-			}
-		}
-	}
-	return ""
-}
-
-// getProbePort determines the appropriate port for probes based on the service spec.
-func getProbePort(serviceSpec Service) intstr.IntOrString {
-	switch len(serviceSpec.Ports) {
-	case 1:
-		port := serviceSpec.Ports[0]
-		if port.Name != "" {
-			return intstr.FromString(port.Name)
-		}
-		return intstr.FromInt(int(port.Port))
-	case 0:
-		// Default to "api" as the operator always adds a default named port with 8000
-		return intstr.FromString(DefaultNamedPortAPI)
-	default:
-		// Multiple ports: Prefer "api"
-		if portName := selectNamedPort(serviceSpec, DefaultNamedPortAPI); portName != "" {
-			return intstr.FromString(portName)
-		}
-		// Default when multiple ports exist
-		return intstr.FromString(DefaultNamedPortAPI)
-	}
-}
-
-// getMetricsPort determines the appropriate port for metrics based on the service spec.
-func getMetricsPort(serviceSpec Service) intstr.IntOrString {
-	switch len(serviceSpec.Ports) {
-	case 1:
-		port := serviceSpec.Ports[0]
-		if port.Name != "" {
-			return intstr.FromString(port.Name)
-		}
-		return intstr.FromInt(int(port.Port))
-	case 0:
-		// Default to "api" as the operator always adds a default named port with 8000
-		return intstr.FromString(DefaultNamedPortAPI)
-	default:
-		// Multiple ports: Prefer "metrics", fallback to "api"
-		if portName := selectNamedPort(serviceSpec, DefaultNamedPortMetrics, DefaultNamedPortAPI); portName != "" {
-			return intstr.FromString(portName)
-		}
-		// Default when multiple ports exist
-		return intstr.FromString(DefaultNamedPortMetrics)
-	}
 }
