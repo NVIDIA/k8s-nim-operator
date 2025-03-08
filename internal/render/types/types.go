@@ -82,6 +82,7 @@ type DeploymentParams struct {
 	RuntimeClassName   string
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
+	InitContainers     []corev1.Container
 }
 
 // StatefulSetParams holds the parameters for rendering a StatefulSet template
@@ -113,6 +114,7 @@ type StatefulSetParams struct {
 	NIMCachePVC        string
 	RuntimeClassName   string
 	OrchestratorType   string
+	InitContainers     []corev1.Container
 }
 
 // ServiceParams holds the parameters for rendering a Service template

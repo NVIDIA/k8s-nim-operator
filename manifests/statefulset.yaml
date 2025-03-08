@@ -24,6 +24,33 @@ spec:
         app: {{ .Name }}
     spec:
       runtimeClassName: {{ .RuntimeClassName }}
+      initContainers:
+      {{- range .InitContainers }}
+      - name: {{ .Name }}
+        image: {{ .Image }}
+        {{- if .ImagePullPolicy }}
+        imagePullPolicy: {{ .ImagePullPolicy }}
+        {{- end }}
+        {{- if .Command }}
+        command: 
+          {{ .Command | yaml | nindent 10 }}
+        {{- end }}
+        {{- if .Args}}
+        args: 
+          {{ .Args| yaml | nindent 10 }}
+        {{- end }}
+        {{- if .WorkingDir }}
+        workingDir: {{ .WorkingDir }}
+        {{- end }}
+        {{- if .Env }}
+        env:
+          {{ .Env | yaml | nindent 10 }}
+        {{- end }}
+        {{- with .Resources }}
+        resources:
+          {{ . | yaml | nindent 10 }}
+        {{- end }}
+      {{- end }}
       containers:
       - name: {{ .ContainerName }}
         image: {{ .Image }}
