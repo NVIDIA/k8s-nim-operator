@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -144,14 +145,8 @@ func (n *NemoEntitystore) GetStandardLabels() map[string]string {
 	}
 }
 
-// GetStandardEnv returns the standard set of env variables for the NemoEntitystore container
-func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
-	// add standard env required for NIM service
-	envVars := []corev1.EnvVar{
-		{
-			Name:  "APP_VERSION",
-			Value: n.Spec.Image.Tag,
-		},
+func (n *NemoEntitystore) GetPostgresEnv() []corev1.EnvVar {
+	return []corev1.EnvVar{
 		{
 			Name: "POSTGRES_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
@@ -180,7 +175,18 @@ func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
 			Value: n.Spec.DatabaseConfig.DatabaseName,
 		},
 	}
+}
 
+// GetStandardEnv returns the standard set of env variables for the NemoEntitystore container
+func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
+	// add standard env required for NIM service
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "APP_VERSION",
+			Value: n.Spec.Image.Tag,
+		},
+	}
+	envVars = append(envVars, n.GetPostgresEnv()...)
 	return envVars
 }
 
@@ -484,6 +490,9 @@ func (n *NemoEntitystore) GetDeploymentParams() *rendertypes.DeploymentParams {
 	// Set labels and selectors
 	params.SelectorLabels = n.GetSelectorLabels()
 
+	// Set init containers
+	params.InitContainers = n.GetInitContainers()
+
 	// Set container spec
 	params.ContainerName = n.GetContainerName()
 	params.Env = n.GetEnv()
@@ -537,6 +546,9 @@ func (n *NemoEntitystore) GetStatefulSetParams() *rendertypes.StatefulSetParams 
 
 	// Set labels and selectors
 	params.SelectorLabels = n.GetSelectorLabels()
+
+	// Set init containers
+	params.InitContainers = n.GetInitContainers()
 
 	// Set container spec
 	params.ContainerName = n.GetContainerName()
@@ -724,6 +736,51 @@ func (n *NemoEntitystore) GetServiceMonitorAnnotations() map[string]string {
 		return utils.MergeMaps(NemoEntitystoreAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
 	return NemoEntitystoreAnnotations
+}
+
+// GetInitContainers returns the init containers for the NemoEntitystore.
+//
+// It creates and returns a slice of corev1.Container.
+// The init containers include a busybox container to wait for Postgres to start,
+// and an entitystore-db-migration container to run the database migration.
+//
+// Returns a slice of corev1.Container.
+func (n *NemoEntitystore) GetInitContainers() []corev1.Container {
+
+	connCmd := fmt.Sprintf(
+		"until nc -z %s %d; do echo \"Waiting for Postgres to start \"; sleep 5; done;",
+		n.Spec.DatabaseConfig.Host,
+		n.Spec.DatabaseConfig.Port)
+
+	return []corev1.Container{
+		{
+			Name:            "wait-for-postgres",
+			Image:           "busybox",
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"sh", "-c", connCmd,
+			},
+		},
+		{
+			Name:            "entitystore-db-migration",
+			Image:           n.GetImage(),
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"/app/.venv/bin/python3",
+			},
+			Args: []string{
+				"-m", "scripts.run_db_migration",
+			},
+			Env:        n.GetPostgresEnv(),
+			WorkingDir: "/app/services/entity-store",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
 }
 
 func init() {
