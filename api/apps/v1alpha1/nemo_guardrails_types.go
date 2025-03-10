@@ -187,6 +187,17 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 			Name:  "DEMO",
 			Value: "False",
 		},
+		{
+			Name: "NIM_ENDPOINT_API_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "NIM_ENDPOINT_API_KEY",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.AuthSecret,
+					},
+				},
+			},
+		},
 	}
 
 	return envVars
