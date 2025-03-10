@@ -12,8 +12,6 @@ spec:
   env:
     - name: NIM_ENDPOINT_URL
       value: "http://<NIM_SERVICE_ENDPOINT>:<NIM_SERVICE_PORT>/v1"
-    - name: NIM_ENDPOINT_API_KEY
-      value: dummy
   expose:
     ingress:
       spec: {}
