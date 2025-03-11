@@ -16,3 +16,7 @@
   loop:
     - crd
   ignore_errors: true
+
+- name: Delete Milvus SA
+  command: kubectl delete serviceaccount milvus -n {{ namespace }}
+  ignore_errors: true
