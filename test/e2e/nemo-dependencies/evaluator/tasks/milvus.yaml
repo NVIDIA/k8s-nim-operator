@@ -1,4 +1,20 @@
 ---
+- name: Get Kube API resources
+  command: kubectl api-resources --verbs=list --namespaced -o name
+  register: api_resources
+
+- name: Check if the current cluster is OpenShift
+  set_fact:
+    is_openshift: "{{ 'routes.route.openshift.io' in api_resources.stdout_lines }}"
+
+- name: OpenShift - Create Milvus service account
+  command: kubectl create serviceaccount milvus -n {{ namespace }}
+  when: is_openshift
+
+- name: OpenShift - Add SCC policy anyuid to Milvus service account
+  command: oc adm policy add-scc-to-user anyuid system:serviceaccount:{{ namespace }}:milvus
+  when: is_openshift
+
 - name: Add Helm repository for Milvus
   command: helm repo add {{ milvus.helm_repo_name }} {{ milvus.helm_repo_url }}
 
@@ -9,6 +25,17 @@
   ansible.builtin.template:
     src: milvus-values.yaml.j2
     dest: milvus-values.yaml
+
+- name: OpenShift - configure Milvus to use its dedicated service account
+  blockinfile:
+    path: milvus-values.yaml
+    marker: "# {mark} ANSIBLE MANAGED BLOCK"
+    insertafter: "^(.*)$"
+    block: |
+      serviceAccount:
+        create: false
+        name: milvus
+  when: is_openshift
 
 - name: Install Milvus Helm chart
   shell: >
