@@ -219,7 +219,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 				},
 				Expose: appsv1alpha1.Expose{
-					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: 8123, MetricsPort: 9009, Annotations: map[string]string{"annotation-key-specific": "service"}},
+					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
 					Ingress: appsv1alpha1.Ingress{
 						Enabled:     ptr.To[bool](true),
 						Annotations: map[string]string{"annotation-key-specific": "ingress"},
@@ -464,8 +464,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(service.Annotations["annotation-key-specific"]).To(Equal("service"))
 			// Verify the named ports
 			expectedPorts := map[string]int32{
-				"api":     8123,
-				"metrics": 9009,
+				"api": 8123,
 			}
 
 			foundPorts := make(map[string]int32)
@@ -508,7 +507,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(sm.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(sm.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(sm.Annotations["annotation-key-specific"]).To(Equal("service-monitor"))
-			Expect(sm.Spec.Endpoints[0].Port).To(Equal("metrics"))
+			Expect(sm.Spec.Endpoints[0].Port).To(Equal("api"))
 			Expect(sm.Spec.Endpoints[0].ScrapeTimeout).To(Equal(monitoringv1.Duration("30s")))
 			Expect(sm.Spec.Endpoints[0].Interval).To(Equal(monitoringv1.Duration("1m")))
 

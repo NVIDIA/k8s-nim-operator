@@ -140,7 +140,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{
 						Type: corev1.ServiceTypeClusterIP,
-						Port: 8000,
+						Port: ptr.To[int32](8000),
 						Annotations: map[string]string{
 							"annotation-key-specific": "service",
 						},

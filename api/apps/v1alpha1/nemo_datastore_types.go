@@ -802,15 +802,10 @@ func (n *NemoDatastore) IsServiceMonitorEnabled() bool {
 
 // GetServicePort returns the service port for the NemoDatastore deployment or default port
 func (n *NemoDatastore) GetServicePort() int32 {
-	if n.Spec.Expose.Service.Port == 0 {
+	if n.Spec.Expose.Service.Port == nil {
 		return DefaultAPIPort
 	}
-	return n.Spec.Expose.Service.Port
-}
-
-// GetMetricsPort returns the metrics port for the NemoDatastore deployment
-func (n *NemoDatastore) GetMetricsPort() int32 {
-	return n.Spec.Expose.Service.MetricsPort
+	return *n.Spec.Expose.Service.Port
 }
 
 // GetServiceType returns the service type for the NemoDatastore deployment
@@ -905,15 +900,6 @@ func (n *NemoDatastore) GetDeploymentParams() *rendertypes.DeploymentParams {
 		},
 	}
 
-	if n.GetMetricsPort() != 0 {
-		metricsPort := corev1.ContainerPort{
-			Name:          DefaultNamedPortMetrics,
-			Protocol:      corev1.ProtocolTCP,
-			ContainerPort: n.GetMetricsPort(),
-		}
-		params.Ports = append(params.Ports, metricsPort)
-	}
-
 	return params
 }
 
@@ -987,16 +973,6 @@ func (n *NemoDatastore) GetServiceParams() *rendertypes.ServiceParams {
 			TargetPort: intstr.FromString((DefaultNamedPortAPI)),
 			Protocol:   corev1.ProtocolTCP,
 		},
-	}
-
-	if n.GetMetricsPort() != 0 {
-		metricsPort := corev1.ServicePort{
-			Name:       DefaultNamedPortMetrics,
-			Port:       n.GetMetricsPort(),
-			TargetPort: intstr.FromString((DefaultNamedPortMetrics)),
-			Protocol:   corev1.ProtocolTCP,
-		}
-		params.Ports = append(params.Ports, metricsPort)
 	}
 
 	return params
@@ -1101,20 +1077,13 @@ func (n *NemoDatastore) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 	params.Labels = svcLabels
 	params.Annotations = n.GetServiceMonitorAnnotations()
 
-	// Determine the appropriate port for monitoring
-	namedMetricsPort := DefaultNamedPortAPI
-	if n.GetMetricsPort() != 0 {
-		// Use the named port for metrics
-		namedMetricsPort = DefaultNamedPortMetrics
-	}
-
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
 		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
 		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
 		Endpoints: []monitoringv1.Endpoint{
 			{
-				Port:          namedMetricsPort,
+				Port:          DefaultNamedPortAPI,
 				ScrapeTimeout: serviceMonitor.ScrapeTimeout,
 				Interval:      serviceMonitor.Interval,
 			},
