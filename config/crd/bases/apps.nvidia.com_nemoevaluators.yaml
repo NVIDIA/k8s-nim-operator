@@ -568,17 +568,15 @@ spec:
                         additionalProperties:
                           type: string
                         type: object
-                      metricsPort:
-                        description: MetricsPort is the port to be used for the metrics
-                          collection (optional)
-                        format: int32
-                        type: integer
                       name:
                         description: override the default service name
                         type: string
                       port:
+                        default: 8000
                         description: Port is the main api serving port
                         format: int32
+                        maximum: 65535
+                        minimum: 1
                         type: integer
                       type:
                         description: Service Type string describes ingress methods

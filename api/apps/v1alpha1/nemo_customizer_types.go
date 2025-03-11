@@ -655,16 +655,6 @@ func (n *NemoCustomizer) GetDeploymentParams() *rendertypes.DeploymentParams {
 			ContainerPort: CustomizerInternalPort,
 		},
 	}
-
-	if n.GetMetricsPort() != 0 {
-		metricsPort := corev1.ContainerPort{
-			Name:          DefaultNamedPortMetrics,
-			Protocol:      corev1.ProtocolTCP,
-			ContainerPort: n.GetMetricsPort(),
-		}
-		params.Ports = append(params.Ports, metricsPort)
-	}
-
 	return params
 }
 
@@ -745,17 +735,6 @@ func (n *NemoCustomizer) GetServiceParams() *rendertypes.ServiceParams {
 			Protocol:   corev1.ProtocolTCP,
 		},
 	}
-
-	if n.GetMetricsPort() != 0 {
-		metricsPort := corev1.ServicePort{
-			Name:       DefaultNamedPortMetrics,
-			Port:       n.GetMetricsPort(),
-			TargetPort: intstr.FromString((DefaultNamedPortMetrics)),
-			Protocol:   corev1.ProtocolTCP,
-		}
-		params.Ports = append(params.Ports, metricsPort)
-	}
-
 	return params
 }
 
@@ -890,20 +869,13 @@ func (n *NemoCustomizer) GetServiceMonitorParams() *rendertypes.ServiceMonitorPa
 	params.Labels = svcLabels
 	params.Annotations = n.GetServiceMonitorAnnotations()
 
-	// Determine the appropriate port for monitoring
-	namedMetricsPort := DefaultNamedPortAPI
-	if n.GetMetricsPort() != 0 {
-		// Use the named port for metrics
-		namedMetricsPort = DefaultNamedPortMetrics
-	}
-
 	// Set Service Monitor spec
 	smSpec := monitoringv1.ServiceMonitorSpec{
 		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{n.Namespace}},
 		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
 		Endpoints: []monitoringv1.Endpoint{
 			{
-				Port:          namedMetricsPort,
+				Port:          DefaultNamedPortAPI,
 				ScrapeTimeout: serviceMonitor.ScrapeTimeout,
 				Interval:      serviceMonitor.Interval,
 			},
@@ -915,15 +887,11 @@ func (n *NemoCustomizer) GetServiceMonitorParams() *rendertypes.ServiceMonitorPa
 
 // GetServicePort returns the service port for the NemoCustomizer deployment or default port
 func (n *NemoCustomizer) GetServicePort() int32 {
-	if n.Spec.Expose.Service.Port == 0 {
+	if n.Spec.Expose.Service.Port == nil {
 		return DefaultAPIPort
 	}
-	return n.Spec.Expose.Service.Port
-}
 
-// GetMetricsPort returns the metrics port for the NemoCustomizer deployment
-func (n *NemoCustomizer) GetMetricsPort() int32 {
-	return n.Spec.Expose.Service.MetricsPort
+	return *n.Spec.Expose.Service.Port
 }
 
 // GetIngressAnnotations return standard and customized ingress annotations

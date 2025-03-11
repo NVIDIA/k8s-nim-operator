@@ -44,9 +44,9 @@ type Service struct {
 	// override the default service name
 	Name string `json:"name,omitempty"`
 	// Port is the main api serving port
-	Port int32 `json:"port"`
-	// MetricsPort is the port to be used for the metrics collection (optional)
-	MetricsPort int32             `json:"metricsPort,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	Port        *int32            `json:"port"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
