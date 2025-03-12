@@ -8,7 +8,8 @@ metadata:
 spec:
   authSecret: ngc-api-secret
   configStore:
-    configMap: gr-config
+    configMap:
+      name: gr-config
   env:
     - name: NIM_ENDPOINT_URL
       value: "http://<NIM_SERVICE_ENDPOINT>:<NIM_SERVICE_PORT>/v1"
