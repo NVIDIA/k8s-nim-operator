@@ -41,6 +41,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	nimparserv1 "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/v1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
 
 var _ = Describe("NIMCache Controller", func() {
@@ -432,7 +433,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
-			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(getPvcName(nimCache, nimCache.Spec.Storage.PVC)))
+			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)))
 		})
 
 		It("should construct a job with multiple profiles", func() {
@@ -463,7 +464,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
-			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(getPvcName(nimCache, nimCache.Spec.Storage.PVC)))
+			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)))
 		})
 
 		It("should construct a job set to download all profiles", func() {

@@ -303,6 +303,12 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, Ne
 		return ctrl.Result{}, err
 	}
 
+	// Sync ConfigStore PVC
+	if NemoGuardrail.Spec.ConfigStore.PVC != nil {
+		if err = r.reconcilePVC(ctx, NemoGuardrail); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 	// Sync service
 	err = r.renderAndSyncResource(ctx, NemoGuardrail, &renderer, &corev1.Service{}, func() (client.Object, error) {
 		return renderer.Service(NemoGuardrail.GetServiceParams())
@@ -392,6 +398,41 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, Ne
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NemoGuardrailReconciler) reconcilePVC(ctx context.Context, nemoGuardrail *appsv1alpha1.NemoGuardrail) error {
+	logger := r.GetLogger()
+	pvcName := shared.GetPVCName(nemoGuardrail, *nemoGuardrail.Spec.ConfigStore.PVC)
+	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nemoGuardrail.GetNamespace()}
+	pvc := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, pvcNamespacedName, pvc)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	// If PVC does not exist, create a new one if creation flag is enabled
+	if err != nil {
+		if nemoGuardrail.Spec.ConfigStore.PVC.Create != nil && *nemoGuardrail.Spec.ConfigStore.PVC.Create {
+			pvc, err = shared.ConstructPVC(*nemoGuardrail.Spec.ConfigStore.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoGuardrail.GetNamespace()})
+			if err != nil {
+				logger.Error(err, "Failed to construct pvc", "name", pvcName)
+				return err
+			}
+			if err := controllerutil.SetControllerReference(nemoGuardrail, pvc, r.GetScheme()); err != nil {
+				return err
+			}
+			err = r.Create(ctx, pvc)
+			if err != nil {
+				logger.Error(err, "Failed to create pvc", "name", pvcName)
+				return err
+			}
+			logger.Info("Created PVC for NEMO Guardrail ConfigStore", "pvc", pvc.Name)
+		} else {
+			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, NemoGuardrail client.Object, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {

@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ConstructPVC constructs a PVC from the custom spec from the user
@@ -48,4 +49,12 @@ func ConstructPVC(pvc appsv1alpha1.PersistentVolumeClaim, pvcMeta metav1.ObjectM
 	}
 
 	return claim, nil
+}
+
+func GetPVCName(parent client.Object, pvc appsv1alpha1.PersistentVolumeClaim) string {
+	pvcName := fmt.Sprintf("%s-pvc", parent.GetName())
+	if pvc.Name != "" {
+		pvcName = pvc.Name
+	}
+	return pvcName
 }

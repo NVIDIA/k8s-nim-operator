@@ -490,7 +490,7 @@ func (r *NIMCacheReconciler) reconcileServiceAccount(ctx context.Context, nimCac
 
 func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
-	pvcName := getPvcName(nimCache, nimCache.Spec.Storage.PVC)
+	pvcName := shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nimCache.GetNamespace()}
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, pvcNamespacedName, pvc)
@@ -744,7 +744,7 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 		logger.Info("Job completed", "job", jobName)
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionJobCompleted, metav1.ConditionTrue, "JobCompleted", "The Job to cache NIM has successfully completed")
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusReady
-		nimCache.Status.PVC = getPvcName(nimCache, nimCache.Spec.Storage.PVC)
+		nimCache.Status.PVC = shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)
 
 		selectedProfiles, err := getSelectedProfiles(nimCache)
 		if err != nil {
@@ -835,7 +835,7 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 	// Reconcile PVC
 	err = r.reconcilePVC(ctx, nimCache)
 	if err != nil {
-		logger.Error(err, "reconciliation of pvc failed", "pvc", getPvcName(nimCache, nimCache.Spec.Storage.PVC))
+		logger.Error(err, "reconciliation of pvc failed", "pvc", shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC))
 		return ctrl.Result{}, err
 	}
 
@@ -892,14 +892,6 @@ func (r *NIMCacheReconciler) updateNIMCacheStatus(ctx context.Context, nimCache 
 
 func getJobName(nimCache *appsv1alpha1.NIMCache) string {
 	return fmt.Sprintf("%s-job", nimCache.GetName())
-}
-
-func getPvcName(parent client.Object, pvc appsv1alpha1.PersistentVolumeClaim) string {
-	pvcName := fmt.Sprintf("%s-pvc", parent.GetName())
-	if pvc.Name != "" {
-		pvcName = pvc.Name
-	}
-	return pvcName
 }
 
 func getPodName(nimCache *appsv1alpha1.NIMCache) string {
@@ -1021,7 +1013,7 @@ func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (s
 
 func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) (*batchv1.Job, error) {
 	logger := r.GetLogger()
-	pvcName := getPvcName(nimCache, nimCache.Spec.Storage.PVC)
+	pvcName := shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)
 	labels := map[string]string{
 		"app":                          "k8s-nim-operator",
 		"app.kubernetes.io/name":       nimCache.Name,
