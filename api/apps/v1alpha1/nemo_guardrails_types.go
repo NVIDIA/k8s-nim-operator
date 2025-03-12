@@ -81,9 +81,17 @@ type NemoGuardrailSpec struct {
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 }
 
+// GuardrailConfig defines the source where the service config is made available.
+//
+// +kubebuilder:validation:XValidation:rule="!(has(self.configMap) && has(self.pvc))", message="Cannot set both ConfigMap and PVC in ConfigStore"
 type GuardrailConfig struct {
-	ConfigMap string                 `json:"configMap,omitempty"`
+	ConfigMap *ConfigMap             `json:"configMap,omitempty"`
 	PVC       *PersistentVolumeClaim `json:"pvc,omitempty"`
+}
+
+type ConfigMap struct {
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
 }
 
 // NemoGuardrailStatus defines the observed state of NemoGuardrail
@@ -375,13 +383,13 @@ func (n *NemoGuardrail) GetDefaultStartupProbe() *corev1.Probe {
 // GetVolumes returns volumes for the NemoGuardrail container
 func (n *NemoGuardrail) GetVolumes() []corev1.Volume {
 	volumes := []corev1.Volume{}
-	if n.Spec.ConfigStore.ConfigMap != "" {
+	if n.Spec.ConfigStore.ConfigMap != nil {
 		volumes = append(volumes, corev1.Volume{
 			Name: "config-store",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.ConfigStore.ConfigMap,
+						Name: n.Spec.ConfigStore.ConfigMap.Name,
 					},
 				},
 			},

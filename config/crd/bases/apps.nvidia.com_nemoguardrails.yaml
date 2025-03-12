@@ -67,7 +67,13 @@ spec:
                 description: ConfigStore stores the config of the guardrail service
                 properties:
                   configMap:
-                    type: string
+                    properties:
+                      name:
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
                   pvc:
                     description: PersistentVolumeClaim defines the attributes of PVC
                       used as a source for caching NIM model
@@ -94,6 +100,9 @@ spec:
                         type: string
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: Cannot set both ConfigMap and PVC in ConfigStore
+                  rule: '!(has(self.configMap) && has(self.pvc))'
               env:
                 items:
                   description: EnvVar represents an environment variable present in
