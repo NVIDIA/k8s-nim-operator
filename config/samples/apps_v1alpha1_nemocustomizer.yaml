@@ -32,8 +32,8 @@ spec:
           port: 9009
           protocol: TCP
   image:
-    repository: "nvcr.io/nvidian/nemo-llm/customizer"
-    tag: "25.03-rc11"
+    repository: nvcr.io/nvidia/nemo-microservices/customizer
+    tag: "25.03"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
@@ -45,7 +45,7 @@ spec:
 
     training:
       queue: "default"
-      image: "nvcr.io/nvidian/nemo-llm/customizer-api:25.03-rc11"
+      image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.03"
       imagePullSecrets:
         - name: ngc-secret
       pvc:
@@ -487,5 +487,5 @@ spec:
         #   turn_end: <|eot_id|>
 
     nemo_data_store_tools:
-      image: nvcr.io/nvidian/nemo-llm/nds-v2-huggingface-cli:25.03-rc11
+      image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.03
       imagePullSecret: ngc-secret

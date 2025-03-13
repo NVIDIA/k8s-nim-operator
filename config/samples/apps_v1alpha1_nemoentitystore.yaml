@@ -9,8 +9,8 @@ metadata:
   namespace: nemo
 spec:
   image:
-    repository: nvcr.io/nvidian/nemo-llm/entity-store
-    tag: "25.03-rc11"
+    repository: nvcr.io/nvidia/nemo-microservices/entity-store
+    tag: "25.03"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
