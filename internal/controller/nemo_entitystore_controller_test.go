@@ -171,7 +171,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{
 						Type: corev1.ServiceTypeClusterIP,
-						Port: 8000,
+						Port: ptr.To[int32](8000),
 						Annotations: map[string]string{
 							"annotation-key-specific": "service",
 						},
@@ -329,7 +329,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 			Expect(ingress.Namespace).To(Equal(nemoEntitystore.GetNamespace()))
 			Expect(ingress.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(ingress.Annotations["annotation-key-specific"]).To(Equal("ingress"))
-			Expect(service.Spec.Ports[0].Name).To(Equal("service-port"))
+			Expect(service.Spec.Ports[0].Name).To(Equal("api"))
 			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8000)))
 			// HPA should be deployed
 			hpa := &autoscalingv2.HorizontalPodAutoscaler{}
@@ -349,7 +349,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 			Expect(sm.Namespace).To(Equal(nemoEntitystore.GetNamespace()))
 			Expect(sm.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(sm.Annotations["annotation-key-specific"]).To(Equal("service-monitor"))
-			Expect(sm.Spec.Endpoints[0].Port).To(Equal("service-port"))
+			Expect(sm.Spec.Endpoints[0].Port).To(Equal("api"))
 			Expect(sm.Spec.Endpoints[0].ScrapeTimeout).To(Equal(monitoringv1.Duration("30s")))
 			Expect(sm.Spec.Endpoints[0].Interval).To(Equal(monitoringv1.Duration("1m")))
 			// Deployment should be created
