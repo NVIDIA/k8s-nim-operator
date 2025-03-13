@@ -532,7 +532,6 @@ spec:
                         description: override the default service name
                         type: string
                       port:
-                        default: 8000
                         description: 'Port is the main api serving port (default:
                           8000)'
                         format: int32
@@ -544,8 +543,6 @@ spec:
                           for a service
                         type: string
                     type: object
-                required:
-                - service
                 type: object
               groupID:
                 format: int64
@@ -2161,7 +2158,6 @@ spec:
                 type: integer
             required:
             - databaseConfig
-            - expose
             - image
             type: object
           status:

@@ -69,7 +69,7 @@ type NemoGuardrailSpec struct {
 	Tolerations    []corev1.Toleration          `json:"tolerations,omitempty"`
 	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
 	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Expose         Expose                       `json:"expose"`
+	Expose         Expose                       `json:"expose,omitempty"`
 	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
 	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
 	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
