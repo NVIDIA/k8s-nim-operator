@@ -57,7 +57,7 @@ spec:
                 type: array
               authSecret:
                 description: The name of an secret that contains authn for the NGC
-                  NIM service API
+                  NIM service API, required when the NIM is hosted by NGC
                 type: string
               command:
                 items:
@@ -2143,7 +2143,6 @@ spec:
                 format: int64
                 type: integer
             required:
-            - authSecret
             - image
             type: object
           status:
