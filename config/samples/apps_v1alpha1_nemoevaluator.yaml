@@ -8,10 +8,11 @@ metadata:
   namespace: nemo
 spec:
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/evaluation-ms
-    tag: "25.02"
+    repository: nvcr.io/nvidia/nemo-microservices/evaluator
+    tag: "25.03"
     pullPolicy: IfNotPresent
-    pullSecrets: []
+    pullSecrets:
+      - ngc-secret
   expose:
     service:
       port: 7331
