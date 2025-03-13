@@ -43,10 +43,11 @@ type Service struct {
 	Type corev1.ServiceType `json:"type,omitempty"`
 	// override the default service name
 	Name string `json:"name,omitempty"`
-	// Port is the main api serving port
+	// Port is the main api serving port (default: 8000)
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
-	Port        *int32            `json:"port"`
+	// +kubebuilder:default:=8000
+	Port        *int32            `json:"port,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 

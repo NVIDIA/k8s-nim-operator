@@ -477,7 +477,8 @@ spec:
                         type: string
                       port:
                         default: 8000
-                        description: Port is the main api serving port
+                        description: 'Port is the main api serving port (default:
+                          8000)'
                         format: int32
                         maximum: 65535
                         minimum: 1
@@ -486,8 +487,6 @@ spec:
                         description: Service Type string describes ingress methods
                           for a service
                         type: string
-                    required:
-                    - port
                     type: object
                 required:
                 - service
