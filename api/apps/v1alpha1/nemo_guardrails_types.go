@@ -57,8 +57,8 @@ type NemoGuardrailSpec struct {
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
-	// The name of an secret that contains authn for the NGC NIM service API
-	AuthSecret string `json:"authSecret"`
+	// The name of an secret that contains authn for the NGC NIM service API, required when the NIM is hosted by NGC
+	AuthSecret *string `json:"authSecret,omitempty"`
 	// ConfigStore stores the config of the guardrail service
 	ConfigStore    GuardrailConfig              `json:"configStore,omitempty"`
 	Labels         map[string]string            `json:"labels,omitempty"`
@@ -197,6 +197,19 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 		},
 	}
 
+	if n.Spec.AuthSecret != nil && len(*n.Spec.AuthSecret) > 0 {
+		envVars = append(envVars, corev1.EnvVar{
+			Name: "NIM_ENDPOINT_API_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "nim-endpoint-api-key",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: *n.Spec.AuthSecret,
+					},
+				},
+			},
+		})
+	}
 	return envVars
 }
 

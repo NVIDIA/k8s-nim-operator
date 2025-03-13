@@ -1802,6 +1802,11 @@ func (in *NemoGuardrailSpec) DeepCopyInto(out *NemoGuardrailSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.AuthSecret != nil {
+		in, out := &in.AuthSecret, &out.AuthSecret
+		*out = new(string)
+		**out = **in
+	}
 	in.ConfigStore.DeepCopyInto(&out.ConfigStore)
 	if in.Labels != nil {
 		in, out := &in.Labels, &out.Labels
