@@ -16,7 +16,7 @@ spec:
   objectStoreConfig:
     credentials:
       user: minioUser
-      secretName: nds-minio-existing-secret
+      secretName: datastore-minio-existing-secret
       passwordKey: objectStoreSecret
     serveDirect: true
     endpoint: datastore-minio.nemo.svc.cluster.local:9000
@@ -26,7 +26,7 @@ spec:
   databaseConfig:
     credentials:
       user: ndsuser
-      secretName: nds-pg-existing-secret
+      secretName: datastore-pg-existing-secret
       passwordKey: password
     host: datastore-pg-postgresql.nemo.svc.cluster.local
     port: 5432

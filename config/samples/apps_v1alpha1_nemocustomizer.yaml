@@ -16,7 +16,7 @@ spec:
   databaseConfig:
     credentials:
       user: ncsuser
-      secretName: ncs-pg-existing-secret
+      secretName: customizer-pg-existing-secret
       passwordKey: password
     host: customizer-pg-postgresql.nemo.svc.cluster.local
     port: 5432

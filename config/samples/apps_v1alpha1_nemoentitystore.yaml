@@ -26,5 +26,5 @@ spec:
     port: 5432
     credentials:
       user: nesuser
-      secretName: nes-pg-existing-secret
+      secretName: entity-store-pg-existing-secret
       passwordKey: password
