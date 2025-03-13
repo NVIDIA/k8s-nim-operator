@@ -29,6 +29,6 @@ spec:
     databaseName: evaldb
     credentials:
       user: evaluser
-      secretName: nev-pg-existing-secret
+      secretName: evaluator-pg-existing-secret
       passwordKey: password
   replicas: 1
