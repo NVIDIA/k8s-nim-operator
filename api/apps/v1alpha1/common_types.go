@@ -34,7 +34,7 @@ const (
 
 // Expose defines attributes to expose the service
 type Expose struct {
-	Service Service `json:"service"`
+	Service Service `json:"service,omitempty"`
 	Ingress Ingress `json:"ingress,omitempty"`
 }
 
@@ -46,7 +46,6 @@ type Service struct {
 	// Port is the main api serving port (default: 8000)
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default:=8000
 	Port        *int32            `json:"port,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
