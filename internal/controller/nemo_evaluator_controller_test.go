@@ -211,6 +211,16 @@ var _ = Describe("NemoEvaluator Controller", func() {
 				VectorDB:      appsv1alpha1.VectorDB{Endpoint: "http://milvus.default.svc.cluster.local:8000"},
 				ArgoWorkflows: appsv1alpha1.ArgoWorkflows{Endpoint: "http://argo.default.svc.cluster.local:8000"},
 				Datastore:     appsv1alpha1.Datastore{Endpoint: "http://nemo-datastore.default.svc.cluster.local:8000"},
+				Entitystore:   appsv1alpha1.Entitystore{Endpoint: "http://nemo-entitystore.default.svc.cluster.local:8000"},
+				EvaluationImages: appsv1alpha1.EvaluationImages{
+					BigcodeEvalHarness: "BigcodeEvalHarness",
+					LmEvalHarness:      "LmEvalHarness",
+					SimilarityMetrics:  "SimilarityMetrics",
+					LlmAsJudge:         "LlmAsJudge",
+					MtBench:            "MtBench",
+					Retriever:          "Retriever",
+					Rag:                "Rag",
+				},
 			},
 			Status: appsv1alpha1.NemoEvaluatorStatus{
 				State: conditions.NotReady,
@@ -356,7 +366,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 				corev1.EnvVar{Name: "NAMESPACE", Value: nemoEvaluator.GetNamespace()},
 				corev1.EnvVar{Name: "ARGO_HOST", Value: nemoEvaluator.Spec.ArgoWorkflows.Endpoint},
 				corev1.EnvVar{Name: "EVAL_CONTAINER", Value: nemoEvaluator.GetImage()},
-				corev1.EnvVar{Name: "DATA_STORE_HOST", Value: nemoEvaluator.Spec.Datastore.Endpoint},
+				corev1.EnvVar{Name: "DATA_STORE_URL", Value: nemoEvaluator.Spec.Datastore.Endpoint},
 			))
 
 			Expect(initContainerEnvVars).To(ContainElement(corev1.EnvVar{
@@ -438,7 +448,11 @@ var _ = Describe("NemoEvaluator Controller", func() {
 
 			// Verify Datastore environment variables
 			Expect(envVars).To(ContainElements(
-				corev1.EnvVar{Name: "DATA_STORE_HOST", Value: nemoEvaluator.Spec.Datastore.Endpoint},
+				corev1.EnvVar{Name: "DATA_STORE_URL", Value: nemoEvaluator.Spec.Datastore.Endpoint},
+			))
+
+			Expect(envVars).To(ContainElements(
+				corev1.EnvVar{Name: "ENTITY_STORE_URL", Value: nemoEvaluator.Spec.Entitystore.Endpoint},
 			))
 
 			// Verify Milvus environment variables
@@ -450,6 +464,17 @@ var _ = Describe("NemoEvaluator Controller", func() {
 			Expect(envVars).To(ContainElements(
 				corev1.EnvVar{Name: "ARGO_HOST", Value: nemoEvaluator.Spec.ArgoWorkflows.Endpoint},
 				corev1.EnvVar{Name: "SERVICE_ACCOUNT", Value: nemoEvaluator.Spec.ArgoWorkflows.ServiceAccount},
+			))
+
+			// Verify Evaluation Images environment variables
+			Expect(envVars).To(ContainElements(
+				corev1.EnvVar{Name: "BIGCODE_EVALUATION_HARNESS", Value: nemoEvaluator.Spec.EvaluationImages.BigcodeEvalHarness},
+				corev1.EnvVar{Name: "LM_EVAL_HARNESS", Value: nemoEvaluator.Spec.EvaluationImages.LmEvalHarness},
+				corev1.EnvVar{Name: "SIMILARITY_METRICS", Value: nemoEvaluator.Spec.EvaluationImages.SimilarityMetrics},
+				corev1.EnvVar{Name: "LLM_AS_A_JUDGE", Value: nemoEvaluator.Spec.EvaluationImages.LlmAsJudge},
+				corev1.EnvVar{Name: "MT_BENCH", Value: nemoEvaluator.Spec.EvaluationImages.MtBench},
+				corev1.EnvVar{Name: "RETRIEVER", Value: nemoEvaluator.Spec.EvaluationImages.Retriever},
+				corev1.EnvVar{Name: "RAG", Value: nemoEvaluator.Spec.EvaluationImages.Rag},
 			))
 		})
 
