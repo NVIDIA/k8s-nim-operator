@@ -18,21 +18,10 @@ spec:
     {{- .SelectorLabels | yaml | nindent 4 }}
   {{- end }}
   ports:
-    {{- if .Ports }}
-      {{- range .Ports }}
+    {{- range .Ports }}
     - port: {{ .Port }}
       targetPort: {{ .TargetPort }}
       protocol: {{ .Protocol | default "TCP" }}
       name: {{ .Name }}
-      {{- end }}
-    {{- else if .Port }}
-    - port: {{ .Port }}
-      {{- if .TargetPort }}
-      targetPort: {{ .TargetPort }}
-      {{- end }}
-      protocol: {{ .Protocol | default "TCP" }}
-      {{- if .Name }}
-      name: {{ .Name }}
-      {{- end }}
     {{- end }}
 

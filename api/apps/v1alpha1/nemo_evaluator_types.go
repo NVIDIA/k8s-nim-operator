@@ -709,7 +709,7 @@ func (n *NemoEvaluator) GetServiceParams() *rendertypes.ServiceParams {
 	params.SelectorLabels = n.GetSelectorLabels()
 
 	// Set service type
-	params.Type = "ClusterIP"
+	params.Type = n.GetServiceType()
 
 	// Set service ports
 	params.Ports = []corev1.ServicePort{

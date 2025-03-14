@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render/types"
@@ -250,11 +251,13 @@ var _ = Describe("K8s Resources Rendering", func() {
 
 		It("should render Service template correctly", func() {
 			params := types.ServiceParams{
-				Name:       "test-service",
-				Namespace:  "default",
-				Port:       80,
-				TargetPort: 8080,
-				Type:       "ClusterIP",
+				Name:      "test-service",
+				Namespace: "default",
+				Ports: []corev1.ServicePort{{
+					Port:       80,
+					TargetPort: intstr.FromInt(8080),
+				}},
+				Type: "ClusterIP",
 			}
 			r := render.NewRenderer(templatesDir)
 			service, err := r.Service(&params)
