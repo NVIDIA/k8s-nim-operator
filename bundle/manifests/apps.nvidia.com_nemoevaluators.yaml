@@ -150,6 +150,15 @@ spec:
                 description: EnableValidation indicates that the validation jobs to
                   be enabled
                 type: boolean
+              entitystore:
+                description: Entitystore stores the entitystore endpoint.
+                properties:
+                  endpoint:
+                    minLength: 1
+                    type: string
+                required:
+                - endpoint
+                type: object
               env:
                 items:
                   description: EnvVar represents an environment variable present in
@@ -275,6 +284,40 @@ spec:
                 - INFO
                 - DEBUG
                 type: string
+              evaluationImages:
+                description: EvaluationImages defines the external images used for
+                  evaluation
+                properties:
+                  bigcodeEvalHarness:
+                    minLength: 1
+                    type: string
+                  llmAsJudge:
+                    minLength: 1
+                    type: string
+                  lmEvalHarness:
+                    minLength: 1
+                    type: string
+                  mtBench:
+                    minLength: 1
+                    type: string
+                  rag:
+                    minLength: 1
+                    type: string
+                  retriever:
+                    minLength: 1
+                    type: string
+                  similarityMetrics:
+                    minLength: 1
+                    type: string
+                required:
+                - bigcodeEvalHarness
+                - llmAsJudge
+                - lmEvalHarness
+                - mtBench
+                - rag
+                - retriever
+                - similarityMetrics
+                type: object
               expose:
                 description: Expose defines attributes to expose the service
                 properties:
@@ -2281,6 +2324,8 @@ spec:
             - argoWorkflows
             - databaseConfig
             - datastore
+            - entitystore
+            - evaluationImages
             - image
             - vectorDB
             type: object

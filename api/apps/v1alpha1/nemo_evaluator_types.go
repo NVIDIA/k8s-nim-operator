@@ -87,7 +87,8 @@ type NemoEvaluatorSpec struct {
 	VectorDB VectorDB `json:"vectorDB"`
 	// Datastore stores the datastore endpoint.
 	Datastore Datastore `json:"datastore"`
-
+	// Entitystore stores the entitystore endpoint.
+	Entitystore Entitystore `json:"entitystore"`
 	// OpenTelemetry Settings
 	// +kubebuilder:validation:Optional
 	OpenTelemetry OTelSpec `json:"otel,omitempty"`
@@ -112,6 +113,26 @@ type NemoEvaluatorSpec struct {
 
 	// EnableValidation indicates that the validation jobs to be enabled
 	EnableValidation *bool `json:"enableValidation,omitempty"`
+
+	// EvaluationImages defines the external images used for evaluation
+	EvaluationImages EvaluationImages `json:"evaluationImages"`
+}
+
+type EvaluationImages struct {
+	// +kubebuilder:validation:MinLength=1
+	BigcodeEvalHarness string `json:"bigcodeEvalHarness"`
+	// +kubebuilder:validation:MinLength=1
+	LmEvalHarness string `json:"lmEvalHarness"`
+	// +kubebuilder:validation:MinLength=1
+	SimilarityMetrics string `json:"similarityMetrics"`
+	// +kubebuilder:validation:MinLength=1
+	LlmAsJudge string `json:"llmAsJudge"`
+	// +kubebuilder:validation:MinLength=1
+	MtBench string `json:"mtBench"`
+	// +kubebuilder:validation:MinLength=1
+	Retriever string `json:"retriever"`
+	// +kubebuilder:validation:MinLength=1
+	Rag string `json:"rag"`
 }
 
 // NemoEvaluatorStatus defines the observed state of NemoEvaluator
@@ -143,6 +164,39 @@ type NemoEvaluatorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NemoEvaluator `json:"items"`
+}
+
+func (ei EvaluationImages) GetEvaluationImageEnv() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:  "BIGCODE_EVALUATION_HARNESS",
+			Value: ei.BigcodeEvalHarness,
+		},
+		{
+			Name:  "LM_EVAL_HARNESS",
+			Value: ei.LmEvalHarness,
+		},
+		{
+			Name:  "SIMILARITY_METRICS",
+			Value: ei.SimilarityMetrics,
+		},
+		{
+			Name:  "LLM_AS_A_JUDGE",
+			Value: ei.LlmAsJudge,
+		},
+		{
+			Name:  "MT_BENCH",
+			Value: ei.MtBench,
+		},
+		{
+			Name:  "RETRIEVER",
+			Value: ei.Retriever,
+		},
+		{
+			Name:  "RAG",
+			Value: ei.Rag,
+		},
+	}
 }
 
 // GetStandardSelectorLabels returns the standard selector labels for the NemoEvaluator deployment
@@ -202,8 +256,12 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 			Value: n.Spec.ArgoWorkflows.ServiceAccount,
 		},
 		{
-			Name:  "DATA_STORE_HOST",
+			Name:  "DATA_STORE_URL",
 			Value: n.Spec.Datastore.Endpoint,
+		},
+		{
+			Name:  "ENTITY_STORE_URL",
+			Value: n.Spec.Entitystore.Endpoint,
 		},
 		{
 			Name:  "EVAL_CONTAINER",
@@ -230,6 +288,9 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 
 	// Append the environment variables for Postgres
 	envVars = append(envVars, n.GetPostgresEnv()...)
+
+	// Append the environment variables for EvaluationImages
+	envVars = append(envVars, n.Spec.EvaluationImages.GetEvaluationImageEnv()...)
 
 	// Append the environment variables for OTel
 	if n.IsOtelEnabled() {
@@ -916,12 +977,15 @@ func (n *NemoEvaluator) GetInitContainers() []corev1.Container {
 			Value: n.GetImage(),
 		},
 		{
-			Name:  "DATA_STORE_HOST",
+			Name:  "DATA_STORE_URL",
 			Value: n.Spec.Datastore.Endpoint,
 		},
 	}
 	// Append the environment variables for Postgres
 	envVars = append(envVars, n.GetPostgresEnv()...)
+
+	// Append the environment variables for EvaluationImages
+	envVars = append(envVars, n.Spec.EvaluationImages.GetEvaluationImageEnv()...)
 
 	return []corev1.Container{
 		{
