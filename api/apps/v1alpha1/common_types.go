@@ -28,8 +28,6 @@ const (
 	DefaultAPIPort = 8000
 	// DefaultNamedPortAPI is the default name for api port
 	DefaultNamedPortAPI = "api"
-	// DefaultNamedPortMetrics is the default name for metrics port
-	DefaultNamedPortMetrics = "metrics"
 )
 
 // Expose defines attributes to expose the service

@@ -38,7 +38,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	// EntitystoreAPIPort is the default port that the entittystore serves on
+	// EntitystoreAPIPort is the default port that the entitystore serves on
 	EntitystoreAPIPort = 8000
 	// NemoEntitystoreConditionReady indicates that the NEMO EntitystoreService is ready.
 	NemoEntitystoreConditionReady = "Ready"

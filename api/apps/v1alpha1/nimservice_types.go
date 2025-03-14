@@ -783,6 +783,7 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 		Selector:          metav1.LabelSelector{MatchLabels: n.GetServiceLabels()},
 		Endpoints: []monitoringv1.Endpoint{
 			{
+				Path:          "/v1/metrics",
 				Port:          DefaultNamedPortAPI,
 				ScrapeTimeout: serviceMonitor.ScrapeTimeout,
 				Interval:      serviceMonitor.Interval,
