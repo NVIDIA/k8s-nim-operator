@@ -23,14 +23,20 @@ type ArgoWorkflows struct {
 	ServiceAccount string `json:"serviceAccount"`
 }
 
-// VectorDB defines configuration for connecting to external VectorDB
+// VectorDB defines the configuration for connecting to the external VectorDB
 type VectorDB struct {
 	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
 
-// Datastore defines configuration for connecting to NeMo Datastore service
+// Datastore defines the configuration for connecting to the NeMo Datastore service
 type Datastore struct {
+	// +kubebuilder:validation:MinLength=1
+	Endpoint string `json:"endpoint"`
+}
+
+// Entitystore defines the configuration for connecting to the NeMo EntityStore service
+type Entitystore struct {
 	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
