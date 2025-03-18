@@ -40,7 +40,6 @@ spec:
       imagePullSecrets:
         - name: ngc-secret
       pvc:
-        storageClass: ""
         size: 5Gi
         volumeAccessMode: ReadWriteOnce
       env:
@@ -89,7 +88,7 @@ spec:
           imagePullPolicy: IfNotPresent
 
     model_download_jobs:
-      image: "nvcr.io/nvidian/nemo-llm/customizer-api:25.03-rc11"
+      image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.03"
       imagePullPolicy: "IfNotPresent"
       imagePullSecrets:
         - name: ngc-secret
