@@ -675,6 +675,14 @@ spec:
                 - update
                 - watch
             - apiGroups:
+                - batch
+              resources:
+                - jobs/status
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
                 - config.openshift.io
               resources:
                 - clusterversions
@@ -806,6 +814,17 @@ spec:
               - batch.volcano.sh
               resources:
               - jobs
+              verbs:
+              - create
+              - delete
+              - get
+              - list
+              - patch
+              - update
+              - watch
+            - apiGroups:
+              - batch.volcano.sh
+              resources:
               - jobs/status
               verbs:
               - get
