@@ -769,6 +769,16 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 			Verbs:         []string{"use"},
 		},
 		{
+			APIGroups: []string{"batch"},
+			Resources: []string{"jobs"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "delete", "patch"},
+		},
+		{
+			APIGroups: []string{"batch"},
+			Resources: []string{"jobs/status"},
+			Verbs:     []string{"get", "list", "watch"},
+		},
+		{
 			APIGroups: []string{""},
 			Resources: []string{"pods", "persistentvolumeclaims", "services", "configmaps"},
 			Verbs:     []string{"create", "get", "list", "watch", "delete"},
@@ -783,7 +793,12 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 	volcanoRules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{"batch.volcano.sh"},
-			Resources: []string{"jobs", "jobs/status"},
+			Resources: []string{"jobs"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "delete", "patch"},
+		},
+		{
+			APIGroups: []string{"batch.volcano.sh"},
+			Resources: []string{"jobs/status"},
 			Verbs:     []string{"get", "list", "watch"},
 		},
 		{
