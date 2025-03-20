@@ -19,7 +19,6 @@ package utils
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -186,30 +185,18 @@ func firstKey(m map[string]interface{}) string {
 
 // GetResourceHash returns a consistent hash for the given object spec
 func GetResourceHash(obj client.Object) string {
-	// Convert obj to a map[string]interface{}
-	objMap, err := json.Marshal(obj)
-	if err != nil {
-		panic(err)
+	parentSpecHash, ok := obj.GetAnnotations()[NvidiaAnnotationParentSpecHashKey]
+	if ok {
+		// remove CR spec hash before generating obj hash.
+		delete(obj.GetAnnotations(), NvidiaAnnotationParentSpecHashKey)
+	}
+	objHash := DeepHashObject(obj)
+	// re-add CR spec hash.
+	if ok {
+		obj.GetAnnotations()[NvidiaAnnotationParentSpecHashKey] = parentSpecHash
 	}
 
-	var objData map[string]interface{}
-	if err := json.Unmarshal(objMap, &objData); err != nil {
-		panic(err)
-	}
-
-	// Sort keys to ensure consistent serialization
-	sortedObjData := SortKeys(objData)
-
-	// Serialize to JSON
-	serialized, err := json.Marshal(sortedObjData)
-	if err != nil {
-		panic(err)
-	}
-
-	// Compute the hash
-	hasher := sha256.New()
-	hasher.Write(serialized)
-	return fmt.Sprintf("%x", hasher.Sum(nil))
+	return objHash
 }
 
 // IsSpecChanged returns true if the spec has changed between the existing one
