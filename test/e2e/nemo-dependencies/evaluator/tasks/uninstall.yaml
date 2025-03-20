@@ -20,3 +20,11 @@
 - name: Delete Milvus SA
   command: kubectl delete serviceaccount milvus -n {{ namespace }}
   ignore_errors: true
+
+- name: Delete Milvus role
+  command: kubectl delete role scc-anyuid -n {{ namespace }}
+  ignore_errors: true
+
+- name: Delete Milvus rolebinding
+  command: kubectl delete rolebinding milvus-scc-anyuid-binding -n {{ namespace }}
+  ignore_errors: true

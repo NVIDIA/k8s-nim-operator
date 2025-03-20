@@ -7,13 +7,16 @@
   set_fact:
     is_openshift: "{{ 'routes.route.openshift.io' in api_resources.stdout_lines }}"
 
-- name: OpenShift - Create Milvus service account
-  command: kubectl create serviceaccount milvus -n {{ namespace }}
-  when: is_openshift
 
-- name: OpenShift - Add SCC policy anyuid to Milvus service account
-  command: oc adm policy add-scc-to-user anyuid system:serviceaccount:{{ namespace }}:milvus
-  when: is_openshift
+- name: OpenShift - Prepare RBAC to use anyuid SCC
+  ansible.builtin.template:
+    src: milvus-oc-rbac.yaml.j2
+    dest: milvus-oc-rbac.yaml
+  when: is_openshift 
+
+- name: OpenShift - apply RBAC to use anyuid SCC
+  command: kubectl apply -f milvus-oc-rbac.yaml
+  when: is_openshift 
 
 - name: Add Helm repository for Milvus
   command: helm repo add {{ milvus.helm_repo_name }} {{ milvus.helm_repo_url }}
