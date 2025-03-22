@@ -57,6 +57,7 @@ type DeploymentParams struct {
 	Namespace          string
 	Labels             map[string]string
 	Annotations        map[string]string
+	PodAnnotations     map[string]string
 	SelectorLabels     map[string]string
 	Replicas           int
 	ContainerName      string

@@ -26,6 +26,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -451,10 +452,19 @@ func (r *NemoDatastoreReconciler) reconcilePVC(ctx context.Context, nemoDatastor
 	return nil
 }
 
-func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, NemoDatastore client.Object, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, NemoDatastore *appsv1alpha1.NemoDatastore, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
 	namespacedName := types.NamespacedName{Name: NemoDatastore.GetName(), Namespace: NemoDatastore.GetNamespace()}
+	err := r.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
+		return err
+	}
+	// Don't do anything if CR is unchanged.
+	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(NemoDatastore.Spec)) {
+		return nil
+	}
 
 	resource, err := renderFunc()
 	if err != nil {
@@ -492,7 +502,7 @@ func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, Nem
 		return err
 	}
 
-	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource, namespacedName)
+	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, NemoDatastore, reason, err.Error())

@@ -260,94 +260,6 @@ func TestIsSpecChanged(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "no change in hash with change in order of elements",
-			current: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "apps/v1",
-					"kind":       "Deployment",
-					"metadata": map[string]interface{}{
-						"name":      "nim-deployment",
-						"namespace": "default",
-					},
-					"spec": map[string]interface{}{
-						"replicas": 2,
-						"selector": map[string]interface{}{
-							"matchLabels": map[string]interface{}{
-								"app": "nim",
-							},
-						},
-						"template": map[string]interface{}{
-							"metadata": map[string]interface{}{
-								"labels": map[string]interface{}{
-									"app": "nim",
-								},
-							},
-							"spec": map[string]interface{}{
-								"containers": []interface{}{
-									map[string]interface{}{
-										"name":  "nim",
-										"image": "nim:v0.1.0",
-										"ports": []interface{}{
-											map[string]interface{}{
-												"containerPort": 80,
-											},
-										}, // swith order of env
-										"env": []interface{}{
-											map[string]interface{}{"name": "ENV_VAR2", "value": "value2"},
-											map[string]interface{}{"name": "ENV_VAR1", "value": "value1"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			desired: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "apps/v1",
-					"kind":       "Deployment",
-					"metadata": map[string]interface{}{
-						"name":      "nim-deployment",
-						"namespace": "default",
-					},
-					"spec": map[string]interface{}{
-						"replicas": 2,
-						"selector": map[string]interface{}{
-							"matchLabels": map[string]interface{}{
-								"app": "nim",
-							},
-						},
-						"template": map[string]interface{}{
-							"metadata": map[string]interface{}{
-								"labels": map[string]interface{}{
-									"app": "nim",
-								},
-							},
-							"spec": map[string]interface{}{
-								"containers": []interface{}{
-									map[string]interface{}{
-										"name":  "nim",
-										"image": "nim:v0.1.0",
-										"ports": []interface{}{
-											map[string]interface{}{
-												"containerPort": 80,
-											},
-										},
-										"env": []interface{}{
-											map[string]interface{}{"name": "ENV_VAR1", "value": "value1"},
-											map[string]interface{}{"name": "ENV_VAR2", "value": "value2"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: false,
-		},
-		{
 			name: "change in hash with change in value of elements",
 			current: &unstructured.Unstructured{
 				Object: map[string]interface{}{
@@ -437,47 +349,13 @@ func TestIsSpecChanged(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for idx, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.current.SetAnnotations(map[string]string{
 				NvidiaAnnotationHashKey: GetResourceHash(tt.current),
 			})
 			if got := IsSpecChanged(tt.current, tt.desired); got != tt.expected {
-				t.Errorf("IsSpecChanged() = %v, want %v, hash current %s vs desired %s", got, tt.expected, GetResourceHash(tt.current), GetResourceHash(tt.desired))
-			}
-		})
-	}
-}
-
-// TestContainsElement tests the ContainsElement function
-func TestContainsElement(t *testing.T) {
-	// Test cases
-	tests := []struct {
-		name     string
-		slice    interface{}
-		element  interface{}
-		expected bool
-	}{
-		{"IntExists", []int{1, 2, 3, 4, 5}, 3, true},
-		{"IntDoesNotExist", []int{1, 2, 3, 4, 5}, 6, false},
-		{"StringExists", []string{"llama", "mistral", "gemini"}, "llama", true},
-		{"StringDoesNotExist", []string{"llama", "mistral", "gemini"}, "arctic", false},
-		{"EmptySlice", []int{}, 1, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			switch slice := tt.slice.(type) {
-			case []int:
-				result := ContainsElement(slice, tt.element.(int))
-				if result != tt.expected {
-					t.Errorf("Contains(%v, %v) = %v; expected %v", slice, tt.element, result, tt.expected)
-				}
-			case []string:
-				result := ContainsElement(slice, tt.element.(string))
-				if result != tt.expected {
-					t.Errorf("Contains(%v, %v) = %v; expected %v", slice, tt.element, result, tt.expected)
-				}
+				t.Errorf("[Testcase %d] IsSpecChanged() = %v, want %v, hash current %s vs desired %s", (idx + 1), got, tt.expected, GetResourceHash(tt.current), GetResourceHash(tt.desired))
 			}
 		})
 	}

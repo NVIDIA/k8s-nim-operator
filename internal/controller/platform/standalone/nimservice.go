@@ -385,6 +385,16 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 
 	namespacedName := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
 
+	err := r.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
+		return err
+	}
+	// Don't do anything if CR is unchanged.
+	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
+		return nil
+	}
+
 	resource, err := renderFunc()
 	if err != nil {
 		logger.Error(err, "failed to render", conditionType, namespacedName)
@@ -421,7 +431,7 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		return err
 	}
 
-	err = r.syncResource(ctx, obj, resource, namespacedName)
+	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
@@ -465,34 +475,6 @@ func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.Depl
 		c := status.Conditions[i]
 		if c.Type == condType {
 			return &c
-		}
-	}
-	return nil
-}
-
-func (r *NIMServiceReconciler) syncResource(ctx context.Context, obj client.Object, desired client.Object, namespacedName types.NamespacedName) error {
-	logger := log.FromContext(ctx)
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if !utils.IsSpecChanged(obj, desired) {
-		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
-		return nil
-	}
-	logger.V(2).Info("Object spec has changed, updating")
-
-	if errors.IsNotFound(err) {
-		err = r.Create(ctx, desired)
-		if err != nil {
-			return err
-		}
-	} else {
-		err = r.Update(ctx, desired)
-		if err != nil {
-			return err
 		}
 	}
 	return nil

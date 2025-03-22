@@ -26,6 +26,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -435,10 +436,19 @@ func (r *NemoGuardrailReconciler) reconcilePVC(ctx context.Context, nemoGuardrai
 	return nil
 }
 
-func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, NemoGuardrail client.Object, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, NemoGuardrail *appsv1alpha1.NemoGuardrail, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
 	namespacedName := types.NamespacedName{Name: NemoGuardrail.GetName(), Namespace: NemoGuardrail.GetNamespace()}
+	err := r.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
+		return err
+	}
+	// Don't do anything if CR is unchanged.
+	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(NemoGuardrail.Spec)) {
+		return nil
+	}
 
 	resource, err := renderFunc()
 	if err != nil {
@@ -476,7 +486,7 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, Nem
 		return err
 	}
 
-	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource, namespacedName)
+	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, NemoGuardrail, reason, err.Error())
