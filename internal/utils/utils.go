@@ -304,27 +304,77 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 	}
 
 	switch castedObj := obj.(type) {
-	case *corev1.ServiceAccount:
-		return updateServiceAccount(castedObj, desired.(*corev1.ServiceAccount))
-	case *rbacv1.Role:
-		return updateRole(castedObj, desired.(*rbacv1.Role))
-	case *rbacv1.RoleBinding:
-		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding))
-	case *corev1.Service:
-		return updateService(castedObj, desired.(*corev1.Service))
-	case *networkingv1.Ingress:
-		return updateIngress(castedObj, desired.(*networkingv1.Ingress))
-	case *autoscalingv2.HorizontalPodAutoscaler:
-		return updateHPA(castedObj, desired.(*autoscalingv2.HorizontalPodAutoscaler))
-	case *monitoringv1.ServiceMonitor:
-		return updateServiceMonitor(castedObj, desired.(*monitoringv1.ServiceMonitor))
 	case *appsv1.Deployment:
 		return updateDeployment(castedObj, desired.(*appsv1.Deployment))
 	case *appsv1.StatefulSet:
 		return updateStatefulSet(castedObj, desired.(*appsv1.StatefulSet))
+	case *autoscalingv2.HorizontalPodAutoscaler:
+		return updateHPA(castedObj, desired.(*autoscalingv2.HorizontalPodAutoscaler))
+	case *corev1.ConfigMap:
+		return updateConfigMap(castedObj, desired.(*corev1.ConfigMap))
+	case *corev1.ServiceAccount:
+		return updateServiceAccount(castedObj, desired.(*corev1.ServiceAccount))
+	case *corev1.Secret:
+		return updateSecret(castedObj, desired.(*corev1.Secret))
+	case *corev1.Service:
+		return updateService(castedObj, desired.(*corev1.Service))
+	case *monitoringv1.ServiceMonitor:
+		return updateServiceMonitor(castedObj, desired.(*monitoringv1.ServiceMonitor))
+	case *networkingv1.Ingress:
+		return updateIngress(castedObj, desired.(*networkingv1.Ingress))
+	case *rbacv1.Role:
+		return updateRole(castedObj, desired.(*rbacv1.Role))
+	case *rbacv1.RoleBinding:
+		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding))
 	default:
 		panic("unsupported obj type")
 	}
+}
+
+func updateDeployment(obj, desired *appsv1.Deployment) *appsv1.Deployment {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateStatefulSet(obj, desired *appsv1.StatefulSet) *appsv1.StatefulSet {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateHPA(obj, desired *autoscalingv2.HorizontalPodAutoscaler) *autoscalingv2.HorizontalPodAutoscaler {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateConfigMap(obj, desired *corev1.ConfigMap) *corev1.ConfigMap {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Immutable = desired.Immutable
+	obj.Data = desired.Data
+	obj.BinaryData = desired.BinaryData
+	return obj
+}
+
+func updateSecret(obj, desired *corev1.Secret) *corev1.Secret {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Immutable = desired.Immutable
+	obj.Data = desired.Data
+	obj.StringData = desired.StringData
+	return obj
+}
+
+func updateService(obj, desired *corev1.Service) *corev1.Service {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
 }
 
 func updateServiceAccount(obj, desired *corev1.ServiceAccount) *corev1.ServiceAccount {
@@ -333,6 +383,20 @@ func updateServiceAccount(obj, desired *corev1.ServiceAccount) *corev1.ServiceAc
 	obj.Secrets = desired.Secrets
 	obj.ImagePullSecrets = desired.ImagePullSecrets
 	obj.AutomountServiceAccountToken = desired.AutomountServiceAccountToken
+	return obj
+}
+
+func updateServiceMonitor(obj, desired *monitoringv1.ServiceMonitor) *monitoringv1.ServiceMonitor {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateIngress(obj, desired *networkingv1.Ingress) *networkingv1.Ingress {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
 	return obj
 }
 
@@ -352,47 +416,5 @@ func updateRoleBinding(obj, desired *rbacv1.RoleBinding) *rbacv1.RoleBinding {
 	obj.SetLabels(desired.GetLabels())
 	obj.Subjects = desired.Subjects
 	obj.RoleRef = desired.RoleRef
-	return obj
-}
-
-func updateService(obj, desired *corev1.Service) *corev1.Service {
-	obj.SetAnnotations(desired.GetAnnotations())
-	obj.SetLabels(desired.GetLabels())
-	obj.Spec = *desired.Spec.DeepCopy()
-	return obj
-}
-
-func updateIngress(obj, desired *networkingv1.Ingress) *networkingv1.Ingress {
-	obj.SetAnnotations(desired.GetAnnotations())
-	obj.SetLabels(desired.GetLabels())
-	obj.Spec = *desired.Spec.DeepCopy()
-	return obj
-}
-
-func updateHPA(obj, desired *autoscalingv2.HorizontalPodAutoscaler) *autoscalingv2.HorizontalPodAutoscaler {
-	obj.SetAnnotations(desired.GetAnnotations())
-	obj.SetLabels(desired.GetLabels())
-	obj.Spec = *desired.Spec.DeepCopy()
-	return obj
-}
-
-func updateServiceMonitor(obj, desired *monitoringv1.ServiceMonitor) *monitoringv1.ServiceMonitor {
-	obj.SetAnnotations(desired.GetAnnotations())
-	obj.SetLabels(desired.GetLabels())
-	obj.Spec = *desired.Spec.DeepCopy()
-	return obj
-}
-
-func updateDeployment(obj, desired *appsv1.Deployment) *appsv1.Deployment {
-	obj.SetAnnotations(desired.GetAnnotations())
-	obj.SetLabels(desired.GetLabels())
-	obj.Spec = *desired.Spec.DeepCopy()
-	return obj
-}
-
-func updateStatefulSet(obj, desired *appsv1.StatefulSet) *appsv1.StatefulSet {
-	obj.SetAnnotations(desired.GetAnnotations())
-	obj.SetLabels(desired.GetLabels())
-	obj.Spec = *desired.Spec.DeepCopy()
 	return obj
 }

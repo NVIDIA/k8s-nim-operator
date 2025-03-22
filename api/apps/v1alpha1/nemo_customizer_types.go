@@ -310,7 +310,7 @@ func (n *NemoCustomizer) GetVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.GetConfigName(),
+						Name: n.GetName(),
 					},
 					Items: []corev1.KeyToPath{
 						{
@@ -335,15 +335,11 @@ func (n *NemoCustomizer) GetVolumeMounts() []corev1.VolumeMount {
 	}
 }
 
-// GetConfigName returns the ConfigMap name for the customizer configuration
-func (n *NemoCustomizer) GetConfigName() string {
-	return fmt.Sprintf("%s-config", n.GetName())
-}
-
 // GetStandardAnnotations returns default annotations to apply to the NemoCustomizer instance
 func (n *NemoCustomizer) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc": "nonroot",
+		"openshift.io/scc":                      "nonroot",
+		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
 }
@@ -601,6 +597,8 @@ func (n *NemoCustomizer) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetNemoCustomizerAnnotations()
+	params.PodAnnotations = n.GetNemoCustomizerAnnotations()
+	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {
@@ -954,7 +952,7 @@ func (n *NemoCustomizer) GetConfigMapParams() *rendertypes.ConfigMapParams {
 	params := &rendertypes.ConfigMapParams{}
 
 	// Set metadata
-	params.Name = n.GetConfigName()
+	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetLabels()
 	params.Annotations = n.GetAnnotations()
