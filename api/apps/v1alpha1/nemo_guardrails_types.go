@@ -218,7 +218,8 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 // GetStandardAnnotations returns default annotations to apply to the NemoGuardrail instance
 func (n *NemoGuardrail) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc": "nonroot",
+		"openshift.io/scc":                      "nonroot",
+		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
 }
@@ -526,6 +527,8 @@ func (n *NemoGuardrail) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetNemoGuardrailAnnotations()
+	params.PodAnnotations = n.GetNemoGuardrailAnnotations()
+	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {

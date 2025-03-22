@@ -272,7 +272,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: nemoCustomizer.GetConfigName(),
+							Name: nemoCustomizer.GetName(),
 						},
 						Items: []corev1.KeyToPath{
 							{
