@@ -431,7 +431,7 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		return err
 	}
 
-	err = r.syncResource(ctx, obj, resource)
+	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
@@ -475,29 +475,6 @@ func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.Depl
 		c := status.Conditions[i]
 		if c.Type == condType {
 			return &c
-		}
-	}
-	return nil
-}
-
-func (r *NIMServiceReconciler) syncResource(ctx context.Context, obj client.Object, desired client.Object) error {
-	logger := log.FromContext(ctx)
-
-	if !utils.IsSpecChanged(obj, desired) {
-		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
-		return nil
-	}
-	logger.V(2).Info("Object spec has changed, updating")
-
-	if obj == nil || obj.GetName() == "" || obj.GetNamespace() == "" {
-		err := r.Create(ctx, desired)
-		if err != nil {
-			return err
-		}
-	} else {
-		err := r.Update(ctx, utils.UpdateObject(obj, desired))
-		if err != nil {
-			return err
 		}
 	}
 	return nil
