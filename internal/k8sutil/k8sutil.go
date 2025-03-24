@@ -140,7 +140,7 @@ func CleanupResource(ctx context.Context, k8sClient client.Client, obj client.Ob
 	if err != nil {
 		return err
 	}
-	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
+	logger.V(2).Info("object deleted", "obj", obj)
 	return nil
 }
 
