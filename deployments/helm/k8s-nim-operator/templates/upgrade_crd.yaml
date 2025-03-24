@@ -91,10 +91,8 @@ spec:
             capabilities:
               drop:
               - ALL
-          command: ["kubectl"]
+          command: ["crd-apply-tool"]
           args:
-            - "apply"
-            - "-f"
-            - "/opt/nim-operator/crds/*.yaml"
+            - "--crds-dir=/opt/nim-operator/crds/"
       restartPolicy: OnFailure
 {{- end }}

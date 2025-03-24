@@ -21,13 +21,21 @@ COPY internal/ internal/
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
-# Install curl
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+#Install Git
+RUN apt-get update && apt-get install -y git
 
-# Install kubectl for must-gather and helm upgrades hooks
-RUN if [ "$TARGETARCH" = "x86_64" ]; then OS_ARCH="amd64"; elif [ "$TARGETARCH" = "aarch64" ]; then OS_ARCH="arm64"; else OS_ARCH="$TARGETARCH"; fi \
-    && curl -LO https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/${OS_ARCH}/kubectl \
-    && chmod +x ./kubectl
+WORKDIR /utils
+
+#Clone the k8s-operator-libs repo
+RUN git clone https://github.com/NVIDIA/k8s-operator-libs.git
+
+WORKDIR /utils/k8s-operator-libs
+
+#Checkout the version of the k8s-operator-libs repo that is compatible with the current version of the NIM Operator
+RUN git checkout 7d667fbaa7ac8fb02196987eb65296856e2dd564
+
+#Build the crd-apply-tool
+RUN go build -o crd-apply-tool cmd/apply-crds/main.go
 
 # Use distroless as minimal base image to package the manager binary
 FROM nvcr.io/nvidia/distroless/go:v3.1.5
@@ -36,7 +44,7 @@ ARG VERSION="unknown"
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
-COPY --from=builder /workspace/kubectl /usr/local/bin/kubectl
+COPY --from=builder /utils/k8s-operator-libs/crd-apply-tool /usr/local/bin/crd-apply-tool
 
 # Add CRD resource into the image for helm upgrades
 COPY deployments/helm/k8s-nim-operator/crds/ /opt/nim-operator/crds/
