@@ -37,7 +37,7 @@ import (
 
 const (
 	// EvaluatorAPIPort is the default port that the evaluator serves on
-	EvaluatorAPIPort = 8000
+	EvaluatorAPIPort = 7331
 	// NemoEvaluatorConditionReady indicates that the NEMO EvaluatorService is ready.
 	NemoEvaluatorConditionReady = "Ready"
 	// NemoEvaluatorConditionFailed indicates that the NEMO EvaluatorService has failed.
