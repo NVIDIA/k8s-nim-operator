@@ -140,31 +140,26 @@ func CleanupResource(ctx context.Context, k8sClient client.Client, obj client.Ob
 	if err != nil {
 		return err
 	}
-	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
+	logger.V(2).Info("object deleted", "obj", obj)
 	return nil
 }
 
 // SyncResource sync the current object with the desired object spec
-func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Object, desired client.Object, namespacedName types.NamespacedName) error {
+func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Object, desired client.Object) error {
 	logger := log.FromContext(ctx)
-
-	err := k8sClient.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
 
 	if !utils.IsSpecChanged(obj, desired) {
 		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
 		return nil
 	}
 	logger.V(2).Info("Object spec has changed, updating")
-	if errors.IsNotFound(err) {
-		err = k8sClient.Create(ctx, desired)
+	if obj == nil || obj.GetName() == "" || obj.GetNamespace() == "" {
+		err := k8sClient.Create(ctx, desired)
 		if err != nil {
 			return err
 		}
 	} else {
-		err = k8sClient.Update(ctx, desired)
+		err := k8sClient.Update(ctx, utils.UpdateObject(obj, desired))
 		if err != nil {
 			return err
 		}

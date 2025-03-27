@@ -145,7 +145,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			return ctrl.Result{}, err
 		}
 	} else {
-		err = r.cleanupResource(ctx, &networkingv1.Ingress{}, namespacedName)
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
 		if err != nil && !errors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
@@ -161,7 +161,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	} else {
 		// If autoscaling is disabled, ensure the HPA is deleted
-		err = r.cleanupResource(ctx, &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -385,6 +385,16 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 
 	namespacedName := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
 
+	err := r.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
+		return err
+	}
+	// Don't do anything if CR is unchanged.
+	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
+		return nil
+	}
+
 	resource, err := renderFunc()
 	if err != nil {
 		logger.Error(err, "failed to render", conditionType, namespacedName)
@@ -421,7 +431,7 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		return err
 	}
 
-	err = r.syncResource(ctx, obj, resource, namespacedName)
+	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
@@ -467,65 +477,6 @@ func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.Depl
 			return &c
 		}
 	}
-	return nil
-}
-
-func (r *NIMServiceReconciler) syncResource(ctx context.Context, obj client.Object, desired client.Object, namespacedName types.NamespacedName) error {
-	logger := log.FromContext(ctx)
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if !utils.IsSpecChanged(obj, desired) {
-		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
-		return nil
-	}
-	logger.V(2).Info("Object spec has changed, updating")
-
-	if errors.IsNotFound(err) {
-		err = r.Create(ctx, desired)
-		if err != nil {
-			return err
-		}
-	} else {
-		err = r.Update(ctx, desired)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// cleanupResource deletes the given Kubernetes resource if it exists.
-// If the resource does not exist or an error occurs during deletion, the function returns nil or the error.
-//
-// Parameters:
-// ctx (context.Context): The context for the operation.
-// obj (client.Object): The Kubernetes resource to delete.
-// namespacedName (types.NamespacedName): The namespaced name of the resource.
-//
-// Returns:
-// error: An error if the resource deletion fails, or nil if the resource is not found or deletion is successful.
-func (r *NIMServiceReconciler) cleanupResource(ctx context.Context, obj client.Object, namespacedName types.NamespacedName) error {
-
-	logger := log.FromContext(ctx)
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if errors.IsNotFound(err) {
-		return nil
-	}
-
-	err = r.Delete(ctx, obj)
-	if err != nil {
-		return err
-	}
-	logger.V(2).Info("NIM Service object changed, deleting ", "obj", obj)
 	return nil
 }
 

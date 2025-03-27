@@ -393,7 +393,8 @@ func (n *NemoEvaluator) GeneratePostgresConnString(secretValue string) string {
 // GetStandardAnnotations returns default annotations to apply to the NemoEvaluator instance
 func (n *NemoEvaluator) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc": "nonroot",
+		"openshift.io/scc":                      "nonroot",
+		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
 }
@@ -657,6 +658,8 @@ func (n *NemoEvaluator) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetNemoEvaluatorAnnotations()
+	params.PodAnnotations = n.GetNemoEvaluatorAnnotations()
+	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {

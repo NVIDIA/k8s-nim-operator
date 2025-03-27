@@ -195,7 +195,8 @@ func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
 // GetStandardAnnotations returns default annotations to apply to the NemoEntitystore instance
 func (n *NemoEntitystore) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc": "nonroot",
+		"openshift.io/scc":                      "nonroot",
+		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
 }
@@ -472,6 +473,8 @@ func (n *NemoEntitystore) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetNemoEntitystoreAnnotations()
+	params.PodAnnotations = n.GetNemoEntitystoreAnnotations()
+	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() {
