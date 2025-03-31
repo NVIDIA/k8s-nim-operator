@@ -21,6 +21,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -47,6 +48,12 @@ type Service struct {
 	// +kubebuilder:default:=8000
 	Port        *int32            `json:"port,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// ExposeV1 defines attributes to expose the service
+type ExposeV1 struct {
+	Service Service   `json:"service,omitempty"`
+	Ingress IngressV1 `json:"ingress,omitempty"`
 }
 
 // Metrics defines attributes to setup metrics collection
@@ -95,17 +102,70 @@ type Ingress struct {
 	Spec        networkingv1.IngressSpec `json:"spec,omitempty"`
 }
 
-// IngressHost defines attributes for ingress host
-type IngressHost struct {
-	Host  string        `json:"host,omitempty"`
-	Paths []IngressPath `json:"paths,omitempty"`
+// IngressV1 defines attributes for ingress
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
+type IngressV1 struct {
+	Enabled     *bool             `json:"enabled,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Spec        *IngressSpec      `json:"spec,omitempty"`
+}
+
+func (i *IngressV1) GenerateNetworkingV1IngressSpec(name string) networkingv1.IngressSpec {
+	if i.Spec == nil {
+		return networkingv1.IngressSpec{}
+	}
+
+	ingressSpec := networkingv1.IngressSpec{
+		IngressClassName: &i.Spec.IngressClassName,
+		Rules: []networkingv1.IngressRule{
+			{
+				Host: i.Spec.Host,
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{},
+				},
+			},
+		},
+	}
+
+	svcBackend := networkingv1.IngressBackend{
+		Service: &networkingv1.IngressServiceBackend{
+			Name: name,
+			Port: networkingv1.ServiceBackendPort{
+				Name: DefaultNamedPortAPI,
+			},
+		},
+	}
+	if len(i.Spec.Paths) == 0 {
+		ingressSpec.Rules[0].HTTP.Paths = append(ingressSpec.Rules[0].HTTP.Paths, networkingv1.HTTPIngressPath{
+			Path:     "/",
+			PathType: ptr.To(networkingv1.PathTypePrefix),
+			Backend:  svcBackend,
+		})
+	}
+	for _, path := range i.Spec.Paths {
+		ingressSpec.Rules[0].HTTP.Paths = append(ingressSpec.Rules[0].HTTP.Paths, networkingv1.HTTPIngressPath{
+			Path:     path.Path,
+			PathType: path.PathType,
+			Backend:  svcBackend,
+		})
+	}
+	return ingressSpec
+}
+
+type IngressSpec struct {
+	// +kubebuilder:validation:Pattern=`[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
+	IngressClassName string        `json:"ingressClassName"`
+	Host             string        `json:"host,omitempty"`
+	Paths            []IngressPath `json:"paths,omitempty"`
 }
 
 // IngressPath defines attributes for ingress paths
 type IngressPath struct {
-	Path        string                `json:"path,omitempty"`
-	PathType    networkingv1.PathType `json:"pathType,omitempty"`
-	ServiceType string                `json:"serviceType,omitempty"`
+	// +kubebuilder:default="/"
+	Path string `json:"path,omitempty"`
+	// +kubebuilder:default=Prefix
+	PathType *networkingv1.PathType `json:"pathType,omitempty"`
 }
 
 // Probe defines attributes for startup/liveness/readiness probes

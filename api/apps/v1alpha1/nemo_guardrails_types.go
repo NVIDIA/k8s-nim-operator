@@ -62,19 +62,16 @@ type NemoGuardrailSpec struct {
 	// The name of an secret that contains authn for the NGC NIM service API, required when the NIM is hosted by NGC
 	AuthSecret string `json:"authSecret,omitempty"`
 	// ConfigStore stores the config of the guardrail service
-	ConfigStore    GuardrailConfig              `json:"configStore,omitempty"`
-	Labels         map[string]string            `json:"labels,omitempty"`
-	Annotations    map[string]string            `json:"annotations,omitempty"`
-	NodeSelector   map[string]string            `json:"nodeSelector,omitempty"`
-	Tolerations    []corev1.Toleration          `json:"tolerations,omitempty"`
-	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
-	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Expose         Expose                       `json:"expose,omitempty"`
-	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
-	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
-	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
-	Scale          Autoscaling                  `json:"scale,omitempty"`
-	Metrics        Metrics                      `json:"metrics,omitempty"`
+	ConfigStore  GuardrailConfig              `json:"configStore,omitempty"`
+	Labels       map[string]string            `json:"labels,omitempty"`
+	Annotations  map[string]string            `json:"annotations,omitempty"`
+	NodeSelector map[string]string            `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
+	PodAffinity  *corev1.PodAffinity          `json:"podAffinity,omitempty"`
+	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Expose       ExposeV1                     `json:"expose,omitempty"`
+	Scale        Autoscaling                  `json:"scale,omitempty"`
+	Metrics      Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
 	Replicas     int    `json:"replicas,omitempty"`
@@ -308,15 +305,7 @@ func (n *NemoGuardrail) GetResources() *corev1.ResourceRequirements {
 
 // GetLivenessProbe returns liveness probe for the NemoGuardrail container
 func (n *NemoGuardrail) GetLivenessProbe() *corev1.Probe {
-	if n.Spec.LivenessProbe.Probe == nil {
-		return n.GetDefaultLivenessProbe()
-	}
-	return n.Spec.LivenessProbe.Probe
-}
-
-// GetDefaultLivenessProbe returns the default liveness probe for the NemoGuardrail container
-func (n *NemoGuardrail) GetDefaultLivenessProbe() *corev1.Probe {
-	probe := corev1.Probe{
+	return &corev1.Probe{
 		InitialDelaySeconds: 15,
 		TimeoutSeconds:      1,
 		PeriodSeconds:       10,
@@ -329,21 +318,11 @@ func (n *NemoGuardrail) GetDefaultLivenessProbe() *corev1.Probe {
 			},
 		},
 	}
-
-	return &probe
 }
 
 // GetReadinessProbe returns readiness probe for the NemoGuardrail container
 func (n *NemoGuardrail) GetReadinessProbe() *corev1.Probe {
-	if n.Spec.ReadinessProbe.Probe == nil {
-		return n.GetDefaultReadinessProbe()
-	}
-	return n.Spec.ReadinessProbe.Probe
-}
-
-// GetDefaultReadinessProbe returns the default readiness probe for the NemoGuardrail container
-func (n *NemoGuardrail) GetDefaultReadinessProbe() *corev1.Probe {
-	probe := corev1.Probe{
+	return &corev1.Probe{
 		InitialDelaySeconds: 15,
 		TimeoutSeconds:      1,
 		PeriodSeconds:       10,
@@ -356,21 +335,11 @@ func (n *NemoGuardrail) GetDefaultReadinessProbe() *corev1.Probe {
 			},
 		},
 	}
-
-	return &probe
 }
 
 // GetStartupProbe returns startup probe for the NemoGuardrail container
 func (n *NemoGuardrail) GetStartupProbe() *corev1.Probe {
-	if n.Spec.StartupProbe.Probe == nil {
-		return n.GetDefaultStartupProbe()
-	}
-	return n.Spec.StartupProbe.Probe
-}
-
-// GetDefaultStartupProbe returns the default startup probe for the NemoGuardrail container
-func (n *NemoGuardrail) GetDefaultStartupProbe() *corev1.Probe {
-	probe := corev1.Probe{
+	return &corev1.Probe{
 		InitialDelaySeconds: 30,
 		TimeoutSeconds:      1,
 		PeriodSeconds:       10,
@@ -383,8 +352,6 @@ func (n *NemoGuardrail) GetDefaultStartupProbe() *corev1.Probe {
 			},
 		},
 	}
-
-	return &probe
 }
 
 // GetVolumes returns volumes for the NemoGuardrail container
@@ -473,7 +440,7 @@ func (n *NemoGuardrail) IsIngressEnabled() bool {
 
 // GetIngressSpec returns the Ingress spec NemoGuardrail deployment
 func (n *NemoGuardrail) GetIngressSpec() networkingv1.IngressSpec {
-	return n.Spec.Expose.Ingress.Spec
+	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoGuardrail deployment
@@ -552,15 +519,11 @@ func (n *NemoGuardrail) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Image = n.GetImage()
 
 	// Set container probes
-	if IsProbeEnabled(n.Spec.LivenessProbe) {
-		params.LivenessProbe = n.GetLivenessProbe()
-	}
-	if IsProbeEnabled(n.Spec.ReadinessProbe) {
-		params.ReadinessProbe = n.GetReadinessProbe()
-	}
-	if IsProbeEnabled(n.Spec.StartupProbe) {
-		params.StartupProbe = n.GetStartupProbe()
-	}
+	params.LivenessProbe = n.GetLivenessProbe()
+	params.ReadinessProbe = n.GetReadinessProbe()
+	params.StartupProbe = n.GetStartupProbe()
+
+	// Set security context
 	params.UserID = n.GetUserID()
 	params.GroupID = n.GetGroupID()
 

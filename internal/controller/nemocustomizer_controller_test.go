@@ -37,7 +37,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -150,36 +149,6 @@ var _ = Describe("NemoCustomizer Controller", func() {
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
 					},
 				},
-				ReadinessProbe: appsv1alpha1.Probe{
-					Enabled: ptr.To[bool](true),
-					Probe: &corev1.Probe{
-						ProbeHandler: corev1.ProbeHandler{
-							HTTPGet: &corev1.HTTPGetAction{
-								Path: "/v1/health/ready",
-								Port: intstr.IntOrString{IntVal: 8000},
-							},
-						},
-						InitialDelaySeconds: 15,
-						PeriodSeconds:       10,
-						TimeoutSeconds:      10,
-						FailureThreshold:    5,
-					},
-				},
-				LivenessProbe: appsv1alpha1.Probe{
-					Enabled: ptr.To[bool](true),
-					Probe: &corev1.Probe{
-						ProbeHandler: corev1.ProbeHandler{
-							HTTPGet: &corev1.HTTPGetAction{
-								Path: "/v1/health/live",
-								Port: intstr.IntOrString{StrVal: "api"},
-							},
-						},
-						InitialDelaySeconds: 15,
-						PeriodSeconds:       10,
-						TimeoutSeconds:      10,
-						FailureThreshold:    5,
-					},
-				},
 				NodeSelector: map[string]string{"gpu-type": "h100"},
 				Tolerations: []corev1.Toleration{
 					{
@@ -189,7 +158,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
-				Expose: appsv1alpha1.Expose{
+				Expose: appsv1alpha1.ExposeV1{
 					Service: appsv1alpha1.Service{
 						Type: corev1.ServiceTypeClusterIP,
 						Port: ptr.To[int32](8000),
@@ -197,30 +166,16 @@ var _ = Describe("NemoCustomizer Controller", func() {
 							"annotation-key-specific": "service",
 						},
 					},
-					Ingress: appsv1alpha1.Ingress{
+					Ingress: appsv1alpha1.IngressV1{
 						Enabled:     ptr.To[bool](true),
 						Annotations: map[string]string{"annotation-key-specific": "ingress"},
-						Spec: networkingv1.IngressSpec{
-							Rules: []networkingv1.IngressRule{
+						Spec: &appsv1alpha1.IngressSpec{
+							IngressClassName: "nginx",
+							Host:             "test-nemocustomizer.default.example.com",
+							Paths: []appsv1alpha1.IngressPath{
 								{
-									Host: "test-nemocustomizer.default.example.com",
-									IngressRuleValue: networkingv1.IngressRuleValue{
-										HTTP: &networkingv1.HTTPIngressRuleValue{
-											Paths: []networkingv1.HTTPIngressPath{
-												{
-													Path: "/",
-													Backend: networkingv1.IngressBackend{
-														Service: &networkingv1.IngressServiceBackend{
-															Name: "test-nemocustomizer",
-															Port: networkingv1.ServiceBackendPort{
-																Number: 8000,
-															},
-														},
-													},
-												},
-											},
-										},
-									},
+									Path:     "/",
+									PathType: ptr.To(networkingv1.PathTypePrefix),
 								},
 							},
 						},
@@ -414,10 +369,9 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			Expect(deployment.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal(nemoCustomizer.GetContainerName()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(nemoCustomizer.GetImage()))
-			// Ensure customized liveness and readiness probes are added
-			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(Equal(nemoCustomizer.Spec.ReadinessProbe.Probe))
-			Expect(deployment.Spec.Template.Spec.Containers[0].LivenessProbe).To(Equal(nemoCustomizer.Spec.LivenessProbe.Probe))
-			// Ensure default startup probe is added
+			// Ensure default probes are added
+			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).NotTo(BeNil())
+			Expect(deployment.Spec.Template.Spec.Containers[0].LivenessProbe).NotTo(BeNil())
 			Expect(deployment.Spec.Template.Spec.Containers[0].StartupProbe).NotTo(BeNil())
 
 			sortVolumes(deployment.Spec.Template.Spec.Volumes)
