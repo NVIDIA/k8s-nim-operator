@@ -168,7 +168,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
-				Expose: appsv1alpha1.Expose{
+				Expose: appsv1alpha1.ExposeV1{
 					Service: appsv1alpha1.Service{
 						Type: corev1.ServiceTypeClusterIP,
 						Port: ptr.To[int32](8000),
@@ -176,30 +176,16 @@ var _ = Describe("NemoEntitystore Controller", func() {
 							"annotation-key-specific": "service",
 						},
 					},
-					Ingress: appsv1alpha1.Ingress{
+					Ingress: appsv1alpha1.IngressV1{
 						Enabled:     ptr.To(true),
 						Annotations: map[string]string{"annotation-key-specific": "ingress"},
-						Spec: networkingv1.IngressSpec{
-							Rules: []networkingv1.IngressRule{
+						Spec: &appsv1alpha1.IngressSpec{
+							IngressClassName: "nginx",
+							Host:             "full-nemoentitystore.default.example.com",
+							Paths: []appsv1alpha1.IngressPath{
 								{
-									Host: "full-nemoentitystore.default.example.com",
-									IngressRuleValue: networkingv1.IngressRuleValue{
-										HTTP: &networkingv1.HTTPIngressRuleValue{
-											Paths: []networkingv1.HTTPIngressPath{
-												{
-													Path: "/",
-													Backend: networkingv1.IngressBackend{
-														Service: &networkingv1.IngressServiceBackend{
-															Name: "full-nemoentitystore",
-															Port: networkingv1.ServiceBackendPort{
-																Number: 8000,
-															},
-														},
-													},
-												},
-											},
-										},
-									},
+									Path:     "/",
+									PathType: ptr.To(networkingv1.PathTypePrefix),
 								},
 							},
 						},
@@ -397,9 +383,10 @@ var _ = Describe("NemoEntitystore Controller", func() {
 			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal(nemoEntitystore.GetContainerName()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(nemoEntitystore.GetImage()))
-			// Ensure customized liveness and readiness probes are added
+			// Ensure default probes are added
 			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).NotTo(BeNil())
 			Expect(deployment.Spec.Template.Spec.Containers[0].LivenessProbe).NotTo(BeNil())
+			Expect(deployment.Spec.Template.Spec.Containers[0].StartupProbe).NotTo(BeNil())
 			Expect(deployment.Spec.Template.Spec.NodeSelector).To(Equal(nemoEntitystore.Spec.NodeSelector))
 			Expect(deployment.Spec.Template.Spec.Tolerations).To(Equal(nemoEntitystore.Spec.Tolerations))
 			envVars := deployment.Spec.Template.Spec.Containers[0].Env

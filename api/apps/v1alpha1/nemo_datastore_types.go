@@ -57,22 +57,19 @@ const (
 
 // NemoDatastoreSpec defines the desired state of NemoDatastore
 type NemoDatastoreSpec struct {
-	Image          Image                        `json:"image"`
-	Command        []string                     `json:"command,omitempty"`
-	Args           []string                     `json:"args,omitempty"`
-	Env            []corev1.EnvVar              `json:"env,omitempty"`
-	Labels         map[string]string            `json:"labels,omitempty"`
-	Annotations    map[string]string            `json:"annotations,omitempty"`
-	NodeSelector   map[string]string            `json:"nodeSelector,omitempty"`
-	Tolerations    []corev1.Toleration          `json:"tolerations,omitempty"`
-	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
-	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Expose         Expose                       `json:"expose,omitempty"`
-	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
-	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
-	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
-	Scale          Autoscaling                  `json:"scale,omitempty"`
-	Metrics        Metrics                      `json:"metrics,omitempty"`
+	Image        Image                        `json:"image"`
+	Command      []string                     `json:"command,omitempty"`
+	Args         []string                     `json:"args,omitempty"`
+	Env          []corev1.EnvVar              `json:"env,omitempty"`
+	Labels       map[string]string            `json:"labels,omitempty"`
+	Annotations  map[string]string            `json:"annotations,omitempty"`
+	NodeSelector map[string]string            `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
+	PodAffinity  *corev1.PodAffinity          `json:"podAffinity,omitempty"`
+	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Expose       ExposeV1                     `json:"expose,omitempty"`
+	Scale        Autoscaling                  `json:"scale,omitempty"`
+	Metrics      Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
 	Replicas     int    `json:"replicas,omitempty"`
@@ -576,15 +573,7 @@ func (n *NemoDatastore) GetResources() *corev1.ResourceRequirements {
 
 // GetLivenessProbe returns liveness probe for the NemoDatastore container
 func (n *NemoDatastore) GetLivenessProbe() *corev1.Probe {
-	if n.Spec.LivenessProbe.Probe == nil {
-		return n.GetDefaultLivenessProbe()
-	}
-	return n.Spec.LivenessProbe.Probe
-}
-
-// GetDefaultLivenessProbe returns the default liveness probe for the NemoDatastore container
-func (n *NemoDatastore) GetDefaultLivenessProbe() *corev1.Probe {
-	probe := corev1.Probe{
+	return &corev1.Probe{
 		InitialDelaySeconds: 15,
 		TimeoutSeconds:      1,
 		PeriodSeconds:       10,
@@ -597,21 +586,11 @@ func (n *NemoDatastore) GetDefaultLivenessProbe() *corev1.Probe {
 			},
 		},
 	}
-
-	return &probe
 }
 
 // GetReadinessProbe returns readiness probe for the NemoDatastore container
 func (n *NemoDatastore) GetReadinessProbe() *corev1.Probe {
-	if n.Spec.ReadinessProbe.Probe == nil {
-		return n.GetDefaultReadinessProbe()
-	}
-	return n.Spec.ReadinessProbe.Probe
-}
-
-// GetDefaultReadinessProbe returns the default readiness probe for the NemoDatastore container
-func (n *NemoDatastore) GetDefaultReadinessProbe() *corev1.Probe {
-	probe := corev1.Probe{
+	return &corev1.Probe{
 		InitialDelaySeconds: 15,
 		TimeoutSeconds:      1,
 		PeriodSeconds:       10,
@@ -624,21 +603,11 @@ func (n *NemoDatastore) GetDefaultReadinessProbe() *corev1.Probe {
 			},
 		},
 	}
-
-	return &probe
 }
 
 // GetStartupProbe returns startup probe for the NemoDatastore container
 func (n *NemoDatastore) GetStartupProbe() *corev1.Probe {
-	if n.Spec.StartupProbe.Probe == nil {
-		return n.GetDefaultStartupProbe()
-	}
-	return n.Spec.StartupProbe.Probe
-}
-
-// GetDefaultStartupProbe returns the default startup probe for the NemoDatastore container
-func (n *NemoDatastore) GetDefaultStartupProbe() *corev1.Probe {
-	probe := corev1.Probe{
+	return &corev1.Probe{
 		InitialDelaySeconds: 30,
 		TimeoutSeconds:      1,
 		PeriodSeconds:       10,
@@ -651,8 +620,6 @@ func (n *NemoDatastore) GetDefaultStartupProbe() *corev1.Probe {
 			},
 		},
 	}
-
-	return &probe
 }
 
 // GetVolumeMounts returns volumes for the NemoDatastore container
@@ -793,7 +760,7 @@ func (n *NemoDatastore) IsIngressEnabled() bool {
 
 // GetIngressSpec returns the Ingress spec NemoDatastore deployment
 func (n *NemoDatastore) GetIngressSpec() networkingv1.IngressSpec {
-	return n.Spec.Expose.Ingress.Spec
+	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoDatastore deployment
@@ -876,15 +843,11 @@ func (n *NemoDatastore) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Image = n.GetImage()
 
 	// Set container probes
-	if IsProbeEnabled(n.Spec.LivenessProbe) {
-		params.LivenessProbe = n.GetLivenessProbe()
-	}
-	if IsProbeEnabled(n.Spec.ReadinessProbe) {
-		params.ReadinessProbe = n.GetReadinessProbe()
-	}
-	if IsProbeEnabled(n.Spec.StartupProbe) {
-		params.StartupProbe = n.GetStartupProbe()
-	}
+	params.LivenessProbe = n.GetLivenessProbe()
+	params.ReadinessProbe = n.GetReadinessProbe()
+	params.StartupProbe = n.GetStartupProbe()
+
+	// Set security context
 	params.UserID = n.GetUserID()
 	params.GroupID = n.GetGroupID()
 

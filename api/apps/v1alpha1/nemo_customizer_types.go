@@ -63,22 +63,19 @@ const (
 
 // NemoCustomizerSpec defines the desired state of NemoCustomizer
 type NemoCustomizerSpec struct {
-	Image          Image                        `json:"image"`
-	Command        []string                     `json:"command,omitempty"`
-	Args           []string                     `json:"args,omitempty"`
-	Env            []corev1.EnvVar              `json:"env,omitempty"`
-	Labels         map[string]string            `json:"labels,omitempty"`
-	Annotations    map[string]string            `json:"annotations,omitempty"`
-	NodeSelector   map[string]string            `json:"nodeSelector,omitempty"`
-	Tolerations    []corev1.Toleration          `json:"tolerations,omitempty"`
-	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
-	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Expose         Expose                       `json:"expose,omitempty"`
-	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
-	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
-	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
-	Scale          Autoscaling                  `json:"scale,omitempty"`
-	Metrics        Metrics                      `json:"metrics,omitempty"`
+	Image        Image                        `json:"image"`
+	Command      []string                     `json:"command,omitempty"`
+	Args         []string                     `json:"args,omitempty"`
+	Env          []corev1.EnvVar              `json:"env,omitempty"`
+	Labels       map[string]string            `json:"labels,omitempty"`
+	Annotations  map[string]string            `json:"annotations,omitempty"`
+	NodeSelector map[string]string            `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
+	PodAffinity  *corev1.PodAffinity          `json:"podAffinity,omitempty"`
+	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Expose       ExposeV1                     `json:"expose,omitempty"`
+	Scale        Autoscaling                  `json:"scale,omitempty"`
+	Metrics      Metrics                      `json:"metrics,omitempty"`
 
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
@@ -434,15 +431,7 @@ func (n *NemoCustomizer) GetResources() *corev1.ResourceRequirements {
 
 // GetStartupProbe returns startup probe for the NemoCustomizer container
 func (n *NemoCustomizer) GetStartupProbe() *corev1.Probe {
-	if n.Spec.StartupProbe.Probe == nil {
-		return n.GetDefaultStartupProbe()
-	}
-	return n.Spec.StartupProbe.Probe
-}
-
-// GetDefaultStartupProbe returns the default startup probe for the NemoCustomizer container
-func (n *NemoCustomizer) GetDefaultStartupProbe() *corev1.Probe {
-	probe := corev1.Probe{
+	return &corev1.Probe{
 		FailureThreshold:    30,
 		InitialDelaySeconds: 30,
 		PeriodSeconds:       10,
@@ -455,21 +444,11 @@ func (n *NemoCustomizer) GetDefaultStartupProbe() *corev1.Probe {
 			},
 		},
 	}
-
-	return &probe
 }
 
 // GetLivenessProbe returns liveness probe for the NemoCustomizer container
 func (n *NemoCustomizer) GetLivenessProbe() *corev1.Probe {
-	if n.Spec.LivenessProbe.Probe == nil {
-		return n.GetDefaultLivenessProbe()
-	}
-	return n.Spec.LivenessProbe.Probe
-}
-
-// GetDefaultLivenessProbe returns the default liveness probe for the NemoCustomizer container
-func (n *NemoCustomizer) GetDefaultLivenessProbe() *corev1.Probe {
-	probe := corev1.Probe{
+	return &corev1.Probe{
 		FailureThreshold:    5,
 		InitialDelaySeconds: 10,
 		PeriodSeconds:       10,
@@ -482,20 +461,11 @@ func (n *NemoCustomizer) GetDefaultLivenessProbe() *corev1.Probe {
 			},
 		},
 	}
-	return &probe
 }
 
 // GetReadinessProbe returns readiness probe for the NemoCustomizer container
 func (n *NemoCustomizer) GetReadinessProbe() *corev1.Probe {
-	if n.Spec.ReadinessProbe.Probe == nil {
-		return n.GetDefaultReadinessProbe()
-	}
-	return n.Spec.ReadinessProbe.Probe
-}
-
-// GetDefaultReadinessProbe returns the default readiness probe for the NemoCustomizer container
-func (n *NemoCustomizer) GetDefaultReadinessProbe() *corev1.Probe {
-	probe := corev1.Probe{
+	return &corev1.Probe{
 		FailureThreshold:    3,
 		InitialDelaySeconds: 10,
 		PeriodSeconds:       10,
@@ -508,8 +478,6 @@ func (n *NemoCustomizer) GetDefaultReadinessProbe() *corev1.Probe {
 			},
 		},
 	}
-
-	return &probe
 }
 
 // GetServiceAccountName returns service account name for the NemoCustomizer deployment
@@ -557,7 +525,7 @@ func (n *NemoCustomizer) IsIngressEnabled() bool {
 
 // GetIngressSpec returns the Ingress spec NemoCustomizer deployment
 func (n *NemoCustomizer) GetIngressSpec() networkingv1.IngressSpec {
-	return n.Spec.Expose.Ingress.Spec
+	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoCustomizer deployment
@@ -628,15 +596,11 @@ func (n *NemoCustomizer) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Image = n.GetImage()
 
 	// Set container probes
-	if IsProbeEnabled(n.Spec.LivenessProbe) {
-		params.LivenessProbe = n.GetLivenessProbe()
-	}
-	if IsProbeEnabled(n.Spec.ReadinessProbe) {
-		params.ReadinessProbe = n.GetReadinessProbe()
-	}
-	if IsProbeEnabled(n.Spec.StartupProbe) {
-		params.StartupProbe = n.GetStartupProbe()
-	}
+	params.LivenessProbe = n.GetLivenessProbe()
+	params.ReadinessProbe = n.GetReadinessProbe()
+	params.StartupProbe = n.GetStartupProbe()
+
+	// Set security context
 	params.UserID = n.GetUserID()
 	params.GroupID = n.GetGroupID()
 
