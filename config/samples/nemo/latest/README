@@ -1,4 +1,4 @@
-# NeMo Custom Resources for 25.03
+# NeMo Custom Resources for 25.04
 
 These CRs are designed to deploy NeMo microservices using the NIM Operator.
 
@@ -14,7 +14,7 @@ These CRs are designed to deploy NeMo microservices using the NIM Operator.
 
 ## Upgrade Notes
 
-If upgrading from a previous NeMo service version (e.g., `25.03`) using the existing operator version:
+If upgrading from a previous NeMo service version (e.g., `25.04`) using the existing operator version:
 - Check for renamed or deprecated fields.
 - Review updated model config parameters.
 - Revalidate against the new CR using:  

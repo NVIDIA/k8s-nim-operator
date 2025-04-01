@@ -39,8 +39,9 @@ spec:
       type: ClusterIP
       port: 8000
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/datastore
-    tag: "25.03"
+    #repository: nvcr.io/nvidia/nemo-microservices/datastore
+    repository: nvcr.io/nvidian/nemo-llm/datastore
+    tag: "25.04-rc10"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
