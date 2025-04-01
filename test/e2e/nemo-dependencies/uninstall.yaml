@@ -26,25 +26,6 @@
   vars_files:
     - values.yaml
   tasks:
-    - name: Uninstall embedding
-      include_role:
-        name: embedding
-        tasks_from: uninstall.yaml  
-      vars:
-        namespace: "{{ installation_namespace }}"
-      when: uninstall.embedding == true
-    - name: Uninstall ranking
-      include_role:
-        name: ranking
-        tasks_from: uninstall.yaml  
-      vars:
-        namespace: "{{ installation_namespace }}"
-      when: uninstall.ranking == true
-
-- hosts: localhost
-  vars_files:
-    - values.yaml
-  tasks:
     - name: Uninstall entity-store
       include_role:
         name: entity-store
