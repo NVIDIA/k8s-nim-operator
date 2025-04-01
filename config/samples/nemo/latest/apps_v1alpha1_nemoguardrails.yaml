@@ -4,7 +4,8 @@ metadata:
   name: nemoguardrails-sample
   namespace: nemo
 spec:
-  authSecret: ngc-api-secret
+  # required if a NIM endpoint is hosted by NVIDIA
+  authSecret: ""
   configStore:
     pvc:
       name: "pvc-guardrail-config"
