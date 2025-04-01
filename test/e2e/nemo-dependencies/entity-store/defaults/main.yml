@@ -9,7 +9,3 @@ postgresql:
   username: nesuser
   password: nespass
   database: nesdb
-
-localPathProvisioner:
-  enabled: true
-  version: v0.0.31

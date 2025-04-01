@@ -13,4 +13,7 @@ uninstall:
 installation_namespace: nemo
 
 # set this to false when a default storage class is already provisioned in the cluster
-enable_local_path_provisioner: true
+localPathProvisioner:
+  enabled: true
+  default: true
+  version: v0.0.31

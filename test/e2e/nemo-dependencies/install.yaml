@@ -12,9 +12,6 @@
           helm_repo_url: https://volcano-sh.github.io/helm-charts
           chart_name: volcano/volcano
           chart_version: 1.9.0
-        localPathProvisioner:
-              enabled: "{{ enable_local_path_provisioner }}"
-              version: "{{ localPathProvisioner.version | default('v0.0.31') }}"
       when: install.customizer == true
   tasks:
     - name: Customizer DB Details
@@ -32,9 +29,6 @@
     - role: datastore
       vars:
         namespace: "{{ installation_namespace }}"
-        localPathProvisioner:
-              enabled: "{{ enable_local_path_provisioner }}"
-              version: "{{ localPathProvisioner.version | default('v0.0.31') }}"
       when: install.datastore == true
   tasks:
     - name: Datastore Details
@@ -54,9 +48,6 @@
     - role: entity-store
       vars:
         namespace: "{{ installation_namespace }}"
-        localPathProvisioner:
-              enabled: "{{ enable_local_path_provisioner }}"
-              version: "{{ localPathProvisioner.version | default('v0.0.31') }}"
       when: install.entity_store == true
   tasks:
   - name: Entity Store DB Details
@@ -74,9 +65,6 @@
     - role: evaluator
       vars:
         namespace: "{{ installation_namespace }}"
-        localPathProvisioner:
-              enabled: "{{ enable_local_path_provisioner }}"
-              version: "{{ localPathProvisioner.version | default('v0.0.31') }}"
       when: install.evaluator == true
   tasks:
   - name: Evaluator Details
