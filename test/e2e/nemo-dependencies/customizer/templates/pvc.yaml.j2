@@ -6,7 +6,7 @@ metadata:
 spec:
   storageClassName: {{ '"local-path"' if localPathProvisioner.enabled else '""' }}
   accessModes:
-    ReadWriteOnce
+    - ReadWriteOnce
   resources:
     requests:
       storage: 100Gi
