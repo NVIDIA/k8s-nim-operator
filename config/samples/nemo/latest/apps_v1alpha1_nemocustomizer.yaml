@@ -23,8 +23,9 @@ spec:
       type: ClusterIP
       port: 8000
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/customizer
-    tag: "25.03"
+    #repository: nvcr.io/nvidia/nemo-microservices/customizer
+    repository: nvcr.io/nvidian/nemo-llm/customizer
+    tag: "25.04-rc10"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
@@ -36,7 +37,8 @@ spec:
 
     training:
       queue: "default"
-      image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.03"
+      #image: nvcr.io/nvidia/nemo-microservices/customizer-api:25.03
+      image: "nvcr.io/nvidian/nemo-llm/customizer-api:25.04-rc10"
       imagePullSecrets:
         - name: ngc-secret
       pvc:
@@ -477,5 +479,6 @@ spec:
         #   turn_end: <|eot_id|>
 
     nemo_data_store_tools:
-      image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.03
+      #image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.03
+      image: nvcr.io/nvidian/nemo-llm/nds-v2-huggingface-cli:25.04-rc10
       imagePullSecret: ngc-secret
