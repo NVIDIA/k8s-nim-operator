@@ -6,8 +6,12 @@ metadata:
 spec:
   authSecret: ngc-api-secret
   configStore:
-    configMap:
-      name: gr-config
+    pvc:
+      name: "pvc-guardrail-config"
+      create: true
+      storageClass: ""
+      volumeAccessMode: ReadWriteOnce
+      size: "1Gi"
   env:
     - name: NIM_ENDPOINT_URL
       value: "http://<NIM_SERVICE_ENDPOINT>:<NIM_SERVICE_PORT>/v1"

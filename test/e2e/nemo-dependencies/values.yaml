@@ -1,17 +1,16 @@
 install:
   customizer: no
   datastore: no
-  embedding: no
-  ranking: no
   entity_store: no
   evaluator: no
 
 uninstall:
   customizer: no
   datastore: no
-  embedding: no
-  ranking: no
   entity_store: no
   evaluator: no
 
 installation_namespace: nemo
+
+# set this to false when a default storage class is already provisioned in the cluster
+enable_local_path_provisioner: true

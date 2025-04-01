@@ -31,7 +31,7 @@ spec:
   pvc:
     name: "pvc-shared-data"
     create: true
-    storageClass: "local-path"
+    storageClass: ""
     volumeAccessMode: ReadWriteOnce
     size: "10Gi"
   expose:
