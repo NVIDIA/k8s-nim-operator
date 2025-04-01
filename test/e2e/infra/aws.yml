@@ -26,10 +26,6 @@ spec:
   containerRuntime:
     install: true
     name: containerd
-  nvidiaContainerToolkit:
-    install: true
-  nvidiaDriver:
-    install: true
   kubernetes:
     install: true
     installer: kubeadm
