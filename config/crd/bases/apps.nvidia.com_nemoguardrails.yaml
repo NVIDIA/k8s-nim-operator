@@ -89,10 +89,13 @@ spec:
                           creation
                         type: string
                       storageClass:
-                        description: StorageClass to be used for PVC creation. Leave
-                          it as empty if the PVC is already created.
+                        description: |-
+                          StorageClass to be used for PVC creation. Leave it as empty if the PVC is already created or
+                          a default storage class is set in the cluster.
                         type: string
                       subPath:
+                        description: SubPath is the path inside the PVC that should
+                          be mounted
                         type: string
                       volumeAccessMode:
                         description: VolumeAccessMode is the volume access mode of

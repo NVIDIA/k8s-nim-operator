@@ -134,13 +134,15 @@ type PersistentVolumeClaim struct {
 	Create *bool `json:"create,omitempty"`
 	// Name is the name of the PVC
 	Name string `json:"name,omitempty"`
-	// StorageClass to be used for PVC creation. Leave it as empty if the PVC is already created.
+	// StorageClass to be used for PVC creation. Leave it as empty if the PVC is already created or
+	// a default storage class is set in the cluster.
 	StorageClass string `json:"storageClass,omitempty"`
 	// Size of the NIM cache in Gi, used during PVC creation
 	Size string `json:"size,omitempty"`
 	// VolumeAccessMode is the volume access mode of the PVC
 	VolumeAccessMode corev1.PersistentVolumeAccessMode `json:"volumeAccessMode,omitempty"`
-	SubPath          string                            `json:"subPath,omitempty"`
+	// SubPath is the path inside the PVC that should be mounted
+	SubPath string `json:"subPath,omitempty"`
 }
 
 // NIMCacheStatus defines the observed state of NIMCache
