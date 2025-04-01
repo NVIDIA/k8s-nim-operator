@@ -78,7 +78,7 @@ jobs:
 
       - name: Send Slack alert notification
         id: slack
-        if: ${{ failure() }}
+        if: false
         uses: slackapi/slack-github-action@v2.0.0
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -86,6 +86,6 @@ jobs:
         with:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           slack-message: |
-            :red_target: On repository ${{ github.repository }} the Workflow *${{ github.workflow }}* has failed.
+            :x: On repository ${{ github.repository }} the Workflow *${{ github.workflow }}* has failed.
   
             Details: ${{ env.SUMMARY_URL }}
