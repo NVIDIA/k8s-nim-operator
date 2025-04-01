@@ -3,7 +3,6 @@
   register: ns_check
   ignore_errors: true
 
-
 - name: Deploy local-path-storage if not already deployed
   shell: >
     kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/{{ localPathProvisioner.version }}/deploy/local-path-storage.yaml

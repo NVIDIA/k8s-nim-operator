@@ -28,10 +28,17 @@ Update the `values.yaml` with required NeMo Services to install under `install`
 install:
   customizer: no
   datastore: no
-  embedding: no
-  ranking: no
   entity_store: no
   evaluator: yes
+```
+
+`NOTE:` If a default storage class is already provisioned in the cluster, then explicitly disable the local-path-provisioner
+        deployed by the ansible playbook by editing as below in the `values.yaml`.
+
+For example
+```yaml
+# set this to false when a default storage class is already provisioned in the cluster
+enable_local_path_provisioner: false
 ```
 
 Run the Anisble Playbook command to install the NeMo services
@@ -56,8 +63,6 @@ Update the `values.yaml` with required NeMo Services uninstall under `uninstall`
 uninstall:
   customizer: no
   datastore: no
-  embedding: no
-  ranking: no
   entity_store: no
   evaluator: yes
 ```
