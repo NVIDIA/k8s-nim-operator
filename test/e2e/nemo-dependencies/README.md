@@ -38,7 +38,10 @@ install:
 For example
 ```yaml
 # set this to false when a default storage class is already provisioned in the cluster
-enable_local_path_provisioner: false
+localPathProvisioner:
+  enabled: false
+  default: false
+  version: v0.0.31
 ```
 
 Run the Anisble Playbook command to install the NeMo services

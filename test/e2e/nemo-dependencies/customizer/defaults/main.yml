@@ -26,10 +26,6 @@ opentelemetry:
   chart_name: open-telemetry/opentelemetry-collector
   chart_version: 0.93.3
 
-localPathProvisioner:
-  enabled: true
-  version: v0.0.31
-
 wandb:
   apikey: testapikey
   encryptionkey: encryptionkey

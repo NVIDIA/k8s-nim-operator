@@ -46,6 +46,3 @@ postgresql:
   password: evalpass
   database: evaldb
 
-localPathProvisioner:
-  enabled: true
-  version: v0.0.31

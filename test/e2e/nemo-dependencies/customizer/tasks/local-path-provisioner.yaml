@@ -16,3 +16,11 @@
   delay: 10
   until: rollout_status.rc == 0
   when: ns_check.rc != 0
+
+- name: Set 'local-path' as the default StorageClass
+  shell: |
+    kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  register: sc_patch_result
+  changed_when: "'patched' in sc_patch_result.stdout"
+  failed_when: sc_patch_result.rc != 0
+  when: localPathProvisioner.default | bool
