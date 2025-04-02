@@ -35,6 +35,25 @@ spec:
     nemo_data_store_url: http://nemodatastore-sample.nemo.svc.cluster.local:8000
     mlflow_tracking_url: http://mlflow-tracking.nemo.svc.cluster.local:80
 
+    nemo_data_store_tools:
+      #image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.03
+      image: nvcr.io/nvidian/nemo-llm/nds-v2-huggingface-cli:25.04-rc10
+      imagePullSecret: ngc-secret
+
+    model_download_jobs:
+      image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.03"
+      imagePullPolicy: "IfNotPresent"
+      imagePullSecrets:
+        - name: ngc-secret
+      ngcAPISecret: ngc-api-secret
+      ngcAPISecretKey: "NGC_API_KEY"
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      ttlSecondsAfterFinished: 600
+
     training:
       queue: "default"
       #image: nvcr.io/nvidia/nemo-microservices/customizer-api:25.03
@@ -47,7 +66,6 @@ spec:
       env:
         - name: LOG_LEVEL
           value: INFO
-
       workspace_dir: /pvc/workspace
       # volumes reference pre-existing PVCs
       volumes:
@@ -83,164 +101,264 @@ spec:
         - name: "NCCL_IB_GID_INDEX"
           value: 3
 
-      tolerations:
-          []
+      tolerations: []
 
       container_defaults:
           imagePullPolicy: IfNotPresent
 
-    model_download_jobs:
-      image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.03"
-      imagePullPolicy: "IfNotPresent"
-      imagePullSecrets:
-        - name: ngc-secret
-      ngcAPISecret: ngc-api-secret
-      ngcAPISecretKey: "NGC_API_KEY"
-      securityContext:
-        fsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-      ttlSecondsAfterFinished: 600
-
     models:
-      # NIM release 1.2 and later
-      meta/llama-3.1-8b-instruct:
+      # -- Llama 3.2 3B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 3B Instruct model.
+      meta/llama-3.2-3b-instruct:
+        # -- Whether to enable the model.
         enabled: false
-        model_uri: ngc://nvidia/nemo/llama-3_1-8b-instruct-nemo:1.0
-        model_path: llama-3_1-8b-instruct
+        # -- NGC model URI.
+        model_uri: ngc://nvidian/nemo-llm/llama-3_2-3b-instruct:0.0.1
+        # -- Path where model files are stored.
+        model_path: llama32_3b-instruct
+        # -- Training options for different fine-tuning methods.
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 1
+            num_nodes: 1
+            tensor_parallel_size: 1
+        # -- Micro batch size for training.
+        micro_batch_size: 1
+        # -- Maximum sequence length for input tokens.
+        max_seq_length: 4096
+        # -- Number of model parameters.
+        num_parameters: 3000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+        # -- Template for formatting prompts.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.2 1B model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B model.
+      meta/llama-3.2-1b:
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI for Llama 3.2 1B model.
+        model_uri: ngc://nvidian/nemo-llm/llama-3_2-1b:0.0.1
+        # -- Path where model files are stored.
+        model_path: llama32_1b
+        # -- Training options for different fine-tuning methods.
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 1
+            num_nodes: 1
+            tensor_parallel_size: 1
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 1
+            num_nodes: 1
+            tensor_parallel_size: 1
+        # -- Micro batch size for training.
+        micro_batch_size: 1
+        # -- Maximum sequence length for input tokens.
+        max_seq_length: 4096
+        # -- Number of model parameters.
+        num_parameters: 1000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+        # -- Template for formatting prompts.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.2 1B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B Instruct model.
+      meta/llama-3.2-1b-instruct:
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI for Llama 3.2 1B Instruct model.
+        model_uri: ngc://nvidian/nemo-llm/llama-3_2-1b-instruct:0.0.1
+        # -- Path where model files are stored.
+        model_path: llama32_1b-instruct
+        # -- Training options for different fine-tuning methods.
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 1
+            num_nodes: 1
+            tensor_parallel_size: 1
+        # -- Micro batch size for training.
+        micro_batch_size: 1
+        # -- Maximum sequence length for input tokens.
+        max_seq_length: 4096
+        # -- Number of model parameters.
+        num_parameters: 1000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+        # -- Template for formatting prompts.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.2 1B Embedding model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B Embedding model.
+      meta/llama-3.2-1b-embedding:
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI for Llama 3.2 1B Embedding model.
+        model_uri: ngc://nvidian/nemo-llm/llama-3_2-1b-embedding-base:0.0.1
+        # -- Path where model files are stored.
+        model_path: llama32_1b-embedding
+        # -- Training options for different fine-tuning methods.
+        training_options:
+          - training_type: sft
+            finetuning_type: all_weights
+            num_gpus: 1
+            num_nodes: 1
+            tensor_parallel_size: 1
+        # -- Micro batch size for training.
+        micro_batch_size: 8
+        # -- Maximum sequence length for input tokens.
+        max_seq_length: 2048
+        # -- Number of model parameters.
+        num_parameters: 1000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+
+      # -- Llama 3 70B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3 70B Instruct model.
+      meta/llama3-70b-instruct:
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI for Llama 3 70B Instruct model.
+        model_uri: ngc://nvidian/nemo-llm/llama-3-70b-instruct:0.0.1
+        # -- Path where model files are stored.
+        model_path: llama-3-70b-bf16
+        # -- Training options for different fine-tuning methods.
         training_options:
           - training_type: sft
             finetuning_type: lora
             num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+        # -- Maximum sequence length for input tokens.
+        max_seq_length: 4096
+        # -- Number of model parameters.
+        num_parameters: 70000000000
+        # -- Micro batch size for training.
+        micro_batch_size: 1
+        # -- Model precision format.
+        precision: bf16-mixed
+        # -- Template for formatting prompts.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.1 8B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.1 8B Instruct model.
+      meta/llama-3.1-8b-instruct:
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI for Llama 3.1 8B Instruct model.
+        model_uri: ngc://nvidian/nemo-llm/llama-3_1-8b-instruct:0.0.1
+        # -- Path where model files are stored.
+        model_path: llama-3_1-8b-instruct_0_0_1
+        # -- Training options for different fine-tuning methods.
+        training_options:
+          - training_type: sft
+            finetuning_type: lora
+            num_gpus: 1
           - training_type: sft
             finetuning_type: all_weights
             num_gpus: 8
             num_nodes: 1
             tensor_parallel_size: 4
+        # -- Micro batch size for training.
         micro_batch_size: 1
+        # -- Maximum sequence length for input tokens.
         max_seq_length: 4096
+        # -- Number of model parameters.
         num_parameters: 8000000000
-        precision: bf16
+        # -- Model precision format.
+        precision: bf16-mixed
+        # -- Tokenizer path.
         tokenizer_path: /home/customizer/.cache/huggingface/hub/models--meta-llama--Meta-Llama-3-8B-instruct/snapshots/c4a54320a52ed5f88b7a2f84496903ea4ff07b45
-        # special_tokens:
-        #   begin_of_text: <|begin_of_text|>
-        #   end_of_text: <|finetune_right_pad_id|>
-        #   role_start: <|start_header_id|>
-        #   role_end: <|end_header_id|>
-        #   label_start: ""
-        #   label_end: ""
-        #   turn_start: ""
-        #   turn_end: <|eot_id|>
+        # -- Template for formatting prompts.
+        prompt_template: "{prompt} {completion}"
 
+      # -- Llama 3.1 70B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.1 70B Instruct model.
       meta/llama-3.1-70b-instruct:
+        # -- Whether to enable the model.
         enabled: false
-        model_uri: ngc://nvidia/nemo/llama-3_1-70b-instruct-nemo:1.0
-        model_path: llama-3_1-70b-instruct
+        # -- NGC model URI for Llama 3.1 70B Instruct model.
+        model_uri: ngc://nvidian/nemo-llm/llama-3_1-70b-instruct:0.0.1
+        # -- Path where model files are stored.
+        model_path: llama-3_1-70b-instruct_0_0_1
+        # -- Training options for different fine-tuning methods.
         training_options:
           - training_type: sft
             finetuning_type: lora
             num_gpus: 4
             num_nodes: 2
             tensor_parallel_size: 8
+        # -- Micro batch size for training.
         micro_batch_size: 1
+        # -- Maximum sequence length for input tokens.
         max_seq_length: 4096
+        # -- Number of model parameters.
         num_parameters: 70000000000
-        precision: bf16
-        # special_tokens:
-        #   begin_of_text: <|begin_of_text|>
-        #   end_of_text: <|finetune_right_pad_id|>
-        #   role_start: <|start_header_id|>
-        #   role_end: <|end_header_id|>
-        #   label_start: ""
-        #   label_end: ""
-        #   turn_start: ""
-        #   turn_end: <|eot_id|>
+        # -- Model precision format.
+        precision: bf16-mixed
+        # -- Template for formatting prompts.
+        prompt_template: "{prompt} {completion}"
 
-      gpt8b-4k:
+      # -- Phi-4 model configuration.
+      # @default -- This object has the following default values for the Phi-4.
+      microsoft/phi-4:
+        # -- Whether to enable the model.
         enabled: false
-        model_uri: ngc://nvidia/nemo/nemotron-3-8b-base-4k:1.0
-        model_path: nemotron_3_8b_base_4k
+        # -- NGC model URI for Phi-4 model.
+        model_uri: ngc://nvidian/nemo-llm/phi-4:0.0.1
+        # -- Path where model files are stored.
+        model_path: phi-4
+        # -- Training options for different fine-tuning methods.
         training_options:
           - training_type: sft
-            finetuning_type: p_tuning
-            num_gpus: 4
-          - training_type: sft
             finetuning_type: lora
-            num_gpus: 4
+            num_gpus: 1
+            num_nodes: 1
           - training_type: sft
             finetuning_type: all_weights
-            num_gpus: 8
-            tensor_parallel_size: 4
+            num_gpus: 4
+            num_nodes: 2
+            tensor_parallel_size: 8
+        # -- Micro batch size for training.
+        micro_batch_size: 1
+        # -- Maximum sequence length for input tokens.
         max_seq_length: 4096
-        num_parameters: 8000000000
+        # -- Number of model parameters.
+        num_parameters: 14659507200
+        # -- Model precision format.
         precision: bf16
-        micro_batch_size: 1
-        multinode_dataset_thresholds:
-          - num_nodes: 2
-            threshold: 80000
+        # -- Template for formatting prompts.
+        prompt_template: "{prompt} {completion}"
 
-      gemma-7b:
+      # -- Llama 3.3 70B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.3 70B Instruct model.
+      meta/llama-3.3-70b-instruct:
+        # -- Whether to enable the model.
         enabled: false
-        model_uri: ngc://nvidia/nemo/gemma_7b_base:1.1
-        model_path: "gemma-7b"
+        # -- NGC model URI for Llama 3.3 70B Instruct model.
+        model_uri: ngc://nvidian/nemo-llm/llama-3_3-70b-instruct:0.0.1
+        # -- Path where model files are stored.
+        model_path: llama-3_3-70b-instruct_0_0_1
+        # -- Training options for different fine-tuning methods.
         training_options:
-          - training_type: sft
-            finetuning_type: p_tuning
-            num_gpus: 2
-          - training_type: sft
-            finetuning_type: lora
-            num_gpus: 2
-        micro_batch_size: 4
-        max_seq_length: 8192
-        num_parameters: 7000000000
-        precision: bf16
-
-      codellama-70b:
-        enabled: false
-        model_path: "codellama_70b_bf16"
-        training_options:
-          - training_type: sft
-            finetuning_type: p_tuning
-            num_gpus: 4
-            num_nodes: 2
-            tensor_parallel_size: 8
           - training_type: sft
             finetuning_type: lora
             num_gpus: 4
-            num_nodes: 2
-            tensor_parallel_size: 8
-        micro_batch_size: 1
-        max_seq_length: 16384
-        num_parameters: 70000000000
-        precision: bf16
-
-      meta/llama3-405b-instruct:
-        enabled: false
-        max_seq_length: 2048
-        num_parameters: 405000000000
-        precision: bf16
-        micro_batch_size: 1
-        model_path: llama-3_1-405b-instruct
-        training_options:
-          - training_type: sft
-            finetuning_type: lora
-            num_gpus: 8
-            num_nodes: 3
+            num_nodes: 1
             tensor_parallel_size: 4
-        # pipeline_parallel_size: 6
-        # use_sequence_parallel: false
-        # special_tokens:
-        #   begin_of_text: <|begin_of_text|>
-        #   end_of_text: <|end_of_text|>
-        #   role_start: <|start_header_id|>
-        #   role_end: <|end_header_id|>
-        #   label_start: ""
-        #   label_end: ""
-        #   turn_start: ""
-        #   turn_end: <|eot_id|>
+        # -- Micro batch size for training.
+        micro_batch_size: 1
+        # -- Maximum sequence length for input tokens.
+        max_seq_length: 4096
+        # -- Number of model parameters.
+        num_parameters: 70000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+        # -- Template for formatting prompts.
+        prompt_template: "{prompt} {completion}"
 
-    nemo_data_store_tools:
-      #image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.03
-      image: nvcr.io/nvidian/nemo-llm/nds-v2-huggingface-cli:25.04-rc10
-      imagePullSecret: ngc-secret
