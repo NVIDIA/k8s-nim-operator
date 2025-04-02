@@ -9,7 +9,7 @@ spec:
     keyName: cnt-ci-east-1
     privateKey: HOLODECK_PRIVATE_KEY
   instance:
-    type: g6.xlarge
+    type: g6e.xlarge
     region: us-east-1
     ingressIpRanges:
     - 18.190.12.32/32
