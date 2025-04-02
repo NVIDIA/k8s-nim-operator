@@ -12,8 +12,16 @@ uninstall:
 
 installation_namespace: nemo
 
-# set this to false when a default storage class is already provisioned in the cluster
+# Specify a custom storage class and volume access mode for all PVCs, for e.g. ReadWriteMany for nfs storage class
+pvc:
+  # Ignored when localPathProvisioner.enabled is true — in which case these will default to:
+  # storage_class: "local-path" and volume_access_mode: "ReadWriteOnce"
+  storage_class: ""
+  volume_access_mode: ReadWriteMany
+
+# Deploy a local-path CSI provisioner
 localPathProvisioner:
+  # disable it when a different CSI provisioner is already deployed in the cluster
   enabled: true
   default: true
   version: v0.0.31
