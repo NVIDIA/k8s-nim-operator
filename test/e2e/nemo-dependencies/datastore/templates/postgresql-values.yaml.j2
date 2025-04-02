@@ -5,8 +5,8 @@ auth:
 architecture: standalone
 primary:
   persistence:
-    storageClass: {{ '"local-path"' if localPathProvisioner.enabled else '""' }}
+    storageClass: {{ '"local-path"' if localPathProvisioner.enabled else pvc.storage_class | to_json }}
     accessModes:
-      - ReadWriteOnce
+      - {{ 'ReadWriteOnce' if localPathProvisioner.enabled else pvc.volume_access_mode }}
     enabled: true
     size: 500Mi
