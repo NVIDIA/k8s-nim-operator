@@ -32,7 +32,7 @@ spec:
   customizerConfig: |
     namespace: nemo
     entity_store_url: http://nemoentitystore-sample.nemo.svc.cluster.local:8000
-    nemo_data_store_url: http://nemodatastore-sample.nemo.svc.cluster.local:3000
+    nemo_data_store_url: http://nemodatastore-sample.nemo.svc.cluster.local:8000
     mlflow_tracking_url: http://mlflow-tracking.nemo.svc.cluster.local:80
 
     training:

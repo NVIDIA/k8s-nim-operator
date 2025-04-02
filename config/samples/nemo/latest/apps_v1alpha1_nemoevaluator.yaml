@@ -29,7 +29,7 @@ spec:
   vectorDB:
     endpoint: http://milvus.nemo.svc.cluster.local:19530
   datastore:
-    endpoint: http://nemodatastore-sample.nemo.svc.cluster.local:3000/v1/hf
+    endpoint: http://nemodatastore-sample.nemo.svc.cluster.local:8000/v1/hf
   entitystore:
     endpoint: http://nemoentitystore-sample.nemo.svc.cluster.local:8000
   databaseConfig:

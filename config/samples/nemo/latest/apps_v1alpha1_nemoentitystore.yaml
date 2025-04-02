@@ -14,7 +14,7 @@ spec:
       - ngc-secret
   env:
     - name: BASE_URL_DATASTORE
-      value: http://nemodatastore-sample.nemo.svc.cluster.local:3000
+      value: http://nemodatastore-sample.nemo.svc.cluster.local:8000
   expose:
     service:
       type: ClusterIP
