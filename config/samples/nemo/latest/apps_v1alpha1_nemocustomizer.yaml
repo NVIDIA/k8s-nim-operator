@@ -249,7 +249,7 @@ spec:
       # @default -- This object has the following default values for the Llama 3.1 8B Instruct model.
       meta/llama-3.1-8b-instruct:
         # -- Whether to enable the model.
-        enabled: false
+        enabled: true
         # -- NGC model URI for Llama 3.1 8B Instruct model.
         model_uri: ngc://nvidian/nemo-llm/llama-3_1-8b-instruct:0.0.1
         # -- Path where model files are stored.
