@@ -1,0 +1,500 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.2
+  name: nimcaches.apps.nvidia.com
+spec:
+  group: apps.nvidia.com
+  names:
+    kind: NIMCache
+    listKind: NIMCacheList
+    plural: nimcaches
+    singular: nimcache
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.state
+      name: Status
+      type: string
+    - jsonPath: .status.pvc
+      name: PVC
+      type: string
+    - format: date-time
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: NIMCache is the Schema for the nimcaches API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: NIMCacheSpec defines the desired state of NIMCache
+            properties:
+              certConfig:
+                description: |-
+                  CertConfig is the name of the ConfigMap containing the custom certificates.
+                  for secure communication.
+                properties:
+                  mountPath:
+                    description: MountPath is the path where the certificates should
+                      be mounted in the container.
+                    type: string
+                  name:
+                    description: Name of the ConfigMap containing the certificate
+                      data.
+                    type: string
+                required:
+                - mountPath
+                - name
+                type: object
+              env:
+                description: Env are the additional custom environment variabes for
+                  the caching job
+                items:
+                  description: EnvVar represents an environment variable present in
+                    a Container.
+                  properties:
+                    name:
+                      description: Name of the environment variable. Must be a C_IDENTIFIER.
+                      type: string
+                    value:
+                      description: |-
+                        Variable references $(VAR_NAME) are expanded
+                        using the previously defined environment variables in the container and
+                        any service environment variables. If a variable cannot be resolved,
+                        the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether the variable
+                        exists or not.
+                        Defaults to "".
+                      type: string
+                    valueFrom:
+                      description: Source for the environment variable's value. Cannot
+                        be used if value is not empty.
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        fieldRef:
+                          description: |-
+                            Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                          properties:
+                            apiVersion:
+                              description: Version of the schema the FieldPath is
+                                written in terms of, defaults to "v1".
+                              type: string
+                            fieldPath:
+                              description: Path of the field to select in the specified
+                                API version.
+                              type: string
+                          required:
+                          - fieldPath
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        resourceFieldRef:
+                          description: |-
+                            Selects a resource of the container: only resources limits and requests
+                            (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                          properties:
+                            containerName:
+                              description: 'Container name: required for volumes,
+                                optional for env vars'
+                              type: string
+                            divisor:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Specifies the output format of the exposed
+                                resources, defaults to "1"
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            resource:
+                              description: 'Required: resource to select'
+                              type: string
+                          required:
+                          - resource
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        secretKeyRef:
+                          description: Selects a key of a secret in the pod's namespace
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+              groupID:
+                description: GroupID is the group ID for the caching job
+                format: int64
+                type: integer
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: NodeSelector is the node selector labels to schedule
+                  the caching job.
+                type: object
+              resources:
+                description: Resources defines the minimum resources required for
+                  the caching job to run(cpu, memory, gpu).
+                properties:
+                  cpu:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: CPU indicates the minimum number of CPUs to use while
+                      caching NIM
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  memory:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: |-
+                      Memory indicates the minimum amount of memory to use while caching NIM
+                      Valid values are numbers followed by one of the suffixes Ki, Mi, Gi, or Ti (e.g. "4Gi", "4096Mi").
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
+              runtimeClassName:
+                description: RuntimeClassName is the runtimeclass for the caching
+                  job
+                type: string
+              source:
+                description: Source is the NIM model source to cache
+                properties:
+                  dataStore:
+                    description: NGCSource represents models stored in NVIDIA DataStore
+                      service
+                    properties:
+                      authSecret:
+                        description: The name of an existing auth secret containing
+                          the AUTH_TOKEN"
+                        type: string
+                      checkpointName:
+                        type: string
+                      datasetName:
+                        type: string
+                      endpoint:
+                        description: The endpoint for datastore
+                        type: string
+                      modelName:
+                        description: Name of either model/checkpoint or dataset to
+                          download
+                        type: string
+                      modelPuller:
+                        description: ModelPuller is the container image that can pull
+                          the model
+                        type: string
+                      pullSecret:
+                        description: PullSecret for the model puller image
+                        type: string
+                    required:
+                    - authSecret
+                    - endpoint
+                    - modelPuller
+                    type: object
+                  ngc:
+                    description: NGCSource represents models stored in NGC
+                    properties:
+                      authSecret:
+                        description: The name of an existing pull secret containing
+                          the NGC_API_KEY
+                        type: string
+                      model:
+                        description: Model spec for caching
+                        properties:
+                          buildable:
+                            description: Buildable indicates generic model profiles
+                              that can be optimized with an NVIDIA engine for any
+                              GPUs
+                            type: boolean
+                          engine:
+                            description: Engine is the backend engine (tensort_llm,
+                              vllm)
+                            type: string
+                          gpus:
+                            description: GPU is the spec for matching GPUs for caching
+                              optimized models
+                            items:
+                              description: GPUSpec is the spec required to cache models
+                                for selected gpu type
+                              properties:
+                                ids:
+                                  description: IDs are the device-ids for a specific
+                                    GPU SKU
+                                  items:
+                                    type: string
+                                  type: array
+                                product:
+                                  description: Product is the GPU product string (h100,
+                                    a100, l40s)
+                                  type: string
+                              type: object
+                            type: array
+                          lora:
+                            description: Lora indicates a finetuned model with LoRa
+                              adapters
+                            type: boolean
+                          precision:
+                            description: Precision is the precision for model quantization
+                            type: string
+                          profiles:
+                            description: Profiles are the specific model profiles
+                              to cache. When these are provided, rest of the model
+                              parameters for profile selection are ignored
+                            items:
+                              type: string
+                            type: array
+                          qosProfile:
+                            description: QoSProfile is the supported QoS profile types
+                              for the models (throughput, latency)
+                            type: string
+                          tensorParallelism:
+                            description: TensorParallelism is the minimum GPUs required
+                              for the model computations
+                            type: string
+                        type: object
+                      modelPuller:
+                        description: ModelPuller is the container image that can pull
+                          the model
+                        type: string
+                        x-kubernetes-validations:
+                        - message: modelPuller is an immutable field. Please create
+                            a new NIMCache resource instead when you want to change
+                            this container.
+                          rule: self == oldSelf
+                      pullSecret:
+                        description: PullSecret to pull the model puller image
+                        type: string
+                    required:
+                    - authSecret
+                    - modelPuller
+                    type: object
+                type: object
+              storage:
+                description: Storage is the target storage for caching NIM model
+                properties:
+                  hostPath:
+                    description: HostPath is the host path volume for caching NIM
+                    type: string
+                  pvc:
+                    description: PersistentVolumeClaim is the pvc volume used for
+                      caching NIM
+                    properties:
+                      create:
+                        description: Create indicates to create a new PVC
+                        type: boolean
+                      name:
+                        description: Name is the name of the PVC
+                        type: string
+                      size:
+                        description: Size of the NIM cache in Gi, used during PVC
+                          creation
+                        type: string
+                      storageClass:
+                        description: StorageClass to be used for PVC creation. Leave
+                          it as empty if the PVC is already created.
+                        type: string
+                      subPath:
+                        type: string
+                      volumeAccessMode:
+                        description: VolumeAccessMode is the volume access mode of
+                          the PVC
+                        type: string
+                    type: object
+                type: object
+              tolerations:
+                description: Tolerations for running the job to cache the NIM model
+                items:
+                  description: |-
+                    The pod this Toleration is attached to tolerates any taint that matches
+                    the triple <key,value,effect> using the matching operator <operator>.
+                  properties:
+                    effect:
+                      description: |-
+                        Effect indicates the taint effect to match. Empty means match all taint effects.
+                        When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                      type: string
+                    key:
+                      description: |-
+                        Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                        If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                      type: string
+                    operator:
+                      description: |-
+                        Operator represents a key's relationship to the value.
+                        Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod can
+                        tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: |-
+                        TolerationSeconds represents the period of time the toleration (which must be
+                        of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                        it is not set, which means tolerate the taint forever (do not evict). Zero and
+                        negative values will be treated as 0 (evict immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: |-
+                        Value is the taint value the toleration matches to.
+                        If the operator is Exists, the value should be empty, otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
+              userID:
+                description: UserID is the user ID for the caching job
+                format: int64
+                type: integer
+            required:
+            - source
+            - storage
+            type: object
+          status:
+            description: NIMCacheStatus defines the observed state of NIMCache
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              profiles:
+                items:
+                  description: NIMProfile defines the profiles that were cached
+                  properties:
+                    config:
+                      additionalProperties:
+                        type: string
+                      type: object
+                    model:
+                      type: string
+                    name:
+                      type: string
+                    release:
+                      type: string
+                  type: object
+                type: array
+              pvc:
+                type: string
+              state:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
