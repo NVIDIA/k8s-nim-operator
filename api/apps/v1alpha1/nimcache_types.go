@@ -162,7 +162,6 @@ type NIMProfile struct {
 }
 
 // Resources defines the minimum resources required for caching NIM.
-// +kubebuilder:validation:Required
 type Resources struct {
 	// CPU indicates the minimum number of CPUs to use while caching NIM
 	CPU resource.Quantity `json:"cpu,omitempty"`
