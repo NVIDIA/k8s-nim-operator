@@ -5,10 +5,10 @@ install:
   evaluator: no
 
 uninstall:
-  customizer: no
-  datastore: no
-  entity_store: no
-  evaluator: no
+  customizer: yes
+  datastore: yes
+  entity_store: yes
+  evaluator: yes
 
 installation_namespace: nemo
 
