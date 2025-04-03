@@ -1,8 +1,8 @@
 install:
-  customizer: no
-  datastore: no
-  entity_store: no
-  evaluator: no
+  customizer: yes
+  datastore: yes
+  entity_store: yes
+  evaluator: yes
 
 uninstall:
   customizer: no
