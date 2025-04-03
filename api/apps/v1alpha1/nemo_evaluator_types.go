@@ -293,9 +293,7 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 	envVars = append(envVars, n.Spec.EvaluationImages.GetEvaluationImageEnv()...)
 
 	// Append the environment variables for OTel
-	if n.IsOtelEnabled() {
-		envVars = append(envVars, n.GetOtelEnv()...)
-	}
+	envVars = append(envVars, n.GetOtelEnv()...)
 
 	return envVars
 }
@@ -316,8 +314,16 @@ func (n *NemoEvaluator) IsOtelEnabled() bool {
 
 // GetOtelEnv generates OpenTelemetry-related environment variables.
 func (n *NemoEvaluator) GetOtelEnv() []corev1.EnvVar {
-	var otelEnvVars []corev1.EnvVar
+	if !n.IsOtelEnabled() {
+		return []corev1.EnvVar{
+			{
+				Name:  "OTEL_SDK_DISABLED",
+				Value: "true",
+			},
+		}
+	}
 
+	var otelEnvVars []corev1.EnvVar
 	otelEnvVars = append(otelEnvVars,
 		corev1.EnvVar{Name: "OTEL_EXPORTER_OTLP_ENDPOINT", Value: n.Spec.OpenTelemetry.ExporterOtlpEndpoint},
 		corev1.EnvVar{Name: "OTEL_TRACES_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.TracesExporter},

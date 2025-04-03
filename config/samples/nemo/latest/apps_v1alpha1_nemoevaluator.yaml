@@ -40,4 +40,7 @@ spec:
       user: evaluser
       secretName: evaluator-pg-existing-secret
       passwordKey: password
+  otel:
+    enabled: true
+    exporterOtlpEndpoint: http://evaluator-otel-opentelemetry-collector.nemo.svc.cluster.local:4317
   replicas: 1
