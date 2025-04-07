@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -396,7 +397,7 @@ func (n *NemoEvaluator) GeneratePostgresConnString(secretValue string) string {
 // GetStandardAnnotations returns default annotations to apply to the NemoEvaluator instance
 func (n *NemoEvaluator) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc":                      "nonroot",
+		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
@@ -601,14 +602,18 @@ func (n *NemoEvaluator) GetServiceType() string {
 
 // GetUserID returns the user ID for the NemoEvaluator deployment
 func (n *NemoEvaluator) GetUserID() *int64 {
-	return n.Spec.UserID
-
+	if n.Spec.UserID != nil {
+		return n.Spec.UserID
+	}
+	return ptr.To[int64](1000)
 }
 
 // GetGroupID returns the group ID for the NemoEvaluator deployment
 func (n *NemoEvaluator) GetGroupID() *int64 {
-	return n.Spec.GroupID
-
+	if n.Spec.GroupID != nil {
+		return n.Spec.GroupID
+	}
+	return ptr.To[int64](2000)
 }
 
 // GetServiceAccountParams return params to render ServiceAccount from templates

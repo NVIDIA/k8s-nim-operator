@@ -32,6 +32,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -341,7 +342,7 @@ func (n *NemoCustomizer) GetVolumeMounts() []corev1.VolumeMount {
 // GetStandardAnnotations returns default annotations to apply to the NemoCustomizer instance
 func (n *NemoCustomizer) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc":                      "nonroot",
+		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
@@ -540,14 +541,18 @@ func (n *NemoCustomizer) GetServiceType() string {
 
 // GetUserID returns the user ID for the NemoCustomizer deployment
 func (n *NemoCustomizer) GetUserID() *int64 {
-	return n.Spec.UserID
-
+	if n.Spec.UserID != nil {
+		return n.Spec.UserID
+	}
+	return ptr.To[int64](1000)
 }
 
 // GetGroupID returns the group ID for the NemoCustomizer deployment
 func (n *NemoCustomizer) GetGroupID() *int64 {
-	return n.Spec.GroupID
-
+	if n.Spec.GroupID != nil {
+		return n.Spec.GroupID
+	}
+	return ptr.To[int64](2000)
 }
 
 // GetServiceAccountParams return params to render ServiceAccount from templates

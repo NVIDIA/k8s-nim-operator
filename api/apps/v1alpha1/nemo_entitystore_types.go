@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -192,7 +193,7 @@ func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
 // GetStandardAnnotations returns default annotations to apply to the NemoEntitystore instance
 func (n *NemoEntitystore) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc":                      "nonroot",
+		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
@@ -409,13 +410,18 @@ func (n *NemoEntitystore) GetServiceType() string {
 
 // GetUserID returns the user ID for the NemoEntitystore deployment
 func (n *NemoEntitystore) GetUserID() *int64 {
-	return n.Spec.UserID
-
+	if n.Spec.UserID != nil {
+		return n.Spec.UserID
+	}
+	return ptr.To[int64](1000)
 }
 
 // GetGroupID returns the group ID for the NemoEntitystore deployment
 func (n *NemoEntitystore) GetGroupID() *int64 {
-	return n.Spec.GroupID
+	if n.Spec.GroupID != nil {
+		return n.Spec.GroupID
+	}
+	return ptr.To[int64](2000)
 
 }
 

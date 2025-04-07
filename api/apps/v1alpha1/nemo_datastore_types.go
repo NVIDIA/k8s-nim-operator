@@ -483,7 +483,7 @@ func (n *NemoDatastore) ShouldCreatePersistentStorage() bool {
 // GetStandardAnnotations returns default annotations to apply to the NemoDatastore instance
 func (n *NemoDatastore) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/scc":                      "nonroot",
+		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
@@ -708,9 +708,6 @@ func (n *NemoDatastore) GetInitContainers() []corev1.Container {
 			},
 			VolumeMounts: n.GetVolumeMountsInitContainer(),
 			Env:          n.GetInitContainerEnv(),
-			SecurityContext: &corev1.SecurityContext{
-				RunAsUser: n.GetUserID(),
-			},
 		},
 	}
 }
