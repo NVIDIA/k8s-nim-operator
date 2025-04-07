@@ -783,6 +783,12 @@ func (n *NemoEvaluator) GetRoleParams() *rendertypes.RoleParams {
 	// Set rules to use SCC
 	params.Rules = []rbacv1.PolicyRule{
 		{
+			APIGroups:     []string{"security.openshift.io"},
+			Resources:     []string{"securitycontextconstraints"},
+			ResourceNames: []string{"nonroot"},
+			Verbs:         []string{"use"},
+		},
+		{
 			APIGroups: []string{""},
 			Resources: []string{"secrets", "pods"},
 			Verbs:     []string{"get", "watch", "list", "create"},
