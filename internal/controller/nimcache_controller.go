@@ -929,7 +929,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 
 	if platformType == k8sutil.OpenShift {
 		annotations = map[string]string{
-			"openshift.io/scc": "nonroot",
+			"openshift.io/required-scc": "nonroot",
 		}
 	}
 
