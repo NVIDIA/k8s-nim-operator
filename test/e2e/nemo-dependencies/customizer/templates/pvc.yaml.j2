@@ -3,6 +3,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: finetuning-ms-models-pvc
   namespace: {{ namespace }}
+  labels:
+    app.kubernetes.io/managed-by: nemo-dependencies
 spec:
   storageClassName: {{ '"local-path"' if localPathProvisioner.enabled else pvc.storage_class | to_json }}
   accessModes:
