@@ -11,6 +11,14 @@ metadata:
   name: "argo-workflows-executor-role"
 rules:
   - apiGroups:
+      - security.openshift.io
+    resourceNames:
+      - nonroot
+    resources:
+      - securitycontextconstraints
+    verbs:
+      - use
+  - apiGroups:
       - argoproj.io
     resources:
       - workflowtaskresults
