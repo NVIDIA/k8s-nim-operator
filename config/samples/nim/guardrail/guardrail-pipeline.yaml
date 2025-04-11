@@ -1,7 +1,7 @@
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMPipeline
 metadata:
-  name: rag-pipeline
+  name: guardrail-pipeline
 spec:
   services:
     - name: meta-llama3-8b-instruct
