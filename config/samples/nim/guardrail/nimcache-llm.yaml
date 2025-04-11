@@ -1,7 +1,7 @@
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  name: nimcache-sample
+  name: meta-llama3-8b-instruct
 spec:
   source:
     ngc:
@@ -9,15 +9,7 @@ spec:
       pullSecret: ngc-secret
       authSecret: ngc-api-secret
       model:
-        profiles: []
-        autoDetect: true
-        precision: "fp8"
-        engine: "tensorrt_llm"
-        qosProfile: "throughput"
-        gpus:
-          product: "l40s"
-          ids:
-            - "26b5"
+        engine: tensorrt_llm
         tensorParallelism: "1"
   storage:
     pvc:
@@ -25,3 +17,4 @@ spec:
       storageClass: ""
       size: "50Gi"
       volumeAccessMode: ReadWriteOnce
+  resources: {}
