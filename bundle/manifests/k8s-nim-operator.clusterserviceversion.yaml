@@ -341,6 +341,26 @@ spec:
             kind: ConfigMap
         specDescriptors: [ ]
         statusDescriptors: [ ]
+      - name: nemoentitystores.apps.nvidia.com
+        displayName: NemoEntitystore
+        kind: NemoEntitystore
+        version: v1alpha1
+        description: NEMO Entitystore Service
+        resources:
+          - version: v1
+            kind: Deployment
+          - version: v1
+            kind: Service
+          - version: v1
+            kind: ReplicaSet
+          - version: v1
+            kind: Pod
+          - version: v1
+            kind: Secret
+          - version: v1
+            kind: ConfigMap
+        specDescriptors: [ ]
+        statusDescriptors: [ ]
     required: []
   install:
     strategy: deployment
