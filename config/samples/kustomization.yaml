@@ -1,8 +1,7 @@
 ## Append samples of your project ##
 resources:
-- nim/apps_v1alpha1_nimservice.yaml
-- nim/apps_v1alpha1_nimcache.yaml
-- nim/apps_v1alpha1_nimpipeline.yaml
+- nim/llm/nimservice.yaml
+- nim/llm/nimcache-llm.yaml
 - nemo/latest/apps_v1alpha1_nemocustomizer.yaml
 - nemo/latest/apps_v1alpha1_nemoguardrails.yaml
 - nemo/latest/apps_v1alpha1_nemoevaluator.yaml

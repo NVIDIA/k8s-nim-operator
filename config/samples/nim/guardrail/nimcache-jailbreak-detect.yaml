@@ -9,7 +9,9 @@ spec:
       modelPuller: nvcr.io/nim/nvidia/nemoguard-jailbreak-detect:1.0.0
       pullSecret: ngc-secret
       authSecret: ngc-api-secret
-      model: {}
+      model:
+        profiles: 
+          - "all"
   storage:
     pvc:
       create: true
