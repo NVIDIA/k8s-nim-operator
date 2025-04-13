@@ -10,7 +10,7 @@ spec:
       pullSecret: ngc-secret
       authSecret: ngc-api-secret
       model:
-        engine: tensorrt_llm
+        engine: tensorrt
   storage:
     pvc:
       create: true
