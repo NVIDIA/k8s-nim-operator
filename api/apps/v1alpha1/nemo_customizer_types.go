@@ -188,6 +188,10 @@ func (n *NemoCustomizer) GetStandardEnv() []corev1.EnvVar {
 			Value: "INFO",
 		},
 		{
+			Name:  "LOG_HEALTH_ENDPOINTS",
+			Value: "false",
+		},
+		{
 			Name: "WANDB_ENCRYPTION_KEY",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
