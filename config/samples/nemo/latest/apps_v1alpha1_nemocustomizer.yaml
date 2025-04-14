@@ -52,7 +52,10 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
+      # -- Time to live in seconds after the job finishes.
       ttlSecondsAfterFinished: 600
+      # -- Interval in seconds to poll for model download status.
+      pollIntervalSeconds: 15
 
     training:
       queue: "default"
@@ -106,6 +109,7 @@ spec:
       container_defaults:
           imagePullPolicy: IfNotPresent
 
+    # -- Models configuration.
     models:
       # -- Llama 3.2 3B Instruct model configuration.
       # @default -- This object has the following default values for the Llama 3.2 3B Instruct model.
@@ -113,7 +117,7 @@ spec:
         # -- Whether to enable the model.
         enabled: false
         # -- NGC model URI.
-        model_uri: ngc://nvidian/nemo-llm/llama-3_2-3b-instruct:0.0.1
+        model_uri: ngc://nvidia/nemo/llama-3_2-3b-instruct:2.0
         # -- Path where model files are stored.
         model_path: llama32_3b-instruct
         # -- Training options for different fine-tuning methods.
@@ -140,7 +144,7 @@ spec:
         # -- Whether to enable the model.
         enabled: false
         # -- NGC model URI for Llama 3.2 1B model.
-        model_uri: ngc://nvidian/nemo-llm/llama-3_2-1b:0.0.1
+        model_uri: ngc://nvidia/nemo/llama-3_2-1b:2.0
         # -- Path where model files are stored.
         model_path: llama32_1b
         # -- Training options for different fine-tuning methods.
@@ -172,13 +176,18 @@ spec:
         # -- Whether to enable the model.
         enabled: false
         # -- NGC model URI for Llama 3.2 1B Instruct model.
-        model_uri: ngc://nvidian/nemo-llm/llama-3_2-1b-instruct:0.0.1
+        model_uri: ngc://nvidia/nemo/llama-3_2-1b-instruct:2.0
         # -- Path where model files are stored.
         model_path: llama32_1b-instruct
         # -- Training options for different fine-tuning methods.
         training_options:
           - training_type: sft
             finetuning_type: lora
+            num_gpus: 1
+            num_nodes: 1
+            tensor_parallel_size: 1
+          - training_type: sft
+            finetuning_type: all_weights
             num_gpus: 1
             num_nodes: 1
             tensor_parallel_size: 1
@@ -193,38 +202,13 @@ spec:
         # -- Template for formatting prompts.
         prompt_template: "{prompt} {completion}"
 
-      # -- Llama 3.2 1B Embedding model configuration.
-      # @default -- This object has the following default values for the Llama 3.2 1B Embedding model.
-      meta/llama-3.2-1b-embedding:
-        # -- Whether to enable the model.
-        enabled: false
-        # -- NGC model URI for Llama 3.2 1B Embedding model.
-        model_uri: ngc://nvidian/nemo-llm/llama-3_2-1b-embedding-base:0.0.1
-        # -- Path where model files are stored.
-        model_path: llama32_1b-embedding
-        # -- Training options for different fine-tuning methods.
-        training_options:
-          - training_type: sft
-            finetuning_type: all_weights
-            num_gpus: 1
-            num_nodes: 1
-            tensor_parallel_size: 1
-        # -- Micro batch size for training.
-        micro_batch_size: 8
-        # -- Maximum sequence length for input tokens.
-        max_seq_length: 2048
-        # -- Number of model parameters.
-        num_parameters: 1000000000
-        # -- Model precision format.
-        precision: bf16-mixed
-
       # -- Llama 3 70B Instruct model configuration.
       # @default -- This object has the following default values for the Llama 3 70B Instruct model.
       meta/llama3-70b-instruct:
         # -- Whether to enable the model.
         enabled: false
         # -- NGC model URI for Llama 3 70B Instruct model.
-        model_uri: ngc://nvidian/nemo-llm/llama-3-70b-instruct:0.0.1
+        model_uri: ngc://nvidia/nemo/llama-3-70b-instruct:2.0
         # -- Path where model files are stored.
         model_path: llama-3-70b-bf16
         # -- Training options for different fine-tuning methods.
@@ -232,8 +216,8 @@ spec:
           - training_type: sft
             finetuning_type: lora
             num_gpus: 4
-            num_nodes: 2
-            tensor_parallel_size: 8
+            num_nodes: 1
+            tensor_parallel_size: 4
         # -- Maximum sequence length for input tokens.
         max_seq_length: 4096
         # -- Number of model parameters.
@@ -251,7 +235,7 @@ spec:
         # -- Whether to enable the model.
         enabled: true
         # -- NGC model URI for Llama 3.1 8B Instruct model.
-        model_uri: ngc://nvidian/nemo-llm/llama-3_1-8b-instruct:0.0.1
+        model_uri: ngc://nvidia/nemo/llama-3_1-8b-instruct-nemo:2.0
         # -- Path where model files are stored.
         model_path: llama-3_1-8b-instruct_0_0_1
         # -- Training options for different fine-tuning methods.
@@ -272,8 +256,6 @@ spec:
         num_parameters: 8000000000
         # -- Model precision format.
         precision: bf16-mixed
-        # -- Tokenizer path.
-        tokenizer_path: /home/customizer/.cache/huggingface/hub/models--meta-llama--Meta-Llama-3-8B-instruct/snapshots/c4a54320a52ed5f88b7a2f84496903ea4ff07b45
         # -- Template for formatting prompts.
         prompt_template: "{prompt} {completion}"
 
@@ -283,7 +265,7 @@ spec:
         # -- Whether to enable the model.
         enabled: false
         # -- NGC model URI for Llama 3.1 70B Instruct model.
-        model_uri: ngc://nvidian/nemo-llm/llama-3_1-70b-instruct:0.0.1
+        model_uri: ngc://nvidia/nemo/llama-3_1-70b-instruct-nemo:2.0
         # -- Path where model files are stored.
         model_path: llama-3_1-70b-instruct_0_0_1
         # -- Training options for different fine-tuning methods.
@@ -291,8 +273,8 @@ spec:
           - training_type: sft
             finetuning_type: lora
             num_gpus: 4
-            num_nodes: 2
-            tensor_parallel_size: 8
+            num_nodes: 1
+            tensor_parallel_size: 4
         # -- Micro batch size for training.
         micro_batch_size: 1
         # -- Maximum sequence length for input tokens.
@@ -310,7 +292,7 @@ spec:
         # -- Whether to enable the model.
         enabled: false
         # -- NGC model URI for Phi-4 model.
-        model_uri: ngc://nvidian/nemo-llm/phi-4:0.0.1
+        model_uri: ngc://nvidia/nemo/phi4:2.0
         # -- Path where model files are stored.
         model_path: phi-4
         # -- Training options for different fine-tuning methods.
@@ -319,11 +301,6 @@ spec:
             finetuning_type: lora
             num_gpus: 1
             num_nodes: 1
-          - training_type: sft
-            finetuning_type: all_weights
-            num_gpus: 4
-            num_nodes: 2
-            tensor_parallel_size: 8
         # -- Micro batch size for training.
         micro_batch_size: 1
         # -- Maximum sequence length for input tokens.
@@ -341,7 +318,7 @@ spec:
         # -- Whether to enable the model.
         enabled: false
         # -- NGC model URI for Llama 3.3 70B Instruct model.
-        model_uri: ngc://nvidian/nemo-llm/llama-3_3-70b-instruct:0.0.1
+        model_uri: ngc://nvidia/nemo/llama-3_3-70b-instruct:1.0
         # -- Path where model files are stored.
         model_path: llama-3_3-70b-instruct_0_0_1
         # -- Training options for different fine-tuning methods.
@@ -361,4 +338,3 @@ spec:
         precision: bf16-mixed
         # -- Template for formatting prompts.
         prompt_template: "{prompt} {completion}"
-
