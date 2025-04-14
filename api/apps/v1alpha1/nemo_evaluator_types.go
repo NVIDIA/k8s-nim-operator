@@ -277,6 +277,10 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 			Name:  "EVAL_LOG_LEVEL",
 			Value: n.Spec.EvalLogLevel,
 		},
+		{
+			Name:  "LOG_HEALTH_ENDPOINTS",
+			Value: "false",
+		},
 	}
 
 	if n.IsValidationEnabled() {
