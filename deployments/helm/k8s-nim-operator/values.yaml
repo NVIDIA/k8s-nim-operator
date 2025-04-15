@@ -19,6 +19,7 @@ operator:
         memory: 128Mi
   nodeSelector: {}
   annotations: {}
+  podAnnotations: {}
   tolerations:
   - key: "node-role.kubernetes.io/control-plane"
     operator: "Equal"
@@ -33,6 +34,16 @@ operator:
               - key: "node-role.kubernetes.io/control-plane"
                 operator: In
                 values: [""]
+  podSecurityContext:
+    seccompProfile:
+      # Required for VMWare TKGS platform
+      type: RuntimeDefault
+    runAsNonRoot: true
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
 
 metricsService:
   ports:
