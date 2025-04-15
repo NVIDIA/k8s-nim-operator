@@ -13,9 +13,9 @@ spec:
       storageClass: ""
       volumeAccessMode: ReadWriteOnce
       size: "1Gi"
-  env:
-    - name: NIM_ENDPOINT_URL
-      value: "http://<NIM_SERVICE_ENDPOINT>:<NIM_SERVICE_PORT>/v1"
+  nimEndpoint:
+    baseURL: "https://integrate.api.nvidia.com/v1"
+    apiKeySecret: "nim-api-key"
   expose:
     service:
       type: ClusterIP

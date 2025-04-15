@@ -56,12 +56,11 @@ const (
 
 // NemoGuardrailSpec defines the desired state of NemoGuardrail
 type NemoGuardrailSpec struct {
-	Image   Image           `json:"image"`
-	Command []string        `json:"command,omitempty"`
-	Args    []string        `json:"args,omitempty"`
-	Env     []corev1.EnvVar `json:"env,omitempty"`
-	// The name of an secret that contains authn for the NGC NIM service API, required when the NIM is hosted by NGC
-	AuthSecret string `json:"authSecret,omitempty"`
+	Image       Image           `json:"image"`
+	Command     []string        `json:"command,omitempty"`
+	Args        []string        `json:"args,omitempty"`
+	Env         []corev1.EnvVar `json:"env,omitempty"`
+	NIMEndpoint NIMEndpoint     `json:"nimEndpoint"`
 	// ConfigStore stores the config of the guardrail service
 	ConfigStore  GuardrailConfig              `json:"configStore,omitempty"`
 	Labels       map[string]string            `json:"labels,omitempty"`
@@ -79,6 +78,26 @@ type NemoGuardrailSpec struct {
 	UserID       *int64 `json:"userID,omitempty"`
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
+}
+
+type NIMEndpoint struct {
+	// The base URL for the NIM service. This can either be the endpoint for a single NIM or a NIM proxy.
+	// A NIM proxy endpoint is needed if you need to run guardrail for serving multiple NIMs.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^https?:\/\/[^\s]+\/v1\/?$`
+	// +kubebuilder:validation:Format=uri
+	BaseURL string `json:"baseURL"`
+	// The name of the secret that contains the API key for accessing the base URL endpoint. This is needed if the base URL is for a NIM proxy.
+	// When using NVIDIA's hosted NIM proxy `https://integrate.api.nvidia.com/v1` as the base URL, the API key can be retrieved from https://build.nvidia.com/explore/discover
+	//
+	// +kubebuilder:validation:Optional
+	APIKeySecret string `json:"apiKeySecret,omitempty"`
+	// The key in the secret that contains the API key for accessing the base URL endpoint. Defaults to `NIM_ENDPOINT_API_KEY`
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="NIM_ENDPOINT_API_KEY"
+	APIKeyKey string `json:"apiKeyKey,omitempty"`
 }
 
 // GuardrailConfig defines the source where the service config is made available.
@@ -165,7 +184,7 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_ENDPOINT_URL",
-			Value: "https://integrate.api.nvidia.com/v1",
+			Value: n.Spec.NIMEndpoint.BaseURL,
 		},
 		{
 			Name:  "DEFAULT_CONFIG_ID",
@@ -201,14 +220,14 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 		},
 	}
 
-	if len(n.Spec.AuthSecret) > 0 {
+	if len(n.Spec.NIMEndpoint.APIKeySecret) > 0 {
 		envVars = append(envVars, corev1.EnvVar{
 			Name: "NIM_ENDPOINT_API_KEY",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: "NIM_ENDPOINT_API_KEY",
+					Key: n.Spec.NIMEndpoint.APIKeyKey,
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.AuthSecret,
+						Name: n.Spec.NIMEndpoint.APIKeySecret,
 					},
 				},
 			},

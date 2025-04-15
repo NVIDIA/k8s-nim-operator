@@ -55,10 +55,6 @@ spec:
                 items:
                   type: string
                 type: array
-              authSecret:
-                description: The name of an secret that contains authn for the NGC
-                  NIM service API, required when the NIM is hosted by NGC
-                type: string
               command:
                 items:
                   type: string
@@ -345,6 +341,29 @@ spec:
                         pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                         type: string
                     type: object
+                type: object
+              nimEndpoint:
+                properties:
+                  apiKeyKey:
+                    default: NIM_ENDPOINT_API_KEY
+                    description: The key in the secret that contains the API key for
+                      accessing the base URL endpoint. Defaults to `NIM_ENDPOINT_API_KEY`
+                    type: string
+                  apiKeySecret:
+                    description: |-
+                      The name of the secret that contains the API key for accessing the base URL endpoint. This is needed if the base URL is for a NIM proxy.
+                      When using NVIDIA's hosted NIM proxy `https://integrate.api.nvidia.com/v1` as the base URL, the API key can be retrieved from https://build.nvidia.com/explore/discover
+                    type: string
+                  baseURL:
+                    description: |-
+                      The base URL for the NIM service. This can either be the endpoint for a single NIM or a NIM proxy.
+                      A NIM proxy endpoint is needed if you need to run guardrail for serving multiple NIMs.
+                    format: uri
+                    minLength: 1
+                    pattern: ^https?:\/\/[^\s]+\/v1\/?$
+                    type: string
+                required:
+                - baseURL
                 type: object
               nodeSelector:
                 additionalProperties:
@@ -1420,6 +1439,7 @@ spec:
                 type: integer
             required:
             - image
+            - nimEndpoint
             type: object
           status:
             description: NemoGuardrailStatus defines the observed state of NemoGuardrail
