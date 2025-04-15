@@ -245,7 +245,16 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, nimService, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
-		return renderer.Deployment(deploymentParams)
+		result, err := renderer.Deployment(deploymentParams)
+		if err != nil {
+			return nil, err
+		}
+		initContainers := nimService.GetInitContainers()
+		if len(initContainers) > 0 {
+			result.Spec.Template.Spec.InitContainers = initContainers
+		}
+		return result, err
+
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
 		return ctrl.Result{}, err

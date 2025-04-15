@@ -1067,6 +1067,15 @@ spec:
                     type: array
                     x-kubernetes-list-type: atomic
                 type: object
+              proxy:
+                properties:
+                  certConfigMap:
+                    type: string
+                  httpProxy:
+                    type: string
+                  httpsProxy:
+                    type: string
+                type: object
               readinessProbe:
                 description: Probe defines attributes for startup/liveness/readiness
                   probes

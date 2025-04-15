@@ -78,10 +78,18 @@ type NIMServiceSpec struct {
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas         int    `json:"replicas,omitempty"`
-	UserID           *int64 `json:"userID,omitempty"`
-	GroupID          *int64 `json:"groupID,omitempty"`
-	RuntimeClassName string `json:"runtimeClassName,omitempty"`
+	Replicas         int        `json:"replicas,omitempty"`
+	UserID           *int64     `json:"userID,omitempty"`
+	GroupID          *int64     `json:"groupID,omitempty"`
+	RuntimeClassName string     `json:"runtimeClassName,omitempty"`
+	Proxy            *ProxySpec `json:"proxy,omitempty"`
+}
+
+// ProxySpec defines the proxy configuration for NIMService
+type ProxySpec struct {
+	HttpProxy     string `json:"httpProxy,omitempty"`
+	HttpsProxy    string `json:"httpsProxy,omitempty"`
+	CertConfigMap string `json:"certConfigMap,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume
@@ -208,6 +216,27 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 	return envVars
 }
 
+// GetProxySpec returns the proxy spec for the NIMService deployment
+func (n *NIMService) GetProxyEnv() []corev1.EnvVar {
+
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "NIM_SDK_USE_NATIVE_TLS",
+			Value: "1",
+		},
+		{
+			Name:  "HTTPS_PROXY",
+			Value: n.Spec.Proxy.HttpsProxy,
+		},
+		{
+			Name:  "HTTP_PROXY",
+			Value: n.Spec.Proxy.HttpProxy,
+		},
+	}
+
+	return envVars
+}
+
 // GetStandardAnnotations returns default annotations to apply to the NIMService instance
 func (n *NIMService) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
@@ -276,7 +305,11 @@ func (n *NIMService) GetArgs() []string {
 
 // GetEnv returns merged slice of standard and user specified env variables
 func (n *NIMService) GetEnv() []corev1.EnvVar {
-	return utils.MergeEnvVars(n.GetStandardEnv(), n.Spec.Env)
+	envVarList := utils.MergeEnvVars(n.GetStandardEnv(), n.Spec.Env)
+	if n.GetProxySpec() != nil {
+		envVarList = utils.MergeEnvVars(envVarList, n.GetProxyEnv())
+	}
+	return envVarList
 }
 
 // GetImage returns container image for the NIMService
@@ -417,6 +450,22 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 		},
 	}
 
+	if n.GetProxySpec() != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "ca-cert-volume",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+			corev1.Volume{
+				Name: "custom-ca",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: n.Spec.Proxy.CertConfigMap}},
+				},
+			},
+		)
+	}
+
 	return volumes
 }
 
@@ -434,6 +483,13 @@ func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.Vo
 		},
 	}
 
+	if n.GetProxySpec() != nil {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "ca-cert-volume",
+			MountPath: "/etc/ssl",
+		},
+		)
+	}
 	return volumeMounts
 }
 
@@ -478,6 +534,37 @@ func (n *NIMService) GetReplicas() int {
 // GetDeploymentKind returns the kind of deployment for NIMService
 func (n *NIMService) GetDeploymentKind() string {
 	return "Deployment"
+}
+
+// GetInitContainers returns the init containers for the NIMService deployment
+func (n *NIMService) GetInitContainers() []corev1.Container {
+	if n.Spec.Proxy != nil {
+		return []corev1.Container{
+			{
+				Name:            "update-ca-certificates",
+				Image:           n.GetImage(),
+				ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+				Command: []string{
+					"sh", "-c", "cp /custom/*.crt /usr/local/share/ca-certificates/ && update-ca-certificates --verbose && cp -r /etc/ssl/certs/ /ca-certs",
+				},
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser:                ptr.To(int64(0)),
+					AllowPrivilegeEscalation: ptr.To(true),
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "ca-cert-volume",
+						MountPath: "/ca-certs",
+					},
+					{
+						Name:      "custom-ca",
+						MountPath: "/custom",
+					},
+				},
+			},
+		}
+	}
+	return []corev1.Container{}
 }
 
 // IsAutoScalingEnabled returns true if autoscaling is enabled for NIMService deployment
@@ -837,6 +924,11 @@ func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
 		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
 	return nimServiceAnnotations
+}
+
+// GetProxySpec returns the proxy spec for the NIMService deployment
+func (n *NIMService) GetProxySpec() *ProxySpec {
+	return n.Spec.Proxy
 }
 
 func init() {
