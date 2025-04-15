@@ -7,7 +7,9 @@ metadata:
     app.kubernetes.io/created-by: k8s-nim-operator
     app.kubernetes.io/part-of: k8s-nim-operator
     control-plane: controller-manager
-  {{- include "k8s-nim-operator.labels" . | nindent 4 }}
+    {{- include "k8s-nim-operator.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.operator.annotations | nindent 4 }}
 spec:
   replicas: {{ .Values.operator.replicas }}
   selector:
@@ -21,6 +23,9 @@ spec:
       {{- include "k8s-nim-operator.selectorLabels" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
+        {{- with .Values.operator.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       containers:
       - args: {{- toYaml .Values.operator.args | nindent 8 }}
@@ -49,25 +54,18 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.operator.resources | nindent 10 }}
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
+        securityContext: {{- toYaml .Values.operator.containerSecurityContext | nindent 10 }}
       imagePullSecrets:
       {{- range .Values.operator.image.pullSecrets }}
         - name: {{ . }}
       {{- end }}
-      securityContext:
-        seccompProfile:
-          type: RuntimeDefault
-        runAsNonRoot: true
+      securityContext: {{- toYaml .Values.operator.podSecurityContext | nindent 8 }}
       serviceAccountName: k8s-nim-operator
       terminationGracePeriodSeconds: 10
     {{- with .Values.operator.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- end }}
     {{- with .Values.operator.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
