@@ -55,7 +55,7 @@
   register: pods
 
 - name: Wait for Milvus pod to be ready
-  command: kubectl wait --for=condition=Ready pod -n {{ namespace }} -l app.kubernetes.io/instance={{ milvus.helm_repo_name }} --timeout=120s
+  command: kubectl wait --for=condition=Ready pod -n {{ namespace }} -l app.kubernetes.io/instance={{ milvus.helm_repo_name }} --timeout=300s
 
 - name: Get Milvus pod details
   shell: |
