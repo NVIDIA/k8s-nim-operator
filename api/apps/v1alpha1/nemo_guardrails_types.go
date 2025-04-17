@@ -60,7 +60,7 @@ type NemoGuardrailSpec struct {
 	Command     []string        `json:"command,omitempty"`
 	Args        []string        `json:"args,omitempty"`
 	Env         []corev1.EnvVar `json:"env,omitempty"`
-	NIMEndpoint NIMEndpoint     `json:"nimEndpoint"`
+	NIMEndpoint *NIMEndpoint    `json:"nimEndpoint,omitempty"`
 	// ConfigStore stores the config of the guardrail service
 	ConfigStore  GuardrailConfig              `json:"configStore,omitempty"`
 	Labels       map[string]string            `json:"labels,omitempty"`
@@ -183,10 +183,6 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 			Value: "/config-store",
 		},
 		{
-			Name:  "NIM_ENDPOINT_URL",
-			Value: n.Spec.NIMEndpoint.BaseURL,
-		},
-		{
 			Name:  "DEFAULT_CONFIG_ID",
 			Value: "default",
 		},
@@ -220,18 +216,24 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 		},
 	}
 
-	if len(n.Spec.NIMEndpoint.APIKeySecret) > 0 {
+	if n.Spec.NIMEndpoint != nil {
 		envVars = append(envVars, corev1.EnvVar{
-			Name: "NIM_ENDPOINT_API_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: n.Spec.NIMEndpoint.APIKeyKey,
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.NIMEndpoint.APIKeySecret,
+			Name:  "NIM_ENDPOINT_URL",
+			Value: n.Spec.NIMEndpoint.BaseURL,
+		})
+		if len(n.Spec.NIMEndpoint.APIKeySecret) > 0 {
+			envVars = append(envVars, corev1.EnvVar{
+				Name: "NIM_ENDPOINT_API_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						Key: n.Spec.NIMEndpoint.APIKeyKey,
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: n.Spec.NIMEndpoint.APIKeySecret,
+						},
 					},
 				},
-			},
-		})
+			})
+		}
 	}
 	return envVars
 }
@@ -409,7 +411,7 @@ func (n *NemoGuardrail) GetVolumes() []corev1.Volume {
 func (n *NemoGuardrail) GetVolumeMounts() []corev1.VolumeMount {
 	volumeMount := corev1.VolumeMount{
 		Name:      "config-store",
-		MountPath: "/config-store/default",
+		MountPath: "/config-store",
 	}
 	if n.Spec.ConfigStore.PVC != nil {
 		volumeMount.MountPath = "/config-store"
