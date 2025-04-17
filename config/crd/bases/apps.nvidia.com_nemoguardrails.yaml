@@ -1439,7 +1439,6 @@ spec:
                 type: integer
             required:
             - image
-            - nimEndpoint
             type: object
           status:
             description: NemoGuardrailStatus defines the observed state of NemoGuardrail
