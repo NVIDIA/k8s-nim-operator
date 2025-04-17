@@ -205,10 +205,6 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 			Name:  "DEMO",
 			Value: "False",
 		},
-		{
-			Name:  "LOG_HEALTH_ENDPOINTS",
-			Value: "false",
-		},
 	}
 
 	if n.Spec.NIMEndpoint != nil {
