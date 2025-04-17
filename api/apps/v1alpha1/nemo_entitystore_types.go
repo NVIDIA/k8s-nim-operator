@@ -185,10 +185,6 @@ func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
 			Name:  "APP_VERSION",
 			Value: n.Spec.Image.Tag,
 		},
-		{
-			Name:  "LOG_HEALTH_ENDPOINTS",
-			Value: "false",
-		},
 	}
 	envVars = append(envVars, n.GetPostgresEnv()...)
 	return envVars
