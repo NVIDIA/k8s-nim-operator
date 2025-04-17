@@ -23,7 +23,7 @@ spec:
       type: ClusterIP
       port: 8000
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/customizer
+    repository: nvcr.io/nvidia/nemo-microservices/customizer-api
     tag: "25.04"
     pullPolicy: IfNotPresent
     pullSecrets:
@@ -57,7 +57,7 @@ spec:
 
     training:
       queue: "default"
-      image: nvcr.io/nvidia/nemo-microservices/customizer-api:25.04
+      image: nvcr.io/nvidia/nemo-microservices/customizer:25.04
       imagePullSecrets:
         - name: ngc-secret
       pvc:
