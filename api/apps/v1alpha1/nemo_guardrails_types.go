@@ -415,7 +415,11 @@ func (n *NemoGuardrail) GetVolumeMounts() []corev1.VolumeMount {
 	}
 	if n.Spec.ConfigStore.PVC != nil {
 		volumeMount.MountPath = "/config-store"
-		volumeMount.SubPath = n.Spec.ConfigStore.PVC.SubPath
+		subPath := n.Spec.ConfigStore.PVC.SubPath
+		if subPath == "" {
+			subPath = "guardrails-config-store"
+		}
+		volumeMount.SubPath = subPath
 	}
 
 	return []corev1.VolumeMount{volumeMount}
