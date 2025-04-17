@@ -1421,7 +1421,11 @@ func (in *NemoDatastoreSpec) DeepCopyInto(out *NemoDatastoreSpec) {
 		*out = new(int64)
 		**out = **in
 	}
-	out.ObjectStoreConfig = in.ObjectStoreConfig
+	if in.ObjectStoreConfig != nil {
+		in, out := &in.ObjectStoreConfig, &out.ObjectStoreConfig
+		*out = new(ObjectStoreConfig)
+		**out = **in
+	}
 	out.DatabaseConfig = in.DatabaseConfig
 	out.Secrets = in.Secrets
 	if in.PVC != nil {

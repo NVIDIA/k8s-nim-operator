@@ -1526,7 +1526,6 @@ spec:
             required:
             - databaseConfig
             - image
-            - objectStoreConfig
             - secrets
             type: object
           status:

@@ -9,10 +9,3 @@ postgresql:
   username: ndsuser
   password: ndspass
   database: ndsdb
-
-minio:
-  enabled: true
-  helm_release_name: datastore-minio
-  helm_oci_registry: oci://registry-1.docker.io/bitnamicharts/minio
-  username: minioUser
-  password: minio@Pass

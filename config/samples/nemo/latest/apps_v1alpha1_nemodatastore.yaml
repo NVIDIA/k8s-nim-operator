@@ -10,16 +10,6 @@ spec:
     datastoreInlineConfigSecret: "nemo-ms-nemo-datastore-inline-config"
     giteaAdminSecret: "gitea-admin-credentials"
     lfsJwtSecret: "nemo-ms-nemo-datastore--lfs-jwt" 
-  objectStoreConfig:
-    credentials:
-      user: minioUser
-      secretName: datastore-minio-existing-secret
-      passwordKey: objectStoreSecret
-    serveDirect: true
-    endpoint: datastore-minio.nemo.svc.cluster.local:9000
-    bucketName: datastore-dev
-    region: object-store-region
-    ssl: false
   databaseConfig:
     credentials:
       user: ndsuser

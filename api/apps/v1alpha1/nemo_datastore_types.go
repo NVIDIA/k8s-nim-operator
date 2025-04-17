@@ -78,7 +78,7 @@ type NemoDatastoreSpec struct {
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 
 	// ObjectStore specifies the location and credentials for accessing the external Object Storage
-	ObjectStoreConfig ObjectStoreConfig `json:"objectStoreConfig"` // e.g. minio
+	ObjectStoreConfig *ObjectStoreConfig `json:"objectStoreConfig,omitempty"` // e.g. minio
 	// DatabaseConfig contains external PostgreSQL configuration
 	DatabaseConfig DatabaseConfig `json:"databaseConfig"` // e.g. postgres
 	// Secrets contains the pre-requisite secrets that must be created before deploying the datastore CR
@@ -220,21 +220,6 @@ func (n *NemoDatastore) GetStandardEnv() []corev1.EnvVar {
 			Value: "/data/gitea/git",
 		},
 		{
-			Name:  "GITEA__LFS__MINIO_ACCESS_KEY_ID",
-			Value: n.Spec.ObjectStoreConfig.Credentials.User,
-		},
-		{
-			Name: "GITEA__LFS__MINIO_SECRET_ACCESS_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: n.Spec.ObjectStoreConfig.Credentials.PasswordKey,
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.ObjectStoreConfig.Credentials.SecretName,
-					},
-				},
-			},
-		},
-		{
 			Name: "GITEA__SERVER__LFS_JWT_SECRET",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
@@ -257,11 +242,30 @@ func (n *NemoDatastore) GetStandardEnv() []corev1.EnvVar {
 			},
 		},
 	}
+
+	if n.Spec.ObjectStoreConfig != nil {
+		envVars = append(envVars,
+			corev1.EnvVar{
+				Name:  "GITEA__LFS__MINIO_ACCESS_KEY_ID",
+				Value: n.Spec.ObjectStoreConfig.Credentials.User,
+			},
+			corev1.EnvVar{
+				Name: "GITEA__LFS__MINIO_SECRET_ACCESS_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						Key: n.Spec.ObjectStoreConfig.Credentials.PasswordKey,
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: n.Spec.ObjectStoreConfig.Credentials.SecretName,
+						},
+					},
+				},
+			},
+		)
+	}
 	return envVars
 }
 
 func (n *NemoDatastore) GetInitContainerEnv() []corev1.EnvVar {
-	objStoreSetting := n.Spec.ObjectStoreConfig
 	dbSetting := n.Spec.DatabaseConfig
 
 	envVars := []corev1.EnvVar{
@@ -288,21 +292,6 @@ func (n *NemoDatastore) GetInitContainerEnv() []corev1.EnvVar {
 		{
 			Name:  "HOME",
 			Value: "/data/gitea/git",
-		},
-		{
-			Name:  "GITEA__LFS__MINIO_ACCESS_KEY_ID",
-			Value: objStoreSetting.Credentials.User,
-		},
-		{
-			Name: "GITEA__LFS__MINIO_SECRET_ACCESS_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: objStoreSetting.Credentials.PasswordKey,
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: objStoreSetting.Credentials.SecretName,
-					},
-				},
-			},
 		},
 		{
 			Name: "GITEA__SERVER__LFS_JWT_SECRET",
@@ -349,34 +338,6 @@ func (n *NemoDatastore) GetInitContainerEnv() []corev1.EnvVar {
 			},
 		},
 		{
-			Name:  "GITEA__LFS__SERVE_DIRECT",
-			Value: strconv.FormatBool(objStoreSetting.ServeDirect),
-		},
-		{
-			Name:  "GITEA__LFS__STORAGE_TYPE",
-			Value: "minio",
-		},
-		{
-			Name:  "GITEA__LFS__MINIO_ENDPOINT",
-			Value: objStoreSetting.Endpoint,
-		},
-		{
-			Name:  "GITEA__LFS__MINIO_BUCKET",
-			Value: objStoreSetting.BucketName,
-		},
-		{
-			Name:  "GITEA__LFS__MINIO_LOCATION",
-			Value: objStoreSetting.Region,
-		},
-		{
-			Name:  "GITEA__LFS__MINIO_LOCATION",
-			Value: objStoreSetting.Region,
-		},
-		{
-			Name:  "GITEA__LFS__MINIO_USE_SSL",
-			Value: strconv.FormatBool(objStoreSetting.SSL),
-		},
-		{
 			Name:  "GITEA__DATABASE__SSL_MODE",
 			Value: "disable",
 		},
@@ -392,6 +353,54 @@ func (n *NemoDatastore) GetInitContainerEnv() []corev1.EnvVar {
 			Name:  "GITEA__DATABASE__USER",
 			Value: dbSetting.Credentials.User,
 		},
+	}
+
+	if n.Spec.ObjectStoreConfig != nil {
+		envVars = append(envVars,
+			corev1.EnvVar{
+				Name:  "GITEA__LFS__SERVE_DIRECT",
+				Value: strconv.FormatBool(n.Spec.ObjectStoreConfig.ServeDirect),
+			},
+			corev1.EnvVar{
+				Name:  "GITEA__LFS__STORAGE_TYPE",
+				Value: "minio",
+			},
+			corev1.EnvVar{
+				Name:  "GITEA__LFS__MINIO_ENDPOINT",
+				Value: n.Spec.ObjectStoreConfig.Endpoint,
+			},
+			corev1.EnvVar{
+				Name:  "GITEA__LFS__MINIO_BUCKET",
+				Value: n.Spec.ObjectStoreConfig.BucketName,
+			},
+			corev1.EnvVar{
+				Name:  "GITEA__LFS__MINIO_LOCATION",
+				Value: n.Spec.ObjectStoreConfig.Region,
+			},
+			corev1.EnvVar{
+				Name:  "GITEA__LFS__MINIO_LOCATION",
+				Value: n.Spec.ObjectStoreConfig.Region,
+			},
+			corev1.EnvVar{
+				Name:  "GITEA__LFS__MINIO_USE_SSL",
+				Value: strconv.FormatBool(n.Spec.ObjectStoreConfig.SSL),
+			},
+			corev1.EnvVar{
+				Name:  "GITEA__LFS__MINIO_ACCESS_KEY_ID",
+				Value: n.Spec.ObjectStoreConfig.Credentials.User,
+			},
+			corev1.EnvVar{
+				Name: "GITEA__LFS__MINIO_SECRET_ACCESS_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						Key: n.Spec.ObjectStoreConfig.Credentials.PasswordKey,
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: n.Spec.ObjectStoreConfig.Credentials.SecretName,
+						},
+					},
+				},
+			},
+		)
 	}
 	return envVars
 }
