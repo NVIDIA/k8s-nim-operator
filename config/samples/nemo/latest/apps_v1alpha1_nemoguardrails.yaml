@@ -5,7 +5,6 @@ metadata:
   namespace: nemo
 spec:
   # required if a NIM endpoint is hosted by NVIDIA
-  authSecret: ""
   configStore:
     pvc:
       name: "pvc-guardrail-config"
@@ -21,9 +20,8 @@ spec:
       type: ClusterIP
       port: 8000
   image:
-    #repository: nvcr.io/nvidia/nemo-microservices/guardrails
-    repository: nvcr.io/nvidian/nemo-llm/guardrails
-    tag: "25.04-rc10"
+    repository: nvcr.io/nvidia/nemo-microservices/guardrails
+    tag: "25.04"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret

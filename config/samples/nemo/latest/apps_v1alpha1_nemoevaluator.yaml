@@ -5,17 +5,16 @@ metadata:
   namespace: nemo
 spec:
   evaluationImages:
-    bigcodeEvalHarness: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-bigcode:0.12.5"
-    lmEvalHarness: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-lm-eval-harness:0.12.5"
-    similarityMetrics: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-custom-eval:0.12.5"
-    llmAsJudge: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.5"
-    mtBench: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.5"
-    retriever: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-retriever:0.12.5"
-    rag: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-rag:0.12.5"
+    bigcodeEvalHarness: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-bigcode:0.12.13"
+    lmEvalHarness: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-lm-eval-harness:0.12.13"
+    similarityMetrics: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-custom-eval:0.12.13"
+    llmAsJudge: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.13"
+    mtBench: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.13"
+    retriever: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-retriever:0.12.13"
+    rag: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-rag:0.12.13"
   image:
-    #repository: nvcr.io/nvidia/nemo-microservices/evaluator
-    repository: nvcr.io/nvidian/nemo-llm/evaluator
-    tag: "25.04-rc10"
+    repository: nvcr.io/nvidia/nemo-microservices/evaluator
+    tag: "25.04"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
