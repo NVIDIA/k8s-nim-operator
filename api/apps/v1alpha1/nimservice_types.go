@@ -21,6 +21,7 @@ import (
 	"maps"
 	"os"
 
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -83,13 +84,6 @@ type NIMServiceSpec struct {
 	GroupID          *int64     `json:"groupID,omitempty"`
 	RuntimeClassName string     `json:"runtimeClassName,omitempty"`
 	Proxy            *ProxySpec `json:"proxy,omitempty"`
-}
-
-// ProxySpec defines the proxy configuration for NIMService
-type ProxySpec struct {
-	HttpProxy     string `json:"httpProxy,omitempty"`
-	HttpsProxy    string `json:"httpsProxy,omitempty"`
-	CertConfigMap string `json:"certConfigMap,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume
@@ -231,6 +225,22 @@ func (n *NIMService) GetProxyEnv() []corev1.EnvVar {
 		{
 			Name:  "HTTP_PROXY",
 			Value: n.Spec.Proxy.HttpProxy,
+		},
+		{
+			Name:  "NO_PROXY",
+			Value: n.Spec.Proxy.NoProxy,
+		},
+		{
+			Name:  "https_proxy",
+			Value: n.Spec.Proxy.HttpsProxy,
+		},
+		{
+			Name:  "http_proxy",
+			Value: n.Spec.Proxy.HttpProxy,
+		},
+		{
+			Name:  "no_proxy",
+			Value: n.Spec.Proxy.NoProxy,
 		},
 	}
 
@@ -544,23 +554,9 @@ func (n *NIMService) GetInitContainers() []corev1.Container {
 				Name:            "update-ca-certificates",
 				Image:           n.GetImage(),
 				ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
-				Command: []string{
-					"sh", "-c", "cp /custom/*.crt /usr/local/share/ca-certificates/ && update-ca-certificates --verbose && cp -r /etc/ssl/certs/ /ca-certs",
-				},
-				SecurityContext: &corev1.SecurityContext{
-					RunAsUser:                ptr.To(int64(0)),
-					AllowPrivilegeEscalation: ptr.To(true),
-				},
-				VolumeMounts: []corev1.VolumeMount{
-					{
-						Name:      "ca-cert-volume",
-						MountPath: "/ca-certs",
-					},
-					{
-						Name:      "custom-ca",
-						MountPath: "/custom",
-					},
-				},
+				Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
+				SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
+				VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
 			},
 		}
 	}

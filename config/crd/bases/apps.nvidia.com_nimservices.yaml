@@ -1076,6 +1076,8 @@ spec:
                     type: string
                   httpsProxy:
                     type: string
+                  noProxy:
+                    type: string
                 type: object
               readinessProbe:
                 description: Probe defines attributes for startup/liveness/readiness

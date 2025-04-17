@@ -959,9 +959,8 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				RunAsUser:    nimCache.GetUserID(),
-				FSGroup:      nimCache.GetGroupID(),
-				RunAsNonRoot: ptr.To[bool](true),
+				RunAsUser: nimCache.GetUserID(),
+				FSGroup:   nimCache.GetGroupID(),
 			},
 			ServiceAccountName: NIMCacheServiceAccount,
 			Tolerations:        nimCache.GetTolerations(),
@@ -1043,9 +1042,8 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Spec: corev1.PodSpec{
 					RuntimeClassName: nimCache.GetRuntimeClassName(),
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser:    nimCache.GetUserID(),
-						FSGroup:      nimCache.GetGroupID(),
-						RunAsNonRoot: ptr.To[bool](true),
+						RunAsUser: nimCache.GetUserID(),
+						FSGroup:   nimCache.GetGroupID(),
 					},
 					Containers:    []corev1.Container{},
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -1194,14 +1192,33 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 
 		// Inject custom CA certificates when running in a proxy envronment
 		if nimCache.Spec.CertConfig != nil {
-			volumes, volumeMounts, err := r.createCertVolumesAndMounts(ctx, nimCache)
-			if err != nil {
-				logger.Error(err, "failed to create volume mounts for custom CA cert injection")
-				return nil, err
-			}
+			logger.Error(err, "Deprecated field 'CertConfig' is used. Please migrate to 'Proxy' field on NIMCache.\"")
+			return nil, err
+		}
 
-			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
-			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
+		if nimCache.GetProxySpec() != nil {
+			job.Spec.Template.Spec.InitContainers = nimCache.GetInitContainers()
+			job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.GetEnvWithProxy())
+			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts,
+				corev1.VolumeMount{
+					Name:      "ca-cert-volume",
+					MountPath: "/etc/ssl",
+				},
+			)
+			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
+				corev1.Volume{
+					Name: "ca-cert-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+				corev1.Volume{
+					Name: "custom-ca",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: nimCache.Spec.Proxy.CertConfigMap}},
+					},
+				},
+			)
 		}
 	}
 	return job, nil

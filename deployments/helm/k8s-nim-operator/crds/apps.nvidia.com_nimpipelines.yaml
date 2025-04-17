@@ -1126,12 +1126,16 @@ spec:
                               x-kubernetes-list-type: atomic
                           type: object
                         proxy:
+                          description: ProxySpec defines the proxy configuration for
+                            NIMService
                           properties:
                             certConfigMap:
                               type: string
                             httpProxy:
                               type: string
                             httpsProxy:
+                              type: string
+                            noProxy:
                               type: string
                           type: object
                         readinessProbe:

@@ -181,3 +181,11 @@ type CertConfig struct {
 	// MountPath is the path where the certificates should be mounted in the container.
 	MountPath string `json:"mountPath"`
 }
+
+// ProxySpec defines the proxy configuration for NIMService
+type ProxySpec struct {
+	HttpProxy     string `json:"httpProxy,omitempty"`
+	HttpsProxy    string `json:"httpsProxy,omitempty"`
+	NoProxy       string `json:"noProxy,omitempty"`
+	CertConfigMap string `json:"certConfigMap,omitempty"`
+}

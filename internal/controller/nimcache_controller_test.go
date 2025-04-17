@@ -351,7 +351,6 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(pod.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
 			Expect(*pod.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*pod.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
-			Expect(*pod.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(pod.Spec.NodeSelector["feature.node.kubernetes.io/pci-10de.present"]).To(Equal("true"))
 		})
 
@@ -376,7 +375,6 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(pod.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
 			Expect(*pod.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*pod.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
-			Expect(*pod.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(pod.Spec.NodeSelector["test-label"]).To(Equal("true"))
 			Expect(pod.Spec.RuntimeClassName).To(Equal(&runtimeClassName))
 		})
@@ -431,7 +429,6 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--profiles", "36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
-			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
 			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)))
 		})
@@ -462,7 +459,6 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--profiles", "36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff", "04fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc12345"))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
-			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
 			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)))
 		})
@@ -544,80 +540,6 @@ var _ = Describe("NIMCache Controller", func() {
 				}
 				Expect(found).To(BeTrue(), "Expected environment variable %s=%s not found", key, value)
 			}
-		})
-
-		It("should create a job with the right custom CA certificate volumes", func() {
-			ctx := context.TODO()
-			profiles := []string{AllProfiles}
-			nimCache := &appsv1alpha1.NIMCache{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-nimcache",
-					Namespace: "default",
-				},
-				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles}}},
-					CertConfig: &appsv1alpha1.CertConfig{
-						Name:      "custom-ca-configmap",
-						MountPath: "/usr/share/ssl/certs",
-					},
-				},
-			}
-
-			// Create a sample ConfigMap with certificate files
-			configMap := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "custom-ca-configmap",
-					Namespace: "default",
-				},
-				Data: map[string]string{
-					"custom-ca-cert.pem": "fake-cert-data",
-					"another-cert.pem":   "fake-cert-data-2",
-				},
-			}
-
-			err := reconciler.Create(context.TODO(), configMap)
-			Expect(err).ToNot(HaveOccurred())
-
-			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = cli.Create(context.TODO(), job)
-			Expect(err).ToNot(HaveOccurred())
-
-			job = &batchv1.Job{}
-			jobName := types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}
-			err = cli.Get(ctx, jobName, job)
-			Expect(err).ToNot(HaveOccurred())
-
-			// Verify CertConfig volume and mounts
-			Expect(job.Spec.Template.Spec.Volumes).To(ContainElement(
-				corev1.Volume{
-					Name: "cert-volume",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "custom-ca-configmap",
-							},
-						},
-					},
-				},
-			))
-
-			Expect(job.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(
-				corev1.VolumeMount{
-					Name:      "cert-volume",
-					MountPath: "/usr/share/ssl/certs/custom-ca-cert.pem",
-					SubPath:   "custom-ca-cert.pem",
-				},
-			))
-
-			Expect(job.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(
-				corev1.VolumeMount{
-					Name:      "cert-volume",
-					MountPath: "/usr/share/ssl/certs/another-cert.pem",
-					SubPath:   "another-cert.pem",
-				},
-			))
 		})
 
 		It("should create a ConfigMap with the given model manifest data", func() {
