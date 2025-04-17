@@ -71,7 +71,7 @@ var _ = Describe("NemoDatastore Controller", func() {
 					VolumeAccessMode: corev1.ReadWriteOnce,
 					Size:             "1Gi",
 				},
-				ObjectStoreConfig: appsv1alpha1.ObjectStoreConfig{
+				ObjectStoreConfig: &appsv1alpha1.ObjectStoreConfig{
 					Endpoint:   "test-mino-host",
 					BucketName: "test-bucket",
 					Region:     "test-region",
@@ -138,7 +138,7 @@ var _ = Describe("NemoDatastore Controller", func() {
 		})
 
 		It("should reject DataStore with invalid object store config", func() {
-			invalidDS.Spec.ObjectStoreConfig = appsv1alpha1.ObjectStoreConfig{}
+			invalidDS.Spec.ObjectStoreConfig = &appsv1alpha1.ObjectStoreConfig{}
 			err := k8sClient.Create(ctx, invalidDS)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInvalid(err)).To(BeTrue())

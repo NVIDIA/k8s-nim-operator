@@ -3,11 +3,11 @@
   register: datastore_installed
   ignore_errors: true
 
-- name: Uninstall Datastore and Minio
-  shell: helm list -n {{ namespace }} | awk '{print $1}' | grep -v NAME | egrep 'datastore|minio' | xargs helm del -n {{ namespace }}
+- name: Uninstall Datastore
+  shell: helm list -n {{ namespace }} | awk '{print $1}' | grep -v NAME | egrep 'datastore' | xargs helm del -n {{ namespace }}
   when: datastore_installed.stdout | int >= 1
   ignore_errors: true
 
-- name: Delete Datastore and Minio PVCs
-  shell: kubectl get pvc -n {{ namespace }} | egrep 'datastore|minio' | awk '{print $1}' | xargs kubectl delete pvc -n {{ namespace }}
+- name: Delete Datastore PVCs
+  shell: kubectl get pvc -n {{ namespace }} | egrep 'datastore' | awk '{print $1}' | xargs kubectl delete pvc -n {{ namespace }}
   ignore_errors: true

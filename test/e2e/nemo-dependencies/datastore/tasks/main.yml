@@ -5,6 +5,4 @@
   when: localPathProvisioner.enabled
 - include_tasks: postgresql.yaml
   when: postgresql.enabled
-- include_tasks: minio.yaml
-  when: minio.enabled
 - include_tasks: secrets.yaml

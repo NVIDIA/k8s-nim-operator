@@ -37,8 +37,6 @@
           - "Datastore DB Password: {{ postgresql.password }}"
           - "Datastore DB Username: {{ postgresql.username }}"
           - "Datastore DB Name: {{ postgresql.database }}"  
-          - "Datastore minio Password: {{ minio.password }}"
-          - "Datastore minio Username: {{ minio.username }}"
       when: install.datastore == true
 
 - hosts: localhost
