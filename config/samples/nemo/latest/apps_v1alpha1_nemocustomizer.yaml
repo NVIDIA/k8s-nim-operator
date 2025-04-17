@@ -23,9 +23,8 @@ spec:
       type: ClusterIP
       port: 8000
   image:
-    #repository: nvcr.io/nvidia/nemo-microservices/customizer
-    repository: nvcr.io/nvidian/nemo-llm/customizer
-    tag: "25.04-rc10"
+    repository: nvcr.io/nvidia/nemo-microservices/customizer
+    tag: "25.04"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
@@ -36,12 +35,11 @@ spec:
     mlflow_tracking_url: http://mlflow-tracking.nemo.svc.cluster.local:80
 
     nemo_data_store_tools:
-      #image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.03
-      image: nvcr.io/nvidian/nemo-llm/nds-v2-huggingface-cli:25.04-rc10
+      image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04
       imagePullSecret: ngc-secret
 
     model_download_jobs:
-      image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.03"
+      image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.04"
       imagePullPolicy: "IfNotPresent"
       imagePullSecrets:
         - name: ngc-secret
@@ -59,8 +57,7 @@ spec:
 
     training:
       queue: "default"
-      #image: nvcr.io/nvidia/nemo-microservices/customizer-api:25.03
-      image: "nvcr.io/nvidian/nemo-llm/customizer-api:25.04-rc10"
+      image: nvcr.io/nvidia/nemo-microservices/customizer-api:25.04
       imagePullSecrets:
         - name: ngc-secret
       pvc:
