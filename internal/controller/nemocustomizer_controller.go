@@ -30,6 +30,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -363,8 +364,13 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Sync Customizer ConfigMap
+	customizerConfigYAML, err := r.renderCustomizerConfig(ctx, NemoCustomizer)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("rendering customizer config: %w", err)
+	}
+
 	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &corev1.ConfigMap{}, func() (client.Object, error) {
-		return renderer.ConfigMap(NemoCustomizer.GetConfigMapParams())
+		return renderer.ConfigMap(NemoCustomizer.GetConfigMapParams(customizerConfigYAML))
 	}, "configmap", conditions.ReasonConfigMapFailed)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -391,19 +397,6 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 
 	// Get params to render Deployment resource
 	deploymentParams := NemoCustomizer.GetDeploymentParams()
-
-	// Calculate the hash of the config data
-	configHash := utils.CalculateSHA256(NemoCustomizer.Spec.CustomizerConfig)
-	annotations := deploymentParams.PodAnnotations
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	// Check if the hash has changed
-	if annotations[ConfigHashAnnotationKey] != configHash {
-		annotations[ConfigHashAnnotationKey] = configHash
-		deploymentParams.PodAnnotations = annotations
-	}
 
 	// Setup volume mounts with customizer config
 	deploymentParams.Volumes = NemoCustomizer.GetVolumes()
@@ -441,6 +434,56 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NemoCustomizerReconciler) renderCustomizerConfig(ctx context.Context, n *appsv1alpha1.NemoCustomizer) ([]byte, error) {
+	cfg := map[string]interface{}{
+		"namespace":           n.GetNamespace(),
+		"entity_store_url":    n.Spec.EntitystoreURL,
+		"nemo_data_store_url": n.Spec.NemoDatastoreURL,
+		"mlflow_tracking_url": n.Spec.MLflowTrackingURL,
+		"nemo_data_store_tools": map[string]interface{}{
+			"image":           n.Spec.NemoDatastoreTools.Image,
+			"imagePullSecret": n.Spec.NemoDatastoreTools.ImagePullSecret,
+		},
+		"model_download_jobs": map[string]interface{}{
+			"image":                   n.Spec.ModelDownloadJobs.Image,
+			"imagePullPolicy":         n.Spec.ModelDownloadJobs.ImagePullPolicy,
+			"imagePullSecrets":        n.Spec.ModelDownloadJobs.ImagePullSecrets,
+			"ngcAPISecret":            n.Spec.ModelDownloadJobs.NGCAPISecret,
+			"ngcAPISecretKey":         n.Spec.ModelDownloadJobs.NGCAPISecretKey,
+			"securityContext":         n.Spec.ModelDownloadJobs.SecurityContext,
+			"ttlSecondsAfterFinished": n.Spec.ModelDownloadJobs.TTLSecondsAfterFinished,
+			"pollIntervalSeconds":     n.Spec.ModelDownloadJobs.PollIntervalSeconds,
+		},
+	}
+
+	// Load and parse training config
+	trainingRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.TrainingConfig.Name, "training")
+	if err != nil {
+		return nil, fmt.Errorf("loading training config: %w", err)
+	}
+
+	var training map[string]interface{}
+	if err := yaml.Unmarshal([]byte(trainingRaw), &training); err != nil {
+		return nil, fmt.Errorf("parsing training config: %w", err)
+	}
+	cfg["training"] = training
+
+	// Load and parse models config
+	modelsRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.ModelsConfig.Name, "models")
+	if err != nil {
+		return nil, fmt.Errorf("loading models config: %w", err)
+	}
+
+	var models map[string]interface{}
+	if err := yaml.Unmarshal([]byte(modelsRaw), &models); err != nil {
+		return nil, fmt.Errorf("parsing models config: %w", err)
+	}
+	cfg["models"] = models
+
+	// Marshal final config
+	return yaml.Marshal(cfg)
 }
 
 func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, NemoCustomizer *appsv1alpha1.NemoCustomizer, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
