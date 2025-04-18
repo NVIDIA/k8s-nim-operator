@@ -1231,43 +1231,6 @@ func (r *NIMCacheReconciler) getConfigMap(ctx context.Context, name, namespace s
 	return configMap, err
 }
 
-func (r *NIMCacheReconciler) createCertVolumesAndMounts(ctx context.Context, nimCache *appsv1alpha1.NIMCache) ([]corev1.Volume, []corev1.VolumeMount, error) {
-	logger := log.FromContext(ctx)
-
-	// Get the config map for custom certificates
-	certConfig, err := r.getConfigMap(ctx, nimCache.Spec.CertConfig.Name, nimCache.Namespace)
-	if err != nil {
-		logger.Error(err, "Failed to get configmap for custom certificates")
-		return nil, nil, err
-	}
-
-	var volume corev1.Volume
-	var volumeMounts []corev1.VolumeMount
-
-	// Prepare the volume mounts for custom CA certificates
-	volume = corev1.Volume{
-		Name: "cert-volume",
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: nimCache.Spec.CertConfig.Name,
-				},
-			},
-		},
-	}
-
-	// Create individual volume mounts for each key in the ConfigMap
-	for key := range certConfig.Data {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      "cert-volume",
-			MountPath: fmt.Sprintf("%s/%s", nimCache.Spec.CertConfig.MountPath, key),
-			SubPath:   key,
-		})
-	}
-
-	return []corev1.Volume{volume}, volumeMounts, nil
-}
-
 // extractNIMManifest extracts the NIMManifest from the ConfigMap data
 func (r *NIMCacheReconciler) extractNIMManifest(ctx context.Context, configName, namespace string) (nimparser.NIMManifestInterface, error) {
 	configMap, err := r.getConfigMap(ctx, configName, namespace)
