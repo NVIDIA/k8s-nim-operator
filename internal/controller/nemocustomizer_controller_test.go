@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 
@@ -43,6 +44,7 @@ import (
 	crClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/yaml"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -102,6 +104,16 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			recorder: record.NewFakeRecorder(1000),
 		}
 
+		// Load test customizer config maps from file
+		testDataDir, err := filepath.Abs("testdata")
+		Expect(err).ToNot(HaveOccurred())
+		trainingCM := loadConfigMapFromFile(filepath.Join(testDataDir, "training_config.yaml"))
+		modelsCM := loadConfigMapFromFile(filepath.Join(testDataDir, "models_config.yaml"))
+
+		// Register the test ConfigMaps in the cluster
+		Expect(reconciler.GetClient().Create(ctx, trainingCM)).To(Succeed())
+		Expect(reconciler.GetClient().Create(ctx, modelsCM)).To(Succeed())
+
 		nemoCustomizer = &appsv1alpha1.NemoCustomizer{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-nemocustomizer",
@@ -117,7 +129,38 @@ var _ = Describe("NemoCustomizer Controller", func() {
 						Value: "custom-value",
 					},
 				},
-				CustomizerConfig: "test-training-data",
+				EntitystoreURL:    "http://nemoentitystore-sample.nemo.svc.cluster.local:8000",
+				NemoDatastoreURL:  "http://nemodatastore-sample.nemo.svc.cluster.local:8000",
+				MLflowTrackingURL: "http://mlflow-tracking.nemo.svc.cluster.local:80",
+				NemoDatastoreTools: appsv1alpha1.NemoDatastoreTools{
+					Image:           "nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04",
+					ImagePullSecret: "ngc-secret",
+				},
+				ModelDownloadJobs: appsv1alpha1.ModelDownloadJobs{
+					Image:           "nvcr.io/nvidia/nemo-microservices/customizer-api:25.04",
+					ImagePullPolicy: "IfNotPresent",
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{
+							Name: "ngc-secret",
+						},
+					},
+					NGCAPISecret:    "ngc-api-secret",
+					NGCAPISecretKey: "NGC_API_KEY",
+					SecurityContext: &corev1.PodSecurityContext{
+						FSGroup:      ptr.To[int64](1000),
+						RunAsNonRoot: ptr.To[bool](true),
+						RunAsUser:    ptr.To[int64](1000),
+						RunAsGroup:   ptr.To[int64](1000),
+					},
+					TTLSecondsAfterFinished: 600,
+					PollIntervalSeconds:     15,
+				},
+				ModelsConfig: appsv1alpha1.ConfigMapRef{
+					Name: "nemo-model-config",
+				},
+				TrainingConfig: appsv1alpha1.ConfigMapRef{
+					Name: "nemo-training-config",
+				},
 				WandBSecret: appsv1alpha1.WandBSecret{
 					Name:          "wandb-secret",
 					APIKeyKey:     "api_key",
@@ -276,6 +319,20 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		err = k8sClient.Get(ctx, namespacedName, secret)
 		if err == nil {
 			Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
+		}
+
+		// Delete the training config
+		trainingCMName := types.NamespacedName{Name: "nemo-training-config", Namespace: "default"}
+		trainingCM := &corev1.ConfigMap{}
+		if err := k8sClient.Get(ctx, trainingCMName, trainingCM); err == nil {
+			Expect(k8sClient.Delete(ctx, trainingCM)).To(Succeed())
+		}
+
+		// Delete the models config
+		modelsCMName := types.NamespacedName{Name: "nemo-model-config", Namespace: "default"}
+		modelsCM := &corev1.ConfigMap{}
+		if err := k8sClient.Get(ctx, modelsCMName, modelsCM); err == nil {
+			Expect(k8sClient.Delete(ctx, modelsCM)).To(Succeed())
 		}
 	})
 
@@ -443,6 +500,48 @@ var _ = Describe("NemoCustomizer Controller", func() {
 				corev1.EnvVar{Name: "OTEL_EXPORTER_OTLP_ENDPOINT", Value: nemoCustomizer.Spec.OpenTelemetry.ExporterOtlpEndpoint},
 				corev1.EnvVar{Name: "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED", Value: "true"},
 			))
+
+			// Check that the customizer config map was created
+			configMap := &corev1.ConfigMap{}
+			err = client.Get(context.TODO(), types.NamespacedName{
+				Name:      nemoCustomizer.Name,
+				Namespace: nemoCustomizer.Namespace,
+			}, configMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify metadata
+			Expect(configMap.Name).To(Equal(nemoCustomizer.GetName()))
+			Expect(configMap.Namespace).To(Equal(nemoCustomizer.Namespace))
+			// Verify key exists
+			Expect(configMap.Data).To(HaveKey("config.yaml"))
+			configData := configMap.Data["config.yaml"]
+			Expect(configData).NotTo(BeEmpty())
+
+			// Verify presence of top-level keys
+			Expect(configData).To(ContainSubstring("training:"))
+			Expect(configData).To(ContainSubstring("models:"))
+			Expect(configData).To(ContainSubstring("model_download_jobs:"))
+
+			// Unmarshal the full merged config
+			var parsed map[string]interface{}
+			err = yaml.Unmarshal([]byte(configData), &parsed)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Validate training config (now already a map)
+			training, ok := parsed["training"].(map[string]interface{})
+			Expect(ok).To(BeTrue(), "expected 'training' to be a map")
+			Expect(training).To(HaveKey("image"))
+			Expect(training).To(HaveKey("pvc"))
+			Expect(training).To(HaveKey("imagePullSecrets"))
+
+			// Validate models config (now already a map)
+			models, ok := parsed["models"].(map[string]interface{})
+			Expect(ok).To(BeTrue(), "expected 'models' to be a map")
+			Expect(models).To(HaveKey("meta/llama-3.1-8b-instruct"))
+
+			Expect(parsed).To(HaveKeyWithValue("entity_store_url", "http://nemoentitystore-sample.nemo.svc.cluster.local:8000"))
+			Expect(parsed).To(HaveKeyWithValue("nemo_data_store_url", "http://nemodatastore-sample.nemo.svc.cluster.local:8000"))
+			Expect(parsed).To(HaveKeyWithValue("mlflow_tracking_url", "http://mlflow-tracking.nemo.svc.cluster.local:80"))
 		})
 
 		It("should delete HPA when NemoCustomizer is updated", func() {
@@ -487,3 +586,26 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		})
 	})
 })
+
+func loadConfigMapFromFile(path string) *corev1.ConfigMap {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read configmap file: %v", err))
+	}
+
+	var cm corev1.ConfigMap
+	if err := yaml.Unmarshal(data, &cm); err != nil {
+		panic(fmt.Sprintf("failed to unmarshal configmap yaml: %v", err))
+	}
+
+	// Sanity check: required fields
+	if cm.Name == "" {
+		panic(fmt.Sprintf("ConfigMap loaded from %s has no metadata.name", path))
+	}
+	if cm.Namespace == "" {
+		// Default it to match your test env
+		cm.Namespace = "default"
+	}
+
+	return &cm
+}

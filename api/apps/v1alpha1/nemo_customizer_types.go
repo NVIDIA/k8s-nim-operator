@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"bytes"
 	"fmt"
 	"maps"
 	"os"
@@ -85,9 +86,29 @@ type NemoCustomizerSpec struct {
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 
-	// CustomizerConfig stores the customizer configuration for training and models
-	// +kubebuilder:validation:MinLength=1
-	CustomizerConfig string `json:"customizerConfig"`
+	// URL of the entity store service
+	// +kubebuilder:validation:Pattern=`^http`
+	EntitystoreURL string `json:"entityStoreUrl"`
+
+	// URL of the Nemo data store service
+	// +kubebuilder:validation:Pattern=`^http`
+	NemoDatastoreURL string `json:"nemoDataStoreUrl"`
+
+	// URL for MLflow tracking server
+	// +kubebuilder:validation:Pattern=`^http`
+	MLflowTrackingURL string `json:"mlflowTrackingUrl,omitempty"`
+
+	// Configuration for data store tools image
+	NemoDatastoreTools NemoDatastoreTools `json:"nemoDataStoreTools"`
+
+	// Model download job configuration
+	ModelDownloadJobs ModelDownloadJobs `json:"modelDownloadJobs"`
+
+	// Reference to ConfigMap containing training configuration
+	TrainingConfig ConfigMapRef `json:"trainingConfig"`
+
+	// Reference to ConfigMap containing models configuration
+	ModelsConfig ConfigMapRef `json:"modelsConfig"`
 
 	// Scheduler Configuration
 	Scheduler Scheduler `json:"scheduler,omitempty"`
@@ -100,6 +121,57 @@ type NemoCustomizerSpec struct {
 
 	// WandBSecret stores the secret and encryption key for the Weights and Biases service.
 	WandBSecret WandBSecret `json:"wandbSecret"`
+}
+
+// NemoDatastoreTools stores config for tools to fetch assets to and from datastore
+type NemoDatastoreTools struct {
+	// Image to use for data store CLI tools
+	// +kubebuilder:validation:MinLength=1
+	Image string `json:"image"`
+
+	// Image pull secret name
+	// +kubebuilder:validation:MinLength=1
+	ImagePullSecret string `json:"imagePullSecret"`
+}
+
+// ModelDownloadJobs stores config for download jobs
+type ModelDownloadJobs struct {
+	// Docker image used for model download jobs
+	// +kubebuilder:validation:MinLength=1
+	Image string `json:"image"`
+
+	// Pull policy for the image
+	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
+	ImagePullPolicy string `json:"imagePullPolicy"`
+
+	// Image pull secrets
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets"`
+
+	// Name of the Kubernetes secret containing NGC API key
+	// +kubebuilder:validation:MinLength=1
+	NGCAPISecret string `json:"ngcAPISecret"`
+
+	// Key in the secret containing the actual API key value
+	// +kubebuilder:validation:MinLength=1
+	NGCAPISecretKey string `json:"ngcAPISecretKey"`
+
+	// Optional security context for the job pods
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// Time to live after job finishes (seconds)
+	// +kubebuilder:validation:Minimum=60
+	TTLSecondsAfterFinished int `json:"ttlSecondsAfterFinished"`
+
+	// Polling interval for model download status
+	// +kubebuilder:validation:Minimum=15
+	PollIntervalSeconds int `json:"pollIntervalSeconds"`
+}
+
+// ConfigMapRef stores the config map info for customizer
+type ConfigMapRef struct {
+	// Name of the ConfigMap
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"Name"`
 }
 
 // Scheduler defines the configuration for the scheduler
@@ -926,22 +998,21 @@ func (n *NemoCustomizer) GetServiceMonitorAnnotations() map[string]string {
 	return NemoCustomizerAnnotations
 }
 
-// GetConfigMapParams returns params to render NemoCustomizer config from templates
-func (n *NemoCustomizer) GetConfigMapParams() *rendertypes.ConfigMapParams {
-	params := &rendertypes.ConfigMapParams{}
+// GetConfigMapParams return customizer config params
+func (n *NemoCustomizer) GetConfigMapParams(customizerConfigYAML []byte) *rendertypes.ConfigMapParams {
+	var config bytes.Buffer
+	config.Write(customizerConfigYAML)
+	config.WriteString("\n")
 
-	// Set metadata
-	params.Name = n.GetName()
-	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetLabels()
-	params.Annotations = n.GetAnnotations()
-
-	// Initialize the ConfigMap data
-	params.ConfigMapData = map[string]string{
-		"config.yaml": n.Spec.CustomizerConfig,
+	return &rendertypes.ConfigMapParams{
+		Name:        n.Name,
+		Namespace:   n.Namespace,
+		Labels:      n.GetLabels(),
+		Annotations: n.GetAnnotations(),
+		ConfigMapData: map[string]string{
+			"config.yaml": config.String(),
+		},
 	}
-
-	return params
 }
 
 func (n *NemoCustomizer) GetSecretParams(secretMapData map[string]string) *rendertypes.SecretParams {
