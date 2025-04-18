@@ -542,6 +542,98 @@ var _ = Describe("NIMCache Controller", func() {
 			}
 		})
 
+		It("should create a job with the right custom CA certificate volumes and Init Container", func() {
+			ctx := context.TODO()
+			profiles := []string{AllProfiles}
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles}}},
+					Proxy: &appsv1alpha1.ProxySpec{
+						HttpProxy:     "http://proxy:1000",
+						HttpsProxy:    "https://proxy:1000",
+						NoProxy:       "http://no-proxy",
+						CertConfigMap: "custom-ca-configmap",
+					},
+				},
+			}
+
+			// Create a sample ConfigMap with certificate files
+			configMap := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "custom-ca-configmap",
+					Namespace: "default",
+				},
+				Data: map[string]string{
+					"custom-ca-cert.pem": "fake-cert-data",
+					"another-cert.pem":   "fake-cert-data-2",
+				},
+			}
+
+			err := reconciler.Create(context.TODO(), configMap)
+			Expect(err).ToNot(HaveOccurred())
+
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = cli.Create(context.TODO(), job)
+			Expect(err).ToNot(HaveOccurred())
+
+			job = &batchv1.Job{}
+			jobName := types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}
+			err = cli.Get(ctx, jobName, job)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify CertConfig volume and mounts
+			Expect(job.Spec.Template.Spec.Volumes).To(ContainElement(
+				corev1.Volume{
+					Name: "custom-ca",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "custom-ca-configmap",
+							},
+						},
+					},
+				},
+			))
+
+			Expect(job.Spec.Template.Spec.Volumes).To(ContainElement(
+				corev1.Volume{
+					Name: "ca-cert-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			))
+
+			Expect(job.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(
+				corev1.VolumeMount{
+					Name:      "ca-cert-volume",
+					MountPath: "/etc/ssl",
+				},
+			))
+
+			Expect(job.Spec.Template.Spec.InitContainers[0].VolumeMounts).To(ContainElement(
+				corev1.VolumeMount{
+					Name:      "ca-cert-volume",
+					MountPath: "/ca-certs",
+				},
+			))
+
+			Expect(job.Spec.Template.Spec.InitContainers[0].VolumeMounts).To(ContainElement(
+				corev1.VolumeMount{
+					Name:      "custom-ca",
+					MountPath: "/custom",
+				},
+			))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Command).To(ContainElements(k8sutil.GetUpdateCaCertInitContainerCommand()))
+
+		})
+
 		It("should create a ConfigMap with the given model manifest data", func() {
 			ctx := context.TODO()
 			nimCache := &appsv1alpha1.NIMCache{
