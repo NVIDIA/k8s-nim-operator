@@ -4,53 +4,119 @@ metadata:
   name: nemocustomizer-sample
   namespace: nemo
 spec:
-  wandbSecret:
-    name: wandb-secret
-    apiKeyKey: encryptionKey
+  # Scheduler configuration for training jobs (volcano (default), runai)
+  scheduler:
+    type: "volcano"
+  # Weights & Biases configuration for experiment tracking
+  wandb:
+    secretName: wandb-secret       # Kubernetes secret that stores WANDB_API_KEY and optionally encryption key
+    apiKey: apiKey                 # Key in the secret that holds the W&B API key
+    encryptionKey: encryptionKey   # Key in the secret that holds optional encryption key
+  # OpenTelemetry tracing configuration
   otel:
     enabled: true
     exporterOtlpEndpoint: http://customizer-otel-opentelemetry-collector.nemo.svc.cluster.local:4317
+  # PostgreSQL database connection configuration
   databaseConfig:
     credentials:
-      user: ncsuser
-      secretName: customizer-pg-existing-secret
-      passwordKey: password
+      user: ncsuser                        # Database username
+      secretName: customizer-pg-existing-secret  # Secret containing password
+      passwordKey: password               # Key inside secret that contains the password
     host: customizer-pg-postgresql.nemo.svc.cluster.local
     port: 5432
     databaseName: ncsdb
+  # Customizer API service exposure settings
   expose:
     service:
       type: ClusterIP
       port: 8000
+  # Global image pull settings used in various subcomponents
   image:
     repository: nvcr.io/nvidia/nemo-microservices/customizer-api
     tag: "25.04"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
-  entitStoreIrl: http://nemoentitystore-sample.nemo.svc.cluster.local:8000
-  nemoDatastoreUrl: http://nemodatastore-sample.nemo.svc.cluster.local:8000
-  mlflowTrackingUrl: http://mlflow-tracking.nemo.svc.cluster.local:80
+  # URL to the NeMo Entity Store microservice
+  entitystore:
+    endpoint: http://nemoentitystore-sample.nemo.svc.cluster.local:8000
+  # URL to the NeMo Data Store microservice
+  datastore:
+    endpoint: http://nemodatastore-sample.nemo.svc.cluster.local:8000
+  # URL for MLflow tracking server
+  mlflow: 
+    endpoint: http://mlflow-tracking.nemo.svc.cluster.local:80
+  # Configuration for the data store CLI tools
   nemoDatastoreTools:
     image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04
-    imagePullSecrets: ngc-secret
+  # Configuration for model download jobs
   modelDownloadJobs:
     image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.04"
-    imagePullPolicy: "IfNotPresent"
-    imagePullSecrets:
-      - name: ngc-secret
-    ngcAPISecret: ngc-api-secret
-    ngcAPISecretKey: "NGC_API_KEY"
+    ngcAPISecret:
+      # Secret that stores NGC API key
+      name: ngc-api-secret
+      # Key inside secret         
+      key: "NGC_API_KEY"                 
     securityContext:
       fsGroup: 1000
       runAsNonRoot: true
       runAsUser: 1000
       runAsGroup: 1000
-    # -- Time to live in seconds after the job finishes.
-    ttlSecondsAfterFinished: 600
-    # -- Interval in seconds to poll for model download status.
-    pollIntervalSeconds: 15
-  trainingConfig:
-    name: nemo-training-config
+     # Time (in seconds) to retain job after completion
+    ttlSecondsAfterFinished: 600   
+    # Polling frequency to check job status     
+    pollIntervalSeconds: 15              
+  # Name to the ConfigMap containing model definitions
   modelConfig:
     name: nemo-model-config
+  # Training configuration
+  trainingConfig:
+    configMap:
+      # Optional: Additional configuration to merge into training config
+      name: nemo-training-config         
+    # PVC where model artifacts are cached or used during training
+    modelPVC:
+      create: true
+      name: finetuning-ms-models-pvc
+      # StorageClass for the PVC (can be empty to use default)
+      storageClass: ""
+      volumeAccessMode: ReadWriteOnce
+      size: 50Gi
+    # Workspace PVC automatically created per job
+    workspacePVC:
+      storageClass: ""
+      volumeAccessMode: ReadWriteOnce
+      size: 10Gi
+      # Mount path for workspace inside container
+      mountPath: /pvc/workspace          
+    image:
+      repository: nvcr.io/nvidia/nemo-microservices/customizer
+      tag: "25.04"
+    env:
+      - name: LOG_LEVEL
+        value: INFO                    
+    # Multi-node networking environment variables for training (CSPs)
+    networkConfig:
+      - name: NCCL_IB_SL
+        value: "0"
+      - name: NCCL_IB_TC
+        value: "41"
+      - name: NCCL_IB_QPS_PER_CONNECTION
+        value: "4"
+      - name: UCX_TLS
+        value: TCP
+      - name: UCX_NET_DEVICES
+        value: eth0
+      - name: HCOLL_ENABLE_MCAST_ALL
+        value: "0"
+      - name: NCCL_IB_GID_INDEX
+        value: "3"
+    # TTL for training job after it completes
+    ttlSecondsAfterFinished: 3600       
+    # Timeout duration (in seconds) for training job
+    timeout: 3600                       
+    # Node tolerations
+    tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"

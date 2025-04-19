@@ -5,50 +5,7 @@ metadata:
   namespace: default
 data:
   training: |
-    queue: "default"
-    image: nvcr.io/nvidia/nemo-microservices/customizer:25.04
-    imagePullSecrets:
-      - name: ngc-secret
-    pvc:
-      size: 5Gi
-      volumeAccessMode: ReadWriteOnce
-    env:
-      - name: LOG_LEVEL
-        value: INFO
-    workspace_dir: /pvc/workspace
-    # volumes reference pre-existing PVCs
-    volumes:
-      # Model cache PVC
-      - name: models
-        persistentVolumeClaim:
-          claimName: finetuning-ms-models-pvc
-          readOnly: True
-      - name: dshm
-        emptyDir:
-          medium: Memory
-    volumeMounts:
-      - name: models
-        mountPath: "/mount/models"
-        readOnly: True
-      - name: dshm
-        mountPath: "/dev/shm"
-     # Network configuration for multi node training specific to CSP
-    training_networking:
-      - name: "NCCL_IB_SL"
-        value: 0
-      - name: "NCCL_IB_TC"
-        value: 41
-      - name: "NCCL_IB_QPS_PER_CONNECTION"
-        value: 4
-      - name: "UCX_TLS"
-        value: TCP
-      - name: "UCX_NET_DEVICES"
-        value: eth0
-      - name: "HCOLL_ENABLE_MCAST_ALL"
-        value: 0
-      - name: "NCCL_IB_GID_INDEX"
-        value: 3
-
-    tolerations: []
     container_defaults:
-      imagePullPolicy: IfNotPresent
+      env:
+        - name: LOG_LEVEL
+          value: INFO

@@ -56,6 +56,7 @@ spec:
                 properties:
                   endpoint:
                     minLength: 1
+                    pattern: ^http
                     type: string
                   serviceAccount:
                     type: string
@@ -142,6 +143,7 @@ spec:
                 properties:
                   endpoint:
                     minLength: 1
+                    pattern: ^http
                     type: string
                 required:
                 - endpoint
@@ -155,6 +157,7 @@ spec:
                 properties:
                   endpoint:
                     minLength: 1
+                    pattern: ^http
                     type: string
                 required:
                 - endpoint
@@ -1589,6 +1592,7 @@ spec:
                 properties:
                   endpoint:
                     minLength: 1
+                    pattern: ^http
                     type: string
                 required:
                 - endpoint

@@ -129,23 +129,16 @@ var _ = Describe("NemoCustomizer Controller", func() {
 						Value: "custom-value",
 					},
 				},
-				EntitystoreURL:    "http://nemoentitystore-sample.nemo.svc.cluster.local:8000",
-				NemoDatastoreURL:  "http://nemodatastore-sample.nemo.svc.cluster.local:8000",
-				MLflowTrackingURL: "http://mlflow-tracking.nemo.svc.cluster.local:80",
-				NemoDatastoreTools: appsv1alpha1.NemoDatastoreTools{
-					Image:           "nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04",
-					ImagePullSecret: "ngc-secret",
+				Entitystore: appsv1alpha1.Entitystore{Endpoint: "http://nemoentitystore-sample.nemo.svc.cluster.local:8000"},
+				Datastore:   appsv1alpha1.Datastore{Endpoint: "http://nemodatastore-sample.nemo.svc.cluster.local:8000"},
+				MLFlow:      appsv1alpha1.MLFlow{Endpoint: "http://mlflow-tracking.nemo.svc.cluster.local:80"},
+				NemoDatastoreTools: &appsv1alpha1.NemoDatastoreToolsConfig{
+					Image: "nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04",
 				},
-				ModelDownloadJobs: appsv1alpha1.ModelDownloadJobs{
+				ModelDownloadJobs: &appsv1alpha1.ModelDownloadJobsConfig{
 					Image:           "nvcr.io/nvidia/nemo-microservices/customizer-api:25.04",
 					ImagePullPolicy: "IfNotPresent",
-					ImagePullSecrets: []corev1.LocalObjectReference{
-						{
-							Name: "ngc-secret",
-						},
-					},
-					NGCAPISecret:    "ngc-api-secret",
-					NGCAPISecretKey: "NGC_API_KEY",
+					NGCSecret:       appsv1alpha1.NGCSecret{Name: "ngc-api-secret"},
 					SecurityContext: &corev1.PodSecurityContext{
 						FSGroup:      ptr.To[int64](1000),
 						RunAsNonRoot: ptr.To[bool](true),
@@ -155,18 +148,56 @@ var _ = Describe("NemoCustomizer Controller", func() {
 					TTLSecondsAfterFinished: 600,
 					PollIntervalSeconds:     15,
 				},
-				ModelsConfig: appsv1alpha1.ConfigMapRef{
+				Models: appsv1alpha1.ConfigMapRef{
 					Name: "nemo-model-config",
 				},
-				TrainingConfig: appsv1alpha1.ConfigMapRef{
-					Name: "nemo-training-config",
+				Training: &appsv1alpha1.TrainingConfig{
+					ConfigMap: &appsv1alpha1.ConfigMapRef{
+						Name: "nemo-training-config",
+					},
+					ModelPVC: appsv1alpha1.PersistentVolumeClaim{
+						Create:           ptr.To[bool](true),
+						StorageClass:     "local-nfs",
+						VolumeAccessMode: "ReadWriteOnce",
+						Size:             "5Gi",
+					},
+					WorkspacePVC: appsv1alpha1.WorkspaceConfig{
+						StorageClass:     "local-nfs",
+						VolumeAccessMode: "ReadWriteOnce",
+						Size:             "10Gi",
+						MountPath:        "/pvc/workspace",
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "LOG_LEVEL",
+							Value: "INFO",
+						},
+					},
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nemo-microservices/customizer",
+						Tag:         "25.04",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					TTLSecondsAfterFinished: ptr.To[int](600),
+					Timeout:                 ptr.To[int](3600),
+					RunAIQueue:              "default",
+					NetworkConfig: []corev1.EnvVar{
+						{
+							Name:  "NCCL_IB_SL",
+							Value: "0",
+						},
+						{
+							Name:  "UCX_NET_DEVICES",
+							Value: "eth0",
+						},
+					},
 				},
-				WandBSecret: appsv1alpha1.WandBSecret{
-					Name:          "wandb-secret",
-					APIKeyKey:     "api_key",
-					EncryptionKey: "encryption_key",
+				WandBConfig: appsv1alpha1.WandBConfig{
+					SecretName:    "wandb-secret",
+					APIKey:        "apiKey",
+					EncryptionKey: "encryptionKey",
 				},
-				OpenTelemetry: appsv1alpha1.OTelSpec{
+				OpenTelemetry: &appsv1alpha1.OTelSpec{
 					Enabled:              ptr.To[bool](true),
 					DisableLogging:       ptr.To[bool](false),
 					ExporterOtlpEndpoint: "http://opentelemetry-collector.default.svc.cluster.local:4317",
@@ -454,17 +485,17 @@ var _ = Describe("NemoCustomizer Controller", func() {
 
 			// Verify WandB environment variables
 			Expect(envVars).To(ContainElements(
-				corev1.EnvVar{Name: "WANDB_SECRET_NAME", Value: nemoCustomizer.Spec.WandBSecret.Name},
-				corev1.EnvVar{Name: "WANDB_SECRET_KEY", Value: nemoCustomizer.Spec.WandBSecret.APIKeyKey},
+				corev1.EnvVar{Name: "WANDB_SECRET_NAME", Value: nemoCustomizer.Spec.WandBConfig.SecretName},
+				corev1.EnvVar{Name: "WANDB_SECRET_KEY", Value: nemoCustomizer.Spec.WandBConfig.APIKey},
 			))
 
 			Expect(envVars).To(ContainElement(corev1.EnvVar{
 				Name: "WANDB_ENCRYPTION_KEY",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
-						Key: nemoCustomizer.Spec.WandBSecret.APIKeyKey,
+						Key: nemoCustomizer.Spec.WandBConfig.EncryptionKey,
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: nemoCustomizer.Spec.WandBSecret.Name,
+							Name: nemoCustomizer.Spec.WandBConfig.SecretName,
 						},
 					},
 				},

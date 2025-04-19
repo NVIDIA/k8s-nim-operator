@@ -181,3 +181,14 @@ type CertConfig struct {
 	// MountPath is the path where the certificates should be mounted in the container.
 	MountPath string `json:"mountPath"`
 }
+
+// NGCSecret represents the secret and key details for NGC.
+type NGCSecret struct {
+	// Name of the Kubernetes secret containing NGC API key
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Key in the key containing the actual API key value
+	// +kubebuilder:default:="NGC_API_KEY"
+	Key string `json:"key"`
+}

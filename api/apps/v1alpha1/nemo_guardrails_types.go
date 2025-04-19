@@ -104,13 +104,8 @@ type NIMEndpoint struct {
 //
 // +kubebuilder:validation:XValidation:rule="!(has(self.configMap) && has(self.pvc))", message="Cannot set both ConfigMap and PVC in ConfigStore"
 type GuardrailConfig struct {
-	ConfigMap *ConfigMap             `json:"configMap,omitempty"`
+	ConfigMap *ConfigMapRef          `json:"configMap,omitempty"`
 	PVC       *PersistentVolumeClaim `json:"pvc,omitempty"`
-}
-
-type ConfigMap struct {
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
 }
 
 // NemoGuardrailStatus defines the observed state of NemoGuardrail

@@ -86,56 +86,96 @@ type NemoCustomizerSpec struct {
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
 
-	// URL of the entity store service
-	// +kubebuilder:validation:Pattern=`^http`
-	EntitystoreURL string `json:"entityStoreUrl"`
+	// Datastore stores the datastore endpoint.
+	Datastore Datastore `json:"datastore"`
 
-	// URL of the Nemo data store service
-	// +kubebuilder:validation:Pattern=`^http`
-	NemoDatastoreURL string `json:"nemoDataStoreUrl"`
+	// Entitystore stores the entitystore endpoint.
+	Entitystore Entitystore `json:"entitystore"`
 
-	// URL for MLflow tracking server
-	// +kubebuilder:validation:Pattern=`^http`
-	MLflowTrackingURL string `json:"mlflowTrackingUrl,omitempty"`
+	// MLFlow stores the mlflow tracking endpoint.
+	MLFlow MLFlow `json:"mlflow"`
 
 	// Configuration for data store tools image
-	NemoDatastoreTools NemoDatastoreTools `json:"nemoDataStoreTools"`
+	NemoDatastoreTools *NemoDatastoreToolsConfig `json:"nemoDatastoreTools"`
 
 	// Model download job configuration
-	ModelDownloadJobs ModelDownloadJobs `json:"modelDownloadJobs"`
+	ModelDownloadJobs *ModelDownloadJobsConfig `json:"modelDownloadJobs"`
 
-	// Reference to ConfigMap containing training configuration
-	TrainingConfig ConfigMapRef `json:"trainingConfig"`
+	// Training stores the training configuration
+	Training *TrainingConfig `json:"trainingConfig"`
 
-	// Reference to ConfigMap containing models configuration
-	ModelsConfig ConfigMapRef `json:"modelsConfig"`
+	// Models stores the model configuration
+	Models ConfigMapRef `json:"modelConfig"`
 
 	// Scheduler Configuration
 	Scheduler Scheduler `json:"scheduler,omitempty"`
 
 	// OpenTelemetry Settings
-	OpenTelemetry OTelSpec `json:"otel"`
+	OpenTelemetry *OTelSpec `json:"otel,omitempty"`
 
 	// DatabaseConfig stores the database configuration
 	DatabaseConfig DatabaseConfig `json:"databaseConfig"`
 
-	// WandBSecret stores the secret and encryption key for the Weights and Biases service.
-	WandBSecret WandBSecret `json:"wandbSecret"`
+	// WandBConfig stores the config for the Weights and Biases service.
+	WandBConfig WandBConfig `json:"wandb"`
 }
 
-// NemoDatastoreTools stores config for tools to fetch assets to and from datastore
-type NemoDatastoreTools struct {
+// TrainingConfig stores config for running finetuning
+type TrainingConfig struct {
+	// ConfigMap is the training configuration in the config map
+	// +kubebuilder:validation:Optional
+	ConfigMap *ConfigMapRef `json:"configMap,omitempty"`
+	// ModelPVC is the persistent storage for models used for finetuning
+	ModelPVC PersistentVolumeClaim `json:"modelPVC"`
+	// WorkspacePVC is the PVC config for NemoTrainingJob, which automatically creates one for each job
+	WorkspacePVC WorkspaceConfig `json:"workspacePVC"`
+	// Env are the environment variables passed to the training jobs
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// Image is the NeMo customizer image used for training
+	Image Image `json:"image"`
+	// Time to live after the training job finishes (seconds)
+	TTLSecondsAfterFinished *int `json:"ttlSecondsAfterFinished,omitempty"`
+	// Timeout for the training job to complete
+	Timeout *int `json:"timeout,omitempty"`
+	// RunAIQueue is the Run.AI's scheduler queue to be used for training jobs.
+	// Used only if the scheduler is set to runai.
+	// +kubebuilder:default:=default
+	RunAIQueue string `json:"runaiQueue,omitempty"`
+	// NetworkConfig is the network configuration for multi-node training
+	NetworkConfig []corev1.EnvVar `json:"networkConfig,omitempty"`
+	// NodeSelector labels for scheduling training jobs
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// Tolerations for the training jobs
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	// PodAffinity for the training jobs
+	PodAffinity *corev1.PodAffinity `json:"podAffinity,omitempty"`
+	// Resources for the training jobs
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+// WorkspaceConfig stores config for temporary workspace used by NeMo customizer training jobs
+type WorkspaceConfig struct {
+	// StorageClass to be used for PVC creation. Leave it as empty if
+	// a default storage class is set in the cluster.
+	StorageClass string `json:"storageClass,omitempty"`
+	// Size of the workspace storage in Gi, used during PVC creation
+	Size string `json:"size,omitempty"`
+	// VolumeAccessMode is the volume access mode of the PVC
+	VolumeAccessMode corev1.PersistentVolumeAccessMode `json:"volumeAccessMode,omitempty"`
+	// MountPath is the path where the workspace pvc is mounted within the training job
+	// +kubebuilder:default:="/pvc/workspace"
+	MountPath string `json:"mountPath,omitempty"`
+}
+
+// NemoDatastoreToolsConfig stores config for tools to fetch assets to and from datastore
+type NemoDatastoreToolsConfig struct {
 	// Image to use for data store CLI tools
 	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`
-
-	// Image pull secret name
-	// +kubebuilder:validation:MinLength=1
-	ImagePullSecret string `json:"imagePullSecret"`
 }
 
-// ModelDownloadJobs stores config for download jobs
-type ModelDownloadJobs struct {
+// ModelDownloadJobsConfig stores config for download jobs
+type ModelDownloadJobsConfig struct {
 	// Docker image used for model download jobs
 	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`
@@ -144,16 +184,8 @@ type ModelDownloadJobs struct {
 	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
 	ImagePullPolicy string `json:"imagePullPolicy"`
 
-	// Image pull secrets
-	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets"`
-
-	// Name of the Kubernetes secret containing NGC API key
-	// +kubebuilder:validation:MinLength=1
-	NGCAPISecret string `json:"ngcAPISecret"`
-
-	// Key in the secret containing the actual API key value
-	// +kubebuilder:validation:MinLength=1
-	NGCAPISecretKey string `json:"ngcAPISecretKey"`
+	// NGCSecret is the secret containing the NGC API key
+	NGCSecret NGCSecret `json:"ngcAPISecret"`
 
 	// Optional security context for the job pods
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
@@ -165,13 +197,6 @@ type ModelDownloadJobs struct {
 	// Polling interval for model download status
 	// +kubebuilder:validation:Minimum=15
 	PollIntervalSeconds int `json:"pollIntervalSeconds"`
-}
-
-// ConfigMapRef stores the config map info for customizer
-type ConfigMapRef struct {
-	// Name of the ConfigMap
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"Name"`
 }
 
 // Scheduler defines the configuration for the scheduler
@@ -267,20 +292,20 @@ func (n *NemoCustomizer) GetStandardEnv() []corev1.EnvVar {
 			Name: "WANDB_ENCRYPTION_KEY",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: n.Spec.WandBSecret.APIKeyKey,
+					Key: n.Spec.WandBConfig.EncryptionKey,
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.WandBSecret.Name,
+						Name: n.Spec.WandBConfig.SecretName,
 					},
 				},
 			},
 		},
 		{
 			Name:  "WANDB_SECRET_NAME",
-			Value: n.Spec.WandBSecret.Name,
+			Value: n.Spec.WandBConfig.SecretName,
 		},
 		{
 			Name:  "WANDB_SECRET_KEY",
-			Value: n.Spec.WandBSecret.APIKeyKey,
+			Value: n.Spec.WandBConfig.APIKey,
 		},
 	}
 
@@ -295,7 +320,10 @@ func (n *NemoCustomizer) GetStandardEnv() []corev1.EnvVar {
 
 // IsOtelEnabled returns true if Open Telemetry Collector is enabled
 func (n *NemoCustomizer) IsOtelEnabled() bool {
-	return n.Spec.OpenTelemetry.Enabled != nil && *n.Spec.OpenTelemetry.Enabled
+	if n.Spec.OpenTelemetry != nil {
+		return n.Spec.OpenTelemetry.Enabled != nil && *n.Spec.OpenTelemetry.Enabled
+	}
+	return false
 }
 
 // GetOtelEnv generates OpenTelemetry-related environment variables.
