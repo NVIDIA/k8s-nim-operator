@@ -6,51 +6,7 @@ metadata:
   namespace: nemo
 data:
   training: |
-    queue: "default"
-    image: nvcr.io/nvidia/nemo-microservices/customizer:25.04
-    imagePullSecrets:
-      - name: ngc-secret
-    pvc:
-      size: 5Gi
-      volumeAccessMode: ReadWriteOnce
-    env:
-      - name: LOG_LEVEL
-        value: INFO
-    workspace_dir: /pvc/workspace
-    # volumes reference pre-existing PVCs
-    volumes:
-      # Model cache PVC
-      - name: models
-        persistentVolumeClaim:
-          claimName: finetuning-ms-models-pvc
-          readOnly: True
-      - name: dshm
-        emptyDir:
-          medium: Memory
-    volumeMounts:
-      - name: models
-        mountPath: "/mount/models"
-        readOnly: True
-      - name: dshm
-        mountPath: "/dev/shm"
-     # Network configuration for multi node training specific to CSP
-    training_networking:
-      - name: "NCCL_IB_SL"
-        value: 0
-      - name: "NCCL_IB_TC"
-        value: 41
-      - name: "NCCL_IB_QPS_PER_CONNECTION"
-        value: 4
-      - name: "UCX_TLS"
-        value: TCP
-      - name: "UCX_NET_DEVICES"
-        value: eth0
-      - name: "HCOLL_ENABLE_MCAST_ALL"
-        value: 0
-      - name: "NCCL_IB_GID_INDEX"
-        value: 3
-
-    tolerations: []
+    # Optional additional configuration for training jobs
     container_defaults:
       imagePullPolicy: IfNotPresent
 
@@ -93,7 +49,7 @@ data:
     # @default -- This object has the following default values for the Llama 3.2 1B model.
     meta/llama-3.2-1b:
       # -- Whether to enable the model.
-      enabled: false
+      enabled: true
       # -- NGC model URI for Llama 3.2 1B model.
       model_uri: ngc://nvidia/nemo/llama-3_2-1b:2.0
       # -- Path where model files are stored.
@@ -125,7 +81,7 @@ data:
     # @default -- This object has the following default values for the Llama 3.2 1B Instruct model.
     meta/llama-3.2-1b-instruct:
       # -- Whether to enable the model.
-      enabled: false
+      enabled: true
       # -- NGC model URI for Llama 3.2 1B Instruct model.
       model_uri: ngc://nvidia/nemo/llama-3_2-1b-instruct:2.0
       # -- Path where model files are stored.
@@ -184,7 +140,7 @@ data:
     # @default -- This object has the following default values for the Llama 3.1 8B Instruct model.
     meta/llama-3.1-8b-instruct:
       # -- Whether to enable the model.
-      enabled: true
+      enabled: false
       # -- NGC model URI for Llama 3.1 8B Instruct model.
       model_uri: ngc://nvidia/nemo/llama-3_1-8b-instruct-nemo:2.0
       # -- Path where model files are stored.

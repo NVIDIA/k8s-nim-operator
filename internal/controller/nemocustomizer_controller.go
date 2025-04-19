@@ -395,6 +395,11 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		return ctrl.Result{}, err
 	}
 
+	// Sync Customizer PVC for model storage
+	if err = r.reconcilePVC(ctx, NemoCustomizer); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Get params to render Deployment resource
 	deploymentParams := NemoCustomizer.GetDeploymentParams()
 
@@ -436,54 +441,219 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	return ctrl.Result{}, nil
 }
 
+func (r *NemoCustomizerReconciler) reconcilePVC(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer) error {
+	logger := r.GetLogger()
+	pvcName := shared.GetPVCName(nemoCustomizer, nemoCustomizer.Spec.Training.ModelPVC)
+	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nemoCustomizer.GetNamespace()}
+	pvc := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, pvcNamespacedName, pvc)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	// If PVC does not exist, create a new one if creation flag is enabled
+	if err != nil {
+		if nemoCustomizer.Spec.Training.ModelPVC.Create != nil && *nemoCustomizer.Spec.Training.ModelPVC.Create {
+			pvc, err = shared.ConstructPVC(nemoCustomizer.Spec.Training.ModelPVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoCustomizer.GetNamespace()})
+			if err != nil {
+				logger.Error(err, "Failed to construct pvc", "name", pvcName)
+				return err
+			}
+			if err := controllerutil.SetControllerReference(nemoCustomizer, pvc, r.GetScheme()); err != nil {
+				return err
+			}
+			err = r.Create(ctx, pvc)
+			if err != nil {
+				logger.Error(err, "Failed to create pvc", "name", pvcName)
+				return err
+			}
+			logger.Info("Created PVC for NeMo Customizer model storage", "pvc", pvc.Name)
+		} else {
+			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *NemoCustomizerReconciler) renderCustomizerConfig(ctx context.Context, n *appsv1alpha1.NemoCustomizer) ([]byte, error) {
-	cfg := map[string]interface{}{
-		"namespace":           n.GetNamespace(),
-		"entity_store_url":    n.Spec.EntitystoreURL,
-		"nemo_data_store_url": n.Spec.NemoDatastoreURL,
-		"mlflow_tracking_url": n.Spec.MLflowTrackingURL,
-		"nemo_data_store_tools": map[string]interface{}{
-			"image":           n.Spec.NemoDatastoreTools.Image,
-			"imagePullSecret": n.Spec.NemoDatastoreTools.ImagePullSecret,
+	cfg := make(map[string]interface{})
+
+	r.addBaseConfig(cfg, n)
+	r.addModelDownloadJobsConfig(cfg, n)
+	r.addWandBConfig(cfg, n)
+
+	if err := r.addTrainingConfig(ctx, cfg, n); err != nil {
+		return nil, err
+	}
+
+	if err := r.addModelConfig(ctx, cfg, n); err != nil {
+		return nil, err
+	}
+
+	return yaml.Marshal(cfg)
+}
+
+func (r *NemoCustomizerReconciler) addBaseConfig(cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
+	cfg["namespace"] = n.GetNamespace()
+	cfg["entity_store_url"] = n.Spec.Entitystore.Endpoint
+	cfg["nemo_data_store_url"] = n.Spec.Datastore.Endpoint
+	cfg["mlflow_tracking_url"] = n.Spec.MLFlow.Endpoint
+	cfg["nemo_data_store_tools"] = map[string]interface{}{
+		"image": n.Spec.NemoDatastoreTools.Image,
+	}
+
+	if len(n.Spec.Image.PullSecrets) > 0 {
+		if tools, ok := cfg["nemo_data_store_tools"].(map[string]interface{}); ok {
+			tools["imagePullSecret"] = n.Spec.Image.PullSecrets[0]
+		}
+	}
+}
+
+func (r *NemoCustomizerReconciler) addModelDownloadJobsConfig(cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
+	// use same pull secrets as the main customizer api image
+	pullSecrets := []map[string]string{}
+	for _, secret := range n.Spec.Image.PullSecrets {
+		pullSecrets = append(pullSecrets, map[string]string{"name": secret})
+	}
+
+	cfg["model_download_jobs"] = map[string]interface{}{
+		"image":                   n.Spec.ModelDownloadJobs.Image,
+		"imagePullPolicy":         n.Spec.Image.PullPolicy,
+		"imagePullSecrets":        pullSecrets,
+		"ngcAPISecret":            n.Spec.ModelDownloadJobs.NGCSecret.Name,
+		"ngcAPISecretKey":         n.Spec.ModelDownloadJobs.NGCSecret.Key,
+		"securityContext":         n.Spec.ModelDownloadJobs.SecurityContext,
+		"ttlSecondsAfterFinished": n.Spec.ModelDownloadJobs.TTLSecondsAfterFinished,
+		"pollIntervalSeconds":     n.Spec.ModelDownloadJobs.PollIntervalSeconds,
+	}
+}
+
+func (r *NemoCustomizerReconciler) addPVCConfig(cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
+	cfg["pvc"] = map[string]string{
+		"storageClass":     n.Spec.Training.ModelPVC.StorageClass,
+		"volumeAccessMode": string(n.Spec.Training.ModelPVC.VolumeAccessMode),
+		"size":             n.Spec.Training.ModelPVC.Size,
+	}
+}
+
+func (r *NemoCustomizerReconciler) addWandBConfig(cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
+	cfg["wandb"] = map[string]string{
+		"project": n.Spec.WandBConfig.Project,
+		"entity":  "null",
+	}
+
+	if n.Spec.WandBConfig.Entity != nil {
+		if wandb, ok := cfg["wandb"].(map[string]interface{}); ok {
+			wandb["entity"] = *n.Spec.WandBConfig.Entity
+		}
+	}
+}
+
+func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
+	trainingCfg := make(map[string]interface{})
+
+	if cmName := n.Spec.Training.ConfigMap.Name; cmName != "" {
+		trainingRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), cmName, "training")
+		if err != nil {
+			return fmt.Errorf("loading training config: %w", err)
+		}
+		var trainingFromCM map[string]interface{}
+		if err := yaml.Unmarshal([]byte(trainingRaw), &trainingFromCM); err != nil {
+			return fmt.Errorf("parsing training config: %w", err)
+		}
+		for k, v := range trainingFromCM {
+			trainingCfg[k] = v
+		}
+	}
+
+	// use same pull secrets as the main customizer api image
+	pullSecrets := []map[string]string{}
+	for _, secret := range n.Spec.Image.PullSecrets {
+		pullSecrets = append(pullSecrets, map[string]string{"name": secret})
+	}
+
+	trainingCfg["image"] = fmt.Sprintf("%s:%s", n.Spec.Training.Image.Repository, n.Spec.Training.Image.Tag)
+	trainingCfg["imagePullPolicy"] = n.Spec.Image.PullPolicy
+	trainingCfg["imagePullSecrets"] = pullSecrets
+	trainingCfg["env"] = n.Spec.Training.Env
+	trainingCfg["training_networking"] = n.Spec.Training.NetworkConfig
+	trainingCfg["workspace_dir"] = n.Spec.Training.WorkspacePVC.MountPath
+	trainingCfg["use_run_ai_executor"] = "false"
+
+	if n.Spec.Scheduler.Type == appsv1alpha1.SchedulerTypeRunAI {
+		trainingCfg["use_run_ai_executor"] = "true"
+	}
+	if n.Spec.Training.TTLSecondsAfterFinished != nil {
+		trainingCfg["ttl_seconds_after_finished"] = *n.Spec.Training.TTLSecondsAfterFinished
+	}
+	if n.Spec.Training.Timeout != nil {
+		trainingCfg["training_timeout"] = n.Spec.Training.Timeout
+	}
+
+	// Add PVC configuration
+	r.addPVCConfig(trainingCfg, n)
+
+	trainingCfg["volumes"] = []map[string]interface{}{
+		{
+			"name": "models",
+			"persistentVolumeClaim": map[string]interface{}{
+				"claimName": shared.GetPVCName(n, n.Spec.Training.ModelPVC),
+				"readOnly":  true,
+			},
 		},
-		"model_download_jobs": map[string]interface{}{
-			"image":                   n.Spec.ModelDownloadJobs.Image,
-			"imagePullPolicy":         n.Spec.ModelDownloadJobs.ImagePullPolicy,
-			"imagePullSecrets":        n.Spec.ModelDownloadJobs.ImagePullSecrets,
-			"ngcAPISecret":            n.Spec.ModelDownloadJobs.NGCAPISecret,
-			"ngcAPISecretKey":         n.Spec.ModelDownloadJobs.NGCAPISecretKey,
-			"securityContext":         n.Spec.ModelDownloadJobs.SecurityContext,
-			"ttlSecondsAfterFinished": n.Spec.ModelDownloadJobs.TTLSecondsAfterFinished,
-			"pollIntervalSeconds":     n.Spec.ModelDownloadJobs.PollIntervalSeconds,
+		{
+			"name": "dshm",
+			"emptyDir": map[string]interface{}{
+				"medium": "Memory",
+			},
 		},
 	}
 
-	// Load and parse training config
-	trainingRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.TrainingConfig.Name, "training")
-	if err != nil {
-		return nil, fmt.Errorf("loading training config: %w", err)
+	trainingCfg["volumeMounts"] = []map[string]interface{}{
+		{
+			"name":      "models",
+			"mountPath": "/mount/models",
+			"readOnly":  true,
+		},
+		{
+			"name":      "dshm",
+			"mountPath": "/dev/shm",
+		},
 	}
 
-	var training map[string]interface{}
-	if err := yaml.Unmarshal([]byte(trainingRaw), &training); err != nil {
-		return nil, fmt.Errorf("parsing training config: %w", err)
-	}
-	cfg["training"] = training
+	cfg["training"] = trainingCfg
 
-	// Load and parse models config
-	modelsRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.ModelsConfig.Name, "models")
+	// Add additional training pod spec fields
+	if len(n.Spec.Training.Tolerations) > 0 {
+		trainingCfg["tolerations"] = n.Spec.Training.Tolerations
+	}
+	if len(n.Spec.Training.NodeSelector) > 0 {
+		trainingCfg["nodeSelector"] = n.Spec.Training.NodeSelector
+	}
+	if n.Spec.Training.PodAffinity != nil {
+		trainingCfg["affinity"] = n.Spec.Training.PodAffinity
+	}
+	if n.Spec.Training.Resources != nil {
+		trainingCfg["resources"] = n.Spec.Training.Resources
+	}
+
+	return nil
+}
+
+func (r *NemoCustomizerReconciler) addModelConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
+	modelsRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.Models.Name, "models")
 	if err != nil {
-		return nil, fmt.Errorf("loading models config: %w", err)
+		return fmt.Errorf("loading models config: %w", err)
 	}
 
 	var models map[string]interface{}
 	if err := yaml.Unmarshal([]byte(modelsRaw), &models); err != nil {
-		return nil, fmt.Errorf("parsing models config: %w", err)
+		return fmt.Errorf("parsing models config: %w", err)
 	}
-	cfg["models"] = models
 
-	// Marshal final config
-	return yaml.Marshal(cfg)
+	cfg["models"] = models
+	return nil
 }
 
 func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, NemoCustomizer *appsv1alpha1.NemoCustomizer, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
