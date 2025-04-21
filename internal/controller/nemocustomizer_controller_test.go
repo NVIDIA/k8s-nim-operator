@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 
@@ -43,6 +44,7 @@ import (
 	crClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/yaml"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -102,6 +104,16 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			recorder: record.NewFakeRecorder(1000),
 		}
 
+		// Load test customizer config maps from file
+		testDataDir, err := filepath.Abs("testdata")
+		Expect(err).ToNot(HaveOccurred())
+		trainingCM := loadConfigMapFromFile(filepath.Join(testDataDir, "training_config.yaml"))
+		modelsCM := loadConfigMapFromFile(filepath.Join(testDataDir, "models_config.yaml"))
+
+		// Register the test ConfigMaps in the cluster
+		Expect(reconciler.GetClient().Create(ctx, trainingCM)).To(Succeed())
+		Expect(reconciler.GetClient().Create(ctx, modelsCM)).To(Succeed())
+
 		nemoCustomizer = &appsv1alpha1.NemoCustomizer{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-nemocustomizer",
@@ -117,13 +129,75 @@ var _ = Describe("NemoCustomizer Controller", func() {
 						Value: "custom-value",
 					},
 				},
-				CustomizerConfig: "test-training-data",
-				WandBSecret: appsv1alpha1.WandBSecret{
-					Name:          "wandb-secret",
-					APIKeyKey:     "api_key",
-					EncryptionKey: "encryption_key",
+				Entitystore: appsv1alpha1.Entitystore{Endpoint: "http://nemoentitystore-sample.nemo.svc.cluster.local:8000"},
+				Datastore:   appsv1alpha1.Datastore{Endpoint: "http://nemodatastore-sample.nemo.svc.cluster.local:8000"},
+				MLFlow:      appsv1alpha1.MLFlow{Endpoint: "http://mlflow-tracking.nemo.svc.cluster.local:80"},
+				NemoDatastoreTools: &appsv1alpha1.NemoDatastoreToolsConfig{
+					Image: "nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04",
 				},
-				OpenTelemetry: appsv1alpha1.OTelSpec{
+				ModelDownloadJobs: &appsv1alpha1.ModelDownloadJobsConfig{
+					Image:           "nvcr.io/nvidia/nemo-microservices/customizer-api:25.04",
+					ImagePullPolicy: "IfNotPresent",
+					NGCSecret:       appsv1alpha1.NGCSecret{Name: "ngc-api-secret"},
+					SecurityContext: &corev1.PodSecurityContext{
+						FSGroup:      ptr.To[int64](1000),
+						RunAsNonRoot: ptr.To[bool](true),
+						RunAsUser:    ptr.To[int64](1000),
+						RunAsGroup:   ptr.To[int64](1000),
+					},
+					TTLSecondsAfterFinished: 600,
+					PollIntervalSeconds:     15,
+				},
+				Models: appsv1alpha1.ConfigMapRef{
+					Name: "nemo-model-config",
+				},
+				Training: &appsv1alpha1.TrainingConfig{
+					ConfigMap: &appsv1alpha1.ConfigMapRef{
+						Name: "nemo-training-config",
+					},
+					ModelPVC: appsv1alpha1.PersistentVolumeClaim{
+						Create:           ptr.To[bool](true),
+						StorageClass:     "local-nfs",
+						VolumeAccessMode: "ReadWriteOnce",
+						Size:             "5Gi",
+					},
+					WorkspacePVC: appsv1alpha1.WorkspacePVCConfig{
+						StorageClass:     "local-nfs",
+						VolumeAccessMode: "ReadWriteOnce",
+						Size:             "10Gi",
+						MountPath:        "/pvc/workspace",
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "LOG_LEVEL",
+							Value: "INFO",
+						},
+					},
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nemo-microservices/customizer",
+						Tag:         "25.04",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					TTLSecondsAfterFinished: ptr.To[int](600),
+					Timeout:                 ptr.To[int](3600),
+					RunAIQueue:              "default",
+					NetworkConfig: []corev1.EnvVar{
+						{
+							Name:  "NCCL_IB_SL",
+							Value: "0",
+						},
+						{
+							Name:  "UCX_NET_DEVICES",
+							Value: "eth0",
+						},
+					},
+				},
+				WandBConfig: appsv1alpha1.WandBConfig{
+					SecretName:    "wandb-secret",
+					APIKeyKey:     "apiKey",
+					EncryptionKey: "encryptionKey",
+				},
+				OpenTelemetry: &appsv1alpha1.OTelSpec{
 					Enabled:              ptr.To[bool](true),
 					DisableLogging:       ptr.To[bool](false),
 					ExporterOtlpEndpoint: "http://opentelemetry-collector.default.svc.cluster.local:4317",
@@ -277,6 +351,20 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		if err == nil {
 			Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
 		}
+
+		// Delete the training config
+		trainingCMName := types.NamespacedName{Name: "nemo-training-config", Namespace: "default"}
+		trainingCM := &corev1.ConfigMap{}
+		if err := k8sClient.Get(ctx, trainingCMName, trainingCM); err == nil {
+			Expect(k8sClient.Delete(ctx, trainingCM)).To(Succeed())
+		}
+
+		// Delete the models config
+		modelsCMName := types.NamespacedName{Name: "nemo-model-config", Namespace: "default"}
+		modelsCM := &corev1.ConfigMap{}
+		if err := k8sClient.Get(ctx, modelsCMName, modelsCM); err == nil {
+			Expect(k8sClient.Delete(ctx, modelsCM)).To(Succeed())
+		}
 	})
 
 	Describe("Reconcile", func() {
@@ -397,17 +485,17 @@ var _ = Describe("NemoCustomizer Controller", func() {
 
 			// Verify WandB environment variables
 			Expect(envVars).To(ContainElements(
-				corev1.EnvVar{Name: "WANDB_SECRET_NAME", Value: nemoCustomizer.Spec.WandBSecret.Name},
-				corev1.EnvVar{Name: "WANDB_SECRET_KEY", Value: nemoCustomizer.Spec.WandBSecret.APIKeyKey},
+				corev1.EnvVar{Name: "WANDB_SECRET_NAME", Value: nemoCustomizer.Spec.WandBConfig.SecretName},
+				corev1.EnvVar{Name: "WANDB_SECRET_KEY", Value: nemoCustomizer.Spec.WandBConfig.APIKeyKey},
 			))
 
 			Expect(envVars).To(ContainElement(corev1.EnvVar{
 				Name: "WANDB_ENCRYPTION_KEY",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
-						Key: nemoCustomizer.Spec.WandBSecret.APIKeyKey,
+						Key: nemoCustomizer.Spec.WandBConfig.EncryptionKey,
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: nemoCustomizer.Spec.WandBSecret.Name,
+							Name: nemoCustomizer.Spec.WandBConfig.SecretName,
 						},
 					},
 				},
@@ -443,6 +531,48 @@ var _ = Describe("NemoCustomizer Controller", func() {
 				corev1.EnvVar{Name: "OTEL_EXPORTER_OTLP_ENDPOINT", Value: nemoCustomizer.Spec.OpenTelemetry.ExporterOtlpEndpoint},
 				corev1.EnvVar{Name: "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED", Value: "true"},
 			))
+
+			// Check that the customizer config map was created
+			configMap := &corev1.ConfigMap{}
+			err = client.Get(context.TODO(), types.NamespacedName{
+				Name:      nemoCustomizer.Name,
+				Namespace: nemoCustomizer.Namespace,
+			}, configMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify metadata
+			Expect(configMap.Name).To(Equal(nemoCustomizer.GetName()))
+			Expect(configMap.Namespace).To(Equal(nemoCustomizer.Namespace))
+			// Verify key exists
+			Expect(configMap.Data).To(HaveKey("config.yaml"))
+			configData := configMap.Data["config.yaml"]
+			Expect(configData).NotTo(BeEmpty())
+
+			// Verify presence of top-level keys
+			Expect(configData).To(ContainSubstring("training:"))
+			Expect(configData).To(ContainSubstring("models:"))
+			Expect(configData).To(ContainSubstring("model_download_jobs:"))
+
+			// Unmarshal the full merged config
+			var parsed map[string]interface{}
+			err = yaml.Unmarshal([]byte(configData), &parsed)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Validate training config (now already a map)
+			training, ok := parsed["training"].(map[string]interface{})
+			Expect(ok).To(BeTrue(), "expected 'training' to be a map")
+			Expect(training).To(HaveKey("image"))
+			Expect(training).To(HaveKey("pvc"))
+			Expect(training).To(HaveKey("imagePullSecrets"))
+
+			// Validate models config (now already a map)
+			models, ok := parsed["models"].(map[string]interface{})
+			Expect(ok).To(BeTrue(), "expected 'models' to be a map")
+			Expect(models).To(HaveKey("meta/llama-3.1-8b-instruct"))
+
+			Expect(parsed).To(HaveKeyWithValue("entity_store_url", "http://nemoentitystore-sample.nemo.svc.cluster.local:8000"))
+			Expect(parsed).To(HaveKeyWithValue("nemo_data_store_url", "http://nemodatastore-sample.nemo.svc.cluster.local:8000"))
+			Expect(parsed).To(HaveKeyWithValue("mlflow_tracking_url", "http://mlflow-tracking.nemo.svc.cluster.local:80"))
 		})
 
 		It("should delete HPA when NemoCustomizer is updated", func() {
@@ -487,3 +617,26 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		})
 	})
 })
+
+func loadConfigMapFromFile(path string) *corev1.ConfigMap {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read configmap file: %v", err))
+	}
+
+	var cm corev1.ConfigMap
+	if err := yaml.Unmarshal(data, &cm); err != nil {
+		panic(fmt.Sprintf("failed to unmarshal configmap yaml: %v", err))
+	}
+
+	// Sanity check: required fields
+	if cm.Name == "" {
+		panic(fmt.Sprintf("ConfigMap loaded from %s has no metadata.name", path))
+	}
+	if cm.Namespace == "" {
+		// Default it to match your test env
+		cm.Namespace = "default"
+	}
+
+	return &cm
+}

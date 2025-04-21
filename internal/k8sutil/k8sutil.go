@@ -269,3 +269,18 @@ func GetVolumesMountsForUpdatingCaCert() []corev1.VolumeMount {
 		},
 	}
 }
+
+// GetRawYAMLFromConfigMap extracts yaml content from given configmap and key
+func GetRawYAMLFromConfigMap(ctx context.Context, k8sClient client.Client, namespace string, configMapName string, configMapKey string) (string, error) {
+	var cm corev1.ConfigMap
+	if err := k8sClient.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: namespace}, &cm); err != nil {
+		return "", err
+	}
+
+	raw, ok := cm.Data[configMapKey]
+	if !ok {
+		return "", fmt.Errorf("key %q not found in ConfigMap %q", configMapKey, configMapName)
+	}
+
+	return raw, nil
+}

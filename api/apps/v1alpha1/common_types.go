@@ -189,3 +189,14 @@ type ProxySpec struct {
 	NoProxy       string `json:"noProxy,omitempty"`
 	CertConfigMap string `json:"certConfigMap,omitempty"`
 }
+
+// NGCSecret represents the secret and key details for NGC.
+type NGCSecret struct {
+	// Name of the Kubernetes secret containing NGC API key
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Key in the key containing the actual API key value
+	// +kubebuilder:default:="NGC_API_KEY"
+	Key string `json:"key"`
+}

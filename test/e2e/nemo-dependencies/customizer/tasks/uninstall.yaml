@@ -12,15 +12,6 @@
   shell: kubectl get pvc -n {{ namespace }} | egrep 'customizer|volcano|mlflow' | awk '{print $1}' | xargs kubectl delete pvc -n {{ namespace }}
   ignore_errors: true
 
-- name: Delete finetuning-ms-models-pvc if created by the nemo-dependencies playbook
-  shell: |
-    pvc_name="finetuning-ms-models-pvc"
-    label_check=$(kubectl get pvc $pvc_name -n {{ namespace }} -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}')
-    if [ "$label_check" = "nemo-dependencies" ]; then
-      kubectl delete pvc $pvc_name -n {{ namespace }}
-    fi
-  ignore_errors: true
-
 - name: Delete Volcano Kubernetes resources
   shell: kubectl get {{ item }} | egrep 'volcano|mlflow' | awk '{print $1}' | xargs kubectl delete {{ item }}
   loop:

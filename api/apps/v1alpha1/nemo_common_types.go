@@ -18,6 +18,7 @@ package v1alpha1
 
 // ArgoWorkflows defines configuration to connect to Argo Workflows service
 type ArgoWorkflows struct {
+	// +kubebuilder:validation:Pattern=`^http`
 	// +kubebuilder:validation:MinLength=1
 	Endpoint       string `json:"endpoint"`
 	ServiceAccount string `json:"serviceAccount"`
@@ -25,18 +26,28 @@ type ArgoWorkflows struct {
 
 // VectorDB defines the configuration for connecting to the external VectorDB
 type VectorDB struct {
+	// +kubebuilder:validation:Pattern=`^http`
 	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
 
 // Datastore defines the configuration for connecting to the NeMo Datastore service
 type Datastore struct {
+	// +kubebuilder:validation:Pattern=`^http`
 	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
 
 // Entitystore defines the configuration for connecting to the NeMo EntityStore service
 type Entitystore struct {
+	// +kubebuilder:validation:Pattern=`^http`
+	// +kubebuilder:validation:MinLength=1
+	Endpoint string `json:"endpoint"`
+}
+
+// MLFlow defines the configuration for connecting to the MLFlow tracking service
+type MLFlow struct {
+	// +kubebuilder:validation:Pattern=`^http`
 	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
@@ -86,13 +97,13 @@ type DatabaseCredentials struct {
 	PasswordKey string `json:"passwordKey,omitempty"`
 }
 
-// WandBSecret represents the secret and key details for the Weights and Biases service.
-type WandBSecret struct {
-	// Name is the name of the Kubernetes Secret containing the WandB API key.
+// WandBConfig represents the config for the Weights and Biases service for tracking training metrics.
+type WandBConfig struct {
+	// SecretName is the name of the Kubernetes Secret containing the WandB API key.
 	// Required, must not be empty.
 	//
 	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
+	SecretName string `json:"secretName"`
 
 	// APIKeyKey is the key in the Secret that holds the WandB API key.
 	// Defaults to "apiKey".
@@ -106,6 +117,17 @@ type WandBSecret struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="encryptionKey"
 	EncryptionKey string `json:"encryptionKey,omitempty"`
+
+	// Entity is the username or team name under which the runs will be logged.
+	// If not specified, the run will default to your default entity
+	// To change the default entity, go to the account settings https://wandb.ai/settings
+	// and update the “Default location to create new projects” under “Default team”.
+	// +kubebuilder:default="null"
+	Entity *string `json:"entity,omitempty"`
+
+	// Project is the name of the project under which this run will be logged
+	// +kubebuilder:default="nvidia-nemo-customizer"
+	Project string `json:"projectName,omitempty"`
 }
 
 // OTelSpec defines the settings for OpenTelemetry
@@ -156,4 +178,10 @@ type ExporterConfig struct {
 	// +kubebuilder:validation:Enum=otlp;console;none
 	// +kubebuilder:default="otlp"
 	LogsExporter string `json:"logsExporter,omitempty"`
+}
+
+// ConfigMapRef with a valid config map name
+type ConfigMapRef struct {
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
 }

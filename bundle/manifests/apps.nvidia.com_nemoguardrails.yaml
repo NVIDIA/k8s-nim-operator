@@ -63,6 +63,7 @@ spec:
                 description: ConfigStore stores the config of the guardrail service
                 properties:
                   configMap:
+                    description: ConfigMapRef with a valid config map name
                     properties:
                       name:
                         minLength: 1
