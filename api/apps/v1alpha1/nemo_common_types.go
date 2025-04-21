@@ -109,7 +109,7 @@ type WandBConfig struct {
 	// Defaults to "apiKey".
 	// +kubebuilder:default="apiKey"
 	// +kubebuilder:validation:MinLength=1
-	APIKey string `json:"apiKey"`
+	APIKeyKey string `json:"apiKeyKey"`
 
 	// EncryptionKey is an optional key in the secret used for encrypting WandB credentials.
 	// This can be used for additional security layers if required.
