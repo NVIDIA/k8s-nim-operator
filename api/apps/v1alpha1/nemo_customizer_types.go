@@ -128,7 +128,7 @@ type TrainingConfig struct {
 	// ModelPVC is the persistent storage for models used for finetuning
 	ModelPVC PersistentVolumeClaim `json:"modelPVC"`
 	// WorkspacePVC is the PVC config for NemoTrainingJob, which automatically creates one for each job
-	WorkspacePVC WorkspaceConfig `json:"workspacePVC"`
+	WorkspacePVC WorkspacePVCConfig `json:"workspacePVC"`
 	// Env are the environment variables passed to the training jobs
 	Env []corev1.EnvVar `json:"env,omitempty"`
 	// Image is the NeMo customizer image used for training
@@ -153,8 +153,8 @@ type TrainingConfig struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
-// WorkspaceConfig stores config for temporary workspace used by NeMo customizer training jobs
-type WorkspaceConfig struct {
+// WorkspacePVCConfig stores config of PVC used for temporary workspace by NeMo customizer training jobs
+type WorkspacePVCConfig struct {
 	// StorageClass to be used for PVC creation. Leave it as empty if
 	// a default storage class is set in the cluster.
 	StorageClass string `json:"storageClass,omitempty"`
@@ -306,7 +306,7 @@ func (n *NemoCustomizer) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "WANDB_SECRET_KEY",
-			Value: n.Spec.WandBConfig.APIKey,
+			Value: n.Spec.WandBConfig.APIKeyKey,
 		},
 	}
 

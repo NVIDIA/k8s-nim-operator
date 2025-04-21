@@ -161,7 +161,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 						VolumeAccessMode: "ReadWriteOnce",
 						Size:             "5Gi",
 					},
-					WorkspacePVC: appsv1alpha1.WorkspaceConfig{
+					WorkspacePVC: appsv1alpha1.WorkspacePVCConfig{
 						StorageClass:     "local-nfs",
 						VolumeAccessMode: "ReadWriteOnce",
 						Size:             "10Gi",
@@ -194,7 +194,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 				},
 				WandBConfig: appsv1alpha1.WandBConfig{
 					SecretName:    "wandb-secret",
-					APIKey:        "apiKey",
+					APIKeyKey:     "apiKey",
 					EncryptionKey: "encryptionKey",
 				},
 				OpenTelemetry: &appsv1alpha1.OTelSpec{
@@ -486,7 +486,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			// Verify WandB environment variables
 			Expect(envVars).To(ContainElements(
 				corev1.EnvVar{Name: "WANDB_SECRET_NAME", Value: nemoCustomizer.Spec.WandBConfig.SecretName},
-				corev1.EnvVar{Name: "WANDB_SECRET_KEY", Value: nemoCustomizer.Spec.WandBConfig.APIKey},
+				corev1.EnvVar{Name: "WANDB_SECRET_KEY", Value: nemoCustomizer.Spec.WandBConfig.APIKeyKey},
 			))
 
 			Expect(envVars).To(ContainElement(corev1.EnvVar{

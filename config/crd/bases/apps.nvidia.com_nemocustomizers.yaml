@@ -2605,7 +2605,7 @@ spec:
                 description: WandBConfig stores the config for the Weights and Biases
                   service.
                 properties:
-                  apiKey:
+                  apiKeyKey:
                     default: apiKey
                     description: |-
                       APIKeyKey is the key in the Secret that holds the WandB API key.
@@ -2639,7 +2639,7 @@ spec:
                     minLength: 1
                     type: string
                 required:
-                - apiKey
+                - apiKeyKey
                 - secretName
                 type: object
             required:
