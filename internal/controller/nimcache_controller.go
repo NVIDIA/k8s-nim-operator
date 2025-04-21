@@ -327,14 +327,25 @@ func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1
 				"app": "k8s-nim-operator",
 			},
 		},
-		Rules: []rbacv1.PolicyRule{
+	}
+	if nimCache.GetProxySpec() != nil {
+		desiredRole.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"anyuid"},
+				Verbs:         []string{"use"},
+			},
+		}
+	} else {
+		desiredRole.Rules = []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{"security.openshift.io"},
 				Resources:     []string{"securitycontextconstraints"},
 				ResourceNames: []string{"nonroot"},
 				Verbs:         []string{"use"},
 			},
-		},
+		}
 	}
 
 	// Check if the Role already exists
@@ -1026,7 +1037,11 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	}
 
 	if platformType == k8sutil.OpenShift {
-		annotations["openshift.io/scc"] = "nonroot"
+		if nimCache.GetProxySpec() != nil {
+			annotations["openshift.io/scc"] = "anyuid"
+		} else {
+			annotations["openshift.io/scc"] = "nonroot"
+		}
 	}
 
 	job := &batchv1.Job{

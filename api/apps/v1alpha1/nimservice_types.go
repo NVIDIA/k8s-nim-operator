@@ -253,6 +253,9 @@ func (n *NIMService) GetStandardAnnotations() map[string]string {
 		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
+	if n.GetProxySpec() != nil {
+		standardAnnotations["openshift.io/required-scc"] = "anyuid"
+	}
 	return standardAnnotations
 }
 
@@ -777,13 +780,24 @@ func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
 	params.Namespace = n.GetNamespace()
 
 	// Set rules to use SCC
-	params.Rules = []rbacv1.PolicyRule{
-		{
-			APIGroups:     []string{"security.openshift.io"},
-			Resources:     []string{"securitycontextconstraints"},
-			ResourceNames: []string{"nonroot"},
-			Verbs:         []string{"use"},
-		},
+	if n.GetProxySpec() != nil {
+		params.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"anyuid"},
+				Verbs:         []string{"use"},
+			},
+		}
+	} else {
+		params.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"nonroot"},
+				Verbs:         []string{"use"},
+			},
+		}
 	}
 
 	return params
