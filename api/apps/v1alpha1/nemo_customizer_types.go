@@ -182,7 +182,8 @@ type ModelDownloadJobsConfig struct {
 
 	// Pull policy for the image
 	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
-	ImagePullPolicy string `json:"imagePullPolicy"`
+	// +kubebuilder:default:=IfNotPresent
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
 
 	// NGCSecret is the secret containing the NGC API key
 	NGCSecret NGCSecret `json:"ngcAPISecret"`
