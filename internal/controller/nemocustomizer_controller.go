@@ -479,9 +479,16 @@ func (r *NemoCustomizerReconciler) reconcilePVC(ctx context.Context, nemoCustomi
 func (r *NemoCustomizerReconciler) renderCustomizerConfig(ctx context.Context, n *appsv1alpha1.NemoCustomizer) ([]byte, error) {
 	cfg := make(map[string]interface{})
 
-	r.addBaseConfig(cfg, n)
-	r.addModelDownloadJobsConfig(cfg, n)
-	r.addWandBConfig(cfg, n)
+	r.addBaseConfig(ctx, cfg, n)
+	r.addWandBConfig(ctx, cfg, n)
+
+	if err := r.addModelDownloadJobsConfig(ctx, cfg, n); err != nil {
+		return nil, err
+	}
+
+	if err := r.addDatastoreToolsConfig(ctx, cfg, n); err != nil {
+		return nil, err
+	}
 
 	if err := r.addTrainingConfig(ctx, cfg, n); err != nil {
 		return nil, err
@@ -494,11 +501,18 @@ func (r *NemoCustomizerReconciler) renderCustomizerConfig(ctx context.Context, n
 	return yaml.Marshal(cfg)
 }
 
-func (r *NemoCustomizerReconciler) addBaseConfig(cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
+func (r *NemoCustomizerReconciler) addBaseConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
 	cfg["namespace"] = n.GetNamespace()
 	cfg["entity_store_url"] = n.Spec.Entitystore.Endpoint
 	cfg["nemo_data_store_url"] = n.Spec.Datastore.Endpoint
 	cfg["mlflow_tracking_url"] = n.Spec.MLFlow.Endpoint
+}
+
+func (r *NemoCustomizerReconciler) addDatastoreToolsConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
+	if n.Spec.NemoDatastoreTools == nil {
+		return fmt.Errorf("NeMo datastore tools image configuration is not set")
+	}
+
 	cfg["nemo_data_store_tools"] = map[string]interface{}{
 		"image": n.Spec.NemoDatastoreTools.Image,
 	}
@@ -508,9 +522,14 @@ func (r *NemoCustomizerReconciler) addBaseConfig(cfg map[string]interface{}, n *
 			tools["imagePullSecret"] = n.Spec.Image.PullSecrets[0]
 		}
 	}
+	return nil
 }
 
-func (r *NemoCustomizerReconciler) addModelDownloadJobsConfig(cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
+func (r *NemoCustomizerReconciler) addModelDownloadJobsConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
+	if n.Spec.ModelDownloadJobs == nil {
+		return fmt.Errorf("NeMo configuration for model download jobs is not set")
+	}
+
 	// use same pull secrets as the main customizer api image
 	pullSecrets := []map[string]string{}
 	for _, secret := range n.Spec.Image.PullSecrets {
@@ -527,9 +546,10 @@ func (r *NemoCustomizerReconciler) addModelDownloadJobsConfig(cfg map[string]int
 		"ttlSecondsAfterFinished": n.Spec.ModelDownloadJobs.TTLSecondsAfterFinished,
 		"pollIntervalSeconds":     n.Spec.ModelDownloadJobs.PollIntervalSeconds,
 	}
+	return nil
 }
 
-func (r *NemoCustomizerReconciler) addPVCConfig(cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
+func (r *NemoCustomizerReconciler) addPVCConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
 	cfg["pvc"] = map[string]string{
 		"storageClass":     n.Spec.Training.ModelPVC.StorageClass,
 		"volumeAccessMode": string(n.Spec.Training.ModelPVC.VolumeAccessMode),
@@ -537,7 +557,7 @@ func (r *NemoCustomizerReconciler) addPVCConfig(cfg map[string]interface{}, n *a
 	}
 }
 
-func (r *NemoCustomizerReconciler) addWandBConfig(cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
+func (r *NemoCustomizerReconciler) addWandBConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
 	cfg["wandb"] = map[string]string{
 		"project": n.Spec.WandBConfig.Project,
 		"entity":  "null",
@@ -551,8 +571,11 @@ func (r *NemoCustomizerReconciler) addWandBConfig(cfg map[string]interface{}, n 
 }
 
 func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
-	trainingCfg := make(map[string]interface{})
+	if n.Spec.Training == nil {
+		return fmt.Errorf("NeMo training configuration is not set")
+	}
 
+	trainingCfg := make(map[string]interface{})
 	if cmName := n.Spec.Training.ConfigMap.Name; cmName != "" {
 		trainingRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), cmName, "training")
 		if err != nil {
@@ -592,7 +615,7 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 	}
 
 	// Add PVC configuration
-	r.addPVCConfig(trainingCfg, n)
+	r.addPVCConfig(ctx, trainingCfg, n)
 
 	trainingCfg["volumes"] = []map[string]interface{}{
 		{
