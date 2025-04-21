@@ -21,6 +21,7 @@ import (
 	"maps"
 	"os"
 
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -78,10 +79,11 @@ type NIMServiceSpec struct {
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas         int    `json:"replicas,omitempty"`
-	UserID           *int64 `json:"userID,omitempty"`
-	GroupID          *int64 `json:"groupID,omitempty"`
-	RuntimeClassName string `json:"runtimeClassName,omitempty"`
+	Replicas         int        `json:"replicas,omitempty"`
+	UserID           *int64     `json:"userID,omitempty"`
+	GroupID          *int64     `json:"groupID,omitempty"`
+	RuntimeClassName string     `json:"runtimeClassName,omitempty"`
+	Proxy            *ProxySpec `json:"proxy,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume
@@ -208,11 +210,51 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 	return envVars
 }
 
+// GetProxySpec returns the proxy spec for the NIMService deployment
+func (n *NIMService) GetProxyEnv() []corev1.EnvVar {
+
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "NIM_SDK_USE_NATIVE_TLS",
+			Value: "1",
+		},
+		{
+			Name:  "HTTPS_PROXY",
+			Value: n.Spec.Proxy.HttpsProxy,
+		},
+		{
+			Name:  "HTTP_PROXY",
+			Value: n.Spec.Proxy.HttpProxy,
+		},
+		{
+			Name:  "NO_PROXY",
+			Value: n.Spec.Proxy.NoProxy,
+		},
+		{
+			Name:  "https_proxy",
+			Value: n.Spec.Proxy.HttpsProxy,
+		},
+		{
+			Name:  "http_proxy",
+			Value: n.Spec.Proxy.HttpProxy,
+		},
+		{
+			Name:  "no_proxy",
+			Value: n.Spec.Proxy.NoProxy,
+		},
+	}
+
+	return envVars
+}
+
 // GetStandardAnnotations returns default annotations to apply to the NIMService instance
 func (n *NIMService) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
 		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
+	}
+	if n.GetProxySpec() != nil {
+		standardAnnotations["openshift.io/required-scc"] = "anyuid"
 	}
 	return standardAnnotations
 }
@@ -276,7 +318,11 @@ func (n *NIMService) GetArgs() []string {
 
 // GetEnv returns merged slice of standard and user specified env variables
 func (n *NIMService) GetEnv() []corev1.EnvVar {
-	return utils.MergeEnvVars(n.GetStandardEnv(), n.Spec.Env)
+	envVarList := utils.MergeEnvVars(n.GetStandardEnv(), n.Spec.Env)
+	if n.GetProxySpec() != nil {
+		envVarList = utils.MergeEnvVars(envVarList, n.GetProxyEnv())
+	}
+	return envVarList
 }
 
 // GetImage returns container image for the NIMService
@@ -417,6 +463,10 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 		},
 	}
 
+	if n.GetProxySpec() != nil {
+		volumes = append(volumes, k8sutil.GetVolumesForUpdatingCaCert(n.Spec.Proxy.CertConfigMap)...)
+	}
+
 	return volumes
 }
 
@@ -434,6 +484,9 @@ func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.Vo
 		},
 	}
 
+	if n.GetProxySpec() != nil {
+		volumeMounts = append(volumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
+	}
 	return volumeMounts
 }
 
@@ -478,6 +531,23 @@ func (n *NIMService) GetReplicas() int {
 // GetDeploymentKind returns the kind of deployment for NIMService
 func (n *NIMService) GetDeploymentKind() string {
 	return "Deployment"
+}
+
+// GetInitContainers returns the init containers for the NIMService deployment
+func (n *NIMService) GetInitContainers() []corev1.Container {
+	if n.Spec.Proxy != nil {
+		return []corev1.Container{
+			{
+				Name:            "update-ca-certificates",
+				Image:           n.GetImage(),
+				ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+				Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
+				SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
+				VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
+			},
+		}
+	}
+	return []corev1.Container{}
 }
 
 // IsAutoScalingEnabled returns true if autoscaling is enabled for NIMService deployment
@@ -710,13 +780,24 @@ func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
 	params.Namespace = n.GetNamespace()
 
 	// Set rules to use SCC
-	params.Rules = []rbacv1.PolicyRule{
-		{
-			APIGroups:     []string{"security.openshift.io"},
-			Resources:     []string{"securitycontextconstraints"},
-			ResourceNames: []string{"nonroot"},
-			Verbs:         []string{"use"},
-		},
+	if n.GetProxySpec() != nil {
+		params.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"anyuid"},
+				Verbs:         []string{"use"},
+			},
+		}
+	} else {
+		params.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"nonroot"},
+				Verbs:         []string{"use"},
+			},
+		}
 	}
 
 	return params
@@ -837,6 +918,11 @@ func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
 		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
 	return nimServiceAnnotations
+}
+
+// GetProxySpec returns the proxy spec for the NIMService deployment
+func (n *NIMService) GetProxySpec() *ProxySpec {
+	return n.Spec.Proxy
 }
 
 func init() {

@@ -546,7 +546,7 @@ var _ = Describe("NIMCache Controller", func() {
 			}
 		})
 
-		It("should create a job with the right custom CA certificate volumes", func() {
+		It("should create a job with the right custom CA certificate volumes and Init Container", func() {
 			ctx := context.TODO()
 			profiles := []string{AllProfiles}
 			nimCache := &appsv1alpha1.NIMCache{
@@ -556,9 +556,11 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
 					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles}}},
-					CertConfig: &appsv1alpha1.CertConfig{
-						Name:      "custom-ca-configmap",
-						MountPath: "/usr/share/ssl/certs",
+					Proxy: &appsv1alpha1.ProxySpec{
+						HttpProxy:     "http://proxy:1000",
+						HttpsProxy:    "https://proxy:1000",
+						NoProxy:       "http://no-proxy",
+						CertConfigMap: "custom-ca-configmap",
 					},
 				},
 			}
@@ -592,7 +594,7 @@ var _ = Describe("NIMCache Controller", func() {
 			// Verify CertConfig volume and mounts
 			Expect(job.Spec.Template.Spec.Volumes).To(ContainElement(
 				corev1.Volume{
-					Name: "cert-volume",
+					Name: "custom-ca",
 					VolumeSource: corev1.VolumeSource{
 						ConfigMap: &corev1.ConfigMapVolumeSource{
 							LocalObjectReference: corev1.LocalObjectReference{
@@ -603,21 +605,61 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			))
 
-			Expect(job.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(
-				corev1.VolumeMount{
-					Name:      "cert-volume",
-					MountPath: "/usr/share/ssl/certs/custom-ca-cert.pem",
-					SubPath:   "custom-ca-cert.pem",
+			Expect(job.Spec.Template.Spec.Volumes).To(ContainElement(
+				corev1.Volume{
+					Name: "ca-cert-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
 				},
 			))
 
 			Expect(job.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(
 				corev1.VolumeMount{
-					Name:      "cert-volume",
-					MountPath: "/usr/share/ssl/certs/another-cert.pem",
-					SubPath:   "another-cert.pem",
+					Name:      "ca-cert-volume",
+					MountPath: "/etc/ssl",
 				},
 			))
+
+			Expect(job.Spec.Template.Spec.InitContainers[0].VolumeMounts).To(ContainElement(
+				corev1.VolumeMount{
+					Name:      "ca-cert-volume",
+					MountPath: "/ca-certs",
+				},
+			))
+
+			Expect(job.Spec.Template.Spec.InitContainers[0].VolumeMounts).To(ContainElement(
+				corev1.VolumeMount{
+					Name:      "custom-ca",
+					MountPath: "/custom",
+				},
+			))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Command).To(ContainElements(k8sutil.GetUpdateCaCertInitContainerCommand()))
+			Expect(job.Spec.Template.Spec.InitContainers[0].SecurityContext).To(Equal(k8sutil.GetUpdateCaCertInitContainerSecurityContext()))
+
+			// Expected environment variables
+			expectedEnvs := map[string]string{
+				"HTTP_PROXY":             "http://proxy:1000",
+				"HTTPS_PROXY":            "https://proxy:1000",
+				"NO_PROXY":               "http://no-proxy",
+				"http_proxy":             "http://proxy:1000",
+				"https_proxy":            "https://proxy:1000",
+				"no_proxy":               "http://no-proxy",
+				"NIM_SDK_USE_NATIVE_TLS": "1",
+			}
+
+			// Verify each custom environment variable
+			for key, value := range expectedEnvs {
+				var found bool
+				for _, envVar := range job.Spec.Template.Spec.Containers[0].Env {
+					if envVar.Name == key && envVar.Value == value {
+						found = true
+						break
+					}
+				}
+				Expect(found).To(BeTrue(), "Expected environment variable %s=%s not found", key, value)
+			}
+
 		})
 
 		It("should create a ConfigMap with the given model manifest data", func() {

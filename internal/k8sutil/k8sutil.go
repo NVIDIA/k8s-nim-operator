@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -202,6 +203,71 @@ func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.Depl
 		}
 	}
 	return nil
+}
+
+// GetUpdateCaCertInitContainerCommand returns the command to update CA certificates in the init container
+func GetUpdateCaCertInitContainerCommand() []string {
+	return []string{
+		"/bin/sh",
+		"-c",
+		"echo 'Copying CA certs from Config Map'; " +
+			"cp /custom/*.crt /usr/local/share/ca-certificates/; " +
+			"echo 'Updating CA certs'; " +
+			"update-ca-certificates; " +
+			"echo 'CA certs updated'; " +
+			"cp -r /etc/ssl/certs/ /ca-certs;" +
+			"echo 'Exiting update-ca-certificates init container'",
+	}
+}
+
+// GetUpdateCaCertInitContainerSecurityContext returns the security context for init container for updating CA certificates
+func GetUpdateCaCertInitContainerSecurityContext() *corev1.SecurityContext {
+	return &corev1.SecurityContext{
+		RunAsUser:    ptr.To(int64(0)),
+		RunAsNonRoot: ptr.To(false),
+	}
+}
+
+// GetUpdateCaCertInitContainerVolumeMounts returns the volume mounts for the init container for updating CA certificates
+func GetUpdateCaCertInitContainerVolumeMounts() []corev1.VolumeMount {
+	return []corev1.VolumeMount{
+		{
+			Name:      "ca-cert-volume",
+			MountPath: "/ca-certs",
+		},
+		{
+			Name:      "custom-ca",
+			MountPath: "/custom",
+		},
+	}
+}
+
+// GetVolumesForUpdatingCaCert returns the volumes required for updating CA certificates
+func GetVolumesForUpdatingCaCert(configMapName string) []corev1.Volume {
+	return []corev1.Volume{
+		{
+			Name: "ca-cert-volume",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "custom-ca",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: configMapName}},
+			},
+		},
+	}
+}
+
+// GetVolumesMountsForUpdatingCaCert returns the volume mounts required for updating CA certificates
+func GetVolumesMountsForUpdatingCaCert() []corev1.VolumeMount {
+	return []corev1.VolumeMount{
+		{
+			Name:      "ca-cert-volume",
+			MountPath: "/etc/ssl",
+		},
+	}
 }
 
 // GetRawYAMLFromConfigMap extracts yaml content from given configmap and key

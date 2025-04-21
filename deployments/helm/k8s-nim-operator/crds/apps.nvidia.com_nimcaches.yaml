@@ -54,6 +54,7 @@ spec:
                 description: |-
                   CertConfig is the name of the ConfigMap containing the custom certificates.
                   for secure communication.
+                  Deprecated: use `Proxy` instead to configure custom certificates for using proxy.
                 properties:
                   mountPath:
                     description: MountPath is the path where the certificates should
@@ -195,6 +196,18 @@ spec:
                   type: string
                 description: NodeSelector is the node selector labels to schedule
                   the caching job.
+                type: object
+              proxy:
+                description: ProxySpec defines the proxy configuration for NIMService
+                properties:
+                  certConfigMap:
+                    type: string
+                  httpProxy:
+                    type: string
+                  httpsProxy:
+                    type: string
+                  noProxy:
+                    type: string
                 type: object
               resources:
                 description: Resources defines the minimum resources required for

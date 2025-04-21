@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"fmt"
 
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,11 +48,14 @@ type NIMCacheSpec struct {
 	GroupID *int64 `json:"groupID,omitempty"`
 	// CertConfig is the name of the ConfigMap containing the custom certificates.
 	// for secure communication.
+	// Deprecated: use `Proxy` instead to configure custom certificates for using proxy.
+	// +optional
 	CertConfig *CertConfig `json:"certConfig,omitempty"`
 	// Env are the additional custom environment variabes for the caching job
 	Env []corev1.EnvVar `json:"env,omitempty"`
 	// RuntimeClassName is the runtimeclass for the caching job
-	RuntimeClassName string `json:"runtimeClassName,omitempty"`
+	RuntimeClassName string     `json:"runtimeClassName,omitempty"`
+	Proxy            *ProxySpec `json:"proxy,omitempty"`
 }
 
 // NIMSource defines the source for caching NIM model
@@ -286,6 +290,65 @@ func (n *NIMCache) GetRuntimeClassName() *string {
 		return nil
 	}
 	return &n.Spec.RuntimeClassName
+}
+
+// GetProxySpec returns the proxy spec for the NIMService deployment
+func (n *NIMCache) GetProxySpec() *ProxySpec {
+	return n.Spec.Proxy
+}
+
+func (n *NIMCache) GetEnvWithProxy() []corev1.EnvVar {
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "NIM_SDK_USE_NATIVE_TLS",
+			Value: "1",
+		},
+		{
+			Name:  "HTTPS_PROXY",
+			Value: n.Spec.Proxy.HttpsProxy,
+		},
+		{
+			Name:  "HTTP_PROXY",
+			Value: n.Spec.Proxy.HttpProxy,
+		},
+		{
+			Name:  "NO_PROXY",
+			Value: n.Spec.Proxy.NoProxy,
+		},
+		{
+			Name:  "https_proxy",
+			Value: n.Spec.Proxy.HttpsProxy,
+		},
+		{
+			Name:  "http_proxy",
+			Value: n.Spec.Proxy.HttpProxy,
+		},
+		{
+			Name:  "no_proxy",
+			Value: n.Spec.Proxy.NoProxy,
+		},
+	}
+	return envVars
+}
+
+func (n *NIMCache) GetInitContainers() []corev1.Container {
+	if n.Spec.Proxy != nil {
+		initContainerList := []corev1.Container{
+			{
+				Name:            "update-ca-certificates",
+				Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
+				SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
+				VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
+			},
+		}
+		if n.Spec.Source.NGC != nil {
+			initContainerList[0].Image = n.Spec.Source.NGC.ModelPuller
+		} else if n.Spec.Source.DataStore != nil {
+			initContainerList[0].Image = n.Spec.Source.DataStore.ModelPuller
+		}
+		return initContainerList
+	}
+	return []corev1.Container{}
 }
 
 // +kubebuilder:object:root=true

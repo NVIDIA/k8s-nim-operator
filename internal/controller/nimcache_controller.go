@@ -327,14 +327,25 @@ func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1
 				"app": "k8s-nim-operator",
 			},
 		},
-		Rules: []rbacv1.PolicyRule{
+	}
+	if nimCache.GetProxySpec() != nil {
+		desiredRole.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"anyuid"},
+				Verbs:         []string{"use"},
+			},
+		}
+	} else {
+		desiredRole.Rules = []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{"security.openshift.io"},
 				Resources:     []string{"securitycontextconstraints"},
 				ResourceNames: []string{"nonroot"},
 				Verbs:         []string{"use"},
 			},
-		},
+		}
 	}
 
 	// Check if the Role already exists
@@ -1026,7 +1037,11 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	}
 
 	if platformType == k8sutil.OpenShift {
-		annotations["openshift.io/scc"] = "nonroot"
+		if nimCache.GetProxySpec() != nil {
+			annotations["openshift.io/scc"] = "anyuid"
+		} else {
+			annotations["openshift.io/scc"] = "nonroot"
+		}
 	}
 
 	job := &batchv1.Job{
@@ -1194,14 +1209,16 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 
 		// Inject custom CA certificates when running in a proxy envronment
 		if nimCache.Spec.CertConfig != nil {
-			volumes, volumeMounts, err := r.createCertVolumesAndMounts(ctx, nimCache)
-			if err != nil {
-				logger.Error(err, "failed to create volume mounts for custom CA cert injection")
-				return nil, err
-			}
+			logger.Error(err, "Deprecated field 'CertConfig' is used. Please migrate to 'Proxy' field on NIMCache.\"")
+			return nil, err
+		}
 
-			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
-			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
+		if nimCache.GetProxySpec() != nil {
+			job.Spec.Template.Spec.InitContainers = nimCache.GetInitContainers()
+			job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.GetEnvWithProxy())
+			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
+			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, k8sutil.GetVolumesForUpdatingCaCert(nimCache.Spec.Proxy.CertConfigMap)...)
+
 		}
 	}
 	return job, nil
@@ -1212,43 +1229,6 @@ func (r *NIMCacheReconciler) getConfigMap(ctx context.Context, name, namespace s
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, configMap)
 	return configMap, err
-}
-
-func (r *NIMCacheReconciler) createCertVolumesAndMounts(ctx context.Context, nimCache *appsv1alpha1.NIMCache) ([]corev1.Volume, []corev1.VolumeMount, error) {
-	logger := log.FromContext(ctx)
-
-	// Get the config map for custom certificates
-	certConfig, err := r.getConfigMap(ctx, nimCache.Spec.CertConfig.Name, nimCache.Namespace)
-	if err != nil {
-		logger.Error(err, "Failed to get configmap for custom certificates")
-		return nil, nil, err
-	}
-
-	var volume corev1.Volume
-	var volumeMounts []corev1.VolumeMount
-
-	// Prepare the volume mounts for custom CA certificates
-	volume = corev1.Volume{
-		Name: "cert-volume",
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: nimCache.Spec.CertConfig.Name,
-				},
-			},
-		},
-	}
-
-	// Create individual volume mounts for each key in the ConfigMap
-	for key := range certConfig.Data {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      "cert-volume",
-			MountPath: fmt.Sprintf("%s/%s", nimCache.Spec.CertConfig.MountPath, key),
-			SubPath:   key,
-		})
-	}
-
-	return []corev1.Volume{volume}, volumeMounts, nil
 }
 
 // extractNIMManifest extracts the NIMManifest from the ConfigMap data

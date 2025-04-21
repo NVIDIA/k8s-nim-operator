@@ -182,6 +182,14 @@ type CertConfig struct {
 	MountPath string `json:"mountPath"`
 }
 
+// ProxySpec defines the proxy configuration for NIMService
+type ProxySpec struct {
+	HttpProxy     string `json:"httpProxy,omitempty"`
+	HttpsProxy    string `json:"httpsProxy,omitempty"`
+	NoProxy       string `json:"noProxy,omitempty"`
+	CertConfigMap string `json:"certConfigMap,omitempty"`
+}
+
 // NGCSecret represents the secret and key details for NGC.
 type NGCSecret struct {
 	// Name of the Kubernetes secret containing NGC API key
