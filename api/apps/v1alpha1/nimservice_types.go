@@ -461,19 +461,7 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 	}
 
 	if n.GetProxySpec() != nil {
-		volumes = append(volumes, corev1.Volume{
-			Name: "ca-cert-volume",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-			corev1.Volume{
-				Name: "custom-ca",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: n.Spec.Proxy.CertConfigMap}},
-				},
-			},
-		)
+		volumes = append(volumes, k8sutil.GetVolumesForUpdatingCaCert(n.Spec.Proxy.CertConfigMap)...)
 	}
 
 	return volumes
@@ -494,11 +482,7 @@ func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.Vo
 	}
 
 	if n.GetProxySpec() != nil {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      "ca-cert-volume",
-			MountPath: "/etc/ssl",
-		},
-		)
+		volumeMounts = append(volumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
 	}
 	return volumeMounts
 }

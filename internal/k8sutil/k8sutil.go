@@ -223,7 +223,8 @@ func GetUpdateCaCertInitContainerCommand() []string {
 // GetUpdateCaCertInitContainerSecurityContext returns the security context for init container for updating CA certificates
 func GetUpdateCaCertInitContainerSecurityContext() *corev1.SecurityContext {
 	return &corev1.SecurityContext{
-		RunAsUser: ptr.To(int64(0)),
+		RunAsUser:    ptr.To(int64(0)),
+		RunAsNonRoot: ptr.To(false),
 	}
 }
 
@@ -237,6 +238,34 @@ func GetUpdateCaCertInitContainerVolumeMounts() []corev1.VolumeMount {
 		{
 			Name:      "custom-ca",
 			MountPath: "/custom",
+		},
+	}
+}
+
+// GetVolumesForUpdatingCaCert returns the volumes required for updating CA certificates
+func GetVolumesForUpdatingCaCert(configMapName string) []corev1.Volume {
+	return []corev1.Volume{
+		{
+			Name: "ca-cert-volume",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "custom-ca",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: configMapName}},
+			},
+		},
+	}
+}
+
+// GetVolumesMountsForUpdatingCaCert returns the volume mounts required for updating CA certificates
+func GetVolumesMountsForUpdatingCaCert() []corev1.VolumeMount {
+	return []corev1.VolumeMount{
+		{
+			Name:      "ca-cert-volume",
+			MountPath: "/etc/ssl",
 		},
 	}
 }

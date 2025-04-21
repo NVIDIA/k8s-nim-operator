@@ -351,6 +351,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(pod.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
 			Expect(*pod.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*pod.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
+			Expect(*pod.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(pod.Spec.NodeSelector["feature.node.kubernetes.io/pci-10de.present"]).To(Equal("true"))
 		})
 
@@ -375,6 +376,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(pod.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
 			Expect(*pod.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*pod.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
+			Expect(*pod.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(pod.Spec.NodeSelector["test-label"]).To(Equal("true"))
 			Expect(pod.Spec.RuntimeClassName).To(Equal(&runtimeClassName))
 		})
@@ -429,6 +431,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--profiles", "36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
+			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
 			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)))
 		})
@@ -459,6 +462,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--profiles", "36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff", "04fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc12345"))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
+			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
 			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)))
 		})
@@ -631,6 +635,30 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 			))
 			Expect(job.Spec.Template.Spec.InitContainers[0].Command).To(ContainElements(k8sutil.GetUpdateCaCertInitContainerCommand()))
+			Expect(job.Spec.Template.Spec.InitContainers[0].SecurityContext).To(Equal(k8sutil.GetUpdateCaCertInitContainerSecurityContext()))
+
+			// Expected environment variables
+			expectedEnvs := map[string]string{
+				"HTTP_PROXY":             "http://proxy:1000",
+				"HTTPS_PROXY":            "https://proxy:1000",
+				"NO_PROXY":               "http://no-proxy",
+				"http_proxy":             "http://proxy:1000",
+				"https_proxy":            "https://proxy:1000",
+				"no_proxy":               "http://no-proxy",
+				"NIM_SDK_USE_NATIVE_TLS": "1",
+			}
+
+			// Verify each custom environment variable
+			for key, value := range expectedEnvs {
+				var found bool
+				for _, envVar := range job.Spec.Template.Spec.Containers[0].Env {
+					if envVar.Name == key && envVar.Value == value {
+						found = true
+						break
+					}
+				}
+				Expect(found).To(BeTrue(), "Expected environment variable %s=%s not found", key, value)
+			}
 
 		})
 

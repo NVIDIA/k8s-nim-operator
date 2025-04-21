@@ -959,8 +959,9 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				RunAsUser: nimCache.GetUserID(),
-				FSGroup:   nimCache.GetGroupID(),
+				RunAsUser:    nimCache.GetUserID(),
+				FSGroup:      nimCache.GetGroupID(),
+				RunAsNonRoot: ptr.To[bool](true),
 			},
 			ServiceAccountName: NIMCacheServiceAccount,
 			Tolerations:        nimCache.GetTolerations(),
@@ -1042,8 +1043,9 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Spec: corev1.PodSpec{
 					RuntimeClassName: nimCache.GetRuntimeClassName(),
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: nimCache.GetUserID(),
-						FSGroup:   nimCache.GetGroupID(),
+						RunAsUser:    nimCache.GetUserID(),
+						FSGroup:      nimCache.GetGroupID(),
+						RunAsNonRoot: ptr.To[bool](true),
 					},
 					Containers:    []corev1.Container{},
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -1199,26 +1201,9 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		if nimCache.GetProxySpec() != nil {
 			job.Spec.Template.Spec.InitContainers = nimCache.GetInitContainers()
 			job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.GetEnvWithProxy())
-			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts,
-				corev1.VolumeMount{
-					Name:      "ca-cert-volume",
-					MountPath: "/etc/ssl",
-				},
-			)
-			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
-				corev1.Volume{
-					Name: "ca-cert-volume",
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-				corev1.Volume{
-					Name: "custom-ca",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: nimCache.Spec.Proxy.CertConfigMap}},
-					},
-				},
-			)
+			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
+			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, k8sutil.GetVolumesForUpdatingCaCert(nimCache.Spec.Proxy.CertConfigMap)...)
+
 		}
 	}
 	return job, nil

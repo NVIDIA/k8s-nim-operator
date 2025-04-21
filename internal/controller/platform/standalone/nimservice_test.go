@@ -32,6 +32,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	. "github.com/onsi/ginkgo/v2"
@@ -1118,6 +1119,113 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			err := reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)
 			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Describe("Reconcile NIMService with Proxy Setting", func() {
+
+		BeforeEach(func() {
+			nimService.Spec.Proxy = &appsv1alpha1.ProxySpec{
+				HttpProxy:     "http://proxy:1000",
+				HttpsProxy:    "https://proxy:1000",
+				NoProxy:       "http://no-proxy",
+				CertConfigMap: "custom-ca-configmap",
+			}
+
+		})
+
+		It("should create deployment with appropriate parameters", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Deployment should be created
+			deployment := &appsv1.Deployment{}
+			err = client.Get(context.TODO(), namespacedName, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deployment.Name).To(Equal(nimService.GetName()))
+			Expect(deployment.Namespace).To(Equal(nimService.GetNamespace()))
+			Expect(deployment.Annotations["annotation-key"]).To(Equal("annotation-value"))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal(nimService.GetContainerName()))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(nimService.GetImage()))
+			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(Equal(nimService.Spec.ReadinessProbe.Probe))
+			Expect(deployment.Spec.Template.Spec.Containers[0].LivenessProbe).To(Equal(nimService.Spec.LivenessProbe.Probe))
+			Expect(deployment.Spec.Template.Spec.Containers[0].StartupProbe).To(Equal(nimService.Spec.StartupProbe.Probe))
+			Expect(*deployment.Spec.Template.Spec.RuntimeClassName).To(Equal(nimService.Spec.RuntimeClassName))
+
+			// Verify CertConfig volume and mounts
+			Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(
+				corev1.Volume{
+					Name: "custom-ca",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "custom-ca-configmap",
+							},
+						},
+					},
+				},
+			))
+
+			Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(
+				corev1.Volume{
+					Name: "ca-cert-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			))
+
+			Expect(deployment.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(
+				corev1.VolumeMount{
+					Name:      "ca-cert-volume",
+					MountPath: "/etc/ssl",
+				},
+			))
+
+			Expect(deployment.Spec.Template.Spec.InitContainers[0].VolumeMounts).To(ContainElement(
+				corev1.VolumeMount{
+					Name:      "ca-cert-volume",
+					MountPath: "/ca-certs",
+				},
+			))
+
+			Expect(deployment.Spec.Template.Spec.InitContainers[0].VolumeMounts).To(ContainElement(
+				corev1.VolumeMount{
+					Name:      "custom-ca",
+					MountPath: "/custom",
+				},
+			))
+			Expect(deployment.Spec.Template.Spec.InitContainers[0].Command).To(ContainElements(k8sutil.GetUpdateCaCertInitContainerCommand()))
+			Expect(deployment.Spec.Template.Spec.InitContainers[0].SecurityContext).To(Equal(k8sutil.GetUpdateCaCertInitContainerSecurityContext()))
+
+			// Expected environment variables
+			expectedEnvs := map[string]string{
+				"HTTP_PROXY":             "http://proxy:1000",
+				"HTTPS_PROXY":            "https://proxy:1000",
+				"NO_PROXY":               "http://no-proxy",
+				"http_proxy":             "http://proxy:1000",
+				"https_proxy":            "https://proxy:1000",
+				"no_proxy":               "http://no-proxy",
+				"NIM_SDK_USE_NATIVE_TLS": "1",
+			}
+
+			// Verify each custom environment variable
+			for key, value := range expectedEnvs {
+				var found bool
+				for _, envVar := range deployment.Spec.Template.Spec.Containers[0].Env {
+					if envVar.Name == key && envVar.Value == value {
+						found = true
+						break
+					}
+				}
+				Expect(found).To(BeTrue(), "Expected environment variable %s=%s not found", key, value)
+			}
+
 		})
 	})
 })
