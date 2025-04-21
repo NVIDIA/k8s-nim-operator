@@ -581,12 +581,8 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 		if err != nil {
 			return fmt.Errorf("loading training config: %w", err)
 		}
-		var trainingFromCM map[string]interface{}
-		if err := yaml.Unmarshal([]byte(trainingRaw), &trainingFromCM); err != nil {
+		if err := yaml.Unmarshal([]byte(trainingRaw), &trainingCfg); err != nil {
 			return fmt.Errorf("parsing training config: %w", err)
-		}
-		for k, v := range trainingFromCM {
-			trainingCfg[k] = v
 		}
 	}
 
