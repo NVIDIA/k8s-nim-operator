@@ -19,6 +19,7 @@ package standalone
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -273,9 +274,10 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
 	} else {
 		// Update NIMServiceStatus with model config.
-		err = r.updateModelStatus(ctx, nimService)
-		if err != nil {
-			return ctrl.Result{}, err
+		updateErr := r.updateModelStatus(ctx, nimService)
+		if updateErr != nil {
+			logger.Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 
 		// Update status as ready
