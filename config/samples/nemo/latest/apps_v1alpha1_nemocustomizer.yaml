@@ -4,13 +4,13 @@ metadata:
   name: nemocustomizer-sample
   namespace: nemo
 spec:
-  # Scheduler configuration for training jobs (volcano (default), runai)
+  # Scheduler configuration for training jobs (volcano (default))
   scheduler:
     type: "volcano"
   # Weights & Biases configuration for experiment tracking
   wandb:
     secretName: wandb-secret       # Kubernetes secret that stores WANDB_API_KEY and optionally encryption key
-    apiKey: apiKey                 # Key in the secret that holds the W&B API key
+    apiKeyKey: apiKey                 # Key in the secret that holds the W&B API key
     encryptionKey: encryptionKey   # Key in the secret that holds optional encryption key
   # OpenTelemetry tracing configuration
   otel:
