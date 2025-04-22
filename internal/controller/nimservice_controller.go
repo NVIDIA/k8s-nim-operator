@@ -155,12 +155,13 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Handle platform-specific reconciliation
-	if result, err := r.Platform.Sync(ctx, r, nimService); err != nil {
+	result, err := r.Platform.Sync(ctx, r, nimService)
+	if err != nil {
 		logger.Error(err, "error reconciling NIMService", "name", nimService.Name)
 		return result, err
 	}
 
-	return ctrl.Result{}, nil
+	return result, nil
 }
 
 // GetScheme returns the scheme of the reconciler
