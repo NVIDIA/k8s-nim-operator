@@ -79,12 +79,12 @@ spec:
       create: true
       name: finetuning-ms-models-pvc
       # StorageClass for the PVC (can be empty to use default)
-      storageClass: ""
+      storageClass: "local-path"
       volumeAccessMode: ReadWriteOnce
       size: 50Gi
     # Workspace PVC automatically created per job
     workspacePVC:
-      storageClass: ""
+      storageClass: "local-path"
       volumeAccessMode: ReadWriteOnce
       size: 10Gi
       # Mount path for workspace inside container
