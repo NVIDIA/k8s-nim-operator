@@ -3,22 +3,23 @@
 Tutorials for NeMo Microservices (MS) Data Flywheel, which includes examples for using the NeMo MS Data Store, Entity Store, Customizer, Evaluator, Guardrails, and NVIDIA NIMs.
 
 ## Prerequisites
-1. Deploy the NIM operator and NeMo Training Operator. Create CRs for requried NeMo Microservices and the NIM pipeline using the manifests from `manifests` folder.
+1. This notebook requires the machine to have 2 GPUs, one for base model inferencing and one for model fine-tuning.
+2. Follow the instructions in [NeMo Microservices Prerequisites](https://sw-docs-dgx-station.nvidia.com/nim-operator/review/89/nemo-prerequisites.html) to install NeMo microservice dependencies and NeMo Training Operator.
+3. Deploy the Ingress 
+    a. Install ingress controller (e.g. nginx ingress controller)
+    ```bash
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+    helm repo update
+    helm install nginx-ingress ingress-nginx/ingress-nginx -n ingress-nginx
+    ```
+    b. Deploy the Ingress objects as configured in [manifests/ingress.yml](./manifests/ingress.yml).
+4. Add the ClusterIP of `ingress-nginx-controller` Service to `/etc/hosts`.
+    ```bash
+    export INGRESS_IP=$(kubectl get svc -n ingress-nginx -o jsonpath='{.items[0].status.clusterIP}')
+    echo -e "\n$INGRESS_IP nemo.test\n $INGRESS_IP data-store.test\n $INGRESS_IP nim.test\n" | sudo tee -a /etc/hosts
+    ```
+5. Deploy the NeMo microservices as defined under [./manifests](./manifests).
 
-
-## 1. Configure Ingress
-a. Install ingress controller (e.g. nginx ingress controller)
-```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-helm install nginx-ingress ingress-nginx/ingress-nginx -n ingress-nginx
-```
-b. Deploy ingress resources as configured in `manifests/ingress.yml`
-c. Add the ClusterIP of `ingress-nginx-controller` to `/etc/hosts`
-```bash
-export INGRESS_IP=$(kubectl get svc -n ingress-nginx -o jsonpath='{.items[0].status.clusterIP}')
-echo -e "\n$INGRESS_IP nemo.test\n $INGRESS_IP data-store.test\n $INGRESS_IP nim.test\n" | sudo tee -a /etc/hosts
-```
 
 ## 2. Update Config
 Update the config.py file with the following values:
