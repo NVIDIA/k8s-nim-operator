@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
-  name: example-ingress
+  name: nemo-ingress
   namespace: nemo
 spec:
   ingressClassName: nginx
@@ -67,6 +67,17 @@ spec:
               number: 8000
         path: /v1/guardrail
         pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+  name: data-store-ingress
+  namespace: nemo
+spec:
+  ingressClassName: nginx
+  rules:
   - host: data-store.test
     http:
       paths:
@@ -77,6 +88,17 @@ spec:
               number: 8000
         path: /
         pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+  name: nim-ingress
+  namespace: nemo
+spec:
+  ingressClassName: nginx
+  rules:
   - host: nim.test
     http:
       paths:
