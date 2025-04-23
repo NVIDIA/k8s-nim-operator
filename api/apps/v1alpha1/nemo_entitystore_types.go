@@ -82,6 +82,8 @@ type NemoEntitystoreSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	DatabaseConfig *DatabaseConfig `json:"databaseConfig,omitempty"`
+	// Datastore stores the datastore endpoint.
+	Datastore Datastore `json:"datastore"`
 }
 
 // NemoEntitystoreStatus defines the observed state of NemoEntitystore
@@ -184,6 +186,10 @@ func (n *NemoEntitystore) GetStandardEnv() []corev1.EnvVar {
 		{
 			Name:  "APP_VERSION",
 			Value: n.Spec.Image.Tag,
+		},
+		{
+			Name:  "BASE_URL_DATASTORE",
+			Value: n.Spec.Datastore.Endpoint,
 		},
 	}
 	envVars = append(envVars, n.GetPostgresEnv()...)

@@ -118,6 +118,16 @@ spec:
                 - databaseName
                 - host
                 type: object
+              datastore:
+                description: Datastore stores the datastore endpoint.
+                properties:
+                  endpoint:
+                    minLength: 1
+                    pattern: ^http
+                    type: string
+                required:
+                - endpoint
+                type: object
               env:
                 items:
                   description: EnvVar represents an environment variable present in
@@ -1432,6 +1442,7 @@ spec:
                 type: integer
             required:
             - databaseConfig
+            - datastore
             - image
             type: object
           status:
