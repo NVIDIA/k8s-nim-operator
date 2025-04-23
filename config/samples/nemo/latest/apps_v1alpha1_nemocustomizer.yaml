@@ -84,7 +84,7 @@ spec:
       size: 50Gi
     # Workspace PVC automatically created per job
     workspacePVC:
-      storageClass: ""
+      storageClass: "local-path"
       volumeAccessMode: ReadWriteOnce
       size: 10Gi
       # Mount path for workspace inside container
