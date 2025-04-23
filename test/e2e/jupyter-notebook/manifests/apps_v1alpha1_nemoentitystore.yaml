@@ -5,6 +5,9 @@ metadata:
   name: nemoentitystore-sample
   namespace: nemo
 spec:
+  env:
+    - name: BASE_URL_DATASTORE
+      value: "http://nemodatastore-sample.nemo.svc.cluster.local:8000"
   image:
     repository: nvcr.io/nvidia/nemo-microservices/entity-store
     tag: "25.04"

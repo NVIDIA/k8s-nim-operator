@@ -41,6 +41,8 @@ spec:
             value: "8"
           - name: ENTITY_STORE_URL
             value: http://nemoentitystore-sample.nemo.svc.cluster.local:8000
+          - name: NIM_GUIDED_DECODING_BACKEND
+            value: fast_outlines
         image:
           repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
           tag: 1.8.3
