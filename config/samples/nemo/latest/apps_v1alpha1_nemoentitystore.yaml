@@ -23,3 +23,5 @@ spec:
       user: nesuser
       secretName: entity-store-pg-existing-secret
       passwordKey: password
+  datastore:
+    endpoint: http://nemodatastore-sample.nemo.svc.cluster.local:8000
