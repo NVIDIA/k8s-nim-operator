@@ -62,4 +62,4 @@ kubectl port-forward svc/jupyter-service -n nemo 8888:8888
 ```
 5. Access your notebook
 
-The notebook is under work directory.
+Once you launch the Jupyter server, the e2e test notebook is under the work directory.
