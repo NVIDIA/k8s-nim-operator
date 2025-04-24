@@ -6,31 +6,20 @@ Tutorials for NeMo Microservices (MS) Data Flywheel, which includes examples for
 1. Deploy the NIM operator and NeMo Training Operator. Create CRs for requried NeMo Microservices and the NIM pipeline using the manifests from `manifests` folder.
 
 
-## 1. Configure Ingress
-a. Install ingress controller (e.g. nginx ingress controller)
-```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-helm install nginx-ingress ingress-nginx/ingress-nginx -n ingress-nginx
-```
-b. Deploy ingress resources as configured in `manifests/ingress.yml`
-c. Add the ClusterIP of `ingress-nginx-controller` to `/etc/hosts`
-```bash
-export INGRESS_IP=$(kubectl get svc -n ingress-nginx -o jsonpath='{.items[0].status.clusterIP}')
-echo -e "\n$INGRESS_IP nemo.test\n $INGRESS_IP data-store.test\n $INGRESS_IP nim.test\n" | sudo tee -a /etc/hosts
-```
-
-## 2. Update Config
+## 1. Update Config
 Update the config.py file with the following values:
 ```python
-NDS_URL = "http://data-store.test"
-NEMO_URL = "http://nemo.test"
-NIM_URL = "http://nim.test"
+NDS_URL = "http://nemodatastore-sample.nemo.svc.cluster.local:8000" # Data Store
+ENTITY_STORE_URL = "http://nemoentitystore-sample.nemo.svc.cluster.local:8000" # Entity Store
+CUSTOMIZER_URL = "http://nemocustomizer-sample.nemo.svc.cluster.local:8000" # Customizer
+EVALUATOR_URL = "http://nemoevaluator-sample.nemo.svc.cluster.local:8000" # Evaluator
+GUARDRAILS_URL = "http://nemoguardrails-sample.nemo.svc.cluster.local:8000" # Guardrails
+NIM_URL = "http://meta-llama3-1b-instruct.nemo.svc.cluster.local:8000" # NIM
 HF_TOKEN = "<your-huggingface-token>"
 BASE_MODEL = "meta/llama-3.2-1b-instruct"
 ```
 
-## 3. Bring up the Jupyter notebook
+## 2. Bring up the Jupyter notebook
 Create a virtual environment. This is recommended to isolate project dependencies.
 
 ```bash
@@ -49,7 +38,7 @@ Start the Jupyter lab server on your NIM cluster.
 jupyter lab --ip 0.0.0.0 --port=8888 --allow-root
 ```
 
-## 4. Access the remote Jupyter notebook
+## 3. Access the remote Jupyter notebook
 
 **On your client machine**
 

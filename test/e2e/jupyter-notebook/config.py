@@ -1,7 +1,10 @@
 # (Required) NeMo Microservices URLs
-NDS_URL = "http://data-store.test" # Data Store
-NEMO_URL = "http://nemo.test" # Customizer, Entity Store, Evaluator, Guardrails
-NIM_URL = "http://nim.test" # NIM
+NDS_URL = "http://nemodatastore-sample.nemo.svc.cluster.local:8000" # Data Store
+ENTITY_STORE_URL = "http://nemoentitystore-sample.nemo.svc.cluster.local:8000" # Entity Store
+CUSTOMIZER_URL = "http://nemocustomizer-sample.nemo.svc.cluster.local:8000" # Customizer
+EVALUATOR_URL = "http://nemoevaluator-sample.nemo.svc.cluster.local:8000" # Evaluator
+GUARDRAILS_URL = "http://nemoguardrails-sample.nemo.svc.cluster.local:8000" # Guardrails
+NIM_URL = "http://meta-llama3-1b-instruct.nemo.svc.cluster.local:8000" # NIM
 
 # (Required) Hugging Face Token
 HF_TOKEN = ""
