@@ -1,16 +1,22 @@
-- name: check if Jupyter server is installed
-  shell: helm list -n {{ namespace }} | egrep 'jupyter' | awk '{print $1}' | wc -l | tr -d '\n'
-  register: jupyter_installed
+- name: Check if Jupyter Deployment exists
+  shell: kubectl get deployment -n {{ namespace }} | egrep '{{ deployment_name }}' | wc -l | tr -d '\n'
+  register: jupyter_deployed
   ignore_errors: true
 
-- name: Uninstall Jupyter server helmchart
-  shell: helm list -n {{ namespace }} | awk '{print $1}' | grep -v NAME | egrep 'jupyter' | xargs helm uninstall -n {{ namespace }}
-  when: jupyter_installed.stdout | int >= 1
+- name: Delete Jupyter Deployment
+  shell: kubectl delete deployment {{ deployment_name }} -n {{ namespace }}
+  when: jupyter_deployed.stdout | int >= 1
   ignore_errors: true
 
-- name: Delete Jupyter resources
-  shell: kubectl get {{ item }} | egrep 'jupyter|notebook' | awk '{print $1}' | xargs kubectl delete {{ item }}
-  loop:
-    - pvc
-    - configmap
+- name: Delete Jupyter Service
+  shell: kubectl delete service {{ service_name }} -n {{ namespace }}
   ignore_errors: true
+
+- name: Delete Jupyter PVC
+  shell: kubectl delete pvc {{ pvc_name }} -n {{ namespace }}
+  ignore_errors: true
+
+- name: Delete Jupyter ConfigMap
+  shell: kubectl delete configmap notebook-config -n {{ namespace }}
+  ignore_errors: true
+

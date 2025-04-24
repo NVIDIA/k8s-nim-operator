@@ -1,5 +1,51 @@
 ---
 # tasks file for jupyter server
-- include_tasks: namespace.yaml
-- include_tasks: jupyter.yaml
+- name: Create namespace
+  ansible.builtin.shell: |
+    kubectl create namespace {{ namespace }} || echo "Namespace {{ namespace }} already exists"
+  args:
+    executable: /bin/bash
 
+- name: Create ConfigMap for notebook and config.py
+  ansible.builtin.shell: |
+    kubectl apply -f -
+  args:
+    stdin: "{{ lookup('template', 'configmap.yaml.j2') }}"
+    executable: /bin/bash
+
+- name: Create PersistentVolumeClaim
+  ansible.builtin.shell: |
+    kubectl apply -f -
+  args:
+    stdin: "{{ lookup('template', 'pvc.yaml.j2') }}"
+    executable: /bin/bash
+
+- name: Deploy Jupyter Notebook
+  ansible.builtin.shell: |
+    kubectl apply -f -
+  args:
+    stdin: "{{ lookup('template', 'deployment.yaml.j2') }}"
+    executable: /bin/bash
+
+- name: Expose Jupyter Notebook with NodePort
+  ansible.builtin.shell: |
+    kubectl apply -f -
+  args:
+    stdin: "{{ lookup('template', 'service.yaml.j2') }}"
+    executable: /bin/bash
+
+- name: Wait for Jupyter Notebook to be ready
+  ansible.builtin.shell: |
+    kubectl wait --for=condition=available --timeout=120s deployment/{{ deployment_name }} -n {{ namespace }}
+  args:
+    executable: /bin/bash
+
+- name: Print how to access Jupyter via port-forward
+  ansible.builtin.debug:
+    msg: |
+      "To access Jupyter Notebook, run the following command in your terminal:
+
+        kubectl port-forward svc/{{ service_name }} -n {{ namespace }} 8888:8888
+
+      Then open http://localhost:8888/ in your browser.
+      If prompted for a token, use: {{ jupyter_token }}"
