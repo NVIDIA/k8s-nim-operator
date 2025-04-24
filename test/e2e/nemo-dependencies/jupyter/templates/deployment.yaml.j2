@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ deployment_name }}
+  namespace: {{ namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jupyter-notebook
+  template:
+    metadata:
+      labels:
+        app: jupyter-notebook
+    spec:
+      containers:
+        - name: jupyter
+          image: jupyter/base-notebook:latest
+          ports:
+            - containerPort: 8888
+          env:
+            - name: JUPYTER_TOKEN
+              value: "{{ jupyter_token }}"
+          volumeMounts:
+            - name: notebook-storage
+              mountPath: {{ mount_path }}
+            - name: config-volume
+              mountPath: "{{ mount_path }}/{{ config_name }}"
+              subPath: "{{ config_name }}"
+            - name: config-volume
+              mountPath: "{{ mount_path }}/{{ notebook_name }}"
+              subPath: "{{ notebook_name }}"
+      volumes:
+        - name: notebook-storage
+          persistentVolumeClaim:
+            claimName: {{ pvc_name }}
+        - name: config-volume
+          configMap:
+            name: notebook-config
