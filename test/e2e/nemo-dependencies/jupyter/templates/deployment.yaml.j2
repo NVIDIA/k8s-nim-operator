@@ -20,8 +20,8 @@ spec:
             - sh
             - -c
             - |
-              cp /config/{{ config_name }} /work/{{ config_name }} && chmod 666 /work/{{ config_name }}
-              cp /config/{{ notebook_name }} /work/{{ notebook_name }} && chmod 666 /work/{{ notebook_name }}
+              [ ! -f /work/{{ config_name }} ] && cp /config/{{ config_name }} /work/{{ config_name }} && chmod 666 /work/{{ config_name }}
+              [ ! -f /work/{{ notebook_name }} ] && cp /config/{{ notebook_name }} /work/{{ notebook_name }} && chmod 666 /work/{{ notebook_name }}
           volumeMounts:
             - name: config-volume
               mountPath: /config
