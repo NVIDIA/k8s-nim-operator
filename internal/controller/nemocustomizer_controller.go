@@ -403,6 +403,19 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	// Get params to render Deployment resource
 	deploymentParams := NemoCustomizer.GetDeploymentParams()
 
+	// Calculate the hash of the config data
+	configHash := utils.CalculateSHA256(string(customizerConfigYAML))
+	annotations := deploymentParams.PodAnnotations
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	// Check if the hash has changed
+	if annotations[ConfigHashAnnotationKey] != configHash {
+		annotations[ConfigHashAnnotationKey] = configHash
+		deploymentParams.PodAnnotations = annotations
+	}
+
 	// Setup volume mounts with customizer config
 	deploymentParams.Volumes = NemoCustomizer.GetVolumes()
 	deploymentParams.VolumeMounts = NemoCustomizer.GetVolumeMounts()
@@ -549,11 +562,11 @@ func (r *NemoCustomizerReconciler) addModelDownloadJobsConfig(ctx context.Contex
 	return nil
 }
 
-func (r *NemoCustomizerReconciler) addPVCConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
+func (r *NemoCustomizerReconciler) addWorkspacePVCConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) {
 	cfg["pvc"] = map[string]string{
-		"storageClass":     n.Spec.Training.ModelPVC.StorageClass,
-		"volumeAccessMode": string(n.Spec.Training.ModelPVC.VolumeAccessMode),
-		"size":             n.Spec.Training.ModelPVC.Size,
+		"storageClass":     n.Spec.Training.WorkspacePVC.StorageClass,
+		"volumeAccessMode": string(n.Spec.Training.WorkspacePVC.VolumeAccessMode),
+		"size":             n.Spec.Training.WorkspacePVC.Size,
 	}
 }
 
@@ -611,7 +624,7 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 	}
 
 	// Add PVC configuration
-	r.addPVCConfig(ctx, trainingCfg, n)
+	r.addWorkspacePVCConfig(ctx, trainingCfg, n)
 
 	trainingCfg["volumes"] = []map[string]interface{}{
 		{
