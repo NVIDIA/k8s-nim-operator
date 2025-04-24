@@ -74,3 +74,21 @@
         - "Evaluator Milvus Password: {{ milvus.password }}"
         - "Evaluator Milvus Username: {{ milvus.username }}"
     when: install.evaluator == true
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  roles:
+    - role: jupyter
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: install.jupyter == true
+  tasks:
+  - name: Jupyter Server Details
+      debug:
+        msg: |
+          To access Jupyter Notebook, run the following command in your terminal:
+             kubectl port-forward svc/{{ service_name }} -n {{ namespace }} 8888:80
+           Then open http://localhost:8888/ in your browser.
+          If prompted for a token, use: {{ jupyter_token }}
+      when: install.jupyter == true

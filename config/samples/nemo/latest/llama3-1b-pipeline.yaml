@@ -1,3 +1,4 @@
+---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
@@ -19,7 +20,6 @@ spec:
       volumeAccessMode: ReadWriteOnce
 
 ---
-
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMPipeline
 metadata:
@@ -38,8 +38,6 @@ spec:
             value: "16"
           - name: NIM_MAX_GPU_LORAS
             value: "8"
-          - name: ENTITY_STORE_URL
-            value: http://nemoentitystore-sample.nemo.svc.cluster.local:8000
           - name: NIM_GUIDED_DECODING_BACKEND
             value: fast_outlines
         image:

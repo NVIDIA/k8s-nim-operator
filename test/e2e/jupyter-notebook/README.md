@@ -1,13 +1,12 @@
 # nemo-data-flywheel-tutorials
 
-Tutorials for NeMo Microservices (MS) Data Flywheel, which includes examples for using the NeMo MS Data Store, Entity Store, Customizer, Evaluator, Guardrails, and NVIDIA NIMs.
+Tutorials for NeMo Microservices (MS) Data Flywheel, including examples for using the NeMo MS Data Store, Entity Store, Customizer, Evaluator, Guardrails, and NVIDIA NIMs.
 
-## Prerequisites
-1. Deploy the NIM operator and NeMo Training Operator. Create CRs for requried NeMo Microservices and the NIM pipeline using the manifests from `manifests` folder.
+## 1. Steps to run the notebook
 
+1. Update Notebook Config
+Update the `test/e2e/jupyter-notebook/config.py` file with the following values:
 
-## 1. Update Config
-Update the config.py file with the following values:
 ```python
 NDS_URL = "http://nemodatastore-sample.nemo.svc.cluster.local:8000" # Data Store
 ENTITY_STORE_URL = "http://nemoentitystore-sample.nemo.svc.cluster.local:8000" # Entity Store
@@ -19,33 +18,44 @@ HF_TOKEN = "<your-huggingface-token>"
 BASE_MODEL = "meta/llama-3.2-1b-instruct"
 ```
 
-## 2. Bring up the Jupyter notebook
-Create a virtual environment. This is recommended to isolate project dependencies.
+2. **Install the NeMo Dependencies Ansible playbook** that deploys the Jupyter server with all required NeMo dependencies enabled in `values.yaml`.
 
-```bash
-python3 -m venv nemo_env
-source nemo_env/bin/activate
+``` yaml
+install:
+  customizer: yes
+  datastore: yes
+  entity_store: yes
+  evaluator: yes
+  jupyter: yes
 ```
 
-Install the required Python packages using requirements.txt.
+3. **Deploy the NeMo Training Operator**
 
 ```bash
-pip install -r requirements.txt
+kubectl create ns nemo-operator
+kubectl create secret -n nemo-operator docker-registry ngc-secret \
+  --docker-server=nvcr.io \
+  --docker-username='$oauthtoken' \
+  --docker-password=<ngc-api-key>
 ```
 
-Start the Jupyter lab server on your NIM cluster.
 ```bash
-jupyter lab --ip 0.0.0.0 --port=8888 --allow-root
+helm fetch https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nemo-operator-25.4.0.tgz --username='$oauthtoken' --password=<YOUR NGC API KEY>
+helm install nemo-operator-25.4.0.tgz -n nemo-operator --set imagePullSecrets[0].name=ngc-secret --set controllerManager.manager.scheduler=volcano
 ```
 
-## 3. Access the remote Jupyter notebook
+4. **Create Custom Resources (CRs) for all NeMo and NIM samples** from `config/samples/nemo/latest` folder.
 
-**On your client machine**
-
-SSH tunnel to forward traffic from Jupyter server on your NIM cluster to your local machine
 ```bash
-ssh -N -f -L localhost:8888:localhost:8888 <your-nim-cluster-username>@<your-nim-cluster-ip>
+kubectl apply -f config/samples/nemo/latest
 ```
 
-Access the Jupyter lab on localhost:8888 in your browser. Paste in the token from the Jupyter server output for authentication.
+5. Access your jupyter server
 
+Once the Ansible playbook has completed, the Jupyter server will be running in your cluster.
+
+To access the Jupyter notebook, use `kubectl port-forward` from your local machine and launch using http://localhost:8888
+
+```bash
+kubectl port-forward svc/jupyter-service -n nemo 8888:8888
+```

@@ -1,0 +1,38 @@
+proxy:
+  secretToken: "{{ jupyter_token }}"
+
+singleuser:
+  image:
+    name: "{{ jupyter_image }}"
+    tag: "{{ jupyter_tag }}"
+  storage:
+    dynamic:
+      storageClass: {{ '"local-path"' if localPathProvisioner.enabled else pvc.storage_class | to_json }}
+    capacity: "{{ storage_size }}"
+    homeMountPath: /home/shiva/work
+  extraInitContainers:
+    - name: copy-notebook
+      image: busybox
+      command: ["sh", "-c", "cp /notebooks/* /home/shiva/work/"]
+      volumeMounts:
+        - name: home
+          mountPath: /home/shiva/work
+        - name: notebook-src
+          mountPath: /notebooks
+  extraVolumes:
+    - name: notebook-src
+      configMap:
+        name: notebook-config
+  extraVolumeMounts:
+    - name: notebook-src
+      mountPath: /notebooks
+
+hub:
+  db:
+    type: sqlite-pvc
+
+rbac:
+  enabled: true
+
+service:
+  type: ClusterIP
