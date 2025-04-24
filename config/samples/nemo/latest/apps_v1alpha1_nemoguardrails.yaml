@@ -13,8 +13,7 @@ spec:
       volumeAccessMode: ReadWriteOnce
       size: "1Gi"
   nimEndpoint:
-    baseURL: "https://integrate.api.nvidia.com/v1"
-    apiKeySecret: "nim-api-key"
+    baseURL: "http://meta-llama3-1b-instruct.nemo.svc.cluster.local:8000/v1"
   expose:
     service:
       type: ClusterIP
