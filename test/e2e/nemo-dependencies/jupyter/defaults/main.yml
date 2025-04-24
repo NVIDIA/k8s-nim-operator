@@ -1,0 +1,12 @@
+---
+# defaults file for jupyter server
+namespace: jupyter
+jupyter_token: token
+storage_size: 5Gi
+notebook_file: "{{ playbook_dir }}/../jupyter-notebook/e2e-notebook.ipynb"
+config_file: "{{ playbook_dir }}/../jupyter-notebook/config.py"
+helm_release_name: jupyterhub
+service_name: proxy-public  # JupyterHub's main service for user access
+jupyter_image: jupyter/base-notebook
+jupyter_tag: latest
+node_port: 30036

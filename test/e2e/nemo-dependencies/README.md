@@ -30,6 +30,7 @@ install:
   datastore: no
   entity_store: no
   evaluator: yes
+  jupyter: no
 ```
 
 `NOTE:` If a default storage class is already provisioned in the cluster, then explicitly disable the local-path-provisioner
@@ -68,6 +69,7 @@ uninstall:
   datastore: no
   entity_store: no
   evaluator: yes
+  jupyter: no
 ```
 
 Run the Anisble Playbook command to uninstall the NeMo services

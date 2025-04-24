@@ -1,0 +1,5 @@
+---
+# tasks file for jupyter server
+- include_tasks: namespace.yaml
+- include_tasks: jupyter.yaml
+

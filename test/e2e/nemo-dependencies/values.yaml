@@ -3,12 +3,14 @@ install:
   datastore: yes
   entity_store: yes
   evaluator: yes
+  jupyter: yes
 
 uninstall:
   customizer: yes
   datastore: yes
   entity_store: yes
   evaluator: yes
+  jupyter: yes
 
 installation_namespace: nemo
 
