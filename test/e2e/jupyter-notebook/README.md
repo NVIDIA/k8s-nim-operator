@@ -18,6 +18,7 @@ HF_TOKEN = "<your-huggingface-token>"
 BASE_MODEL = "meta/llama-3.2-1b-instruct"
 ```
 
+If you are already done steps in QuickStart guide, you can skip steps 2-4
 2. **Install the NeMo Dependencies Ansible playbook** that deploys the Jupyter server with all required NeMo dependencies enabled in `values.yaml`.
 
 ``` yaml
@@ -54,8 +55,11 @@ kubectl apply -f config/samples/nemo/latest
 
 Once the Ansible playbook has completed, the Jupyter server will be running in your cluster.
 
-To access the Jupyter notebook, use `kubectl port-forward` from your local machine and launch using http://localhost:8888
+To access the Jupyter notebook, use `kubectl port-forward` from your local machine and launch using http://localhost:8888. The token is "token"
 
 ```bash
 kubectl port-forward svc/jupyter-service -n nemo 8888:8888
 ```
+5. Access your notebook
+
+The notebook is under work directory.
