@@ -19,6 +19,7 @@ BASE_MODEL = "meta/llama-3.2-1b-instruct"
 ```
 
 **NOTE:** if you have are already gone through steps in the QuickStart guide, you can skip steps 2-4
+
 2. **Install the NeMo Dependencies Ansible playbook** that deploys the Jupyter server with all required NeMo dependencies enabled in `values.yaml`.
 
 ``` yaml
