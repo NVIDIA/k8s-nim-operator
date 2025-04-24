@@ -9,9 +9,8 @@ spec:
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
-  env:
-    - name: BASE_URL_DATASTORE
-      value: http://nemodatastore-test.{TEST_NAMESPACE}:3000
+  datastore:
+    endpoint: http://nemodatastore-test.{TEST_NAMESPACE}:3000
   expose:
     service:
       port: 8000

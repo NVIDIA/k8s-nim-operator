@@ -148,6 +148,9 @@ var _ = Describe("NemoEntitystore Controller", func() {
 					Port:         5432,
 					DatabaseName: "esdb",
 				},
+				Datastore: appsv1alpha1.Datastore{
+					Endpoint: "http://nemo-datastore:8000",
+				},
 				Replicas: 1,
 				Resources: &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
@@ -465,6 +468,9 @@ var _ = Describe("NemoEntitystore Controller", func() {
 							User:       "test-pg-user",
 							SecretName: "test-pg-secret",
 						},
+					},
+					Datastore: appsv1alpha1.Datastore{
+						Endpoint: "http://nemo-datastore:8000",
 					},
 				},
 			}
