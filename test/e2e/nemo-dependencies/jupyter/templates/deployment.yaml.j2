@@ -13,6 +13,20 @@ spec:
       labels:
         app: jupyter-notebook
     spec:
+      initContainers:
+        - name: copy-notebook-config
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              cp /config/{{ config_name }} /work/{{ config_name }}
+              cp /config/{{ notebook_name }} /work/{{ notebook_name }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+            - name: notebook-storage
+              mountPath: /work
       containers:
         - name: jupyter
           image: jupyter/base-notebook:latest
@@ -24,12 +38,6 @@ spec:
           volumeMounts:
             - name: notebook-storage
               mountPath: {{ mount_path }}
-            - name: config-volume
-              mountPath: "{{ mount_path }}/{{ config_name }}"
-              subPath: "{{ config_name }}"
-            - name: config-volume
-              mountPath: "{{ mount_path }}/{{ notebook_name }}"
-              subPath: "{{ notebook_name }}"
       volumes:
         - name: notebook-storage
           persistentVolumeClaim:
