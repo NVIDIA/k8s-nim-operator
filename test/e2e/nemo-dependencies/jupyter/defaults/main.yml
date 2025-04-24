@@ -2,11 +2,13 @@
 # defaults file for jupyter server
 namespace: jupyter
 jupyter_token: token
+notebook_file: "{{ lookup('pipe', 'realpath ../jupyter-notebook/e2e-notebook.ipynb') }}"
+config_file: "{{ lookup('pipe', 'realpath ../jupyter-notebook/config.py') }}"
+notebook_name: e2e-notebook.ipynb
+config_name: config.py
 storage_size: 5Gi
-notebook_file: "{{ playbook_dir }}/../jupyter-notebook/e2e-notebook.ipynb"
-config_file: "{{ playbook_dir }}/../jupyter-notebook/config.py"
-helm_release_name: jupyterhub
-service_name: proxy-public  # JupyterHub's main service for user access
-jupyter_image: jupyter/base-notebook
-jupyter_tag: latest
 node_port: 30036
+pvc_name: jupyter-pvc
+deployment_name: jupyter-notebook
+service_name: jupyter-service
+mount_path: /home/jovyan/work

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ pvc_name }}
+  namespace: {{ namespace }}
+spec:
+  storageClassName: {{ '"local-path"' if localPathProvisioner.enabled else pvc.storage_class | to_json }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ storage_size }}

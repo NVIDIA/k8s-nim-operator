@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notebook-config
+  namespace: {{ namespace }}
+data:
+  {{ config_name }}: |-
+    {{ lookup('file', config_file) | indent(4) }}
+  {{ notebook_name }}: |-
+    {{ lookup('file', notebook_file) | indent(4) }}
