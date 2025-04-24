@@ -74,3 +74,15 @@
         - "Evaluator Milvus Password: {{ milvus.password }}"
         - "Evaluator Milvus Username: {{ milvus.username }}"
     when: install.evaluator == true
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  roles:
+    - role: jupyter
+      when: install.jupyter == true
+  tasks:
+    - name: Jupyter Install Details
+      debug:
+        msg:
+          - "Jupyter Installed"
+      when: install.jupyter == true

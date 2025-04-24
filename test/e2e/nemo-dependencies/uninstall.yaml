@@ -45,3 +45,13 @@
       vars:
         namespace: "{{ installation_namespace }}"
       when: uninstall.evaluator == true
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  tasks:
+    - name: Uninstall Jupyter
+      include_role:
+        name: jupyter
+        tasks_from: uninstall.yaml
+      when: uninstall.jupyter == true

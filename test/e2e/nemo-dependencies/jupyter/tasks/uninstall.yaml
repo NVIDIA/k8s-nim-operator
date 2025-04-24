@@ -1,0 +1,8 @@
+- name: check if Evaluator is installed
+  shell: helm list -n {{ namespace }} | grep 'jupyter' | awk '{print $1}' | wc -l | tr -d '\n'
+  register: jupyter_installed
+  ignore_errors: true
+
+- name: Uninstall Evaluator helm charts
+  shell: helm list -n {{ namespace }} | awk '{print $1}' | grep -v NAME | egrep 'jupyter' | xargs helm del -n {{ namespace }}
+  ignore_errors: true

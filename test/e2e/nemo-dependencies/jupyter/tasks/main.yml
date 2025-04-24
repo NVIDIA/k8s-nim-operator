@@ -1,0 +1,4 @@
+---
+# tasks file for jupyter
+- include_tasks: namespace.yaml
+- include_tasks: deploy_jupyterhub.yaml

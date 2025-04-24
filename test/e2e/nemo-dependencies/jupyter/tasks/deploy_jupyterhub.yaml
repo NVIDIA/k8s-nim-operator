@@ -1,0 +1,49 @@
+#deploy_jupyterhub.yaml
+    - name: Ensure jupyterhub Helm repo is added
+      ansible.builtin.command:
+        cmd: helm repo add {{ helm_repo_name }} {{ helm_repo_url }}
+      register: helm_repo_add
+      changed_when: "'\"has been added\"' in helm_repo_add.stdout or '\"already exists\"' in helm_repo_add.stderr"
+
+    - name: Update Helm repos
+      ansible.builtin.command:
+        cmd: helm repo update
+
+    - name: Create values.yaml file
+      ansible.builtin.copy:
+        dest: "{{ jupyter_values_file }}"
+        content: |
+          proxy:
+            secretToken: "{{ lookup('password', '/dev/null length=64 chars=hex') }}"
+          singleuser:
+            image:
+              name: jupyter/scipy-notebook
+              tag: latest
+            storage:
+              type: dynamic
+              extraVolumeMounts: []
+              extraVolumes: []
+          hub:
+            config:
+              JupyterHub:
+                authenticator_class: dummy
+              DummyAuthenticator:
+                password: "password"
+
+ #   - name: Install JupyterHub via Helm
+ #     kubernetes.core.helm:
+ #       name: "{{ release_name }}"
+ #       chart_ref: "{{ helm_repo_name }}/jupyterhub"
+ #       release_namespace: "{{ namespace }}"
+ #       create_namespace: false
+ #       values_files:
+ #         - "{{ jupyter_values_file }}"
+
+    - name: Install JupyterHub Helm chart
+      shell: >
+        helm upgrade --install {{ release_name }}
+        {{ helm_repo_name }}/jupyterhub
+        --namespace {{ namespace }}
+        --values "{{ jupyter_values_file }}"
+      register: helm_install_result
+      changed_when: "'STATUS: deployed' in helm_install_result.stdout"

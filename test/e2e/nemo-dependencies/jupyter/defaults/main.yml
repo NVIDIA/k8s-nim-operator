@@ -1,0 +1,7 @@
+---
+# defaults file for jupyter
+namespace: jupyter
+release_name: jupyter
+helm_repo_name: jupyterhub
+helm_repo_url: https://jupyterhub.github.io/helm-chart/
+jupyter_values_file: /tmp/jupyter_values.yaml
