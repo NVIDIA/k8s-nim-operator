@@ -82,6 +82,7 @@ build:
 		$(DOCKER_BUILD_OPTIONS) \
 		$(DOCKER_BUILD_PLATFORM_OPTIONS) \
 		$(foreach tag,$(IMAGE_EXTRA_TAGS),-t $(tag)) \
+		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
 		-f $(DOCKERFILE) \
