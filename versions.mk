@@ -20,10 +20,10 @@
 MODULE_NAME := k8s-nim-operator
 MODULE := github.com/NVIDIA/$(MODULE_NAME)
 
-REGISTRY ?= nvcr.io/nvidia
+REGISTRY ?= nvcr.io/nvidia/cloud-native
 
-VERSION ?= v1.0.0
+VERSION ?= v2.0.0
 
-GOLANG_VERSION ?= 1.22.2
+GOLANG_VERSION ?= 1.24.2
 
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")
