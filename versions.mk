@@ -20,7 +20,7 @@
 MODULE_NAME := k8s-nim-operator
 MODULE := github.com/NVIDIA/$(MODULE_NAME)
 
-REGISTRY ?= nvcr.io/nvidia/cloud-native
+REGISTRY ?= ghcr.io/nvidia
 
 VERSION ?= v2.0.0
 
