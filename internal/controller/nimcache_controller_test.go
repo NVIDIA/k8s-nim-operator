@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -343,8 +344,13 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
 					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+					Resources: appsv1alpha1.Resources{
+						CPU:    resource.MustParse("250m"),
+						Memory: resource.MustParse("256Mi"),
+					},
 				},
 			}
+
 			pod := constructPodSpec(nimCache, k8sutil.K8s)
 			Expect(pod.Name).To(Equal(getPodName(nimCache)))
 			Expect(pod.Spec.Containers[0].Image).To(Equal("nvcr.io/nim:test"))
@@ -353,6 +359,12 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(*pod.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
 			Expect(*pod.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(pod.Spec.NodeSelector["feature.node.kubernetes.io/pci-10de.present"]).To(Equal("true"))
+			// Add resource checks
+			resources := pod.Spec.Containers[0].Resources
+			Expect(resources.Requests.Cpu().String()).To(Equal("250m"))
+			Expect(resources.Requests.Memory().String()).To(Equal("256Mi"))
+			Expect(resources.Limits.Cpu().String()).To(Equal("250m"))
+			Expect(resources.Limits.Memory().String()).To(Equal("256Mi"))
 		})
 
 		It("should construct a pod with runtime class and node selector", func() {
