@@ -1,7 +1,7 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  name: nim-operator-certified.v0.1.0
+  name: nim-operator-certified.v2.0.0
   namespace: placeholder
   labels:
     operatorframework.io/arch.amd64: supported
@@ -176,9 +176,9 @@ spec:
     * Install NVIDIA GPU Operator 
     * Install CSI Driver or Local Path Provision 
     * Create necessary ImagePullSecret and NGC Auth Secrets
-  maturity: alpha
-  version: 0.1.0
-  replaces: ''
+  maturity: stable
+  version: 2.0.0
+  replaces: 'nim-operator-certified.v1.0.1'
   skips: []
   minKubeVersion: 1.26.0
   keywords: []
