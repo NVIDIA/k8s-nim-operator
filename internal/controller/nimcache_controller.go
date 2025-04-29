@@ -967,6 +967,16 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 						RunAsGroup:   nimCache.GetGroupID(),
 						RunAsUser:    nimCache.GetUserID(),
 					},
+					Resources: corev1.ResourceRequirements{
+						Limits: map[corev1.ResourceName]apiResource.Quantity{
+							"cpu":    nimCache.Spec.Resources.CPU,
+							"memory": nimCache.Spec.Resources.Memory,
+						},
+						Requests: map[corev1.ResourceName]apiResource.Quantity{
+							"cpu":    nimCache.Spec.Resources.CPU,
+							"memory": nimCache.Spec.Resources.Memory,
+						},
+					},
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
@@ -1116,6 +1126,16 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						Name:      "nim-cache-volume",
 						MountPath: "/output",
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
+					},
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: map[corev1.ResourceName]apiResource.Quantity{
+						"cpu":    nimCache.Spec.Resources.CPU,
+						"memory": nimCache.Spec.Resources.Memory,
+					},
+					Requests: map[corev1.ResourceName]apiResource.Quantity{
+						"cpu":    nimCache.Spec.Resources.CPU,
+						"memory": nimCache.Spec.Resources.Memory,
 					},
 				},
 				SecurityContext: &corev1.SecurityContext{
