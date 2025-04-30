@@ -47,7 +47,7 @@ make deploy IMG=<your-private-registry>/k8s-nim-operator:<tag>
 privileges or be logged in as admin.
 > Ensure that the samples have default values.
 
-### Deploying Sample `NIMCache` and `NIMService` Resources
+### Deploying Sample `NIMCache`, `NIMService`, `NIMPipeline`, `NemoCustomizer`, `NemoEvaluator` and `NemoGuardrail` Resources
 
 Follow the guides in the [docs](https://docs.nvidia.com/nim-operator/latest) to deploy sample CR instances.
 
