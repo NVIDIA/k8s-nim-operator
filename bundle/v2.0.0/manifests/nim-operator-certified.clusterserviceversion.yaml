@@ -198,10 +198,10 @@ metadata:
               "endpoint": "http://mlflow-tracking.nemo.svc.cluster.local:80"
             },
             "nemoDatastoreTools": {
-              "image": "nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04"
+              "image": "nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli@sha256:f3119e9b1555f106968b8594bebd344d6e97381728a75df900a52c7e328d721e"
             },
             "modelDownloadJobs": {
-              "image": "nvcr.io/nvidia/nemo-microservices/customizer-api:25.04",
+              "image": "nvcr.io/nvidia/nemo-microservices/customizer-api@sha256:1c896fbd865eeac2eab88d784f67522dc61f811efe58d48ae95de9f6251640a5",
               "ngcAPISecret": {
                 "name": "ngc-api-secret",
                 "key": "NGC_API_KEY"
@@ -316,13 +316,13 @@ metadata:
           },
           "spec": {
             "evaluationImages": {
-              "bigcodeEvalHarness": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-bigcode:0.12.13",
-              "lmEvalHarness": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-lm-eval-harness:0.12.15",
-              "similarityMetrics": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-custom-eval:0.12.13",
-              "llmAsJudge": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.15",
-              "mtBench": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.15",
-              "retriever": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-retriever:0.12.13",
-              "rag": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-rag:0.12.13"
+              "bigcodeEvalHarness": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-bigcode@sha256:b802c5344bc2ca4fd100be555e647ba5be0c7a852b5e5f371037f4faeb12217d",
+              "lmEvalHarness": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-lm-eval-harness@sha256:1b6514520ca6af26de70dbd269d89d27559cc6520c43f87bacf9a501d0ae7a2f",
+              "similarityMetrics": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-custom-eval@sha256:5bf3dc569d6318be24fe88bc5527a46541e28378cdd14699284c41b27c9ca597",
+              "llmAsJudge": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge@sha256:1ee1808bd690435c5ea50c9ceb7bfe9c1cf1f1bec584069d89ddafdf141687a4",
+              "mtBench": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge@1ee1808bd690435c5ea50c9ceb7bfe9c1cf1f1bec584069d89ddafdf141687a4",
+              "retriever": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-retriever@sha256:442cbd23cf6a0cb656ce8a817bae9886aec991343d3cfff5bcb0c0bae7cc0a9e",
+              "rag": "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-rag@sha256:fb095172dc9cc831fab48b28934b8e527af3bd092109997df9f189d5eeddb6a0"
             },
             "image": {
               "repository": "nvcr.io/nvidia/nemo-microservices/evaluator",
@@ -465,7 +465,7 @@ metadata:
     createdAt: 'Tue Apr 29 21:14:50 PDT 2025'
     description: >-
       An Operator for deployment and maintenance of NVIDIA NIMs and NeMo microservices in a Kubernetes environment
-    containerImage: 'ghcr.io/nvidia/k8s-nim-operator:release-2.0'
+    containerImage: 'nvcr.io/nvidia/cloud-native/k8s-nim-operator@sha256:876620620fc31d171021c15fc67606ef9f47fab80e734d46af0af328de8da7fb'
     support: NVIDIA
     capabilities: Basic Install
     repository: github.com/NVIDIA/k8s-nim-operator
@@ -1285,7 +1285,7 @@ spec:
                           fieldRef:
                             apiVersion: v1
                             fieldPath: metadata.namespace
-                    image: 'ghcr.io/nvidia/k8s-nim-operator:release-2.0'
+                    image: 'nvcr.io/nvidia/cloud-native/k8s-nim-operator@sha256:876620620fc31d171021c15fc67606ef9f47fab80e734d46af0af328de8da7fb'
                     imagePullPolicy: Always
                     livenessProbe:
                       failureThreshold: 3
