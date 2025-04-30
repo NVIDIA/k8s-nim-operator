@@ -6,10 +6,10 @@ metadata:
 spec:
   evaluationImages:
     bigcodeEvalHarness: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-bigcode:0.12.13"
-    lmEvalHarness: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-lm-eval-harness:0.12.13"
+    lmEvalHarness: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-lm-eval-harness:0.12.15"
     similarityMetrics: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-custom-eval:0.12.13"
-    llmAsJudge: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.13"
-    mtBench: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.13"
+    llmAsJudge: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.15"
+    mtBench: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.15"
     retriever: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-retriever:0.12.13"
     rag: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-rag:0.12.13"
   image:
