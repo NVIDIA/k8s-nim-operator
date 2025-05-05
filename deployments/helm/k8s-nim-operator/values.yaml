@@ -3,7 +3,7 @@ operator:
   upgradeCRD: true
   image:
     repository: ghcr.io/nvidia/k8s-nim-operator
-    tag: main
+    tag: release-2.0
     pullSecrets: []
     pullPolicy: Always
   args:
