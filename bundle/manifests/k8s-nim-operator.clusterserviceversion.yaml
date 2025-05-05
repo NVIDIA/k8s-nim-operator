@@ -152,7 +152,7 @@ metadata:
     createdAt: 'Fri Sep 27 08:33:17 PDT 2024'
     description: >-
       An Operator for deployment and maintenance of NVIDIA NIMs and NeMo microservices in a Kubernetes environment
-    containerImage: 'ghcr.io/nvidia/k8s-nim-operator:main'
+    containerImage: 'ghcr.io/nvidia/k8s-nim-operator:release-2.0'
     support: NVIDIA
     capabilities: Basic Install
     repository: github.com/NVIDIA/k8s-nim-operator
@@ -938,7 +938,7 @@ spec:
                           fieldRef:
                             apiVersion: v1
                             fieldPath: metadata.namespace
-                    image: 'ghcr.io/nvidia/k8s-nim-operator:main'
+                    image: 'ghcr.io/nvidia/k8s-nim-operator:release-2.0'
                     imagePullPolicy: Always
                     livenessProbe:
                       failureThreshold: 3
