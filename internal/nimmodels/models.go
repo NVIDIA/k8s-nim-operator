@@ -71,7 +71,12 @@ func ListModelsV1(ctx context.Context, nimServiceEndpoint string) (*ModelsV1List
 		logger.Error(err, "Failed to make request for models endpoint", "url", modelsURL)
 		return nil, err
 	}
-	defer modelsResp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			logger.Error(err, "Failed to close response body", "url", modelsURL)
+		}
+	}(modelsResp.Body)
 
 	modelsData, err := io.ReadAll(modelsResp.Body)
 	if err != nil {

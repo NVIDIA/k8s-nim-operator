@@ -21,7 +21,6 @@ import (
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -203,7 +202,7 @@ const (
 )
 
 // EnvFromSecrets return the list of secrets that should be mounted as env vars
-func (s *NIMSource) EnvFromSecrets() []v1.EnvFromSource {
+func (s *NIMSource) EnvFromSecrets() []corev1.EnvFromSource {
 	if s.NGC != nil && s.NGC.AuthSecret != "" {
 		return []corev1.EnvFromSource{
 			{
