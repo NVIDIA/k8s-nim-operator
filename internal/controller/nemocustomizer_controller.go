@@ -131,7 +131,7 @@ func (r *NemoCustomizerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	logger.Info("Reconciling", "NemoCustomizer", NemoCustomizer.Name)
 
 	// Check if the instance is marked for deletion
-	if NemoCustomizer.ObjectMeta.DeletionTimestamp.IsZero() {
+	if NemoCustomizer.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(NemoCustomizer, NemoCustomizerFinalizer) {
 			controllerutil.AddFinalizer(NemoCustomizer, NemoCustomizerFinalizer)
@@ -163,7 +163,7 @@ func (r *NemoCustomizerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Fetch container orchestrator type
 	_, err := r.GetOrchestratorType()
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
 
 	// Handle platform-specific reconciliation
@@ -221,7 +221,7 @@ func (r *NemoCustomizerReconciler) GetOrchestratorType() (k8sutil.OrchestratorTy
 	if r.orchestratorType == "" {
 		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
 		if err != nil {
-			return k8sutil.Unknown, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+			return k8sutil.Unknown, fmt.Errorf("unable to get container orchestrator type, %v", err)
 		}
 		r.orchestratorType = orchestratorType
 		r.GetLogger().Info("Container orchestrator is successfully set", "type", orchestratorType)
@@ -268,7 +268,7 @@ func (r *NemoCustomizerReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
 	// List all customizer instances
 	NemoCustomizerList := &appsv1alpha1.NemoCustomizerList{}
-	err := r.Client.List(ctx, NemoCustomizerList, &client.ListOptions{})
+	err := r.List(ctx, NemoCustomizerList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list NemoCustomizers in the cluster")
 		return

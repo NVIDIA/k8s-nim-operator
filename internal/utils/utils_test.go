@@ -78,7 +78,10 @@ func TestGetFilesWithSuffix(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
-		f.Close()
+		err = f.Close()
+		if err != nil {
+			t.Fatalf("Failed to close test file: %v", err)
+		}
 	}
 
 	files, err := GetFilesWithSuffix(dir, ".txt", ".yaml")

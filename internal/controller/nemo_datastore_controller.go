@@ -121,7 +121,7 @@ func (r *NemoDatastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger.Info("Reconciling", "NemoDatastore", NemoDatastore.Name)
 
 	// Check if the instance is marked for deletion
-	if NemoDatastore.ObjectMeta.DeletionTimestamp.IsZero() {
+	if NemoDatastore.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(NemoDatastore, NemoDatastoreFinalizer) {
 			controllerutil.AddFinalizer(NemoDatastore, NemoDatastoreFinalizer)
@@ -153,7 +153,7 @@ func (r *NemoDatastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// Fetch container orchestrator type
 	_, err := r.GetOrchestratorType()
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
 
 	// Handle platform-specific reconciliation
@@ -211,7 +211,7 @@ func (r *NemoDatastoreReconciler) GetOrchestratorType() (k8sutil.OrchestratorTyp
 	if r.orchestratorType == "" {
 		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
 		if err != nil {
-			return k8sutil.Unknown, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+			return k8sutil.Unknown, fmt.Errorf("unable to get container orchestrator type, %v", err)
 		}
 		r.orchestratorType = orchestratorType
 		r.GetLogger().Info("Container orchestrator is successfully set", "type", orchestratorType)
@@ -257,7 +257,7 @@ func (r *NemoDatastoreReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
 	// List all datastore instances
 	NemoDatastoreList := &appsv1alpha1.NemoDatastoreList{}
-	err := r.Client.List(ctx, NemoDatastoreList, &client.ListOptions{})
+	err := r.List(ctx, NemoDatastoreList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list NemoDatastores in the cluster")
 		return

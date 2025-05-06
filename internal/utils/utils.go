@@ -294,7 +294,7 @@ func FormatEndpoint(ip string, port int32) string {
 func DeepHashObject(objToWrite any) string {
 	hasher := fnv.New32a()
 	hasher.Reset()
-	fmt.Fprintf(hasher, "%v", dump.ForHash(objToWrite))
+	_, _ = fmt.Fprintf(hasher, "%v", dump.ForHash(objToWrite))
 	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
 }
 

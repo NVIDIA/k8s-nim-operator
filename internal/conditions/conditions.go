@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,7 +110,7 @@ func (u *updater) SetConditionsReadyNIMService(ctx context.Context, cr *appsv1al
 		Status: metav1.ConditionFalse,
 		Reason: Ready,
 	})
-	cr.Status.State = v1alpha1.NIMServiceStatusReady
+	cr.Status.State = appsv1alpha1.NIMServiceStatusReady
 	return u.updateNIMServiceStatus(ctx, cr)
 }
 
@@ -128,7 +127,7 @@ func (u *updater) SetConditionsReadyNemoGuardrail(ctx context.Context, cr *appsv
 		Status: metav1.ConditionFalse,
 		Reason: Ready,
 	})
-	cr.Status.State = v1alpha1.NemoGuardrailStatusReady
+	cr.Status.State = appsv1alpha1.NemoGuardrailStatusReady
 	return u.updateNemoGuardrailStatus(ctx, cr)
 }
 
@@ -145,7 +144,7 @@ func (u *updater) SetConditionsReadyNemoEntitystore(ctx context.Context, cr *app
 		Status: metav1.ConditionFalse,
 		Reason: Ready,
 	})
-	cr.Status.State = v1alpha1.NemoEntitystoreStatusReady
+	cr.Status.State = appsv1alpha1.NemoEntitystoreStatusReady
 	return u.updateNemoEntitystoreStatus(ctx, cr)
 }
 
@@ -162,7 +161,7 @@ func (u *updater) SetConditionsReadyNemoDatastore(ctx context.Context, cr *appsv
 		Status: metav1.ConditionFalse,
 		Reason: Ready,
 	})
-	cr.Status.State = v1alpha1.NemoDatastoreStatusReady
+	cr.Status.State = appsv1alpha1.NemoDatastoreStatusReady
 	return u.updateNemoDatastoreStatus(ctx, cr)
 }
 
@@ -179,7 +178,7 @@ func (u *updater) SetConditionsReadyNemoCustomizer(ctx context.Context, cr *apps
 		Status: metav1.ConditionFalse,
 		Reason: Ready,
 	})
-	cr.Status.State = v1alpha1.NemoCustomizerStatusReady
+	cr.Status.State = appsv1alpha1.NemoCustomizerStatusReady
 	return u.updateNemoCustomizerStatus(ctx, cr)
 }
 
@@ -196,7 +195,7 @@ func (u *updater) SetConditionsReadyNemoEvaluator(ctx context.Context, cr *appsv
 		Status: metav1.ConditionFalse,
 		Reason: Ready,
 	})
-	cr.Status.State = v1alpha1.NemoEvaluatorStatusReady
+	cr.Status.State = appsv1alpha1.NemoEvaluatorStatusReady
 	return u.updateNemoEvaluatorStatus(ctx, cr)
 }
 
@@ -233,7 +232,7 @@ func (u *updater) SetConditionsNotReadyNIMService(ctx context.Context, cr *appsv
 		Reason:  Ready,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NIMServiceStatusNotReady
+	cr.Status.State = appsv1alpha1.NIMServiceStatusNotReady
 	return u.updateNIMServiceStatus(ctx, cr)
 }
 
@@ -251,7 +250,7 @@ func (u *updater) SetConditionsNotReadyNemoGuardrail(ctx context.Context, cr *ap
 		Reason:  Ready,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoGuardrailStatusNotReady
+	cr.Status.State = appsv1alpha1.NemoGuardrailStatusNotReady
 	return u.updateNemoGuardrailStatus(ctx, cr)
 }
 
@@ -269,7 +268,7 @@ func (u *updater) SetConditionsNotReadyNemoEntitystore(ctx context.Context, cr *
 		Reason:  Ready,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoEntitystoreStatusNotReady
+	cr.Status.State = appsv1alpha1.NemoEntitystoreStatusNotReady
 	return u.updateNemoEntitystoreStatus(ctx, cr)
 }
 
@@ -287,7 +286,7 @@ func (u *updater) SetConditionsNotReadyNemoDatastore(ctx context.Context, cr *ap
 		Reason:  Ready,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoDatastoreStatusNotReady
+	cr.Status.State = appsv1alpha1.NemoDatastoreStatusNotReady
 	return u.updateNemoDatastoreStatus(ctx, cr)
 }
 
@@ -305,7 +304,7 @@ func (u *updater) SetConditionsNotReadyNemoCustomizer(ctx context.Context, cr *a
 		Reason:  Ready,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoCustomizerStatusNotReady
+	cr.Status.State = appsv1alpha1.NemoCustomizerStatusNotReady
 	return u.updateNemoCustomizerStatus(ctx, cr)
 }
 
@@ -323,7 +322,7 @@ func (u *updater) SetConditionsNotReadyNemoEvaluator(ctx context.Context, cr *ap
 		Reason:  Ready,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoEvaluatorStatusNotReady
+	cr.Status.State = appsv1alpha1.NemoEvaluatorStatusNotReady
 	return u.updateNemoEvaluatorStatus(ctx, cr)
 }
 
@@ -359,7 +358,7 @@ func (u *updater) SetConditionsFailedNIMService(ctx context.Context, cr *appsv1a
 		Reason:  reason,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NIMServiceStatusFailed
+	cr.Status.State = appsv1alpha1.NIMServiceStatusFailed
 	return u.updateNIMServiceStatus(ctx, cr)
 }
 
@@ -376,7 +375,7 @@ func (u *updater) SetConditionsFailedNemoGuardrail(ctx context.Context, cr *apps
 		Reason:  reason,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoGuardrailStatusFailed
+	cr.Status.State = appsv1alpha1.NemoGuardrailStatusFailed
 	return u.updateNemoGuardrailStatus(ctx, cr)
 }
 
@@ -393,7 +392,7 @@ func (u *updater) SetConditionsFailedNemoEntitystore(ctx context.Context, cr *ap
 		Reason:  reason,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoEntitystoreStatusFailed
+	cr.Status.State = appsv1alpha1.NemoEntitystoreStatusFailed
 	return u.updateNemoEntitystoreStatus(ctx, cr)
 }
 
@@ -410,7 +409,7 @@ func (u *updater) SetConditionsFailedNemoDatastore(ctx context.Context, cr *apps
 		Reason:  reason,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoDatastoreStatusFailed
+	cr.Status.State = appsv1alpha1.NemoDatastoreStatusFailed
 	return u.updateNemoDatastoreStatus(ctx, cr)
 }
 
@@ -427,7 +426,7 @@ func (u *updater) SetConditionsFailedNemoCustomizer(ctx context.Context, cr *app
 		Reason:  reason,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoCustomizerStatusFailed
+	cr.Status.State = appsv1alpha1.NemoCustomizerStatusFailed
 	return u.updateNemoCustomizerStatus(ctx, cr)
 }
 
@@ -444,7 +443,7 @@ func (u *updater) SetConditionsFailedNemoEvaluator(ctx context.Context, cr *apps
 		Reason:  reason,
 		Message: message,
 	})
-	cr.Status.State = v1alpha1.NemoEvaluatorStatusFailed
+	cr.Status.State = appsv1alpha1.NemoEvaluatorStatusFailed
 	return u.updateNemoEvaluatorStatus(ctx, cr)
 }
 

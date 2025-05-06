@@ -119,7 +119,7 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger.Info("Reconciling", "NIMService", nimService.Name)
 
 	// Check if the instance is marked for deletion
-	if nimService.ObjectMeta.DeletionTimestamp.IsZero() {
+	if nimService.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
 			controllerutil.AddFinalizer(nimService, NIMServiceFinalizer)
@@ -151,7 +151,7 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Fetch container orchestrator type
 	_, err := r.GetOrchestratorType()
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
 
 	// Handle platform-specific reconciliation
@@ -204,7 +204,7 @@ func (r *NIMServiceReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, 
 	if r.orchestratorType == "" {
 		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
 		if err != nil {
-			return k8sutil.Unknown, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+			return k8sutil.Unknown, fmt.Errorf("unable to get container orchestrator type, %v", err)
 		}
 		r.orchestratorType = orchestratorType
 		r.GetLogger().Info("Container orchestrator is successfully set", "type", orchestratorType)
@@ -250,7 +250,7 @@ func (r *NIMServiceReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
 	// List all nodes
 	nimServiceList := &appsv1alpha1.NIMServiceList{}
-	err := r.Client.List(ctx, nimServiceList, &client.ListOptions{})
+	err := r.List(ctx, nimServiceList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list nimServices in the cluster")
 		return

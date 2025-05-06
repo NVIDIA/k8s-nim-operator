@@ -77,7 +77,7 @@ func (r *NIMPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	logger.Info("Reconciling", "NIMPipeline", nimPipeline.Name)
 
 	// Check if the instance is marked for deletion
-	if nimPipeline.ObjectMeta.DeletionTimestamp.IsZero() {
+	if nimPipeline.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimPipeline, NIMPipelineFinalizer) {
 			controllerutil.AddFinalizer(nimPipeline, NIMPipelineFinalizer)
@@ -399,7 +399,7 @@ func (r *NIMPipelineReconciler) refreshMetrics(ctx context.Context) {
 	logger := log.FromContext(ctx)
 	// List all nodes
 	nimPipelineList := &appsv1alpha1.NIMPipelineList{}
-	err := r.Client.List(ctx, nimPipelineList, &client.ListOptions{})
+	err := r.List(ctx, nimPipelineList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list nim pipelines in the cluster")
 		return

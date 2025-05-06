@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
@@ -154,7 +153,7 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}()
 	// Check if the instance is marked for deletion
-	if nimCache.ObjectMeta.DeletionTimestamp.IsZero() {
+	if nimCache.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimCache, NIMCacheFinalizer) {
 			controllerutil.AddFinalizer(nimCache, NIMCacheFinalizer)
@@ -182,7 +181,7 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Fetch container orchestrator type
 	_, err = r.GetOrchestratorType()
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
 
 	// Handle nim-cache reconciliation
@@ -237,7 +236,7 @@ func (r *NIMCacheReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, er
 	if r.orchestratorType == "" {
 		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
 		if err != nil {
-			return k8sutil.Unknown, fmt.Errorf("Unable to get container orchestrator type, %v", err)
+			return k8sutil.Unknown, fmt.Errorf("unable to get container orchestrator type, %v", err)
 		}
 		r.orchestratorType = orchestratorType
 		r.GetLogger().Info("Container orchestrator is successfully set", "type", orchestratorType)
@@ -735,7 +734,7 @@ func (r *NIMCacheReconciler) reconcileJob(ctx context.Context, nimCache *appsv1a
 		logger.Info("Created Job for NIM Cache", "job", jobName)
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionJobCreated, metav1.ConditionTrue, "JobCreated", "The Job to cache NIM has been created")
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusStarted
-		nimCache.Status.Profiles = []v1alpha1.NIMProfile{}
+		nimCache.Status.Profiles = []appsv1alpha1.NIMProfile{}
 		return nil
 	}
 
@@ -791,19 +790,19 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 		logger.Info("Failed to cache NIM, job failed", "job", jobName)
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionJobCompleted, metav1.ConditionFalse, "JobFailed", "The Job to cache NIM has failed")
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusFailed
-		nimCache.Status.Profiles = []v1alpha1.NIMProfile{}
+		nimCache.Status.Profiles = []appsv1alpha1.NIMProfile{}
 
 	case job.Status.Active > 0 && nimCache.Status.State != appsv1alpha1.NimCacheStatusInProgress:
 		logger.Info("Caching NIM is in progress, job running", "job", jobName)
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionJobPending, metav1.ConditionFalse, "JobRunning", "The Job to cache NIM is in progress")
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusInProgress
-		nimCache.Status.Profiles = []v1alpha1.NIMProfile{}
+		nimCache.Status.Profiles = []appsv1alpha1.NIMProfile{}
 
 	case job.Status.Active == 0 && nimCache.Status.State != appsv1alpha1.NimCacheStatusReady && nimCache.Status.State != appsv1alpha1.NimCacheStatusPending:
 		logger.Info("Caching NIM is in progress, job pending", "job", jobName)
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionJobPending, metav1.ConditionTrue, "JobPending", "The Job to cache NIM is in pending state")
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusPending
-		nimCache.Status.Profiles = []v1alpha1.NIMProfile{}
+		nimCache.Status.Profiles = []appsv1alpha1.NIMProfile{}
 
 	}
 
@@ -1022,7 +1021,9 @@ func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (s
 	if err != nil {
 		return "", err
 	}
-	defer podLogs.Close()
+	defer func(podLogs io.ReadCloser) {
+		_ = podLogs.Close()
+	}(podLogs)
 
 	buf := new(bytes.Buffer)
 	_, err = io.Copy(buf, podLogs)
@@ -1335,7 +1336,7 @@ func (r *NIMCacheReconciler) GetNodeGPUProducts(ctx context.Context) (map[string
 
 	// List all nodes
 	nodeList := &corev1.NodeList{}
-	err := r.Client.List(ctx, nodeList)
+	err := r.List(ctx, nodeList)
 	if err != nil {
 		logger.Error(err, "unable to list nodes to detect gpu types in the cluster")
 		return nil, fmt.Errorf("unable to list gpu nodes: %w", err)
@@ -1359,7 +1360,7 @@ func (r *NIMCacheReconciler) refreshMetrics(ctx context.Context) {
 
 	// List all nodes
 	nimCacheList := &appsv1alpha1.NIMCacheList{}
-	err := r.Client.List(ctx, nimCacheList, &client.ListOptions{})
+	err := r.List(ctx, nimCacheList, &client.ListOptions{})
 	if err != nil {
 		logger.Error(err, "unable to list nim caches in the cluster")
 		return
