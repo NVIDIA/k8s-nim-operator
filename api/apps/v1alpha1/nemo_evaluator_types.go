@@ -337,7 +337,7 @@ func (n *NemoEvaluator) GetOtelEnv() []corev1.EnvVar {
 		})
 	}
 
-	var enableLog bool = true
+	var enableLog = true
 	if n.Spec.OpenTelemetry.DisableLogging != nil {
 		enableLog = !*n.Spec.OpenTelemetry.DisableLogging
 	}

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
@@ -294,7 +293,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	return ctrl.Result{}, nil
 }
 
-func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *v1alpha1.NIMService) error {
+func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
 	clusterEndpoint, externalEndpoint, err := r.getNIMModelEndpoints(ctx, nimService)
 	if err != nil {
 		return err
@@ -303,7 +302,7 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 	if err != nil {
 		return err
 	}
-	nimService.Status.Model = &v1alpha1.ModelStatus{
+	nimService.Status.Model = &appsv1alpha1.ModelStatus{
 		Name:             modelName,
 		ClusterEndpoint:  clusterEndpoint,
 		ExternalEndpoint: externalEndpoint,

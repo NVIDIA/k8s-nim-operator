@@ -45,7 +45,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -1068,10 +1067,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			deploymentParams := &rendertypes.DeploymentParams{
 				Resources: &corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
-						corev1.ResourceName("nvidia.com/gpu"): apiResource.MustParse("8"),
+						corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
 					},
 					Limits: corev1.ResourceList{
-						corev1.ResourceName("nvidia.com/gpu"): apiResource.MustParse("8"),
+						corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
 					},
 				},
 			}
@@ -1079,8 +1078,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
 
 			// Ensure the user-provided GPU resources (8) are retained and not overridden
-			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("8")))
-			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("8")))
+			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
+			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
 		})
 
 		It("should assign GPU resources when tensor parallelism is provided", func() {
@@ -1092,8 +1091,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			deploymentParams := &rendertypes.DeploymentParams{}
 
 			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
-			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("4")))
-			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("4")))
+			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
+			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
 		})
 
 		It("should assign 1 GPU resource if tensor parallelism is not provided", func() {
@@ -1105,8 +1104,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			deploymentParams := &rendertypes.DeploymentParams{}
 
 			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
-			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("1")))
-			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), apiResource.MustParse("1")))
+			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
+			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
 		})
 
 		It("should return an error if tensor parallelism cannot be parsed", func() {
