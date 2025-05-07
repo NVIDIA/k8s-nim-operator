@@ -21,12 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -47,12 +41,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
-// NemoDatastoreFinalizer is the finalizer annotation
+// NemoDatastoreFinalizer is the finalizer annotation.
 const NemoDatastoreFinalizer = "finalizer.nemodatastore.apps.nvidia.com"
 
-// NemoDatastoreReconciler reconciles a NemoDatastore object
+// NemoDatastoreReconciler reconciles a NemoDatastore object.
 type NemoDatastoreReconciler struct {
 	client.Client
 	scheme           *runtime.Scheme
@@ -64,10 +65,10 @@ type NemoDatastoreReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 }
 
-// Ensure NemoDatastoreReconciler implements the Reconciler interface
+// Ensure NemoDatastoreReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NemoDatastoreReconciler{}
 
-// NewNemoDatastoreReconciler creates a new reconciler for NemoDatastore with the given platform
+// NewNemoDatastoreReconciler creates a new reconciler for NemoDatastore with the given platform.
 func NewNemoDatastoreReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoDatastoreReconciler {
 	return &NemoDatastoreReconciler{
 		Client:   client,
@@ -151,7 +152,7 @@ func (r *NemoDatastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// Fetch container orchestrator type
-	_, err := r.GetOrchestratorType()
+	_, err := r.GetOrchestratorType(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
@@ -171,45 +172,45 @@ func (r *NemoDatastoreReconciler) cleanupNemoDatastore(ctx context.Context, nimS
 	return nil
 }
 
-// GetScheme returns the scheme of the reconciler
+// GetScheme returns the scheme of the reconciler.
 func (r *NemoDatastoreReconciler) GetScheme() *runtime.Scheme {
 	return r.scheme
 }
 
-// GetLogger returns the logger of the reconciler
+// GetLogger returns the logger of the reconciler.
 func (r *NemoDatastoreReconciler) GetLogger() logr.Logger {
 	return r.log
 }
 
-// GetClient returns the client instance
+// GetClient returns the client instance.
 func (r *NemoDatastoreReconciler) GetClient() client.Client {
 	return r.Client
 }
 
-// GetConfig returns the rest config
+// GetConfig returns the rest config.
 func (r *NemoDatastoreReconciler) GetConfig() *rest.Config {
 	return r.Config
 }
 
-// GetUpdater returns the conditions updater instance
+// GetUpdater returns the conditions updater instance.
 func (r *NemoDatastoreReconciler) GetUpdater() conditions.Updater {
 	return r.updater
 }
 
-// GetRenderer returns the renderer instance
+// GetRenderer returns the renderer instance.
 func (r *NemoDatastoreReconciler) GetRenderer() render.Renderer {
 	return r.renderer
 }
 
-// GetEventRecorder returns the event recorder
+// GetEventRecorder returns the event recorder.
 func (r *NemoDatastoreReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetOrchestratorType returns the container platform type
-func (r *NemoDatastoreReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, error) {
+// GetOrchestratorType returns the container platform type.
+func (r *NemoDatastoreReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
-		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		orchestratorType, err := k8sutil.GetOrchestratorType(ctx, r.GetClient())
 		if err != nil {
 			return k8sutil.Unknown, fmt.Errorf("unable to get container orchestrator type, %v", err)
 		}
@@ -236,15 +237,17 @@ func (r *NemoDatastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				// Type assert to NemoDatastore
 				if oldNemoDatastore, ok := e.ObjectOld.(*appsv1alpha1.NemoDatastore); ok {
-					newNemoDatastore := e.ObjectNew.(*appsv1alpha1.NemoDatastore)
+					newNemoDatastore, ok := e.ObjectNew.(*appsv1alpha1.NemoDatastore)
+					if ok {
 
-					// Handle case where object is marked for deletion
-					if !newNemoDatastore.ObjectMeta.DeletionTimestamp.IsZero() {
-						return true
+						// Handle case where object is marked for deletion
+						if !newNemoDatastore.ObjectMeta.DeletionTimestamp.IsZero() {
+							return true
+						}
+
+						// Handle only spec updates
+						return !reflect.DeepEqual(oldNemoDatastore.Spec, newNemoDatastore.Spec)
 					}
-
-					// Handle only spec updates
-					return !reflect.DeepEqual(oldNemoDatastore.Spec, newNemoDatastore.Spec)
 				}
 				// For other types we watch, reconcile them
 				return true
@@ -452,26 +455,26 @@ func (r *NemoDatastoreReconciler) reconcilePVC(ctx context.Context, nemoDatastor
 	return nil
 }
 
-func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, NemoDatastore *appsv1alpha1.NemoDatastore, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: NemoDatastore.GetName(), Namespace: NemoDatastore.GetNamespace()}
+	namespacedName := types.NamespacedName{Name: nemoDatastore.GetName(), Namespace: nemoDatastore.GetNamespace()}
 	err := r.Get(ctx, namespacedName, obj)
 	if err != nil && !errors.IsNotFound(err) {
 		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
 		return err
 	}
 	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(NemoDatastore.Spec)) {
+	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoDatastore.Spec)) {
 		return nil
 	}
 
 	resource, err := renderFunc()
 	if err != nil {
 		logger.Error(err, "failed to render", conditionType, namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, NemoDatastore, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, nemoDatastore, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoDatastore", NemoDatastore.GetName())
+			logger.Error(statusError, "failed to update status", "NemoDatastore", nemoDatastore.GetName())
 		}
 		return err
 	}
@@ -493,11 +496,11 @@ func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, Nem
 		return nil
 	}
 
-	if err = controllerutil.SetControllerReference(NemoDatastore, resource, r.GetScheme()); err != nil {
+	if err = controllerutil.SetControllerReference(nemoDatastore, resource, r.GetScheme()); err != nil {
 		logger.Error(err, "failed to set owner", conditionType, namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, NemoDatastore, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, nemoDatastore, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoDatastore", NemoDatastore.GetName())
+			logger.Error(statusError, "failed to update status", "NemoDatastore", nemoDatastore.GetName())
 		}
 		return err
 	}
@@ -505,9 +508,9 @@ func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, Nem
 	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, NemoDatastore, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, nemoDatastore, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoDatastore", NemoDatastore.GetName())
+			logger.Error(statusError, "failed to update status", "NemoDatastore", nemoDatastore.GetName())
 		}
 		return err
 	}

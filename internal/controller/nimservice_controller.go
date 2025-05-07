@@ -21,12 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -42,12 +36,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
 
-// NIMServiceFinalizer is the finalizer annotation
+// NIMServiceFinalizer is the finalizer annotation.
 const NIMServiceFinalizer = "finalizer.nimservice.apps.nvidia.com"
 
-// NIMServiceReconciler reconciles a NIMService object
+// NIMServiceReconciler reconciles a NIMService object.
 type NIMServiceReconciler struct {
 	client.Client
 	scheme           *runtime.Scheme
@@ -60,10 +61,10 @@ type NIMServiceReconciler struct {
 	recorder         record.EventRecorder
 }
 
-// Ensure NIMServiceReconciler implements the Reconciler interface
+// Ensure NIMServiceReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NIMServiceReconciler{}
 
-// NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform
+// NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform.
 func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
 		Client:   client,
@@ -149,7 +150,7 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Fetch container orchestrator type
-	_, err := r.GetOrchestratorType()
+	_, err := r.GetOrchestratorType(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
@@ -164,45 +165,45 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return result, nil
 }
 
-// GetScheme returns the scheme of the reconciler
+// GetScheme returns the scheme of the reconciler.
 func (r *NIMServiceReconciler) GetScheme() *runtime.Scheme {
 	return r.scheme
 }
 
-// GetLogger returns the logger of the reconciler
+// GetLogger returns the logger of the reconciler.
 func (r *NIMServiceReconciler) GetLogger() logr.Logger {
 	return r.log
 }
 
-// GetClient returns the client instance
+// GetClient returns the client instance.
 func (r *NIMServiceReconciler) GetClient() client.Client {
 	return r.Client
 }
 
-// GetConfig returns the rest config
+// GetConfig returns the rest config.
 func (r *NIMServiceReconciler) GetConfig() *rest.Config {
 	return r.Config
 }
 
-// GetUpdater returns the conditions updater instance
+// GetUpdater returns the conditions updater instance.
 func (r *NIMServiceReconciler) GetUpdater() conditions.Updater {
 	return r.updater
 }
 
-// GetRenderer returns the renderer instance
+// GetRenderer returns the renderer instance.
 func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 	return r.renderer
 }
 
-// GetEventRecorder returns the event recorder
+// GetEventRecorder returns the event recorder.
 func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetOrchestratorType returns the container platform type
-func (r *NIMServiceReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, error) {
+// GetOrchestratorType returns the container platform type.
+func (r *NIMServiceReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
-		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		orchestratorType, err := k8sutil.GetOrchestratorType(ctx, r.GetClient())
 		if err != nil {
 			return k8sutil.Unknown, fmt.Errorf("unable to get container orchestrator type, %v", err)
 		}
@@ -229,15 +230,16 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				// Type assert to NIMService
 				if oldNIMService, ok := e.ObjectOld.(*appsv1alpha1.NIMService); ok {
-					newNIMService := e.ObjectNew.(*appsv1alpha1.NIMService)
+					newNIMService, ok := e.ObjectNew.(*appsv1alpha1.NIMService)
+					if ok {
+						// Handle case where object is marked for deletion
+						if !newNIMService.ObjectMeta.DeletionTimestamp.IsZero() {
+							return true
+						}
 
-					// Handle case where object is marked for deletion
-					if !newNIMService.ObjectMeta.DeletionTimestamp.IsZero() {
-						return true
+						// Handle only spec updates
+						return !reflect.DeepEqual(oldNIMService.Spec, newNIMService.Spec)
 					}
-
-					// Handle only spec updates
-					return !reflect.DeepEqual(oldNIMService.Spec, newNIMService.Spec)
 				}
 				// For other types we watch, reconcile them
 				return true

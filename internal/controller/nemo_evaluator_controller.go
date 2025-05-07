@@ -22,12 +22,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -47,12 +41,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
-// NemoEvaluatorFinalizer is the finalizer annotation
+// NemoEvaluatorFinalizer is the finalizer annotation.
 const NemoEvaluatorFinalizer = "finalizer.nemoevaluator.apps.nvidia.com"
 
-// NemoEvaluatorReconciler reconciles a NemoEvaluator object
+// NemoEvaluatorReconciler reconciles a NemoEvaluator object.
 type NemoEvaluatorReconciler struct {
 	client.Client
 	scheme           *runtime.Scheme
@@ -64,10 +65,10 @@ type NemoEvaluatorReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 }
 
-// Ensure NemoEvaluatorReconciler implements the Reconciler interface
+// Ensure NemoEvaluatorReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NemoEvaluatorReconciler{}
 
-// NemoEvaluatorReconciler creates a new reconciler for NemoEvaluator with the given platform
+// NemoEvaluatorReconciler creates a new reconciler for NemoEvaluator with the given platform.
 func NewNemoEvaluatorReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoEvaluatorReconciler {
 	return &NemoEvaluatorReconciler{
 		Client:   client,
@@ -151,7 +152,7 @@ func (r *NemoEvaluatorReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// Fetch container orchestrator type
-	_, err := r.GetOrchestratorType()
+	_, err := r.GetOrchestratorType(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
@@ -171,45 +172,45 @@ func (r *NemoEvaluatorReconciler) cleanupNemoEvaluator(ctx context.Context, nemo
 	return nil
 }
 
-// GetScheme returns the scheme of the reconciler
+// GetScheme returns the scheme of the reconciler.
 func (r *NemoEvaluatorReconciler) GetScheme() *runtime.Scheme {
 	return r.scheme
 }
 
-// GetLogger returns the logger of the reconciler
+// GetLogger returns the logger of the reconciler.
 func (r *NemoEvaluatorReconciler) GetLogger() logr.Logger {
 	return r.log
 }
 
-// GetClient returns the client instance
+// GetClient returns the client instance.
 func (r *NemoEvaluatorReconciler) GetClient() client.Client {
 	return r.Client
 }
 
-// GetConfig returns the rest config
+// GetConfig returns the rest config.
 func (r *NemoEvaluatorReconciler) GetConfig() *rest.Config {
 	return r.Config
 }
 
-// GetUpdater returns the conditions updater instance
+// GetUpdater returns the conditions updater instance.
 func (r *NemoEvaluatorReconciler) GetUpdater() conditions.Updater {
 	return r.updater
 }
 
-// GetRenderer returns the renderer instance
+// GetRenderer returns the renderer instance.
 func (r *NemoEvaluatorReconciler) GetRenderer() render.Renderer {
 	return r.renderer
 }
 
-// GetEventRecorder returns the event recorder
+// GetEventRecorder returns the event recorder.
 func (r *NemoEvaluatorReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetOrchestratorType returns the container platform type
-func (r *NemoEvaluatorReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, error) {
+// GetOrchestratorType returns the container platform type.
+func (r *NemoEvaluatorReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
-		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		orchestratorType, err := k8sutil.GetOrchestratorType(ctx, r.GetClient())
 		if err != nil {
 			return k8sutil.Unknown, fmt.Errorf("unable to get container orchestrator type, %v", err)
 		}
@@ -236,15 +237,16 @@ func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				// Type assert to NemoEvaluator
 				if oldNemoEvaluator, ok := e.ObjectOld.(*appsv1alpha1.NemoEvaluator); ok {
-					newNemoEvaluator := e.ObjectNew.(*appsv1alpha1.NemoEvaluator)
+					newNemoEvaluator, ok := e.ObjectNew.(*appsv1alpha1.NemoEvaluator)
+					if ok {
+						// Handle case where object is marked for deletion
+						if !newNemoEvaluator.ObjectMeta.DeletionTimestamp.IsZero() {
+							return true
+						}
 
-					// Handle case where object is marked for deletion
-					if !newNemoEvaluator.ObjectMeta.DeletionTimestamp.IsZero() {
-						return true
+						// Handle only spec updates
+						return !reflect.DeepEqual(oldNemoEvaluator.Spec, newNemoEvaluator.Spec)
 					}
-
-					// Handle only spec updates
-					return !reflect.DeepEqual(oldNemoEvaluator.Spec, newNemoEvaluator.Spec)
 				}
 				// For other types we watch, reconcile them
 				return true
@@ -417,26 +419,26 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, ne
 	return ctrl.Result{}, nil
 }
 
-func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, NemoEvaluator *appsv1alpha1.NemoEvaluator, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, nemoEvaluator *appsv1alpha1.NemoEvaluator, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: NemoEvaluator.GetName(), Namespace: NemoEvaluator.GetNamespace()}
+	namespacedName := types.NamespacedName{Name: nemoEvaluator.GetName(), Namespace: nemoEvaluator.GetNamespace()}
 	err := r.Get(ctx, namespacedName, obj)
 	if err != nil && !errors.IsNotFound(err) {
 		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
 		return err
 	}
 	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(NemoEvaluator.Spec)) {
+	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoEvaluator.Spec)) {
 		return nil
 	}
 
 	resource, err := renderFunc()
 	if err != nil {
 		logger.Error(err, "failed to render", conditionType, namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, NemoEvaluator, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, nemoEvaluator, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoEvaluator", NemoEvaluator.GetName())
+			logger.Error(statusError, "failed to update status", "NemoEvaluator", nemoEvaluator.GetName())
 		}
 		return err
 	}
@@ -458,11 +460,11 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, Nem
 		return nil
 	}
 
-	if err = controllerutil.SetControllerReference(NemoEvaluator, resource, r.GetScheme()); err != nil {
+	if err = controllerutil.SetControllerReference(nemoEvaluator, resource, r.GetScheme()); err != nil {
 		logger.Error(err, "failed to set owner", conditionType, namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, NemoEvaluator, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, nemoEvaluator, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoEvaluator", NemoEvaluator.GetName())
+			logger.Error(statusError, "failed to update status", "NemoEvaluator", nemoEvaluator.GetName())
 		}
 		return err
 	}
@@ -470,9 +472,9 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, Nem
 	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, NemoEvaluator, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, nemoEvaluator, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoEvaluator", NemoEvaluator.GetName())
+			logger.Error(statusError, "failed to update status", "NemoEvaluator", nemoEvaluator.GetName())
 		}
 		return err
 	}
