@@ -21,9 +21,10 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 var _ = Describe("NIMParser", func() {
@@ -35,8 +36,10 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
 			profile, exists := (nimManifest)["03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61"]
 			Expect(exists).To(BeTrue())
 			Expect(profile.Model).To(Equal("meta/llama3-70b-instruct"))
@@ -50,8 +53,10 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
 			profile, exists := nimManifest["0f3de1afe11d355e01657424a267fbaad19bfea3143a9879307c49aed8299db0"]
 			Expect(exists).To(BeTrue())
 			Expect(profile.Model).To(Equal("meta/llama3-70b-instruct"))
@@ -65,8 +70,10 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
 			profile, exists := (nimManifest)["36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"]
 			Expect(exists).To(BeTrue())
 			Expect(profile.Model).To(Equal("meta/llama3-70b-instruct"))
@@ -80,8 +87,10 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
 			profile, exists := (nimManifest)["03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61"]
 			Expect(exists).To(BeTrue())
 			Expect(profile.Model).To(Equal("meta/llama3-70b-instruct"))
@@ -107,8 +116,10 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
 			modelSpec := appsv1alpha1.ModelSpec{Precision: "fp16",
 				Engine:            "tensorrt_llm",
 				QoSProfile:        "throughput",
@@ -126,8 +137,10 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
 			// Match using discovered GPUs (node product labels)
 			modelSpec := appsv1alpha1.ModelSpec{Precision: "fp16",
 				Engine:            "tensorrt_llm",
@@ -144,8 +157,10 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
 			// Match using Lora
 			modelSpec := appsv1alpha1.ModelSpec{
 				Lora: utils.BoolPtr(true),
@@ -159,8 +174,11 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
+			// Match using Lora
 			modelSpec := appsv1alpha1.ModelSpec{
 				Engine: "tensorrt_llm",
 			}
@@ -174,8 +192,10 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
 			// Match using backend
 			modelSpec := appsv1alpha1.ModelSpec{
 				Engine: "tensorrt", // instead of tensorrt_llm for llm nims
@@ -189,8 +209,10 @@ var _ = Describe("NIMParser", func() {
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
-			nimManifest := config.(NIMManifest)
-
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
 			// Match using GPU product name
 			modelSpec := appsv1alpha1.ModelSpec{
 				GPUs: []appsv1alpha1.GPUSpec{{Product: "A10G"}},

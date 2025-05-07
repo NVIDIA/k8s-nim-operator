@@ -22,34 +22,35 @@ import (
 	"strconv"
 	"strings"
 
+	"gopkg.in/yaml.v2"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
-	"gopkg.in/yaml.v2"
 )
 
 const (
-	// BackendTypeTensorRT indicates tensortt backend
+	// BackendTypeTensorRT indicates tensortt backend.
 	BackendTypeTensorRT = "tensorrt"
 )
 
-// Uri represents model source
+// Uri represents model source.
 type Uri struct {
 	Uri string `yaml:"uri" json:"uri,omitempty"`
 }
 
-// Workspace represents workspace for model components
+// Workspace represents workspace for model components.
 type Workspace struct {
 	Files map[string]Uri `yaml:"files" json:"files,omitempty"`
 }
 
-// NIMProfile is the model profile supported by the NIM container
+// NIMProfile is the model profile supported by the NIM container.
 type NIMProfile struct {
 	ID        string            `yaml:"id" json:"id,omitempty"`
 	Tags      map[string]string `yaml:"tags" json:"tags,omitempty"`
 	Workspace Workspace         `yaml:"workspace" json:"workspace,omitempty"`
 }
 
-// NIMManifest is the model manifest file
+// NIMManifest is the model manifest file.
 type NIMManifest struct {
 	SchemaVersion            string       `yaml:"schema_version" json:"schema_version,omitempty"`
 	ProfileSelectionCriteria string       `yaml:"profile_selection_criteria" json:"profile_selection_criteria,omitempty"`
@@ -57,7 +58,7 @@ type NIMManifest struct {
 }
 
 func (manifest NIMManifest) MatchProfiles(modelSpec appsv1alpha1.ModelSpec, discoveredGPUs []string) ([]string, error) {
-	//TODO implement me
+	// TODO implement me
 	var selectedProfiles []string
 
 	for _, profile := range manifest.Profiles {

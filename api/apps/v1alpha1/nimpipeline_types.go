@@ -29,15 +29,15 @@ const (
 	// NIMPipelineConditionFailed indicates that the NIM pipeline has failed.
 	NIMPipelineConditionFailed = "NIM_PIPELINE_FAILED"
 
-	// NIMPipelineStatusNotReady indicates that one or more services in the NIM pipeline are not ready
+	// NIMPipelineStatusNotReady indicates that one or more services in the NIM pipeline are not ready.
 	NIMPipelineStatusNotReady = "NotReady"
-	// NIMPipelineStatusReady indicates that NIM pipeline is ready
+	// NIMPipelineStatusReady indicates that NIM pipeline is ready.
 	NIMPipelineStatusReady = "Ready"
-	// NIMPipelineStatusFailed indicates that one or more services in the NIM pipeline has failed
+	// NIMPipelineStatusFailed indicates that one or more services in the NIM pipeline has failed.
 	NIMPipelineStatusFailed = "Failed"
 )
 
-// NIMPipelineSpec defines the desired state of NIMPipeline
+// NIMPipelineSpec defines the desired state of NIMPipeline.
 type NIMPipelineSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -46,7 +46,7 @@ type NIMPipelineSpec struct {
 	Services []NIMServicePipelineSpec `json:"services,omitempty"`
 }
 
-// NIMServicePipelineSpec defines the desired state of NIMService as part of the NIMPipeline
+// NIMServicePipelineSpec defines the desired state of NIMService as part of the NIMPipeline.
 type NIMServicePipelineSpec struct {
 	Name         string              `json:"name,omitempty"`
 	Enabled      *bool               `json:"enabled,omitempty"`
@@ -54,7 +54,7 @@ type NIMServicePipelineSpec struct {
 	Dependencies []ServiceDependency `json:"dependencies,omitempty"`
 }
 
-// ServiceDependency defines service dependencies
+// ServiceDependency defines service dependencies.
 type ServiceDependency struct {
 	// Name is the dependent service name
 	Name string `json:"name"`
@@ -66,7 +66,7 @@ type ServiceDependency struct {
 	EnvValue string `json:"envValue,omitempty"`
 }
 
-// NIMPipelineStatus defines the observed state of NIMPipeline
+// NIMPipelineStatus defines the observed state of NIMPipeline.
 type NIMPipelineStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -83,7 +83,7 @@ type NIMPipelineStatus struct {
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
 // +kubebuilder:printcolumn:name="Age",type="date",format="date-time",JSONPath=".metadata.creationTimestamp",priority=0
 
-// NIMPipeline is the Schema for the nimpipelines API
+// NIMPipeline is the Schema for the nimpipelines API.
 type NIMPipeline struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -94,7 +94,7 @@ type NIMPipeline struct {
 
 // +kubebuilder:object:root=true
 
-// NIMPipelineList contains a list of NIMPipeline
+// NIMPipelineList contains a list of NIMPipeline.
 type NIMPipelineList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

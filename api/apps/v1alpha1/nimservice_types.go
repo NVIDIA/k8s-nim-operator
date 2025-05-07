@@ -21,9 +21,6 @@ import (
 	"maps"
 	"os"
 
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
-	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -33,30 +30,34 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
+	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	// NIMAPIPort is the default port that the NIM serves on
+	// NIMAPIPort is the default port that the NIM serves on.
 	NIMAPIPort = 8000
 	// NIMServiceConditionReady indicates that the NIM deployment is ready.
 	NIMServiceConditionReady = "NIM_SERVICE_READY"
 	// NIMServiceConditionFailed indicates that the NIM deployment has failed.
 	NIMServiceConditionFailed = "NIM_SERVICE_FAILED"
 
-	// NIMServiceStatusPending indicates that NIM deployment is in pending state
+	// NIMServiceStatusPending indicates that NIM deployment is in pending state.
 	NIMServiceStatusPending = "Pending"
-	// NIMServiceStatusNotReady indicates that NIM deployment is not ready
+	// NIMServiceStatusNotReady indicates that NIM deployment is not ready.
 	NIMServiceStatusNotReady = "NotReady"
-	// NIMServiceStatusReady indicates that NIM deployment is ready
+	// NIMServiceStatusReady indicates that NIM deployment is ready.
 	NIMServiceStatusReady = "Ready"
-	// NIMServiceStatusFailed indicates that NIM deployment has failed
+	// NIMServiceStatusFailed indicates that NIM deployment has failed.
 	NIMServiceStatusFailed = "Failed"
 )
 
-// NIMServiceSpec defines the desired state of NIMService
+// NIMServiceSpec defines the desired state of NIMService.
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
@@ -87,13 +88,13 @@ type NIMServiceSpec struct {
 	Proxy            *ProxySpec `json:"proxy,omitempty"`
 }
 
-// NIMCacheVolSpec defines the spec to use NIMCache volume
+// NIMCacheVolSpec defines the spec to use NIMCache volume.
 type NIMCacheVolSpec struct {
 	Name    string `json:"name,omitempty"`
 	Profile string `json:"profile,omitempty"`
 }
 
-// NIMServiceStatus defines the observed state of NIMService
+// NIMServiceStatus defines the observed state of NIMService.
 type NIMServiceStatus struct {
 	Conditions        []metav1.Condition `json:"conditions,omitempty"`
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
@@ -114,7 +115,7 @@ type ModelStatus struct {
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
 // +kubebuilder:printcolumn:name="Age",type="date",format="date-time",JSONPath=".metadata.creationTimestamp",priority=0
 
-// NIMService is the Schema for the nimservices API
+// NIMService is the Schema for the nimservices API.
 type NIMService struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -125,14 +126,14 @@ type NIMService struct {
 
 // +kubebuilder:object:root=true
 
-// NIMServiceList contains a list of NIMService
+// NIMServiceList contains a list of NIMService.
 type NIMServiceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NIMService `json:"items"`
 }
 
-// NIMServiceStorage defines the attributes of various storage targets used to store the model
+// NIMServiceStorage defines the attributes of various storage targets used to store the model.
 type NIMServiceStorage struct {
 	NIMCache NIMCacheVolSpec `json:"nimCache,omitempty"`
 	// SharedMemorySizeLimit sets the max size of the shared memory volume (emptyDir) used by NIMs for fast model runtime I/O.
@@ -146,7 +147,7 @@ type NIMServiceStorage struct {
 }
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
-// Prefers pvc.Name if explicitly set by the user in the NIMService instance
+// Prefers pvc.Name if explicitly set by the user in the NIMService instance.
 func (n *NIMService) GetPVCName(pvc PersistentVolumeClaim) string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
 	if pvc.Name != "" {
@@ -155,14 +156,14 @@ func (n *NIMService) GetPVCName(pvc PersistentVolumeClaim) string {
 	return pvcName
 }
 
-// GetStandardSelectorLabels returns the standard selector labels for the NIMService deployment
+// GetStandardSelectorLabels returns the standard selector labels for the NIMService deployment.
 func (n *NIMService) GetStandardSelectorLabels() map[string]string {
 	return map[string]string{
 		"app": n.Name,
 	}
 }
 
-// GetStandardLabels returns the standard set of labels for NIMService resources
+// GetStandardLabels returns the standard set of labels for NIMService resources.
 func (n *NIMService) GetStandardLabels() map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":             n.Name,
@@ -173,7 +174,7 @@ func (n *NIMService) GetStandardLabels() map[string]string {
 	}
 }
 
-// GetStandardEnv returns the standard set of env variables for the NIMService container
+// GetStandardEnv returns the standard set of env variables for the NIMService container.
 func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 	// add standard env required for NIM service
 	envVars := []corev1.EnvVar{
@@ -213,7 +214,7 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 	return envVars
 }
 
-// GetProxySpec returns the proxy spec for the NIMService deployment
+// GetProxySpec returns the proxy spec for the NIMService deployment.
 func (n *NIMService) GetProxyEnv() []corev1.EnvVar {
 
 	envVars := []corev1.EnvVar{
@@ -250,7 +251,7 @@ func (n *NIMService) GetProxyEnv() []corev1.EnvVar {
 	return envVars
 }
 
-// GetStandardAnnotations returns default annotations to apply to the NIMService instance
+// GetStandardAnnotations returns default annotations to apply to the NIMService instance.
 func (n *NIMService) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
 		"openshift.io/required-scc":             "nonroot",
@@ -262,7 +263,7 @@ func (n *NIMService) GetStandardAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetNIMServiceAnnotations returns annotations to apply to the NIMService instance
+// GetNIMServiceAnnotations returns annotations to apply to the NIMService instance.
 func (n *NIMService) GetNIMServiceAnnotations() map[string]string {
 	standardAnnotations := n.GetStandardAnnotations()
 
@@ -273,7 +274,7 @@ func (n *NIMService) GetNIMServiceAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetServiceLabels returns merged labels to apply to the NIMService instance
+// GetServiceLabels returns merged labels to apply to the NIMService instance.
 func (n *NIMService) GetServiceLabels() map[string]string {
 	standardLabels := n.GetStandardLabels()
 
@@ -283,43 +284,43 @@ func (n *NIMService) GetServiceLabels() map[string]string {
 	return standardLabels
 }
 
-// GetSelectorLabels returns standard selector labels to apply to the NIMService instance
+// GetSelectorLabels returns standard selector labels to apply to the NIMService instance.
 func (n *NIMService) GetSelectorLabels() map[string]string {
 	// TODO: add custom ones
 	return n.GetStandardSelectorLabels()
 }
 
-// GetNodeSelector returns node selector labels for the NIMService instance
+// GetNodeSelector returns node selector labels for the NIMService instance.
 func (n *NIMService) GetNodeSelector() map[string]string {
 	return n.Spec.NodeSelector
 }
 
-// GetTolerations returns tolerations for the NIMService instance
+// GetTolerations returns tolerations for the NIMService instance.
 func (n *NIMService) GetTolerations() []corev1.Toleration {
 	return n.Spec.Tolerations
 }
 
-// GetPodAffinity returns pod affinity for the NIMService instance
+// GetPodAffinity returns pod affinity for the NIMService instance.
 func (n *NIMService) GetPodAffinity() *corev1.PodAffinity {
 	return n.Spec.PodAffinity
 }
 
-// GetContainerName returns name of the container for NIMService deployment
+// GetContainerName returns name of the container for NIMService deployment.
 func (n *NIMService) GetContainerName() string {
 	return fmt.Sprintf("%s-ctr", n.Name)
 }
 
-// GetCommand return command to override for the NIMService container
+// GetCommand return command to override for the NIMService container.
 func (n *NIMService) GetCommand() []string {
 	return n.Spec.Command
 }
 
-// GetArgs return arguments for the NIMService container
+// GetArgs return arguments for the NIMService container.
 func (n *NIMService) GetArgs() []string {
 	return n.Spec.Args
 }
 
-// GetEnv returns merged slice of standard and user specified env variables
+// GetEnv returns merged slice of standard and user specified env variables.
 func (n *NIMService) GetEnv() []corev1.EnvVar {
 	envVarList := utils.MergeEnvVars(n.GetStandardEnv(), n.Spec.Env)
 	if n.GetProxySpec() != nil {
@@ -328,27 +329,27 @@ func (n *NIMService) GetEnv() []corev1.EnvVar {
 	return envVarList
 }
 
-// GetImage returns container image for the NIMService
+// GetImage returns container image for the NIMService.
 func (n *NIMService) GetImage() string {
 	return fmt.Sprintf("%s:%s", n.Spec.Image.Repository, n.Spec.Image.Tag)
 }
 
-// GetImagePullSecrets returns the image pull secrets for the NIM container
+// GetImagePullSecrets returns the image pull secrets for the NIM container.
 func (n *NIMService) GetImagePullSecrets() []string {
 	return n.Spec.Image.PullSecrets
 }
 
-// GetImagePullPolicy returns the image pull policy for the NIM container
+// GetImagePullPolicy returns the image pull policy for the NIM container.
 func (n *NIMService) GetImagePullPolicy() string {
 	return n.Spec.Image.PullPolicy
 }
 
-// GetResources returns resources to allocate to the NIMService container
+// GetResources returns resources to allocate to the NIMService container.
 func (n *NIMService) GetResources() *corev1.ResourceRequirements {
 	return n.Spec.Resources
 }
 
-// IsProbeEnabled returns true if a given liveness/readiness/startup probe is enabled
+// IsProbeEnabled returns true if a given liveness/readiness/startup probe is enabled.
 func IsProbeEnabled(probe Probe) bool {
 	if probe.Enabled == nil {
 		return true
@@ -356,7 +357,7 @@ func IsProbeEnabled(probe Probe) bool {
 	return *probe.Enabled
 }
 
-// GetLivenessProbe returns liveness probe for the NIMService container
+// GetLivenessProbe returns liveness probe for the NIMService container.
 func (n *NIMService) GetLivenessProbe() *corev1.Probe {
 	if n.Spec.LivenessProbe.Probe == nil {
 		return n.GetDefaultLivenessProbe()
@@ -364,7 +365,7 @@ func (n *NIMService) GetLivenessProbe() *corev1.Probe {
 	return n.Spec.LivenessProbe.Probe
 }
 
-// GetDefaultLivenessProbe returns the default liveness probe for the NIMService container
+// GetDefaultLivenessProbe returns the default liveness probe for the NIMService container.
 func (n *NIMService) GetDefaultLivenessProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 15,
@@ -383,7 +384,7 @@ func (n *NIMService) GetDefaultLivenessProbe() *corev1.Probe {
 	return &probe
 }
 
-// GetReadinessProbe returns readiness probe for the NIMService container
+// GetReadinessProbe returns readiness probe for the NIMService container.
 func (n *NIMService) GetReadinessProbe() *corev1.Probe {
 	if n.Spec.ReadinessProbe.Probe == nil {
 		return n.GetDefaultReadinessProbe()
@@ -391,7 +392,7 @@ func (n *NIMService) GetReadinessProbe() *corev1.Probe {
 	return n.Spec.ReadinessProbe.Probe
 }
 
-// GetDefaultReadinessProbe returns the default readiness probe for the NIMService container
+// GetDefaultReadinessProbe returns the default readiness probe for the NIMService container.
 func (n *NIMService) GetDefaultReadinessProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 15,
@@ -410,7 +411,7 @@ func (n *NIMService) GetDefaultReadinessProbe() *corev1.Probe {
 	return &probe
 }
 
-// GetStartupProbe returns startup probe for the NIMService container
+// GetStartupProbe returns startup probe for the NIMService container.
 func (n *NIMService) GetStartupProbe() *corev1.Probe {
 	if n.Spec.StartupProbe.Probe == nil {
 		return n.GetDefaultStartupProbe()
@@ -418,7 +419,7 @@ func (n *NIMService) GetStartupProbe() *corev1.Probe {
 	return n.Spec.StartupProbe.Probe
 }
 
-// GetDefaultStartupProbe returns the default startup probe for the NIMService container
+// GetDefaultStartupProbe returns the default startup probe for the NIMService container.
 func (n *NIMService) GetDefaultStartupProbe() *corev1.Probe {
 	probe := corev1.Probe{
 		InitialDelaySeconds: 30,
@@ -437,13 +438,13 @@ func (n *NIMService) GetDefaultStartupProbe() *corev1.Probe {
 	return &probe
 }
 
-// GetVolumesMounts returns volume mounts for the NIMService container
+// GetVolumesMounts returns volume mounts for the NIMService container.
 func (n *NIMService) GetVolumesMounts() []corev1.Volume {
 	// TODO: setup volume mounts required for NIM
 	return nil
 }
 
-// GetVolumes returns volumes for the NIMService container
+// GetVolumes returns volumes for the NIMService container.
 func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume {
 	// TODO: Fetch actual PVC name from associated NIMCache obj
 	volumes := []corev1.Volume{
@@ -474,7 +475,7 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 	return volumes
 }
 
-// GetVolumeMounts returns volumes for the NIMService container
+// GetVolumeMounts returns volumes for the NIMService container.
 func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
@@ -494,37 +495,37 @@ func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.Vo
 	return volumeMounts
 }
 
-// GetServiceAccountName returns service account name for the NIMService deployment
+// GetServiceAccountName returns service account name for the NIMService deployment.
 func (n *NIMService) GetServiceAccountName() string {
 	return n.Name
 }
 
-// GetRuntimeClassName return the runtime class name for the NIMService deployment
+// GetRuntimeClassName return the runtime class name for the NIMService deployment.
 func (n *NIMService) GetRuntimeClassName() string {
 	return n.Spec.RuntimeClassName
 }
 
-// GetNIMCacheName returns the NIMCache name to use for the NIMService deployment
+// GetNIMCacheName returns the NIMCache name to use for the NIMService deployment.
 func (n *NIMService) GetNIMCacheName() string {
 	return n.Spec.Storage.NIMCache.Name
 }
 
-// GetNIMCacheProfile returns the explicit profile to use for the NIMService deployment
+// GetNIMCacheProfile returns the explicit profile to use for the NIMService deployment.
 func (n *NIMService) GetNIMCacheProfile() string {
 	return n.Spec.Storage.NIMCache.Profile
 }
 
-// GetHPA returns the HPA spec for the NIMService deployment
+// GetHPA returns the HPA spec for the NIMService deployment.
 func (n *NIMService) GetHPA() HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPA
 }
 
-// GetServiceMonitor returns the Service Monitor details for the NIMService deployment
+// GetServiceMonitor returns the Service Monitor details for the NIMService deployment.
 func (n *NIMService) GetServiceMonitor() ServiceMonitor {
 	return n.Spec.Metrics.ServiceMonitor
 }
 
-// GetReplicas returns replicas for the NIMService deployment
+// GetReplicas returns replicas for the NIMService deployment.
 func (n *NIMService) GetReplicas() int {
 	if n.IsAutoScalingEnabled() {
 		return 0
@@ -532,12 +533,12 @@ func (n *NIMService) GetReplicas() int {
 	return n.Spec.Replicas
 }
 
-// GetDeploymentKind returns the kind of deployment for NIMService
+// GetDeploymentKind returns the kind of deployment for NIMService.
 func (n *NIMService) GetDeploymentKind() string {
 	return "Deployment"
 }
 
-// GetInitContainers returns the init containers for the NIMService deployment
+// GetInitContainers returns the init containers for the NIMService deployment.
 func (n *NIMService) GetInitContainers() []corev1.Container {
 	if n.Spec.Proxy != nil {
 		return []corev1.Container{
@@ -554,27 +555,27 @@ func (n *NIMService) GetInitContainers() []corev1.Container {
 	return []corev1.Container{}
 }
 
-// IsAutoScalingEnabled returns true if autoscaling is enabled for NIMService deployment
+// IsAutoScalingEnabled returns true if autoscaling is enabled for NIMService deployment.
 func (n *NIMService) IsAutoScalingEnabled() bool {
 	return n.Spec.Scale.Enabled != nil && *n.Spec.Scale.Enabled
 }
 
-// IsIngressEnabled returns true if ingress is enabled for NIMService deployment
+// IsIngressEnabled returns true if ingress is enabled for NIMService deployment.
 func (n *NIMService) IsIngressEnabled() bool {
 	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
 }
 
-// GetIngressSpec returns the Ingress spec NIMService deployment
+// GetIngressSpec returns the Ingress spec NIMService deployment.
 func (n *NIMService) GetIngressSpec() networkingv1.IngressSpec {
 	return n.Spec.Expose.Ingress.Spec
 }
 
-// IsServiceMonitorEnabled returns true if servicemonitor is enabled for NIMService deployment
+// IsServiceMonitorEnabled returns true if servicemonitor is enabled for NIMService deployment.
 func (n *NIMService) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
 }
 
-// GetServicePort returns the service port for the NIMService deployment or default port
+// GetServicePort returns the service port for the NIMService deployment or default port.
 func (n *NIMService) GetServicePort() int32 {
 	if n.Spec.Expose.Service.Port == nil {
 		return DefaultAPIPort
@@ -582,12 +583,12 @@ func (n *NIMService) GetServicePort() int32 {
 	return *n.Spec.Expose.Service.Port
 }
 
-// GetServiceType returns the service type for the NIMService deployment
+// GetServiceType returns the service type for the NIMService deployment.
 func (n *NIMService) GetServiceType() string {
 	return string(n.Spec.Expose.Service.Type)
 }
 
-// GetUserID returns the user ID for the NIMService deployment
+// GetUserID returns the user ID for the NIMService deployment.
 func (n *NIMService) GetUserID() *int64 {
 	if n.Spec.UserID != nil {
 		return n.Spec.UserID
@@ -595,7 +596,7 @@ func (n *NIMService) GetUserID() *int64 {
 	return ptr.To[int64](1000)
 }
 
-// GetGroupID returns the group ID for the NIMService deployment
+// GetGroupID returns the group ID for the NIMService deployment.
 func (n *NIMService) GetGroupID() *int64 {
 	if n.Spec.GroupID != nil {
 		return n.Spec.GroupID
@@ -603,7 +604,7 @@ func (n *NIMService) GetGroupID() *int64 {
 	return ptr.To[int64](2000)
 }
 
-// GetStorageReadOnly returns true if the volume have to be mounted as read-only for the NIMService deployment
+// GetStorageReadOnly returns true if the volume have to be mounted as read-only for the NIMService deployment.
 func (n *NIMService) GetStorageReadOnly() bool {
 	if n.Spec.Storage.ReadOnly == nil {
 		return false
@@ -611,7 +612,7 @@ func (n *NIMService) GetStorageReadOnly() bool {
 	return *n.Spec.Storage.ReadOnly
 }
 
-// GetServiceAccountParams return params to render ServiceAccount from templates
+// GetServiceAccountParams return params to render ServiceAccount from templates.
 func (n *NIMService) GetServiceAccountParams() *rendertypes.ServiceAccountParams {
 	params := &rendertypes.ServiceAccountParams{}
 
@@ -623,7 +624,7 @@ func (n *NIMService) GetServiceAccountParams() *rendertypes.ServiceAccountParams
 	return params
 }
 
-// GetDeploymentParams returns params to render Deployment from templates
+// GetDeploymentParams returns params to render Deployment from templates.
 func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params := &rendertypes.DeploymentParams{}
 
@@ -687,7 +688,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	return params
 }
 
-// GetStatefulSetParams returns params to render StatefulSet from templates
+// GetStatefulSetParams returns params to render StatefulSet from templates.
 func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 
 	params := &rendertypes.StatefulSetParams{}
@@ -733,7 +734,7 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	return params
 }
 
-// GetServiceParams returns params to render Service from templates
+// GetServiceParams returns params to render Service from templates.
 func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 	params := &rendertypes.ServiceParams{}
 
@@ -761,7 +762,7 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 	return params
 }
 
-// GetIngressParams returns params to render Ingress from templates
+// GetIngressParams returns params to render Ingress from templates.
 func (n *NIMService) GetIngressParams() *rendertypes.IngressParams {
 	params := &rendertypes.IngressParams{}
 
@@ -775,7 +776,7 @@ func (n *NIMService) GetIngressParams() *rendertypes.IngressParams {
 	return params
 }
 
-// GetRoleParams returns params to render Role from templates
+// GetRoleParams returns params to render Role from templates.
 func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
@@ -807,7 +808,7 @@ func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
 	return params
 }
 
-// GetRoleBindingParams returns params to render RoleBinding from templates
+// GetRoleBindingParams returns params to render RoleBinding from templates.
 func (n *NIMService) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	params := &rendertypes.RoleBindingParams{}
 
@@ -820,7 +821,7 @@ func (n *NIMService) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	return params
 }
 
-// GetHPAParams returns params to render HPA from templates
+// GetHPAParams returns params to render HPA from templates.
 func (n *NIMService) GetHPAParams() *rendertypes.HPAParams {
 	params := &rendertypes.HPAParams{}
 
@@ -849,7 +850,7 @@ func (n *NIMService) GetHPAParams() *rendertypes.HPAParams {
 	return params
 }
 
-// GetSCCParams return params to render SCC from templates
+// GetSCCParams return params to render SCC from templates.
 func (n *NIMService) GetSCCParams() *rendertypes.SCCParams {
 	params := &rendertypes.SCCParams{}
 	// Set metadata
@@ -859,7 +860,7 @@ func (n *NIMService) GetSCCParams() *rendertypes.SCCParams {
 	return params
 }
 
-// GetServiceMonitorParams return params to render Service Monitor from templates
+// GetServiceMonitorParams return params to render Service Monitor from templates.
 func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams {
 	params := &rendertypes.ServiceMonitorParams{}
 	serviceMonitor := n.GetServiceMonitor()
@@ -924,7 +925,7 @@ func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
 	return nimServiceAnnotations
 }
 
-// GetProxySpec returns the proxy spec for the NIMService deployment
+// GetProxySpec returns the proxy spec for the NIMService deployment.
 func (n *NIMService) GetProxySpec() *ProxySpec {
 	return n.Spec.Proxy
 }

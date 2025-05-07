@@ -17,9 +17,10 @@ limitations under the License.
 package controller
 
 import (
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/prometheus/client_golang/prometheus"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
 var (
@@ -162,7 +163,7 @@ func refreshNIMCacheMetrics(nimCacheList *appsv1alpha1.NIMCacheList) {
 		if _, ok := counts[status]; !ok {
 			counts[status] = 1
 		} else {
-			counts[status] = counts[status] + 1
+			counts[status]++
 		}
 	}
 	for _, status := range nimCacheStatusValues {
@@ -187,7 +188,7 @@ func refreshNIMServiceMetrics(nimServiceList *appsv1alpha1.NIMServiceList) {
 		if _, ok := counts[status]; !ok {
 			counts[status] = 1
 		} else {
-			counts[status] = counts[status] + 1
+			counts[status]++
 		}
 	}
 	for _, status := range nimServiceStatusValues {
@@ -212,7 +213,7 @@ func refreshNIMPipelineMetrics(nimPipelineList *appsv1alpha1.NIMPipelineList) {
 		if _, ok := counts[status]; !ok {
 			counts[status] = 1
 		} else {
-			counts[status] = counts[status] + 1
+			counts[status]++
 		}
 	}
 	for _, status := range nimPipelineStatusValues {
@@ -237,7 +238,7 @@ func refreshNemoDatastoreMetrics(nemoDatastoreList *appsv1alpha1.NemoDatastoreLi
 		if _, ok := counts[status]; !ok {
 			counts[status] = 1
 		} else {
-			counts[status] = counts[status] + 1
+			counts[status]++
 		}
 	}
 	for _, status := range nemoDatastoreStatusValues {
@@ -262,7 +263,7 @@ func refreshNemoEvaluatorMetrics(nemoEvaluatorList *appsv1alpha1.NemoEvaluatorLi
 		if _, ok := counts[status]; !ok {
 			counts[status] = 1
 		} else {
-			counts[status] = counts[status] + 1
+			counts[status]++
 		}
 	}
 	for _, status := range nemoEvaluatorStatusValues {
@@ -287,7 +288,7 @@ func refreshNemoCustomizerMetrics(nemoCustomizerList *appsv1alpha1.NemoCustomize
 		if _, ok := counts[status]; !ok {
 			counts[status] = 1
 		} else {
-			counts[status] = counts[status] + 1
+			counts[status]++
 		}
 	}
 	for _, status := range nemoCustomizerStatusValues {
@@ -312,7 +313,7 @@ func refreshNemoEntitystoreMetrics(nemoEntitystoreList *appsv1alpha1.NemoEntitys
 		if _, ok := counts[status]; !ok {
 			counts[status] = 1
 		} else {
-			counts[status] = counts[status] + 1
+			counts[status]++
 		}
 	}
 	for _, status := range nemoEntitystoreStatusValues {
@@ -337,7 +338,7 @@ func refreshNemoGuardrailMetrics(nemoGuardrailList *appsv1alpha1.NemoGuardrailLi
 		if _, ok := counts[status]; !ok {
 			counts[status] = 1
 		} else {
-			counts[status] = counts[status] + 1
+			counts[status]++
 		}
 	}
 	for _, status := range nemoGuardrailStatusValues {

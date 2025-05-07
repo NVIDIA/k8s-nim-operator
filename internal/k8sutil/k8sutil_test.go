@@ -17,6 +17,7 @@ limitations under the License.
 package k8sutil
 
 import (
+	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -53,7 +54,7 @@ func TestDetectPlatform(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithObjects(node).Build()
 
 			// Detect container platform
-			platform, err := GetOrchestratorType(fakeClient)
+			platform, err := GetOrchestratorType(context.TODO(), fakeClient)
 			if err != nil {
 				t.Fatalf("GetContainerPlatform failed: %v", err)
 			}

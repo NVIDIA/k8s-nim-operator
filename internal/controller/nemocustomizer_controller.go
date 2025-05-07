@@ -22,12 +22,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"gopkg.in/yaml.v2"
@@ -48,16 +42,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 const (
-	// NemoCustomizerFinalizer is the finalizer annotation
+	// NemoCustomizerFinalizer is the finalizer annotation.
 	NemoCustomizerFinalizer = "finalizer.nemocustomizer.apps.nvidia.com"
-	// ConfigHashAnnotationKey is the annotation key for storing hash of the training configuration
+	// ConfigHashAnnotationKey is the annotation key for storing hash of the training configuration.
 	ConfigHashAnnotationKey = "apps.nvidia.com/training-config-hash"
 )
 
-// NemoCustomizerReconciler reconciles a NemoCustomizer object
+// NemoCustomizerReconciler reconciles a NemoCustomizer object.
 type NemoCustomizerReconciler struct {
 	client.Client
 	scheme           *runtime.Scheme
@@ -69,10 +70,10 @@ type NemoCustomizerReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 }
 
-// Ensure NemoCustomizerReconciler implements the Reconciler interface
+// Ensure NemoCustomizerReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NemoCustomizerReconciler{}
 
-// NewNemoCustomizerReconciler creates a new reconciler for NemoCustomizer with the given platform
+// NewNemoCustomizerReconciler creates a new reconciler for NemoCustomizer with the given platform.
 func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoCustomizerReconciler {
 	return &NemoCustomizerReconciler{
 		Client:   client,
@@ -161,7 +162,7 @@ func (r *NemoCustomizerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// Fetch container orchestrator type
-	_, err := r.GetOrchestratorType()
+	_, err := r.GetOrchestratorType(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
@@ -181,45 +182,45 @@ func (r *NemoCustomizerReconciler) cleanupNemoCustomizer(ctx context.Context, ne
 	return nil
 }
 
-// GetScheme returns the scheme of the reconciler
+// GetScheme returns the scheme of the reconciler.
 func (r *NemoCustomizerReconciler) GetScheme() *runtime.Scheme {
 	return r.scheme
 }
 
-// GetLogger returns the logger of the reconciler
+// GetLogger returns the logger of the reconciler.
 func (r *NemoCustomizerReconciler) GetLogger() logr.Logger {
 	return r.log
 }
 
-// GetClient returns the client instance
+// GetClient returns the client instance.
 func (r *NemoCustomizerReconciler) GetClient() client.Client {
 	return r.Client
 }
 
-// GetConfig returns the rest config
+// GetConfig returns the rest config.
 func (r *NemoCustomizerReconciler) GetConfig() *rest.Config {
 	return r.Config
 }
 
-// GetUpdater returns the conditions updater instance
+// GetUpdater returns the conditions updater instance.
 func (r *NemoCustomizerReconciler) GetUpdater() conditions.Updater {
 	return r.updater
 }
 
-// GetRenderer returns the renderer instance
+// GetRenderer returns the renderer instance.
 func (r *NemoCustomizerReconciler) GetRenderer() render.Renderer {
 	return r.renderer
 }
 
-// GetEventRecorder returns the event recorder
+// GetEventRecorder returns the event recorder.
 func (r *NemoCustomizerReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetOrchestratorType returns the container platform type
-func (r *NemoCustomizerReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, error) {
+// GetOrchestratorType returns the container platform type.
+func (r *NemoCustomizerReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
-		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		orchestratorType, err := k8sutil.GetOrchestratorType(ctx, r.GetClient())
 		if err != nil {
 			return k8sutil.Unknown, fmt.Errorf("unable to get container orchestrator type, %v", err)
 		}
@@ -247,15 +248,16 @@ func (r *NemoCustomizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				// Type assert to NemoCustomizer
 				if oldNemoCustomizer, ok := e.ObjectOld.(*appsv1alpha1.NemoCustomizer); ok {
-					newNemoCustomizer := e.ObjectNew.(*appsv1alpha1.NemoCustomizer)
+					newNemoCustomizer, ok := e.ObjectNew.(*appsv1alpha1.NemoCustomizer)
+					if ok {
+						// Handle case where object is marked for deletion
+						if !newNemoCustomizer.ObjectMeta.DeletionTimestamp.IsZero() {
+							return true
+						}
 
-					// Handle case where object is marked for deletion
-					if !newNemoCustomizer.ObjectMeta.DeletionTimestamp.IsZero() {
-						return true
+						// Handle only spec updates
+						return !reflect.DeepEqual(oldNemoCustomizer.Spec, newNemoCustomizer.Spec)
 					}
-
-					// Handle only spec updates
-					return !reflect.DeepEqual(oldNemoCustomizer.Spec, newNemoCustomizer.Spec)
 				}
 				// For other types we watch, reconcile them
 				return true
@@ -276,56 +278,56 @@ func (r *NemoCustomizerReconciler) refreshMetrics(ctx context.Context) {
 	refreshNemoCustomizerMetrics(NemoCustomizerList)
 }
 
-func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, NemoCustomizer *appsv1alpha1.NemoCustomizer) (ctrl.Result, error) {
+func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	var err error
 	defer func() {
 		if err != nil {
-			r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeWarning, conditions.Failed,
-				"NemoCustomizer %s failed, msg: %s", NemoCustomizer.Name, err.Error())
+			r.GetEventRecorder().Eventf(nemoCustomizer, corev1.EventTypeWarning, conditions.Failed,
+				"NemoCustomizer %s failed, msg: %s", nemoCustomizer.Name, err.Error())
 		}
 	}()
 	// Generate annotation for the current operator-version and apply to all resources
 	// Get generic name for all resources
-	namespacedName := types.NamespacedName{Name: NemoCustomizer.GetName(), Namespace: NemoCustomizer.GetNamespace()}
+	namespacedName := types.NamespacedName{Name: nemoCustomizer.GetName(), Namespace: nemoCustomizer.GetNamespace()}
 	renderer := r.GetRenderer()
 
 	// Sync serviceaccount
-	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
-		return renderer.ServiceAccount(NemoCustomizer.GetServiceAccountParams())
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
+		return renderer.ServiceAccount(nemoCustomizer.GetServiceAccountParams())
 	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Sync role
-	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(NemoCustomizer.GetRoleParams())
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+		return renderer.Role(nemoCustomizer.GetRoleParams())
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
-		return renderer.RoleBinding(NemoCustomizer.GetRoleBindingParams())
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+		return renderer.RoleBinding(nemoCustomizer.GetRoleBindingParams())
 	}, "rolebinding", conditions.ReasonRoleBindingFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Sync service
-	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &corev1.Service{}, func() (client.Object, error) {
-		return renderer.Service(NemoCustomizer.GetServiceParams())
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.Service{}, func() (client.Object, error) {
+		return renderer.Service(nemoCustomizer.GetServiceParams())
 	}, "service", conditions.ReasonServiceFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Sync ingress
-	if NemoCustomizer.IsIngressEnabled() {
-		err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
-			return renderer.Ingress(NemoCustomizer.GetIngressParams())
+	if nemoCustomizer.IsIngressEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
+			return renderer.Ingress(nemoCustomizer.GetIngressParams())
 		}, "ingress", conditions.ReasonIngressFailed)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -338,9 +340,9 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Sync HPA
-	if NemoCustomizer.IsAutoScalingEnabled() {
-		err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
-			return renderer.HPA(NemoCustomizer.GetHPAParams())
+	if nemoCustomizer.IsAutoScalingEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
+			return renderer.HPA(nemoCustomizer.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -354,9 +356,9 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Sync Service Monitor
-	if NemoCustomizer.IsServiceMonitorEnabled() {
-		err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
-			return renderer.ServiceMonitor(NemoCustomizer.GetServiceMonitorParams())
+	if nemoCustomizer.IsServiceMonitorEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
+			return renderer.ServiceMonitor(nemoCustomizer.GetServiceMonitorParams())
 		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -364,23 +366,23 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Sync Customizer ConfigMap
-	customizerConfigYAML, err := r.renderCustomizerConfig(ctx, NemoCustomizer)
+	customizerConfigYAML, err := r.renderCustomizerConfig(ctx, nemoCustomizer)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("rendering customizer config: %w", err)
 	}
 
-	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &corev1.ConfigMap{}, func() (client.Object, error) {
-		return renderer.ConfigMap(NemoCustomizer.GetConfigMapParams(customizerConfigYAML))
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.ConfigMap{}, func() (client.Object, error) {
+		return renderer.ConfigMap(nemoCustomizer.GetConfigMapParams(customizerConfigYAML))
 	}, "configmap", conditions.ReasonConfigMapFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	secretValue, err := r.getValueFromSecret(ctx, NemoCustomizer.GetNamespace(), NemoCustomizer.Spec.DatabaseConfig.Credentials.SecretName, NemoCustomizer.Spec.DatabaseConfig.Credentials.PasswordKey)
+	secretValue, err := r.getValueFromSecret(ctx, nemoCustomizer.GetNamespace(), nemoCustomizer.Spec.DatabaseConfig.Credentials.SecretName, nemoCustomizer.Spec.DatabaseConfig.Credentials.PasswordKey)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	data := NemoCustomizer.GeneratePostgresConnString(secretValue)
+	data := nemoCustomizer.GeneratePostgresConnString(secretValue)
 	// Encode to base64
 	encoded := base64.StdEncoding.EncodeToString([]byte(data))
 
@@ -388,20 +390,20 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		"dsn": encoded,
 	}
 	// Sync Customizer Secret
-	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &corev1.Secret{}, func() (client.Object, error) {
-		return renderer.Secret(NemoCustomizer.GetSecretParams(secretMapData))
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.Secret{}, func() (client.Object, error) {
+		return renderer.Secret(nemoCustomizer.GetSecretParams(secretMapData))
 	}, "secret", conditions.ReasonSecretFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Sync Customizer PVC for model storage
-	if err = r.reconcilePVC(ctx, NemoCustomizer); err != nil {
+	if err = r.reconcilePVC(ctx, nemoCustomizer); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Get params to render Deployment resource
-	deploymentParams := NemoCustomizer.GetDeploymentParams()
+	deploymentParams := nemoCustomizer.GetDeploymentParams()
 
 	// Calculate the hash of the config data
 	configHash := utils.CalculateSHA256(string(customizerConfigYAML))
@@ -417,11 +419,11 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Setup volume mounts with customizer config
-	deploymentParams.Volumes = NemoCustomizer.GetVolumes()
-	deploymentParams.VolumeMounts = NemoCustomizer.GetVolumeMounts()
+	deploymentParams.Volumes = nemoCustomizer.GetVolumes()
+	deploymentParams.VolumeMounts = nemoCustomizer.GetVolumeMounts()
 
 	// Sync deployment
-	err = r.renderAndSyncResource(ctx, NemoCustomizer, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
 		return renderer.Deployment(deploymentParams)
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
@@ -436,14 +438,14 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 
 	if !ready {
 		// Update status as NotReady
-		err = r.updater.SetConditionsNotReady(ctx, NemoCustomizer, conditions.NotReady, msg)
-		r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeNormal, conditions.NotReady,
-			"NemoCustomizer %s not ready yet, msg: %s", NemoCustomizer.Name, msg)
+		err = r.updater.SetConditionsNotReady(ctx, nemoCustomizer, conditions.NotReady, msg)
+		r.GetEventRecorder().Eventf(nemoCustomizer, corev1.EventTypeNormal, conditions.NotReady,
+			"NemoCustomizer %s not ready yet, msg: %s", nemoCustomizer.Name, msg)
 	} else {
 		// Update status as ready
-		err = r.updater.SetConditionsReady(ctx, NemoCustomizer, conditions.Ready, msg)
-		r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeNormal, conditions.Ready,
-			"NemoCustomizer %s ready, msg: %s", NemoCustomizer.Name, msg)
+		err = r.updater.SetConditionsReady(ctx, nemoCustomizer, conditions.Ready, msg)
+		r.GetEventRecorder().Eventf(nemoCustomizer, corev1.EventTypeNormal, conditions.Ready,
+			"NemoCustomizer %s ready, msg: %s", nemoCustomizer.Name, msg)
 	}
 
 	if err != nil {
@@ -692,26 +694,26 @@ func (r *NemoCustomizerReconciler) addModelConfig(ctx context.Context, cfg map[s
 	return nil
 }
 
-func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, NemoCustomizer *appsv1alpha1.NemoCustomizer, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: NemoCustomizer.GetName(), Namespace: NemoCustomizer.GetNamespace()}
+	namespacedName := types.NamespacedName{Name: nemoCustomizer.GetName(), Namespace: nemoCustomizer.GetNamespace()}
 	err := r.Get(ctx, namespacedName, obj)
 	if err != nil && !errors.IsNotFound(err) {
 		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
 		return err
 	}
 	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(NemoCustomizer.Spec)) {
+	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoCustomizer.Spec)) {
 		return nil
 	}
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, NemoCustomizer.GetName(), NemoCustomizer.GetNamespace())
-		statusError := r.updater.SetConditionsFailed(ctx, NemoCustomizer, reason, err.Error())
+		logger.Error(err, "failed to render", conditionType, nemoCustomizer.GetName(), nemoCustomizer.GetNamespace())
+		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoCustomizer", NemoCustomizer.GetName())
+			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
 		}
 		return err
 	}
@@ -733,11 +735,11 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, Ne
 		return nil
 	}
 
-	if err = controllerutil.SetControllerReference(NemoCustomizer, resource, r.GetScheme()); err != nil {
+	if err = controllerutil.SetControllerReference(nemoCustomizer, resource, r.GetScheme()); err != nil {
 		logger.Error(err, "failed to set owner", conditionType, namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, NemoCustomizer, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoCustomizer", NemoCustomizer.GetName())
+			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
 		}
 		return err
 	}
@@ -745,9 +747,9 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, Ne
 	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
-		statusError := r.updater.SetConditionsFailed(ctx, NemoCustomizer, reason, err.Error())
+		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "NemoCustomizer", NemoCustomizer.GetName())
+			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
 		}
 		return err
 	}

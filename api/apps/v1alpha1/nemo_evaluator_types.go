@@ -23,8 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
-	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -34,27 +32,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
+	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 const (
-	// EvaluatorAPIPort is the default port that the evaluator serves on
+	// EvaluatorAPIPort is the default port that the evaluator serves on.
 	EvaluatorAPIPort = 7331
 	// NemoEvaluatorConditionReady indicates that the NEMO EvaluatorService is ready.
 	NemoEvaluatorConditionReady = "Ready"
 	// NemoEvaluatorConditionFailed indicates that the NEMO EvaluatorService has failed.
 	NemoEvaluatorConditionFailed = "Failed"
 
-	// NemoEvaluatorStatusPending indicates that NEMO EvaluatorService is in pending state
+	// NemoEvaluatorStatusPending indicates that NEMO EvaluatorService is in pending state.
 	NemoEvaluatorStatusPending = "Pending"
-	// NemoEvaluatorStatusNotReady indicates that NEMO EvaluatorService is not ready
+	// NemoEvaluatorStatusNotReady indicates that NEMO EvaluatorService is not ready.
 	NemoEvaluatorStatusNotReady = "NotReady"
-	// NemoEvaluatorStatusReady indicates that NEMO EvaluatorService is ready
+	// NemoEvaluatorStatusReady indicates that NEMO EvaluatorService is ready.
 	NemoEvaluatorStatusReady = "Ready"
-	// NemoEvaluatorStatusFailed indicates that NEMO EvaluatorService has failed
+	// NemoEvaluatorStatusFailed indicates that NEMO EvaluatorService has failed.
 	NemoEvaluatorStatusFailed = "Failed"
 )
 
-// NemoEvaluatorSpec defines the desired state of NemoEvaluator
+// NemoEvaluatorSpec defines the desired state of NemoEvaluator.
 type NemoEvaluatorSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
@@ -133,7 +134,7 @@ type EvaluationImages struct {
 	Rag string `json:"rag"`
 }
 
-// NemoEvaluatorStatus defines the observed state of NemoEvaluator
+// NemoEvaluatorStatus defines the observed state of NemoEvaluator.
 type NemoEvaluatorStatus struct {
 	Conditions        []metav1.Condition `json:"conditions,omitempty"`
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
@@ -146,7 +147,7 @@ type NemoEvaluatorStatus struct {
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
 // +kubebuilder:printcolumn:name="Age",type="date",format="date-time",JSONPath=".metadata.creationTimestamp",priority=0
 
-// NemoEvaluator is the Schema for the NemoEvaluator API
+// NemoEvaluator is the Schema for the NemoEvaluator API.
 type NemoEvaluator struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -157,7 +158,7 @@ type NemoEvaluator struct {
 
 // +kubebuilder:object:root=true
 
-// NemoEvaluatorList contains a list of NemoEvaluator
+// NemoEvaluatorList contains a list of NemoEvaluator.
 type NemoEvaluatorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -197,14 +198,14 @@ func (ei EvaluationImages) GetEvaluationImageEnv() []corev1.EnvVar {
 	}
 }
 
-// GetStandardSelectorLabels returns the standard selector labels for the NemoEvaluator deployment
+// GetStandardSelectorLabels returns the standard selector labels for the NemoEvaluator deployment.
 func (n *NemoEvaluator) GetStandardSelectorLabels() map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name": n.Name,
 	}
 }
 
-// GetStandardLabels returns the standard set of labels for NemoEvaluator resources
+// GetStandardLabels returns the standard set of labels for NemoEvaluator resources.
 func (n *NemoEvaluator) GetStandardLabels() map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":             n.Name,
@@ -215,7 +216,7 @@ func (n *NemoEvaluator) GetStandardLabels() map[string]string {
 	}
 }
 
-// GetStandardEnv returns the standard set of env variables for the NemoEvaluator container
+// GetStandardEnv returns the standard set of env variables for the NemoEvaluator container.
 func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 	// add standard env required for NIM service
 
@@ -296,7 +297,7 @@ func (n *NemoEvaluator) GetStandardEnv() []corev1.EnvVar {
 	return envVars
 }
 
-// IsValidationEnabled returns if the validation jobs are enabled by default
+// IsValidationEnabled returns if the validation jobs are enabled by default.
 func (n *NemoEvaluator) IsValidationEnabled() bool {
 	if n.Spec.EnableValidation == nil {
 		// validation jobs are enabled by default
@@ -305,7 +306,7 @@ func (n *NemoEvaluator) IsValidationEnabled() bool {
 	return *n.Spec.EnableValidation
 }
 
-// IsOtelEnabled returns true if Open Telemetry Collector is enabled
+// IsOtelEnabled returns true if Open Telemetry Collector is enabled.
 func (n *NemoEvaluator) IsOtelEnabled() bool {
 	return n.Spec.OpenTelemetry.Enabled != nil && *n.Spec.OpenTelemetry.Enabled
 }
@@ -394,7 +395,7 @@ func (n *NemoEvaluator) GeneratePostgresConnString(secretValue string) string {
 	return connString
 }
 
-// GetStandardAnnotations returns default annotations to apply to the NemoEvaluator instance
+// GetStandardAnnotations returns default annotations to apply to the NemoEvaluator instance.
 func (n *NemoEvaluator) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
 		"openshift.io/required-scc":             "nonroot",
@@ -403,7 +404,7 @@ func (n *NemoEvaluator) GetStandardAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetNemoEvaluatorAnnotations returns annotations to apply to the NemoEvaluator instance
+// GetNemoEvaluatorAnnotations returns annotations to apply to the NemoEvaluator instance.
 func (n *NemoEvaluator) GetNemoEvaluatorAnnotations() map[string]string {
 	standardAnnotations := n.GetStandardAnnotations()
 
@@ -414,7 +415,7 @@ func (n *NemoEvaluator) GetNemoEvaluatorAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetServiceLabels returns merged labels to apply to the NemoEvaluator instance
+// GetServiceLabels returns merged labels to apply to the NemoEvaluator instance.
 func (n *NemoEvaluator) GetServiceLabels() map[string]string {
 	standardLabels := n.GetStandardLabels()
 
@@ -424,68 +425,68 @@ func (n *NemoEvaluator) GetServiceLabels() map[string]string {
 	return standardLabels
 }
 
-// GetSelectorLabels returns standard selector labels to apply to the NemoEvaluator instance
+// GetSelectorLabels returns standard selector labels to apply to the NemoEvaluator instance.
 func (n *NemoEvaluator) GetSelectorLabels() map[string]string {
 	// TODO: add custom ones
 	return n.GetStandardSelectorLabels()
 }
 
-// GetNodeSelector returns node selector labels for the NemoEvaluator instance
+// GetNodeSelector returns node selector labels for the NemoEvaluator instance.
 func (n *NemoEvaluator) GetNodeSelector() map[string]string {
 	return n.Spec.NodeSelector
 }
 
-// GetTolerations returns tolerations for the NemoEvaluator instance
+// GetTolerations returns tolerations for the NemoEvaluator instance.
 func (n *NemoEvaluator) GetTolerations() []corev1.Toleration {
 	return n.Spec.Tolerations
 }
 
-// GetPodAffinity returns pod affinity for the NemoEvaluator instance
+// GetPodAffinity returns pod affinity for the NemoEvaluator instance.
 func (n *NemoEvaluator) GetPodAffinity() *corev1.PodAffinity {
 	return n.Spec.PodAffinity
 }
 
-// GetContainerName returns name of the container for NemoEvaluator deployment
+// GetContainerName returns name of the container for NemoEvaluator deployment.
 func (n *NemoEvaluator) GetContainerName() string {
 	return fmt.Sprintf("%s-ctr", n.Name)
 }
 
-// GetCommand return command to override for the NemoEvaluator container
+// GetCommand return command to override for the NemoEvaluator container.
 func (n *NemoEvaluator) GetCommand() []string {
 	return n.Spec.Command
 }
 
-// GetArgs return arguments for the NemoEvaluator container
+// GetArgs return arguments for the NemoEvaluator container.
 func (n *NemoEvaluator) GetArgs() []string {
 	return n.Spec.Args
 }
 
-// GetEnv returns merged slice of standard and user specified env variables
+// GetEnv returns merged slice of standard and user specified env variables.
 func (n *NemoEvaluator) GetEnv() []corev1.EnvVar {
 	return utils.MergeEnvVars(n.GetStandardEnv(), n.Spec.Env)
 }
 
-// GetImage returns container image for the NemoEvaluator
+// GetImage returns container image for the NemoEvaluator.
 func (n *NemoEvaluator) GetImage() string {
 	return fmt.Sprintf("%s:%s", n.Spec.Image.Repository, n.Spec.Image.Tag)
 }
 
-// GetImagePullSecrets returns the image pull secrets for the NIM container
+// GetImagePullSecrets returns the image pull secrets for the NIM container.
 func (n *NemoEvaluator) GetImagePullSecrets() []string {
 	return n.Spec.Image.PullSecrets
 }
 
-// GetImagePullPolicy returns the image pull policy for the NIM container
+// GetImagePullPolicy returns the image pull policy for the NIM container.
 func (n *NemoEvaluator) GetImagePullPolicy() string {
 	return n.Spec.Image.PullPolicy
 }
 
-// GetResources returns resources to allocate to the NemoEvaluator container
+// GetResources returns resources to allocate to the NemoEvaluator container.
 func (n *NemoEvaluator) GetResources() *corev1.ResourceRequirements {
 	return n.Spec.Resources
 }
 
-// GetLivenessProbe returns liveness probe for the NemoEvaluator container
+// GetLivenessProbe returns liveness probe for the NemoEvaluator container.
 func (n *NemoEvaluator) GetLivenessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		FailureThreshold: 3,
@@ -501,7 +502,7 @@ func (n *NemoEvaluator) GetLivenessProbe() *corev1.Probe {
 	}
 }
 
-// GetReadinessProbe returns readiness probe for the NemoEvaluator container
+// GetReadinessProbe returns readiness probe for the NemoEvaluator container.
 func (n *NemoEvaluator) GetReadinessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		FailureThreshold: 3,
@@ -517,7 +518,7 @@ func (n *NemoEvaluator) GetReadinessProbe() *corev1.Probe {
 	}
 }
 
-// GetStartupProbe returns startup probe for the NemoEvaluator container
+// GetStartupProbe returns startup probe for the NemoEvaluator container.
 func (n *NemoEvaluator) GetStartupProbe() *corev1.Probe {
 	return &corev1.Probe{
 		InitialDelaySeconds: 30,
@@ -534,27 +535,27 @@ func (n *NemoEvaluator) GetStartupProbe() *corev1.Probe {
 	}
 }
 
-// GetServiceAccountName returns service account name for the NemoEvaluator deployment
+// GetServiceAccountName returns service account name for the NemoEvaluator deployment.
 func (n *NemoEvaluator) GetServiceAccountName() string {
 	return n.Name
 }
 
-// GetRuntimeClass return the runtime class name for the NemoEvaluator deployment
+// GetRuntimeClass return the runtime class name for the NemoEvaluator deployment.
 func (n *NemoEvaluator) GetRuntimeClass() string {
 	return n.Spec.RuntimeClass
 }
 
-// GetHPA returns the HPA spec for the NemoEvaluator deployment
+// GetHPA returns the HPA spec for the NemoEvaluator deployment.
 func (n *NemoEvaluator) GetHPA() HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPA
 }
 
-// GetServiceMonitor returns the Service Monitor details for the NemoEvaluator deployment
+// GetServiceMonitor returns the Service Monitor details for the NemoEvaluator deployment.
 func (n *NemoEvaluator) GetServiceMonitor() ServiceMonitor {
 	return n.Spec.Metrics.ServiceMonitor
 }
 
-// GetReplicas returns replicas for the NemoEvaluator deployment
+// GetReplicas returns replicas for the NemoEvaluator deployment.
 func (n *NemoEvaluator) GetReplicas() int {
 	if n.IsAutoScalingEnabled() {
 		return 0
@@ -562,32 +563,32 @@ func (n *NemoEvaluator) GetReplicas() int {
 	return n.Spec.Replicas
 }
 
-// GetDeploymentKind returns the kind of deployment for NemoEvaluator
+// GetDeploymentKind returns the kind of deployment for NemoEvaluator.
 func (n *NemoEvaluator) GetDeploymentKind() string {
 	return "Deployment"
 }
 
-// IsAutoScalingEnabled returns true if autoscaling is enabled for NemoEvaluator deployment
+// IsAutoScalingEnabled returns true if autoscaling is enabled for NemoEvaluator deployment.
 func (n *NemoEvaluator) IsAutoScalingEnabled() bool {
 	return n.Spec.Scale.Enabled != nil && *n.Spec.Scale.Enabled
 }
 
-// IsIngressEnabled returns true if ingress is enabled for NemoEvaluator deployment
+// IsIngressEnabled returns true if ingress is enabled for NemoEvaluator deployment.
 func (n *NemoEvaluator) IsIngressEnabled() bool {
 	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
 }
 
-// GetIngressSpec returns the Ingress spec NemoEvaluator deployment
+// GetIngressSpec returns the Ingress spec NemoEvaluator deployment.
 func (n *NemoEvaluator) GetIngressSpec() networkingv1.IngressSpec {
 	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
 }
 
-// IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoEvaluator deployment
+// IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoEvaluator deployment.
 func (n *NemoEvaluator) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
 }
 
-// GetServicePort returns the service port for the NemoEvaluator deployment or default port
+// GetServicePort returns the service port for the NemoEvaluator deployment or default port.
 func (n *NemoEvaluator) GetServicePort() int32 {
 	if n.Spec.Expose.Service.Port == nil {
 		return DefaultAPIPort
@@ -595,12 +596,12 @@ func (n *NemoEvaluator) GetServicePort() int32 {
 	return *n.Spec.Expose.Service.Port
 }
 
-// GetServiceType returns the service type for the NemoEvaluator deployment
+// GetServiceType returns the service type for the NemoEvaluator deployment.
 func (n *NemoEvaluator) GetServiceType() string {
 	return string(n.Spec.Expose.Service.Type)
 }
 
-// GetUserID returns the user ID for the NemoEvaluator deployment
+// GetUserID returns the user ID for the NemoEvaluator deployment.
 func (n *NemoEvaluator) GetUserID() *int64 {
 	if n.Spec.UserID != nil {
 		return n.Spec.UserID
@@ -608,7 +609,7 @@ func (n *NemoEvaluator) GetUserID() *int64 {
 	return ptr.To[int64](1000)
 }
 
-// GetGroupID returns the group ID for the NemoEvaluator deployment
+// GetGroupID returns the group ID for the NemoEvaluator deployment.
 func (n *NemoEvaluator) GetGroupID() *int64 {
 	if n.Spec.GroupID != nil {
 		return n.Spec.GroupID
@@ -616,7 +617,7 @@ func (n *NemoEvaluator) GetGroupID() *int64 {
 	return ptr.To[int64](2000)
 }
 
-// GetServiceAccountParams return params to render ServiceAccount from templates
+// GetServiceAccountParams return params to render ServiceAccount from templates.
 func (n *NemoEvaluator) GetServiceAccountParams() *rendertypes.ServiceAccountParams {
 	params := &rendertypes.ServiceAccountParams{}
 
@@ -628,7 +629,7 @@ func (n *NemoEvaluator) GetServiceAccountParams() *rendertypes.ServiceAccountPar
 	return params
 }
 
-// GetDeploymentParams returns params to render Deployment from templates
+// GetDeploymentParams returns params to render Deployment from templates.
 func (n *NemoEvaluator) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params := &rendertypes.DeploymentParams{}
 
@@ -688,7 +689,7 @@ func (n *NemoEvaluator) GetDeploymentParams() *rendertypes.DeploymentParams {
 	return params
 }
 
-// GetStatefulSetParams returns params to render StatefulSet from templates
+// GetStatefulSetParams returns params to render StatefulSet from templates.
 func (n *NemoEvaluator) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 
 	params := &rendertypes.StatefulSetParams{}
@@ -734,7 +735,7 @@ func (n *NemoEvaluator) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	return params
 }
 
-// GetServiceParams returns params to render Service from templates
+// GetServiceParams returns params to render Service from templates.
 func (n *NemoEvaluator) GetServiceParams() *rendertypes.ServiceParams {
 	params := &rendertypes.ServiceParams{}
 
@@ -763,7 +764,7 @@ func (n *NemoEvaluator) GetServiceParams() *rendertypes.ServiceParams {
 	return params
 }
 
-// GetIngressParams returns params to render Ingress from templates
+// GetIngressParams returns params to render Ingress from templates.
 func (n *NemoEvaluator) GetIngressParams() *rendertypes.IngressParams {
 	params := &rendertypes.IngressParams{}
 
@@ -777,7 +778,7 @@ func (n *NemoEvaluator) GetIngressParams() *rendertypes.IngressParams {
 	return params
 }
 
-// GetRoleParams returns params to render Role from templates
+// GetRoleParams returns params to render Role from templates.
 func (n *NemoEvaluator) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
@@ -803,7 +804,7 @@ func (n *NemoEvaluator) GetRoleParams() *rendertypes.RoleParams {
 	return params
 }
 
-// GetRoleBindingParams returns params to render RoleBinding from templates
+// GetRoleBindingParams returns params to render RoleBinding from templates.
 func (n *NemoEvaluator) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	params := &rendertypes.RoleBindingParams{}
 
@@ -816,7 +817,7 @@ func (n *NemoEvaluator) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	return params
 }
 
-// GetHPAParams returns params to render HPA from templates
+// GetHPAParams returns params to render HPA from templates.
 func (n *NemoEvaluator) GetHPAParams() *rendertypes.HPAParams {
 	params := &rendertypes.HPAParams{}
 
@@ -845,7 +846,7 @@ func (n *NemoEvaluator) GetHPAParams() *rendertypes.HPAParams {
 	return params
 }
 
-// GetSCCParams return params to render SCC from templates
+// GetSCCParams return params to render SCC from templates.
 func (n *NemoEvaluator) GetSCCParams() *rendertypes.SCCParams {
 	params := &rendertypes.SCCParams{}
 	// Set metadata
@@ -855,7 +856,7 @@ func (n *NemoEvaluator) GetSCCParams() *rendertypes.SCCParams {
 	return params
 }
 
-// GetServiceMonitorParams return params to render Service Monitor from templates
+// GetServiceMonitorParams return params to render Service Monitor from templates.
 func (n *NemoEvaluator) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams {
 	params := &rendertypes.ServiceMonitorParams{}
 	serviceMonitor := n.GetServiceMonitor()

@@ -1,0 +1,37 @@
+version: "2"
+run:
+  tests: true
+linters:
+  enable:
+    - asciicheck
+    - contextcheck
+    - forcetypeassert
+    - gocritic
+    - godot
+    - misspell
+    - staticcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/NVIDIA/k8s-nim-operator
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

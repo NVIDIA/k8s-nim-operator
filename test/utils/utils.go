@@ -46,7 +46,7 @@ func InstallPrometheusOperator() error {
 	return err
 }
 
-// Run executes the provided command within this context
+// Run executes the provided command within this context.
 func Run(cmd *exec.Cmd) ([]byte, error) {
 	dir, _ := GetProjectDir()
 	cmd.Dir = dir
@@ -69,7 +69,7 @@ func Run(cmd *exec.Cmd) ([]byte, error) {
 	return output, nil
 }
 
-// UninstallPrometheusOperator uninstalls the prometheus
+// UninstallPrometheusOperator uninstalls the prometheus.
 func UninstallPrometheusOperator() {
 	url := fmt.Sprintf(prometheusOperatorURL, prometheusOperatorVersion)
 	cmd := exec.Command("kubectl", "delete", "-f", url)
@@ -78,7 +78,7 @@ func UninstallPrometheusOperator() {
 	}
 }
 
-// UninstallCertManager uninstalls the cert manager
+// UninstallCertManager uninstalls the cert manager.
 func UninstallCertManager() {
 	url := fmt.Sprintf(certmanagerURLTmpl, certmanagerVersion)
 	cmd := exec.Command("kubectl", "delete", "-f", url)
@@ -106,7 +106,7 @@ func InstallCertManager() error {
 	return err
 }
 
-// LoadImageToKindCluster loads a local docker image to the kind cluster
+// LoadImageToKindCluster loads a local docker image to the kind cluster.
 func LoadImageToKindClusterWithName(name string) error {
 	cluster := "kind"
 	if v, ok := os.LookupEnv("KIND_CLUSTER"); ok {
@@ -132,7 +132,7 @@ func GetNonEmptyLines(output string) []string {
 	return res
 }
 
-// GetProjectDir will return the directory where the project is
+// GetProjectDir will return the directory where the project is.
 func GetProjectDir() (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
