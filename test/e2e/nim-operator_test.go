@@ -33,9 +33,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 
+	"github.com/NVIDIA/k8s-test-infra/pkg/diagnostics"
+
 	"github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/api/versioned"
-	"github.com/NVIDIA/k8s-test-infra/pkg/diagnostics"
 )
 
 // Regex patterns for string substitution in CRs.
@@ -45,7 +46,7 @@ const (
 	esVersionPattern = "{NEMO_ENTITYSTORE_VERSION}"
 )
 
-// Actual test suite
+// Actual test suite.
 var _ = Describe("NIM Operator", func() {
 
 	AfterEach(func(ctx context.Context) {
@@ -243,7 +244,7 @@ func cleanup() {
 	}
 }
 
-// cleanupNIMCRs deletes all NIMCache, NIMService and NIMPipeline CRs deployed on the test namespace
+// cleanupNIMCRs deletes all NIMCache, NIMService and NIMPipeline CRs deployed on the test namespace.
 func cleanupNIMCRs() {
 	cli, err := versioned.NewForConfig(clientConfig)
 	Expect(err).NotTo(HaveOccurred())
@@ -301,7 +302,7 @@ func cleanupNIMCRs() {
 	}
 }
 
-// cleanupNEMOCRs deletes all NEMO microservice CRs deployed on the test namespace
+// cleanupNEMOCRs deletes all NEMO microservice CRs deployed on the test namespace.
 func cleanupNEMOCRs() {
 	cli, err := versioned.NewForConfig(clientConfig)
 	Expect(err).NotTo(HaveOccurred())

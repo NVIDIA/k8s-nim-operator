@@ -20,10 +20,11 @@ import (
 	"regexp"
 	"strings"
 
+	yaml "gopkg.in/yaml.v2"
+
 	nimparser "github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
 	nimparserv1 "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/v1"
 	nimparserv2 "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/v2"
-	yaml "gopkg.in/yaml.v2"
 )
 
 // GetNIMParser unmarshals the provided byte slice into a NIMSchemaManifest struct and returns

@@ -130,6 +130,7 @@ test-e2e:
 
 .PHONY: lint
 lint: golangci-lint
+	$(GOLANGCI_LINT) config path
 	$(GOLANGCI_LINT) run -v
 
 .PHONY: lint-fix

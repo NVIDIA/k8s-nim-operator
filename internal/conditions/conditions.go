@@ -20,49 +20,50 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
 const (
-	// Ready indicates that the service is ready
+	// Ready indicates that the service is ready.
 	Ready = "Ready"
-	// NotReady indicates that the service is not yet ready
+	// NotReady indicates that the service is not yet ready.
 	NotReady = "NotReady"
-	// Failed indicates that the service has failed
+	// Failed indicates that the service has failed.
 	Failed = "Failed"
-	// ValidationFailed indicates that the service CR has failed validations
+	// ValidationFailed indicates that the service CR has failed validations.
 	ValidationFailed = "ValidationFailed"
-	// ReasonServiceAccountFailed indicates that the creation of serviceaccount has failed
+	// ReasonServiceAccountFailed indicates that the creation of serviceaccount has failed.
 	ReasonServiceAccountFailed = "ServiceAccountFailed"
-	// ReasonRoleFailed indicates that the creation of serviceaccount has failed
+	// ReasonRoleFailed indicates that the creation of serviceaccount has failed.
 	ReasonRoleFailed = "RoleFailed"
-	// ReasonRoleBindingFailed indicates that the creation of rolebinding has failed
+	// ReasonRoleBindingFailed indicates that the creation of rolebinding has failed.
 	ReasonRoleBindingFailed = "RoleBindingFailed"
-	// ReasonServiceFailed indicates that the creation of service has failed
+	// ReasonServiceFailed indicates that the creation of service has failed.
 	ReasonServiceFailed = "ServiceFailed"
-	// ReasonIngressFailed indicates that the creation of ingress has failed
+	// ReasonIngressFailed indicates that the creation of ingress has failed.
 	ReasonIngressFailed = "IngressFailed"
-	// ReasonHPAFailed indicates that the creation of hpa has failed
+	// ReasonHPAFailed indicates that the creation of hpa has failed.
 	ReasonHPAFailed = "HPAFailed"
-	// ReasonSCCFailed indicates that the creation of scc has failed
+	// ReasonSCCFailed indicates that the creation of scc has failed.
 	ReasonSCCFailed = "SCCFailed"
-	// ReasonServiceMonitorFailed indicates that the creation of Service Monitor has failed
+	// ReasonServiceMonitorFailed indicates that the creation of Service Monitor has failed.
 	ReasonServiceMonitorFailed = "ServiceMonitorFailed"
-	// ReasonConfigMapFailed indicates that the creation of configmap has failed
+	// ReasonConfigMapFailed indicates that the creation of configmap has failed.
 	ReasonConfigMapFailed = "ConfigMapFailed"
-	// ReasonDeploymentFailed indicates that the creation of deployment has failed
+	// ReasonDeploymentFailed indicates that the creation of deployment has failed.
 	ReasonDeploymentFailed = "DeploymentFailed"
-	// ReasonStatefulSetFailed indicates that the creation of statefulset has failed
+	// ReasonStatefulSetFailed indicates that the creation of statefulset has failed.
 	ReasonStatefulSetFailed = "StatefulsetFailed"
-	// ReasonSecretFailed indicates that the creation of secret has failed
+	// ReasonSecretFailed indicates that the creation of secret has failed.
 	ReasonSecretFailed = "SecretFailed"
 )
 
-// Updater is the condition updater
+// Updater is the condition updater.
 type Updater interface {
 	SetConditionsReady(ctx context.Context, cr client.Object, reason, message string) error
 	SetConditionsNotReady(ctx context.Context, cr client.Object, reason, message string) error
@@ -73,7 +74,7 @@ type updater struct {
 	client client.Client
 }
 
-// NewUpdater returns an instance of updater
+// NewUpdater returns an instance of updater.
 func NewUpdater(c client.Client) Updater {
 	return &updater{client: c}
 }
@@ -526,7 +527,7 @@ func (u *updater) updateNemoEvaluatorStatus(ctx context.Context, cr *appsv1alpha
 	return nil
 }
 
-// UpdateCondition updates the given condition into the conditions list
+// UpdateCondition updates the given condition into the conditions list.
 func UpdateCondition(conditions *[]metav1.Condition, conditionType string, status metav1.ConditionStatus, reason, message string) {
 	for i := range *conditions {
 		if (*conditions)[i].Type == conditionType {
@@ -550,7 +551,7 @@ func UpdateCondition(conditions *[]metav1.Condition, conditionType string, statu
 	// condition updated
 }
 
-// IfPresentUpdateCondition updates an already existing condition
+// IfPresentUpdateCondition updates an already existing condition.
 func IfPresentUpdateCondition(conditions *[]metav1.Condition, conditionType string, status metav1.ConditionStatus, reason, message string) {
 	for i := range *conditions {
 		if (*conditions)[i].Type == conditionType {

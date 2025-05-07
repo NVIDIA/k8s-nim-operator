@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	// BackendTypeTensorRT indicates tensortt backend
+	// BackendTypeTensorRT indicates tensortt backend.
 	BackendTypeTensorRT = "tensorrt"
 )
 
