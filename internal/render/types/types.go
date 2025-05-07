@@ -24,7 +24,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 )
 
-// DaemonsetParams holds the parameters for rendering a Daemonset template
+// DaemonsetParams holds the parameters for rendering a Daemonset template.
 type DaemonsetParams struct {
 	Name               string
 	Namespace          string
@@ -51,7 +51,7 @@ type DaemonsetParams struct {
 	NIMCachePVC        string
 }
 
-// DeploymentParams holds the parameters for rendering a Deployment template
+// DeploymentParams holds the parameters for rendering a Deployment template.
 type DeploymentParams struct {
 	Name               string
 	Namespace          string
@@ -86,7 +86,7 @@ type DeploymentParams struct {
 	InitContainers     []corev1.Container
 }
 
-// StatefulSetParams holds the parameters for rendering a StatefulSet template
+// StatefulSetParams holds the parameters for rendering a StatefulSet template.
 type StatefulSetParams struct {
 	Name               string
 	Namespace          string
@@ -118,7 +118,7 @@ type StatefulSetParams struct {
 	InitContainers     []corev1.Container
 }
 
-// ServiceParams holds the parameters for rendering a Service template
+// ServiceParams holds the parameters for rendering a Service template.
 type ServiceParams struct {
 	Name      string
 	Namespace string
@@ -130,7 +130,7 @@ type ServiceParams struct {
 	SelectorLabels map[string]string
 }
 
-// ServiceAccountParams holds the parameters for rendering a ServiceAccount template
+// ServiceAccountParams holds the parameters for rendering a ServiceAccount template.
 type ServiceAccountParams struct {
 	Name        string
 	Namespace   string
@@ -138,14 +138,14 @@ type ServiceAccountParams struct {
 	Annotations map[string]string
 }
 
-// RoleParams holds the parameters for rendering a Role template
+// RoleParams holds the parameters for rendering a Role template.
 type RoleParams struct {
 	Name      string
 	Namespace string
 	Rules     []rbacv1.PolicyRule
 }
 
-// RoleBindingParams holds the parameters for rendering a RoleBinding template
+// RoleBindingParams holds the parameters for rendering a RoleBinding template.
 type RoleBindingParams struct {
 	Name               string
 	Namespace          string
@@ -153,13 +153,13 @@ type RoleBindingParams struct {
 	ServiceAccountName string
 }
 
-// SCCParams holds the parameters for rendering a SecurityContextConstraints template
+// SCCParams holds the parameters for rendering a SecurityContextConstraints template.
 type SCCParams struct {
 	Name               string
 	ServiceAccountName string
 }
 
-// IngressParams holds the parameters for rendering an Ingress template
+// IngressParams holds the parameters for rendering an Ingress template.
 type IngressParams struct {
 	Enabled     bool
 	Name        string
@@ -169,20 +169,20 @@ type IngressParams struct {
 	Spec        networkingv1.IngressSpec
 }
 
-// IngressHost defines attributes for ingress host
+// IngressHost defines attributes for ingress host.
 type IngressHost struct {
 	Host  string
 	Paths []IngressPath
 }
 
-// IngressPath defines attributes for ingress paths
+// IngressPath defines attributes for ingress paths.
 type IngressPath struct {
 	Path        string
 	PathType    networkingv1.PathType
 	ServiceType string
 }
 
-// HPAParams holds the parameters for rendering a HorizontalPodAutoscaler template
+// HPAParams holds the parameters for rendering a HorizontalPodAutoscaler template.
 type HPAParams struct {
 	Enabled     bool
 	Name        string
@@ -192,7 +192,7 @@ type HPAParams struct {
 	HPASpec     autoscalingv2.HorizontalPodAutoscalerSpec
 }
 
-// ServiceMonitorParams holds the parameters for rendering a ServiceMonitor template
+// ServiceMonitorParams holds the parameters for rendering a ServiceMonitor template.
 type ServiceMonitorParams struct {
 	Enabled       bool
 	Name          string
@@ -207,7 +207,7 @@ type ServiceMonitorParams struct {
 	SMSpec        monitoringv1.ServiceMonitorSpec
 }
 
-// ConfigMapParams holds the parameters for rendering a ConfigMap template
+// ConfigMapParams holds the parameters for rendering a ConfigMap template.
 type ConfigMapParams struct {
 	Name        string
 	Namespace   string
@@ -217,7 +217,7 @@ type ConfigMapParams struct {
 	ConfigMapData map[string]string
 }
 
-// SecretParams holds the parameters for rendering a Secret template
+// SecretParams holds the parameters for rendering a Secret template.
 type SecretParams struct {
 	Name        string
 	Namespace   string

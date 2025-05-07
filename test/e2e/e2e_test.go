@@ -65,7 +65,7 @@ const (
 	PollInterval = 2 * time.Second
 )
 
-// Test context
+// Test context.
 var (
 	KUBECONFIG string
 
@@ -80,14 +80,14 @@ var (
 	CollectLogsFrom            string
 	Timeout                    time.Duration
 
-	// k8s clients
+	// k8s clients.
 	clientConfig *rest.Config
 	clientSet    clientset.Interface
 	extClient    *extclient.Clientset
 
 	testNamespace *corev1.Namespace // Every test has at least one namespace unless creation is skipped
 
-	// Helm
+	// Helm.
 	helmChart       string
 	helmClient      helm.Client
 	helmLogFile     *os.File
@@ -108,7 +108,7 @@ var (
 		"daemonsets",
 	}
 
-	// NEMO microservice variables
+	// NEMO microservice variables.
 	NemoEntityStoreRepo    string
 	NemoEntityStoreVersion string
 )
@@ -122,7 +122,7 @@ func TestMain(t *testing.T) {
 	)
 }
 
-// BeforeSuite runs before the test suite
+// BeforeSuite runs before the test suite.
 var _ = BeforeSuite(func() {
 	var err error
 	ctx = context.Background()
@@ -154,7 +154,7 @@ var _ = BeforeSuite(func() {
 	deployDependencies(ctx)
 })
 
-// AfterSuite runs after the test suite
+// AfterSuite runs after the test suite.
 var _ = AfterSuite(func() {
 	// Clean up CRs so they are garbage collected by their controllers
 	cleanupNIMCRs()
@@ -167,7 +167,7 @@ var _ = AfterSuite(func() {
 	DeleteNamespace()
 })
 
-// deployDependencies installs all the dependent helm charts
+// deployDependencies installs all the dependent helm charts.
 func deployDependencies(ctx context.Context) {
 	// Install dependencies if needed
 	if EnableNFD {
@@ -257,7 +257,7 @@ func deployDependencies(ctx context.Context) {
 	}
 }
 
-// cleanup cleans up the test environment
+// cleanup cleans up the test environment.
 func getK8sClients() {
 	var err error
 
@@ -273,7 +273,7 @@ func getK8sClients() {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-// cleanup cleans up the test environment
+// cleanup cleans up the test environment.
 func getHelmClient() {
 	var err error
 
@@ -304,7 +304,7 @@ func getHelmClient() {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-// cleanup cleans up the test environment
+// cleanup cleans up the test environment.
 func getTestEnv() {
 	var err error
 
@@ -413,7 +413,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	return got, nil
 }
 
-// DeleteNamespace can be used to delete a namespace
+// DeleteNamespace can be used to delete a namespace.
 func DeleteNamespace() {
 	defer func() {
 		err := clientSet.CoreV1().Namespaces().Delete(ctx, testNamespace.Name, metav1.DeleteOptions{})

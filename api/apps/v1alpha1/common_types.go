@@ -25,19 +25,19 @@ import (
 )
 
 const (
-	// DefaultAPIPort is the default api  port
+	// DefaultAPIPort is the default api  port.
 	DefaultAPIPort = 8000
-	// DefaultNamedPortAPI is the default name for api port
+	// DefaultNamedPortAPI is the default name for api port.
 	DefaultNamedPortAPI = "api"
 )
 
-// Expose defines attributes to expose the service
+// Expose defines attributes to expose the service.
 type Expose struct {
 	Service Service `json:"service,omitempty"`
 	Ingress Ingress `json:"ingress,omitempty"`
 }
 
-// Service defines attributes to create a service
+// Service defines attributes to create a service.
 type Service struct {
 	Type corev1.ServiceType `json:"type,omitempty"`
 	// override the default service name
@@ -50,20 +50,20 @@ type Service struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// ExposeV1 defines attributes to expose the service
+// ExposeV1 defines attributes to expose the service.
 type ExposeV1 struct {
 	Service Service   `json:"service,omitempty"`
 	Ingress IngressV1 `json:"ingress,omitempty"`
 }
 
-// Metrics defines attributes to setup metrics collection
+// Metrics defines attributes to setup metrics collection.
 type Metrics struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// for use with the Prometheus Operator and the primary service object
 	ServiceMonitor ServiceMonitor `json:"serviceMonitor,omitempty"`
 }
 
-// ServiceMonitor defines attributes to create a service monitor
+// ServiceMonitor defines attributes to create a service monitor.
 type ServiceMonitor struct {
 	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
 	Annotations      map[string]string `json:"annotations,omitempty"`
@@ -71,14 +71,14 @@ type ServiceMonitor struct {
 	ScrapeTimeout    promv1.Duration   `json:"scrapeTimeout,omitempty"`
 }
 
-// Autoscaling defines attributes to automatically scale the service based on metrics
+// Autoscaling defines attributes to automatically scale the service based on metrics.
 type Autoscaling struct {
 	Enabled     *bool                       `json:"enabled,omitempty"`
 	HPA         HorizontalPodAutoscalerSpec `json:"hpa,omitempty"`
 	Annotations map[string]string           `json:"annotations,omitempty"`
 }
 
-// HorizontalPodAutoscalerSpec defines the parameters required to setup HPA
+// HorizontalPodAutoscalerSpec defines the parameters required to setup HPA.
 type HorizontalPodAutoscalerSpec struct {
 	MinReplicas *int32                                         `json:"minReplicas,omitempty"`
 	MaxReplicas int32                                          `json:"maxReplicas"`
@@ -86,7 +86,7 @@ type HorizontalPodAutoscalerSpec struct {
 	Behavior    *autoscalingv2.HorizontalPodAutoscalerBehavior `json:"behavior,omitempty" `
 }
 
-// Image defines image attributes
+// Image defines image attributes.
 type Image struct {
 	Repository  string   `json:"repository"`
 	PullPolicy  string   `json:"pullPolicy,omitempty"`
@@ -94,7 +94,7 @@ type Image struct {
 	PullSecrets []string `json:"pullSecrets,omitempty"`
 }
 
-// Ingress defines attributes to enable ingress for the service
+// Ingress defines attributes to enable ingress for the service.
 type Ingress struct {
 	// ingress, or virtualService - not both
 	Enabled     *bool                    `json:"enabled,omitempty"`
@@ -160,7 +160,7 @@ type IngressSpec struct {
 	Paths            []IngressPath `json:"paths,omitempty"`
 }
 
-// IngressPath defines attributes for ingress paths
+// IngressPath defines attributes for ingress paths.
 type IngressPath struct {
 	// +kubebuilder:default="/"
 	Path string `json:"path,omitempty"`
@@ -168,7 +168,7 @@ type IngressPath struct {
 	PathType *networkingv1.PathType `json:"pathType,omitempty"`
 }
 
-// Probe defines attributes for startup/liveness/readiness probes
+// Probe defines attributes for startup/liveness/readiness probes.
 type Probe struct {
 	Enabled *bool         `json:"enabled,omitempty"`
 	Probe   *corev1.Probe `json:"probe,omitempty"`
@@ -182,7 +182,7 @@ type CertConfig struct {
 	MountPath string `json:"mountPath"`
 }
 
-// ProxySpec defines the proxy configuration for NIMService
+// ProxySpec defines the proxy configuration for NIMService.
 type ProxySpec struct {
 	HttpProxy     string `json:"httpProxy,omitempty"`
 	HttpsProxy    string `json:"httpsProxy,omitempty"`

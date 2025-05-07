@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1alpha1
 
-// ArgoWorkflows defines configuration to connect to Argo Workflows service
+// ArgoWorkflows defines configuration to connect to Argo Workflows service.
 type ArgoWorkflows struct {
 	// +kubebuilder:validation:Pattern=`^http`
 	// +kubebuilder:validation:MinLength=1
@@ -24,35 +24,35 @@ type ArgoWorkflows struct {
 	ServiceAccount string `json:"serviceAccount"`
 }
 
-// VectorDB defines the configuration for connecting to the external VectorDB
+// VectorDB defines the configuration for connecting to the external VectorDB.
 type VectorDB struct {
 	// +kubebuilder:validation:Pattern=`^http`
 	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
 
-// Datastore defines the configuration for connecting to the NeMo Datastore service
+// Datastore defines the configuration for connecting to the NeMo Datastore service.
 type Datastore struct {
 	// +kubebuilder:validation:Pattern=`^http`
 	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
 
-// Entitystore defines the configuration for connecting to the NeMo EntityStore service
+// Entitystore defines the configuration for connecting to the NeMo EntityStore service.
 type Entitystore struct {
 	// +kubebuilder:validation:Pattern=`^http`
 	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
 
-// MLFlow defines the configuration for connecting to the MLFlow tracking service
+// MLFlow defines the configuration for connecting to the MLFlow tracking service.
 type MLFlow struct {
 	// +kubebuilder:validation:Pattern=`^http`
 	// +kubebuilder:validation:MinLength=1
 	Endpoint string `json:"endpoint"`
 }
 
-// DatabaseConfig is the external database configuration
+// DatabaseConfig is the external database configuration.
 type DatabaseConfig struct {
 	// Host is the hostname of the database.
 	// Required, must not be empty.
@@ -78,7 +78,7 @@ type DatabaseConfig struct {
 	Credentials DatabaseCredentials `json:"credentials"`
 }
 
-// DatabaseCredentials are the external database credentials
+// DatabaseCredentials are the external database credentials.
 type DatabaseCredentials struct {
 	// User is the non-root username for a NEMO Service in the database.
 	// Required, must not be empty.
@@ -130,7 +130,7 @@ type WandBConfig struct {
 	Project string `json:"projectName,omitempty"`
 }
 
-// OTelSpec defines the settings for OpenTelemetry
+// OTelSpec defines the settings for OpenTelemetry.
 type OTelSpec struct {
 	// Enabled indicates if opentelemetry collector and tracing are enabled
 	Enabled *bool `json:"enabled,omitempty"`
@@ -159,7 +159,7 @@ type OTelSpec struct {
 	LogLevel string `json:"logLevel,omitempty"`
 }
 
-// ExporterConfig stores configuration for different OTel exporters
+// ExporterConfig stores configuration for different OTel exporters.
 type ExporterConfig struct {
 	// TracesExporter sets the traces exporter: (otlp, console, none).
 	// +kubebuilder:validation:Optional
@@ -180,7 +180,7 @@ type ExporterConfig struct {
 	LogsExporter string `json:"logsExporter,omitempty"`
 }
 
-// ConfigMapRef with a valid config map name
+// ConfigMapRef with a valid config map name.
 type ConfigMapRef struct {
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`

@@ -30,9 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render/types"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type templateData struct {
@@ -44,9 +45,15 @@ type templateData struct {
 func checkRenderedUnstructured(objs []*unstructured.Unstructured, t *templateData) {
 	for idx, obj := range objs {
 		Expect(obj.GetKind()).To(Equal(fmt.Sprint("TestObj", idx+1)))
-		Expect(obj.Object["metadata"].(map[string]interface{})["name"].(string)).To(Equal(t.Foo))
-		Expect(obj.Object["spec"].(map[string]interface{})["attribute"].(string)).To(Equal(t.Bar))
-		Expect(obj.Object["spec"].(map[string]interface{})["anotherAttribute"].(string)).To(Equal(t.Baz))
+		metadata, ok := obj.Object["metadata"].(map[string]interface{})["name"].(string)
+		Expect(ok).To(BeTrue())
+		Expect(metadata).To(Equal(t.Foo))
+		attribute, ok := obj.Object["spec"].(map[string]interface{})["attribute"].(string)
+		Expect(ok).To(BeTrue())
+		Expect(attribute).To(Equal(t.Bar))
+		anotherAttribute, ok := obj.Object["spec"].(map[string]interface{})["anotherAttribute"].(string)
+		Expect(ok).To(BeTrue())
+		Expect(anotherAttribute).To(Equal(t.Baz))
 	}
 }
 
@@ -95,7 +102,9 @@ var _ = Describe("Test Renderer via API", func() {
 			objs, err := r.RenderObjects(t)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(objs)).To(Equal(3))
-			checkRenderedUnstructured(objs, t.Data.(*templateData))
+			templateData, ok := t.Data.(*templateData)
+			Expect(ok).To(BeTrue())
+			checkRenderedUnstructured(objs, templateData)
 		})
 	})
 
@@ -105,7 +114,9 @@ var _ = Describe("Test Renderer via API", func() {
 			objs, err := r.RenderObjects(t)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(objs)).To(Equal(3))
-			checkRenderedUnstructured(objs, t.Data.(*templateData))
+			templateData, ok := t.Data.(*templateData)
+			Expect(ok).To(BeTrue())
+			checkRenderedUnstructured(objs, templateData)
 		})
 	})
 })

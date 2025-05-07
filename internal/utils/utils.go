@@ -39,15 +39,15 @@ import (
 )
 
 const (
-	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by the operator
+	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by the operator.
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 
-	// NvidiaAnnotationParentSpecHashKey indicates annotation name for applied hash by the operator
+	// NvidiaAnnotationParentSpecHashKey indicates annotation name for applied hash by the operator.
 	NvidiaAnnotationParentSpecHashKey = "nvidia.com/parent-spec-hash"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
-// The operation is performed recursively on subdirectories as well
+// The operation is performed recursively on subdirectories as well.
 func GetFilesWithSuffix(baseDir string, suffixes ...string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
@@ -89,7 +89,7 @@ func GetStringHash(s string) string {
 	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
 }
 
-// MergeMaps merges two maps and ensures no duplicate key-value pairs
+// MergeMaps merges two maps and ensures no duplicate key-value pairs.
 func MergeMaps(m1, m2 map[string]string) map[string]string {
 	merged := make(map[string]string)
 
@@ -106,7 +106,7 @@ func MergeMaps(m1, m2 map[string]string) map[string]string {
 	return merged
 }
 
-// MergeEnvVars merges two slices of environment variables, giving precedence to the second slice in case of duplicates
+// MergeEnvVars merges two slices of environment variables, giving precedence to the second slice in case of duplicates.
 func MergeEnvVars(env1, env2 []corev1.EnvVar) []corev1.EnvVar {
 	var mergedEnv []corev1.EnvVar
 	envMap := make(map[string]bool)
@@ -124,7 +124,7 @@ func MergeEnvVars(env1, env2 []corev1.EnvVar) []corev1.EnvVar {
 	return mergedEnv
 }
 
-// SortKeys recursively sorts the keys of a map to ensure consistent serialization
+// SortKeys recursively sorts the keys of a map to ensure consistent serialization.
 func SortKeys(obj interface{}) interface{} {
 	switch obj := obj.(type) {
 	case map[string]interface{}:
@@ -173,7 +173,7 @@ func SortKeys(obj interface{}) interface{} {
 	return obj
 }
 
-// Helper function to get the first key of a map (alphabetically sorted)
+// Helper function to get the first key of a map (alphabetically sorted).
 func firstKey(m map[string]interface{}) string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -183,7 +183,7 @@ func firstKey(m map[string]interface{}) string {
 	return keys[0]
 }
 
-// GetResourceHash returns a consistent hash for the given object spec
+// GetResourceHash returns a consistent hash for the given object spec.
 func GetResourceHash(obj client.Object) string {
 	parentSpecHash, ok := obj.GetAnnotations()[NvidiaAnnotationParentSpecHashKey]
 	if ok {
@@ -278,7 +278,7 @@ func SortHPAMetricsSpec(metrics []autoscalingv2.MetricSpec) []autoscalingv2.Metr
 	return metrics
 }
 
-// CalculateSHA256 calculates a SHA256 hash for the given data
+// CalculateSHA256 calculates a SHA256 hash for the given data.
 func CalculateSHA256(data string) string {
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:])
@@ -305,27 +305,27 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 
 	switch castedObj := obj.(type) {
 	case *appsv1.Deployment:
-		return updateDeployment(castedObj, desired.(*appsv1.Deployment))
+		return updateDeployment(castedObj, desired.(*appsv1.Deployment)) //nolint:forcetypeassert
 	case *appsv1.StatefulSet:
-		return updateStatefulSet(castedObj, desired.(*appsv1.StatefulSet))
+		return updateStatefulSet(castedObj, desired.(*appsv1.StatefulSet)) //nolint:forcetypeassert
 	case *autoscalingv2.HorizontalPodAutoscaler:
-		return updateHPA(castedObj, desired.(*autoscalingv2.HorizontalPodAutoscaler))
+		return updateHPA(castedObj, desired.(*autoscalingv2.HorizontalPodAutoscaler)) //nolint:forcetypeassert
 	case *corev1.ConfigMap:
-		return updateConfigMap(castedObj, desired.(*corev1.ConfigMap))
+		return updateConfigMap(castedObj, desired.(*corev1.ConfigMap)) //nolint:forcetypeassert
 	case *corev1.ServiceAccount:
-		return updateServiceAccount(castedObj, desired.(*corev1.ServiceAccount))
+		return updateServiceAccount(castedObj, desired.(*corev1.ServiceAccount)) //nolint:forcetypeassert
 	case *corev1.Secret:
-		return updateSecret(castedObj, desired.(*corev1.Secret))
+		return updateSecret(castedObj, desired.(*corev1.Secret)) //nolint:forcetypeassert
 	case *corev1.Service:
-		return updateService(castedObj, desired.(*corev1.Service))
+		return updateService(castedObj, desired.(*corev1.Service)) //nolint:forcetypeassert
 	case *monitoringv1.ServiceMonitor:
-		return updateServiceMonitor(castedObj, desired.(*monitoringv1.ServiceMonitor))
+		return updateServiceMonitor(castedObj, desired.(*monitoringv1.ServiceMonitor)) //nolint:forcetypeassert
 	case *networkingv1.Ingress:
-		return updateIngress(castedObj, desired.(*networkingv1.Ingress))
+		return updateIngress(castedObj, desired.(*networkingv1.Ingress)) //nolint:forcetypeassert
 	case *rbacv1.Role:
-		return updateRole(castedObj, desired.(*rbacv1.Role))
+		return updateRole(castedObj, desired.(*rbacv1.Role)) //nolint:forcetypeassert
 	case *rbacv1.RoleBinding:
-		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding))
+		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
