@@ -28,7 +28,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NIMCache is the Schema for the nimcaches API
+        description: NIMCache is the Schema for the nimcaches API.
         properties:
           apiVersion:
             description: |-
@@ -48,7 +48,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: NIMCacheSpec defines the desired state of NIMCache
+            description: NIMCacheSpec defines the desired state of NIMCache.
             properties:
               certConfig:
                 description: |-
@@ -198,7 +198,7 @@ spec:
                   the caching job.
                 type: object
               proxy:
-                description: ProxySpec defines the proxy configuration for NIMService
+                description: ProxySpec defines the proxy configuration for NIMService.
                 properties:
                   certConfigMap:
                     type: string
@@ -293,7 +293,7 @@ spec:
                               optimized models
                             items:
                               description: GPUSpec is the spec required to cache models
-                                for selected gpu type
+                                for selected gpu type.
                               properties:
                                 ids:
                                   description: IDs are the device-ids for a specific
@@ -430,7 +430,7 @@ spec:
             - storage
             type: object
           status:
-            description: NIMCacheStatus defines the observed state of NIMCache
+            description: NIMCacheStatus defines the observed state of NIMCache.
             properties:
               conditions:
                 items:
@@ -490,7 +490,7 @@ spec:
                 type: array
               profiles:
                 items:
-                  description: NIMProfile defines the profiles that were cached
+                  description: NIMProfile defines the profiles that were cached.
                   properties:
                     config:
                       additionalProperties:

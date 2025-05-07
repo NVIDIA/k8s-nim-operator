@@ -24,8 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
-	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -34,36 +32,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
+	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 const (
-	// CustomizerAPIPort is the default port that customizer serves on
+	// CustomizerAPIPort is the default port that customizer serves on.
 	CustomizerAPIPort = 8000
-	// DefaultNamedPortInternal is the default name for customizer internal port
+	// DefaultNamedPortInternal is the default name for customizer internal port.
 	DefaultNamedPortInternal = "internal"
-	// CustomizerInternalPort is the default port used for syncing training progress
+	// CustomizerInternalPort is the default port used for syncing training progress.
 	CustomizerInternalPort = 9009
 	// NemoCustomizerConditionReady indicates that the NEMO CustomizerService is ready.
 	NemoCustomizerConditionReady = "Ready"
 	// NemoCustomizerConditionFailed indicates that the NEMO CustomizerService has failed.
 	NemoCustomizerConditionFailed = "Failed"
 
-	// NemoCustomizerStatusPending indicates that NEMO CustomizerService is in pending state
+	// NemoCustomizerStatusPending indicates that NEMO CustomizerService is in pending state.
 	NemoCustomizerStatusPending = "Pending"
-	// NemoCustomizerStatusNotReady indicates that NEMO CustomizerService is not ready
+	// NemoCustomizerStatusNotReady indicates that NEMO CustomizerService is not ready.
 	NemoCustomizerStatusNotReady = "NotReady"
-	// NemoCustomizerStatusReady indicates that NEMO CustomizerService is ready
+	// NemoCustomizerStatusReady indicates that NEMO CustomizerService is ready.
 	NemoCustomizerStatusReady = "Ready"
-	// NemoCustomizerStatusFailed indicates that NEMO CustomizerService has failed
+	// NemoCustomizerStatusFailed indicates that NEMO CustomizerService has failed.
 	NemoCustomizerStatusFailed = "Failed"
 
-	// SchedulerTypeVolcano indicates if the scheduler is volcano
+	// SchedulerTypeVolcano indicates if the scheduler is volcano.
 	SchedulerTypeVolcano = "volcano"
-	// SchedulerTypeRunAI indicates if the scheduler is run.ai
+	// SchedulerTypeRunAI indicates if the scheduler is run.ai.
 	SchedulerTypeRunAI = "runai"
 )
 
-// NemoCustomizerSpec defines the desired state of NemoCustomizer
+// NemoCustomizerSpec defines the desired state of NemoCustomizer.
 type NemoCustomizerSpec struct {
 	Image        Image                        `json:"image"`
 	Command      []string                     `json:"command,omitempty"`
@@ -120,7 +121,7 @@ type NemoCustomizerSpec struct {
 	WandBConfig WandBConfig `json:"wandb"`
 }
 
-// TrainingConfig stores config for running finetuning
+// TrainingConfig stores config for running finetuning.
 type TrainingConfig struct {
 	// ConfigMap is the training configuration in the config map
 	// +kubebuilder:validation:Optional
@@ -153,7 +154,7 @@ type TrainingConfig struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
-// WorkspacePVCConfig stores config of PVC used for temporary workspace by NeMo customizer training jobs
+// WorkspacePVCConfig stores config of PVC used for temporary workspace by NeMo customizer training jobs.
 type WorkspacePVCConfig struct {
 	// StorageClass to be used for PVC creation. Leave it as empty if
 	// a default storage class is set in the cluster.
@@ -167,14 +168,14 @@ type WorkspacePVCConfig struct {
 	MountPath string `json:"mountPath,omitempty"`
 }
 
-// NemoDatastoreToolsConfig stores config for tools to fetch assets to and from datastore
+// NemoDatastoreToolsConfig stores config for tools to fetch assets to and from datastore.
 type NemoDatastoreToolsConfig struct {
 	// Image to use for data store CLI tools
 	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`
 }
 
-// ModelDownloadJobsConfig stores config for download jobs
+// ModelDownloadJobsConfig stores config for download jobs.
 type ModelDownloadJobsConfig struct {
 	// Docker image used for model download jobs
 	// +kubebuilder:validation:MinLength=1
@@ -200,7 +201,7 @@ type ModelDownloadJobsConfig struct {
 	PollIntervalSeconds int `json:"pollIntervalSeconds"`
 }
 
-// Scheduler defines the configuration for the scheduler
+// Scheduler defines the configuration for the scheduler.
 type Scheduler struct {
 	// Type is the scheduler type (volcano, runai)
 	// +kubebuilder:validation:Enum=volcano;runai
@@ -208,7 +209,7 @@ type Scheduler struct {
 	Type string `json:"type,omitempty"`
 }
 
-// NemoCustomizerStatus defines the observed state of NemoCustomizer
+// NemoCustomizerStatus defines the observed state of NemoCustomizer.
 type NemoCustomizerStatus struct {
 	Conditions        []metav1.Condition `json:"conditions,omitempty"`
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
@@ -221,7 +222,7 @@ type NemoCustomizerStatus struct {
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
 // +kubebuilder:printcolumn:name="Age",type="date",format="date-time",JSONPath=".metadata.creationTimestamp",priority=0
 
-// NemoCustomizer is the Schema for the NemoCustomizer API
+// NemoCustomizer is the Schema for the NemoCustomizer API.
 type NemoCustomizer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -232,21 +233,21 @@ type NemoCustomizer struct {
 
 // +kubebuilder:object:root=true
 
-// NemoCustomizerList contains a list of NemoCustomizer
+// NemoCustomizerList contains a list of NemoCustomizer.
 type NemoCustomizerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NemoCustomizer `json:"items"`
 }
 
-// GetStandardSelectorLabels returns the standard selector labels for the NemoCustomizer deployment
+// GetStandardSelectorLabels returns the standard selector labels for the NemoCustomizer deployment.
 func (n *NemoCustomizer) GetStandardSelectorLabels() map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name": n.Name,
 	}
 }
 
-// GetStandardLabels returns the standard set of labels for NemoCustomizer resources
+// GetStandardLabels returns the standard set of labels for NemoCustomizer resources.
 func (n *NemoCustomizer) GetStandardLabels() map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":             n.Name,
@@ -257,7 +258,7 @@ func (n *NemoCustomizer) GetStandardLabels() map[string]string {
 	}
 }
 
-// GetStandardEnv returns the standard set of env variables for the NemoCustomizer container
+// GetStandardEnv returns the standard set of env variables for the NemoCustomizer container.
 func (n *NemoCustomizer) GetStandardEnv() []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
@@ -315,7 +316,7 @@ func (n *NemoCustomizer) GetStandardEnv() []corev1.EnvVar {
 	return envVars
 }
 
-// IsOtelEnabled returns true if Open Telemetry Collector is enabled
+// IsOtelEnabled returns true if Open Telemetry Collector is enabled.
 func (n *NemoCustomizer) IsOtelEnabled() bool {
 	if n.Spec.OpenTelemetry != nil {
 		return n.Spec.OpenTelemetry.Enabled != nil && *n.Spec.OpenTelemetry.Enabled
@@ -440,7 +441,7 @@ func (n *NemoCustomizer) GetVolumeMounts() []corev1.VolumeMount {
 	}
 }
 
-// GetStandardAnnotations returns default annotations to apply to the NemoCustomizer instance
+// GetStandardAnnotations returns default annotations to apply to the NemoCustomizer instance.
 func (n *NemoCustomizer) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
 		"openshift.io/required-scc":             "nonroot",
@@ -449,7 +450,7 @@ func (n *NemoCustomizer) GetStandardAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetNemoCustomizerAnnotations returns annotations to apply to the NemoCustomizer instance
+// GetNemoCustomizerAnnotations returns annotations to apply to the NemoCustomizer instance.
 func (n *NemoCustomizer) GetNemoCustomizerAnnotations() map[string]string {
 	standardAnnotations := n.GetStandardAnnotations()
 
@@ -460,7 +461,7 @@ func (n *NemoCustomizer) GetNemoCustomizerAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetServiceLabels returns merged labels to apply to the NemoCustomizer instance
+// GetServiceLabels returns merged labels to apply to the NemoCustomizer instance.
 func (n *NemoCustomizer) GetServiceLabels() map[string]string {
 	standardLabels := n.GetStandardLabels()
 
@@ -470,68 +471,68 @@ func (n *NemoCustomizer) GetServiceLabels() map[string]string {
 	return standardLabels
 }
 
-// GetSelectorLabels returns standard selector labels to apply to the NemoCustomizer instance
+// GetSelectorLabels returns standard selector labels to apply to the NemoCustomizer instance.
 func (n *NemoCustomizer) GetSelectorLabels() map[string]string {
 	// TODO: add custom ones
 	return n.GetStandardSelectorLabels()
 }
 
-// GetNodeSelector returns node selector labels for the NemoCustomizer instance
+// GetNodeSelector returns node selector labels for the NemoCustomizer instance.
 func (n *NemoCustomizer) GetNodeSelector() map[string]string {
 	return n.Spec.NodeSelector
 }
 
-// GetTolerations returns tolerations for the NemoCustomizer instance
+// GetTolerations returns tolerations for the NemoCustomizer instance.
 func (n *NemoCustomizer) GetTolerations() []corev1.Toleration {
 	return n.Spec.Tolerations
 }
 
-// GetPodAffinity returns pod affinity for the NemoCustomizer instance
+// GetPodAffinity returns pod affinity for the NemoCustomizer instance.
 func (n *NemoCustomizer) GetPodAffinity() *corev1.PodAffinity {
 	return n.Spec.PodAffinity
 }
 
-// GetContainerName returns name of the container for NemoCustomizer deployment
+// GetContainerName returns name of the container for NemoCustomizer deployment.
 func (n *NemoCustomizer) GetContainerName() string {
 	return fmt.Sprintf("%s-ctr", n.Name)
 }
 
-// GetCommand return command to override for the NemoCustomizer container
+// GetCommand return command to override for the NemoCustomizer container.
 func (n *NemoCustomizer) GetCommand() []string {
 	return n.Spec.Command
 }
 
-// GetArgs return arguments for the NemoCustomizer container
+// GetArgs return arguments for the NemoCustomizer container.
 func (n *NemoCustomizer) GetArgs() []string {
 	return n.Spec.Args
 }
 
-// GetEnv returns merged slice of standard and user specified env variables
+// GetEnv returns merged slice of standard and user specified env variables.
 func (n *NemoCustomizer) GetEnv() []corev1.EnvVar {
 	return utils.MergeEnvVars(n.GetStandardEnv(), n.Spec.Env)
 }
 
-// GetImage returns container image for the NemoCustomizer
+// GetImage returns container image for the NemoCustomizer.
 func (n *NemoCustomizer) GetImage() string {
 	return fmt.Sprintf("%s:%s", n.Spec.Image.Repository, n.Spec.Image.Tag)
 }
 
-// GetImagePullSecrets returns the image pull secrets for the NIM container
+// GetImagePullSecrets returns the image pull secrets for the NIM container.
 func (n *NemoCustomizer) GetImagePullSecrets() []string {
 	return n.Spec.Image.PullSecrets
 }
 
-// GetImagePullPolicy returns the image pull policy for the NIM container
+// GetImagePullPolicy returns the image pull policy for the NIM container.
 func (n *NemoCustomizer) GetImagePullPolicy() string {
 	return n.Spec.Image.PullPolicy
 }
 
-// GetResources returns resources to allocate to the NemoCustomizer container
+// GetResources returns resources to allocate to the NemoCustomizer container.
 func (n *NemoCustomizer) GetResources() *corev1.ResourceRequirements {
 	return n.Spec.Resources
 }
 
-// GetStartupProbe returns startup probe for the NemoCustomizer container
+// GetStartupProbe returns startup probe for the NemoCustomizer container.
 func (n *NemoCustomizer) GetStartupProbe() *corev1.Probe {
 	return &corev1.Probe{
 		FailureThreshold:    30,
@@ -548,7 +549,7 @@ func (n *NemoCustomizer) GetStartupProbe() *corev1.Probe {
 	}
 }
 
-// GetLivenessProbe returns liveness probe for the NemoCustomizer container
+// GetLivenessProbe returns liveness probe for the NemoCustomizer container.
 func (n *NemoCustomizer) GetLivenessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		FailureThreshold:    5,
@@ -565,7 +566,7 @@ func (n *NemoCustomizer) GetLivenessProbe() *corev1.Probe {
 	}
 }
 
-// GetReadinessProbe returns readiness probe for the NemoCustomizer container
+// GetReadinessProbe returns readiness probe for the NemoCustomizer container.
 func (n *NemoCustomizer) GetReadinessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		FailureThreshold:    3,
@@ -582,27 +583,27 @@ func (n *NemoCustomizer) GetReadinessProbe() *corev1.Probe {
 	}
 }
 
-// GetServiceAccountName returns service account name for the NemoCustomizer deployment
+// GetServiceAccountName returns service account name for the NemoCustomizer deployment.
 func (n *NemoCustomizer) GetServiceAccountName() string {
 	return n.Name
 }
 
-// GetRuntimeClass return the runtime class name for the NemoCustomizer deployment
+// GetRuntimeClass return the runtime class name for the NemoCustomizer deployment.
 func (n *NemoCustomizer) GetRuntimeClass() string {
 	return n.Spec.RuntimeClass
 }
 
-// GetHPA returns the HPA spec for the NemoCustomizer deployment
+// GetHPA returns the HPA spec for the NemoCustomizer deployment.
 func (n *NemoCustomizer) GetHPA() HorizontalPodAutoscalerSpec {
 	return n.Spec.Scale.HPA
 }
 
-// GetServiceMonitor returns the Service Monitor details for the NemoCustomizer deployment
+// GetServiceMonitor returns the Service Monitor details for the NemoCustomizer deployment.
 func (n *NemoCustomizer) GetServiceMonitor() ServiceMonitor {
 	return n.Spec.Metrics.ServiceMonitor
 }
 
-// GetReplicas returns replicas for the NemoCustomizer deployment
+// GetReplicas returns replicas for the NemoCustomizer deployment.
 func (n *NemoCustomizer) GetReplicas() int {
 	if n.IsAutoScalingEnabled() {
 		return 0
@@ -610,37 +611,37 @@ func (n *NemoCustomizer) GetReplicas() int {
 	return n.Spec.Replicas
 }
 
-// GetDeploymentKind returns the kind of deployment for NemoCustomizer
+// GetDeploymentKind returns the kind of deployment for NemoCustomizer.
 func (n *NemoCustomizer) GetDeploymentKind() string {
 	return "Deployment"
 }
 
-// IsAutoScalingEnabled returns true if autoscaling is enabled for NemoCustomizer deployment
+// IsAutoScalingEnabled returns true if autoscaling is enabled for NemoCustomizer deployment.
 func (n *NemoCustomizer) IsAutoScalingEnabled() bool {
 	return n.Spec.Scale.Enabled != nil && *n.Spec.Scale.Enabled
 }
 
-// IsIngressEnabled returns true if ingress is enabled for NemoCustomizer deployment
+// IsIngressEnabled returns true if ingress is enabled for NemoCustomizer deployment.
 func (n *NemoCustomizer) IsIngressEnabled() bool {
 	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
 }
 
-// GetIngressSpec returns the Ingress spec NemoCustomizer deployment
+// GetIngressSpec returns the Ingress spec NemoCustomizer deployment.
 func (n *NemoCustomizer) GetIngressSpec() networkingv1.IngressSpec {
 	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
 }
 
-// IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoCustomizer deployment
+// IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoCustomizer deployment.
 func (n *NemoCustomizer) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
 }
 
-// GetServiceType returns the service type for the NemoCustomizer deployment
+// GetServiceType returns the service type for the NemoCustomizer deployment.
 func (n *NemoCustomizer) GetServiceType() string {
 	return string(n.Spec.Expose.Service.Type)
 }
 
-// GetUserID returns the user ID for the NemoCustomizer deployment
+// GetUserID returns the user ID for the NemoCustomizer deployment.
 func (n *NemoCustomizer) GetUserID() *int64 {
 	if n.Spec.UserID != nil {
 		return n.Spec.UserID
@@ -648,7 +649,7 @@ func (n *NemoCustomizer) GetUserID() *int64 {
 	return ptr.To[int64](1000)
 }
 
-// GetGroupID returns the group ID for the NemoCustomizer deployment
+// GetGroupID returns the group ID for the NemoCustomizer deployment.
 func (n *NemoCustomizer) GetGroupID() *int64 {
 	if n.Spec.GroupID != nil {
 		return n.Spec.GroupID
@@ -656,7 +657,7 @@ func (n *NemoCustomizer) GetGroupID() *int64 {
 	return ptr.To[int64](2000)
 }
 
-// GetServiceAccountParams return params to render ServiceAccount from templates
+// GetServiceAccountParams return params to render ServiceAccount from templates.
 func (n *NemoCustomizer) GetServiceAccountParams() *rendertypes.ServiceAccountParams {
 	params := &rendertypes.ServiceAccountParams{}
 
@@ -668,7 +669,7 @@ func (n *NemoCustomizer) GetServiceAccountParams() *rendertypes.ServiceAccountPa
 	return params
 }
 
-// GetDeploymentParams returns params to render Deployment from templates
+// GetDeploymentParams returns params to render Deployment from templates.
 func (n *NemoCustomizer) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params := &rendertypes.DeploymentParams{}
 
@@ -732,7 +733,7 @@ func (n *NemoCustomizer) GetDeploymentParams() *rendertypes.DeploymentParams {
 	return params
 }
 
-// GetStatefulSetParams returns params to render StatefulSet from templates
+// GetStatefulSetParams returns params to render StatefulSet from templates.
 func (n *NemoCustomizer) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 
 	params := &rendertypes.StatefulSetParams{}
@@ -778,7 +779,7 @@ func (n *NemoCustomizer) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	return params
 }
 
-// GetServiceParams returns params to render Service from templates
+// GetServiceParams returns params to render Service from templates.
 func (n *NemoCustomizer) GetServiceParams() *rendertypes.ServiceParams {
 	params := &rendertypes.ServiceParams{}
 
@@ -812,7 +813,7 @@ func (n *NemoCustomizer) GetServiceParams() *rendertypes.ServiceParams {
 	return params
 }
 
-// GetIngressParams returns params to render Ingress from templates
+// GetIngressParams returns params to render Ingress from templates.
 func (n *NemoCustomizer) GetIngressParams() *rendertypes.IngressParams {
 	params := &rendertypes.IngressParams{}
 
@@ -826,7 +827,7 @@ func (n *NemoCustomizer) GetIngressParams() *rendertypes.IngressParams {
 	return params
 }
 
-// GetRoleParams returns params to render Role from templates
+// GetRoleParams returns params to render Role from templates.
 func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
@@ -894,7 +895,7 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 	return params
 }
 
-// GetRoleBindingParams returns params to render RoleBinding from templates
+// GetRoleBindingParams returns params to render RoleBinding from templates.
 func (n *NemoCustomizer) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	params := &rendertypes.RoleBindingParams{}
 
@@ -907,7 +908,7 @@ func (n *NemoCustomizer) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	return params
 }
 
-// GetHPAParams returns params to render HPA from templates
+// GetHPAParams returns params to render HPA from templates.
 func (n *NemoCustomizer) GetHPAParams() *rendertypes.HPAParams {
 	params := &rendertypes.HPAParams{}
 
@@ -936,7 +937,7 @@ func (n *NemoCustomizer) GetHPAParams() *rendertypes.HPAParams {
 	return params
 }
 
-// GetSCCParams return params to render SCC from templates
+// GetSCCParams return params to render SCC from templates.
 func (n *NemoCustomizer) GetSCCParams() *rendertypes.SCCParams {
 	params := &rendertypes.SCCParams{}
 	// Set metadata
@@ -946,7 +947,7 @@ func (n *NemoCustomizer) GetSCCParams() *rendertypes.SCCParams {
 	return params
 }
 
-// GetServiceMonitorParams return params to render Service Monitor from templates
+// GetServiceMonitorParams return params to render Service Monitor from templates.
 func (n *NemoCustomizer) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams {
 	params := &rendertypes.ServiceMonitorParams{}
 	serviceMonitor := n.GetServiceMonitor()
@@ -974,7 +975,7 @@ func (n *NemoCustomizer) GetServiceMonitorParams() *rendertypes.ServiceMonitorPa
 	return params
 }
 
-// GetServicePort returns the service port for the NemoCustomizer deployment or default port
+// GetServicePort returns the service port for the NemoCustomizer deployment or default port.
 func (n *NemoCustomizer) GetServicePort() int32 {
 	if n.Spec.Expose.Service.Port == nil {
 		return DefaultAPIPort
@@ -983,7 +984,7 @@ func (n *NemoCustomizer) GetServicePort() int32 {
 	return *n.Spec.Expose.Service.Port
 }
 
-// GetIngressAnnotations return standard and customized ingress annotations
+// GetIngressAnnotations return standard and customized ingress annotations.
 func (n *NemoCustomizer) GetIngressAnnotations() map[string]string {
 	NemoCustomizerAnnotations := n.GetNemoCustomizerAnnotations()
 
@@ -993,7 +994,7 @@ func (n *NemoCustomizer) GetIngressAnnotations() map[string]string {
 	return NemoCustomizerAnnotations
 }
 
-// GetServiceAnnotations return standard and customized service annotations
+// GetServiceAnnotations return standard and customized service annotations.
 func (n *NemoCustomizer) GetServiceAnnotations() map[string]string {
 	NemoCustomizerAnnotations := n.GetNemoCustomizerAnnotations()
 
@@ -1003,7 +1004,7 @@ func (n *NemoCustomizer) GetServiceAnnotations() map[string]string {
 	return NemoCustomizerAnnotations
 }
 
-// GetHPAAnnotations return standard and customized hpa annotations
+// GetHPAAnnotations return standard and customized hpa annotations.
 func (n *NemoCustomizer) GetHPAAnnotations() map[string]string {
 	NemoCustomizerAnnotations := n.GetNemoCustomizerAnnotations()
 
@@ -1013,7 +1014,7 @@ func (n *NemoCustomizer) GetHPAAnnotations() map[string]string {
 	return NemoCustomizerAnnotations
 }
 
-// GetServiceMonitorAnnotations return standard and customized servicemonitor annotations
+// GetServiceMonitorAnnotations return standard and customized servicemonitor annotations.
 func (n *NemoCustomizer) GetServiceMonitorAnnotations() map[string]string {
 	NemoCustomizerAnnotations := n.GetNemoCustomizerAnnotations()
 
@@ -1023,7 +1024,7 @@ func (n *NemoCustomizer) GetServiceMonitorAnnotations() map[string]string {
 	return NemoCustomizerAnnotations
 }
 
-// GetConfigMapParams return customizer config params
+// GetConfigMapParams return customizer config params.
 func (n *NemoCustomizer) GetConfigMapParams(customizerConfigYAML []byte) *rendertypes.ConfigMapParams {
 	var config bytes.Buffer
 	config.Write(customizerConfigYAML)

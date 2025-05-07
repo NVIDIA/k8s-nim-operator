@@ -705,8 +705,8 @@ var _ = Describe("NIMCache Controller", func() {
 			extractedManifest, err := reconciler.extractNIMManifest(ctx, createdConfigMap.Name, createdConfigMap.Namespace)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(extractedManifest).NotTo(BeNil())
-			nimManifest := extractedManifest.(nimparserv1.NIMManifest)
-
+			nimManifest, ok := extractedManifest.(nimparserv1.NIMManifest)
+			Expect(ok).To(BeTrue())
 			profile, exists := (nimManifest)["03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61"]
 			Expect(exists).To(BeTrue())
 			Expect(profile.Model).To(Equal("meta/llama3-70b-instruct"))

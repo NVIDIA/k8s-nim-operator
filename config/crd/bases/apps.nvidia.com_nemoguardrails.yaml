@@ -25,7 +25,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NemoGuardrail is the Schema for the NemoGuardrail API
+        description: NemoGuardrail is the Schema for the NemoGuardrail API.
         properties:
           apiVersion:
             description: |-
@@ -45,7 +45,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: NemoGuardrailSpec defines the desired state of NemoGuardrail
+            description: NemoGuardrailSpec defines the desired state of NemoGuardrail.
             properties:
               annotations:
                 additionalProperties:
@@ -63,7 +63,7 @@ spec:
                 description: ConfigStore stores the config of the guardrail service
                 properties:
                   configMap:
-                    description: ConfigMapRef with a valid config map name
+                    description: ConfigMapRef with a valid config map name.
                     properties:
                       name:
                         minLength: 1
@@ -73,7 +73,7 @@ spec:
                     type: object
                   pvc:
                     description: PersistentVolumeClaim defines the attributes of PVC
-                      used as a source for caching NIM model
+                      used as a source for caching NIM model.
                     properties:
                       create:
                         description: Create indicates to create a new PVC
@@ -221,7 +221,7 @@ spec:
                   type: object
                 type: array
               expose:
-                description: ExposeV1 defines attributes to expose the service
+                description: ExposeV1 defines attributes to expose the service.
                 properties:
                   ingress:
                     description: IngressV1 defines attributes for ingress
@@ -242,7 +242,7 @@ spec:
                           paths:
                             items:
                               description: IngressPath defines attributes for ingress
-                                paths
+                                paths.
                               properties:
                                 path:
                                   default: /
@@ -263,7 +263,7 @@ spec:
                       rule: (has(self.spec) && has(self.enabled) && self.enabled)
                         || !has(self.enabled) || !self.enabled
                   service:
-                    description: Service defines attributes to create a service
+                    description: Service defines attributes to create a service.
                     properties:
                       annotations:
                         additionalProperties:
@@ -290,7 +290,7 @@ spec:
                 format: int64
                 type: integer
               image:
-                description: Image defines image attributes
+                description: Image defines image attributes.
                 properties:
                   pullPolicy:
                     type: string
@@ -311,7 +311,7 @@ spec:
                   type: string
                 type: object
               metrics:
-                description: Metrics defines attributes to setup metrics collection
+                description: Metrics defines attributes to setup metrics collection.
                 properties:
                   enabled:
                     type: boolean
@@ -793,7 +793,7 @@ spec:
                 type: string
               scale:
                 description: Autoscaling defines attributes to automatically scale
-                  the service based on metrics
+                  the service based on metrics.
                 properties:
                   annotations:
                     additionalProperties:
@@ -803,7 +803,7 @@ spec:
                     type: boolean
                   hpa:
                     description: HorizontalPodAutoscalerSpec defines the parameters
-                      required to setup HPA
+                      required to setup HPA.
                     properties:
                       behavior:
                         description: |-
@@ -1442,7 +1442,7 @@ spec:
             - image
             type: object
           status:
-            description: NemoGuardrailStatus defines the observed state of NemoGuardrail
+            description: NemoGuardrailStatus defines the observed state of NemoGuardrail.
             properties:
               availableReplicas:
                 format: int32

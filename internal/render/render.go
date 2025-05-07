@@ -34,8 +34,6 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render/types"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	securityv1 "github.com/openshift/api/security/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -47,16 +45,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
 	yamlConverter "sigs.k8s.io/yaml"
+
+	"github.com/NVIDIA/k8s-nim-operator/internal/render/types"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 const (
 	maxBufSizeForYamlDecode = 4096
 )
 
-// ManifestFileSuffix indictes common suffixes of files to render
+// ManifestFileSuffix indictes common suffixes of files to render.
 var ManifestFileSuffix = []string{"yaml", "yml", "json"}
 
-// Renderer renders k8s objects from a manifest source dir and TemplateData used by the templating engine
+// Renderer renders k8s objects from a manifest source dir and TemplateData used by the templating engine.
 type Renderer interface {
 	// RenderObjects renders kubernetes objects using provided TemplateData
 	RenderObjects(data *TemplateData) ([]*unstructured.Unstructured, error)
@@ -75,7 +76,7 @@ type Renderer interface {
 	Secret(params *types.SecretParams) (*corev1.Secret, error)
 }
 
-// TemplateData is used by the templating engine to render templates
+// TemplateData is used by the templating engine to render templates.
 type TemplateData struct {
 	// Funcs are additional Functions used during the templating process
 	Funcs template.FuncMap
@@ -92,7 +93,7 @@ func NewRenderer(directory string) Renderer {
 }
 
 // textTemplateRenderer is an implementation of the Renderer interface using golang builtin text/template package
-// as its templating engine
+// as its templating engine.
 type textTemplateRenderer struct {
 	directory string
 }
@@ -116,7 +117,7 @@ func (r *textTemplateRenderer) RenderObjects(data *TemplateData) ([]*unstructure
 	return objs, nil
 }
 
-// renderFile renders a single file to a list of k8s unstructured objects
+// renderFile renders a single file to a list of k8s unstructured objects.
 func (r *textTemplateRenderer) renderFile(filePath string, data *TemplateData) ([]*unstructured.Unstructured, error) {
 	// Read file
 	txt, err := os.ReadFile(filePath)
@@ -179,7 +180,7 @@ func (r *textTemplateRenderer) renderFile(filePath string, data *TemplateData) (
 	return out, nil
 }
 
-// Daemonset renders a DaemonSet spec with given templating data
+// Daemonset renders a DaemonSet spec with given templating data.
 func (r *textTemplateRenderer) DaemonSet(params *types.DaemonsetParams) (*appsv1.DaemonSet, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "daemonset.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -198,7 +199,7 @@ func (r *textTemplateRenderer) DaemonSet(params *types.DaemonsetParams) (*appsv1
 	return daemonset, nil
 }
 
-// Deployment renders a Deployment spec with given templating data
+// Deployment renders a Deployment spec with given templating data.
 func (r *textTemplateRenderer) Deployment(params *types.DeploymentParams) (*appsv1.Deployment, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "deployment.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -217,7 +218,7 @@ func (r *textTemplateRenderer) Deployment(params *types.DeploymentParams) (*apps
 	return deployment, nil
 }
 
-// StatefulSet renders spec for a StatefulSet with the given templating data
+// StatefulSet renders spec for a StatefulSet with the given templating data.
 func (r *textTemplateRenderer) StatefulSet(params *types.StatefulSetParams) (*appsv1.StatefulSet, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "statefulset.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -234,7 +235,7 @@ func (r *textTemplateRenderer) StatefulSet(params *types.StatefulSetParams) (*ap
 	return statefulset, nil
 }
 
-// Service renders a Service spec with given templating data
+// Service renders a Service spec with given templating data.
 func (r *textTemplateRenderer) Service(params *types.ServiceParams) (*corev1.Service, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "service.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -251,7 +252,7 @@ func (r *textTemplateRenderer) Service(params *types.ServiceParams) (*corev1.Ser
 	return service, nil
 }
 
-// ServiceAccount renders a ServiceAccount spec with the given templating data
+// ServiceAccount renders a ServiceAccount spec with the given templating data.
 func (r *textTemplateRenderer) ServiceAccount(params *types.ServiceAccountParams) (*corev1.ServiceAccount, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "serviceaccount.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -268,7 +269,7 @@ func (r *textTemplateRenderer) ServiceAccount(params *types.ServiceAccountParams
 	return serviceAccount, nil
 }
 
-// Role renders a Role spec with the given templating data
+// Role renders a Role spec with the given templating data.
 func (r *textTemplateRenderer) Role(params *types.RoleParams) (*rbacv1.Role, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "role.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -285,7 +286,7 @@ func (r *textTemplateRenderer) Role(params *types.RoleParams) (*rbacv1.Role, err
 	return role, nil
 }
 
-// RoleBinding renders a RoleBinding spec with the given templating data
+// RoleBinding renders a RoleBinding spec with the given templating data.
 func (r *textTemplateRenderer) RoleBinding(params *types.RoleBindingParams) (*rbacv1.RoleBinding, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "rolebinding.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -302,7 +303,7 @@ func (r *textTemplateRenderer) RoleBinding(params *types.RoleBindingParams) (*rb
 	return roleBinding, nil
 }
 
-// SCC renders a SecurityContextConstraints spec with the given templating data
+// SCC renders a SecurityContextConstraints spec with the given templating data.
 func (r *textTemplateRenderer) SCC(params *types.SCCParams) (*securityv1.SecurityContextConstraints, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "scc.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -319,7 +320,7 @@ func (r *textTemplateRenderer) SCC(params *types.SCCParams) (*securityv1.Securit
 	return scc, nil
 }
 
-// Ingress renders an Ingress spec with the given templating data
+// Ingress renders an Ingress spec with the given templating data.
 func (r *textTemplateRenderer) Ingress(params *types.IngressParams) (*networkingv1.Ingress, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "ingress.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -336,7 +337,7 @@ func (r *textTemplateRenderer) Ingress(params *types.IngressParams) (*networking
 	return ingress, nil
 }
 
-// HPA renders spec for HPA with the given templating data
+// HPA renders spec for HPA with the given templating data.
 func (r *textTemplateRenderer) HPA(params *types.HPAParams) (*autoscalingv2.HorizontalPodAutoscaler, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "hpa.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -355,7 +356,7 @@ func (r *textTemplateRenderer) HPA(params *types.HPAParams) (*autoscalingv2.Hori
 	return hpa, nil
 }
 
-// ServiceMonitor renders spec for a ServiceMonitor with the given templating data
+// ServiceMonitor renders spec for a ServiceMonitor with the given templating data.
 func (r *textTemplateRenderer) ServiceMonitor(params *types.ServiceMonitorParams) (*monitoringv1.ServiceMonitor, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "servicemonitor.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -372,7 +373,7 @@ func (r *textTemplateRenderer) ServiceMonitor(params *types.ServiceMonitorParams
 	return serviceMonitor, nil
 }
 
-// ConfigMap renders a ConfigMap spec with given templating data
+// ConfigMap renders a ConfigMap spec with given templating data.
 func (r *textTemplateRenderer) ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "configmap.yaml"), &TemplateData{Data: params})
 	if err != nil {
@@ -389,7 +390,7 @@ func (r *textTemplateRenderer) ConfigMap(params *types.ConfigMapParams) (*corev1
 	return cm, nil
 }
 
-// Secret renders a Secret spec with given templating data
+// Secret renders a Secret spec with given templating data.
 func (r *textTemplateRenderer) Secret(params *types.SecretParams) (*corev1.Secret, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "secret.yaml"), &TemplateData{Data: params})
 	if err != nil {

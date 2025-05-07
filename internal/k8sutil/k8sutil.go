@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,39 +27,41 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
-// OrchestratorType is the underlying container orchestrator type
+// OrchestratorType is the underlying container orchestrator type.
 type OrchestratorType string
 
 const (
-	// TKGS is the VMware Tanzu Kubernetes Grid Service
+	// TKGS is the VMware Tanzu Kubernetes Grid Service.
 	TKGS OrchestratorType = "TKGS"
-	// OpenShift is the RedHat Openshift Container Platform
+	// OpenShift is the RedHat Openshift Container Platform.
 	OpenShift OrchestratorType = "OpenShift"
-	// GKE is the Google Kubernetes Engine Service
+	// GKE is the Google Kubernetes Engine Service.
 	GKE OrchestratorType = "GKE"
-	// EKS is the Amazon Elastic Kubernetes Service
+	// EKS is the Amazon Elastic Kubernetes Service.
 	EKS OrchestratorType = "EKS"
-	// AKS is the Azure Kubernetes Service
+	// AKS is the Azure Kubernetes Service.
 	AKS OrchestratorType = "AKS"
-	// OKE is the Oracle Kubernetes Service
+	// OKE is the Oracle Kubernetes Service.
 	OKE OrchestratorType = "OKE"
-	// Ezmeral is the HPE Ezmeral Data Fabric
+	// Ezmeral is the HPE Ezmeral Data Fabric.
 	Ezmeral OrchestratorType = "Ezmeral"
-	// RKE is the Rancker Kubernetes Engine
+	// RKE is the Rancker Kubernetes Engine.
 	RKE OrchestratorType = "RKE"
-	// K8s is the upstream Kubernetes Distribution
+	// K8s is the upstream Kubernetes Distribution.
 	K8s OrchestratorType = "Kubernetes"
-	// Unknown distribution type
+	// Unknown distribution type.
 	Unknown OrchestratorType = "Unknown"
 )
 
 // GetOrchestratorType checks the container orchestrator by looking for specific node labels that identify
 // TKGS, OpenShift, or CSP-specific Kubernetes distributions.
-func GetOrchestratorType(k8sClient client.Client) (OrchestratorType, error) {
+func GetOrchestratorType(ctx context.Context, k8sClient client.Client) (OrchestratorType, error) {
 	nodes := &corev1.NodeList{}
-	err := k8sClient.List(context.TODO(), nodes)
+	err := k8sClient.List(ctx, nodes)
 	if err != nil {
 		return Unknown, fmt.Errorf("error listing nodes: %v", err)
 	}
@@ -145,7 +146,7 @@ func CleanupResource(ctx context.Context, k8sClient client.Client, obj client.Ob
 	return nil
 }
 
-// SyncResource sync the current object with the desired object spec
+// SyncResource sync the current object with the desired object spec.
 func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Object, desired client.Object) error {
 	logger := log.FromContext(ctx)
 
@@ -168,7 +169,7 @@ func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Objec
 	return nil
 }
 
-// IsDeploymentReady checks if the Deployment is ready
+// IsDeploymentReady checks if the Deployment is ready.
 func IsDeploymentReady(ctx context.Context, k8sClient client.Client, namespacedName *types.NamespacedName) (string, bool, error) {
 	deployment := &appsv1.Deployment{}
 	err := k8sClient.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, deployment)
@@ -205,7 +206,7 @@ func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.Depl
 	return nil
 }
 
-// GetUpdateCaCertInitContainerCommand returns the command to update CA certificates in the init container
+// GetUpdateCaCertInitContainerCommand returns the command to update CA certificates in the init container.
 func GetUpdateCaCertInitContainerCommand() []string {
 	return []string{
 		"/bin/sh",
@@ -220,7 +221,7 @@ func GetUpdateCaCertInitContainerCommand() []string {
 	}
 }
 
-// GetUpdateCaCertInitContainerSecurityContext returns the security context for init container for updating CA certificates
+// GetUpdateCaCertInitContainerSecurityContext returns the security context for init container for updating CA certificates.
 func GetUpdateCaCertInitContainerSecurityContext() *corev1.SecurityContext {
 	return &corev1.SecurityContext{
 		RunAsUser:    ptr.To(int64(0)),
@@ -228,7 +229,7 @@ func GetUpdateCaCertInitContainerSecurityContext() *corev1.SecurityContext {
 	}
 }
 
-// GetUpdateCaCertInitContainerVolumeMounts returns the volume mounts for the init container for updating CA certificates
+// GetUpdateCaCertInitContainerVolumeMounts returns the volume mounts for the init container for updating CA certificates.
 func GetUpdateCaCertInitContainerVolumeMounts() []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
@@ -242,7 +243,7 @@ func GetUpdateCaCertInitContainerVolumeMounts() []corev1.VolumeMount {
 	}
 }
 
-// GetVolumesForUpdatingCaCert returns the volumes required for updating CA certificates
+// GetVolumesForUpdatingCaCert returns the volumes required for updating CA certificates.
 func GetVolumesForUpdatingCaCert(configMapName string) []corev1.Volume {
 	return []corev1.Volume{
 		{
@@ -260,7 +261,7 @@ func GetVolumesForUpdatingCaCert(configMapName string) []corev1.Volume {
 	}
 }
 
-// GetVolumesMountsForUpdatingCaCert returns the volume mounts required for updating CA certificates
+// GetVolumesMountsForUpdatingCaCert returns the volume mounts required for updating CA certificates.
 func GetVolumesMountsForUpdatingCaCert() []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
@@ -270,7 +271,7 @@ func GetVolumesMountsForUpdatingCaCert() []corev1.VolumeMount {
 	}
 }
 
-// GetRawYAMLFromConfigMap extracts yaml content from given configmap and key
+// GetRawYAMLFromConfigMap extracts yaml content from given configmap and key.
 func GetRawYAMLFromConfigMap(ctx context.Context, k8sClient client.Client, namespace string, configMapName string, configMapKey string) (string, error) {
 	var cm corev1.ConfigMap
 	if err := k8sClient.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: namespace}, &cm); err != nil {

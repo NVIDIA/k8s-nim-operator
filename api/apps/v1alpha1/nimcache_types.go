@@ -19,17 +19,18 @@ package v1alpha1
 import (
 	"fmt"
 
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// NIMCacheSpec defines the desired state of NIMCache
+// NIMCacheSpec defines the desired state of NIMCache.
 type NIMCacheSpec struct {
 	// Source is the NIM model source to cache
 	Source NIMSource `json:"source"`
@@ -57,7 +58,7 @@ type NIMCacheSpec struct {
 	Proxy            *ProxySpec `json:"proxy,omitempty"`
 }
 
-// NIMSource defines the source for caching NIM model
+// NIMSource defines the source for caching NIM model.
 type NIMSource struct {
 	// NGCSource represents models stored in NGC
 	NGC *NGCSource `json:"ngc,omitempty"`
@@ -66,7 +67,7 @@ type NIMSource struct {
 	DataStore *DataStoreSource `json:"dataStore,omitempty"`
 }
 
-// NGCSource references a model stored on NVIDIA NGC
+// NGCSource references a model stored on NVIDIA NGC.
 type NGCSource struct {
 	// The name of an existing pull secret containing the NGC_API_KEY
 	AuthSecret string `json:"authSecret"`
@@ -79,7 +80,7 @@ type NGCSource struct {
 	Model ModelSpec `json:"model,omitempty"`
 }
 
-// ModelSpec is the spec required to cache selected models
+// ModelSpec is the spec required to cache selected models.
 type ModelSpec struct {
 	// Profiles are the specific model profiles to cache. When these are provided, rest of the model parameters for profile selection are ignored
 	Profiles []string `json:"profiles,omitempty"`
@@ -99,7 +100,7 @@ type ModelSpec struct {
 	Buildable *bool `json:"buildable,omitempty"`
 }
 
-// GPUSpec is the spec required to cache models for selected gpu type
+// GPUSpec is the spec required to cache models for selected gpu type.
 type GPUSpec struct {
 	// Product is the GPU product string (h100, a100, l40s)
 	Product string `json:"product,omitempty"`
@@ -107,7 +108,7 @@ type GPUSpec struct {
 	IDs []string `json:"ids,omitempty"`
 }
 
-// DataStoreSource references a model stored on NVIDIA DataStore service
+// DataStoreSource references a model stored on NVIDIA DataStore service.
 type DataStoreSource struct {
 	// The endpoint for datastore
 	Endpoint string `json:"endpoint"`
@@ -123,7 +124,7 @@ type DataStoreSource struct {
 	PullSecret string `json:"pullSecret,omitempty"`
 }
 
-// NIMCacheStorage defines the attributes of various storage targets used to store the model
+// NIMCacheStorage defines the attributes of various storage targets used to store the model.
 type NIMCacheStorage struct {
 	// PersistentVolumeClaim is the pvc volume used for caching NIM
 	PVC PersistentVolumeClaim `json:"pvc,omitempty"`
@@ -131,7 +132,7 @@ type NIMCacheStorage struct {
 	HostPath *string `json:"hostPath,omitempty"`
 }
 
-// PersistentVolumeClaim defines the attributes of PVC used as a source for caching NIM model
+// PersistentVolumeClaim defines the attributes of PVC used as a source for caching NIM model.
 type PersistentVolumeClaim struct {
 	// Create indicates to create a new PVC
 	Create *bool `json:"create,omitempty"`
@@ -148,7 +149,7 @@ type PersistentVolumeClaim struct {
 	SubPath string `json:"subPath,omitempty"`
 }
 
-// NIMCacheStatus defines the observed state of NIMCache
+// NIMCacheStatus defines the observed state of NIMCache.
 type NIMCacheStatus struct {
 	State      string             `json:"state,omitempty"`
 	PVC        string             `json:"pvc,omitempty"`
@@ -156,7 +157,7 @@ type NIMCacheStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
-// NIMProfile defines the profiles that were cached
+// NIMProfile defines the profiles that were cached.
 type NIMProfile struct {
 	Name    string            `json:"name,omitempty"`
 	Model   string            `json:"model,omitempty"`
@@ -182,26 +183,26 @@ const (
 	NimCacheConditionJobPending = "NIM_CACHE_JOB_PENDING"
 	// NimCacheConditionPVCCreated indicates that the caching pvc is created.
 	NimCacheConditionPVCCreated = "NIM_CACHE_PVC_CREATED"
-	// NimCacheConditionReconcileFailed indicated that error occured while reconciling NIMCache object
+	// NimCacheConditionReconcileFailed indicated that error occurred while reconciling NIMCache object.
 	NimCacheConditionReconcileFailed = "NIM_CACHE_RECONCILE_FAILED"
 
-	// NimCacheStatusNotReady indicates that cache is not ready
+	// NimCacheStatusNotReady indicates that cache is not ready.
 	NimCacheStatusNotReady = "NotReady"
-	// NimCacheStatusPVCCreated indicates that the pvc is created for caching
+	// NimCacheStatusPVCCreated indicates that the pvc is created for caching.
 	NimCacheStatusPVCCreated = "PVC-Created"
-	// NimCacheStatusStarted indicates that caching process is started
+	// NimCacheStatusStarted indicates that caching process is started.
 	NimCacheStatusStarted = "Started"
-	// NimCacheStatusReady indicates that cache is ready
+	// NimCacheStatusReady indicates that cache is ready.
 	NimCacheStatusReady = "Ready"
-	// NimCacheStatusInProgress indicates that caching is in progress
+	// NimCacheStatusInProgress indicates that caching is in progress.
 	NimCacheStatusInProgress = "InProgress"
-	// NimCacheStatusPending indicates that caching is not yet started
+	// NimCacheStatusPending indicates that caching is not yet started.
 	NimCacheStatusPending = "Pending"
-	// NimCacheStatusFailed indicates that caching is failed
+	// NimCacheStatusFailed indicates that caching is failed.
 	NimCacheStatusFailed = "Failed"
 )
 
-// EnvFromSecrets return the list of secrets that should be mounted as env vars
+// EnvFromSecrets return the list of secrets that should be mounted as env vars.
 func (s *NIMSource) EnvFromSecrets() []corev1.EnvFromSource {
 	if s.NGC != nil && s.NGC.AuthSecret != "" {
 		return []corev1.EnvFromSource{
@@ -235,7 +236,7 @@ func (s *NIMSource) EnvFromSecrets() []corev1.EnvFromSource {
 // +kubebuilder:printcolumn:name="PVC",type=string,JSONPath=`.status.pvc`,priority=0
 // +kubebuilder:printcolumn:name="Age",type="date",format="date-time",JSONPath=".metadata.creationTimestamp",priority=0
 
-// NIMCache is the Schema for the nimcaches API
+// NIMCache is the Schema for the nimcaches API.
 type NIMCache struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -245,7 +246,7 @@ type NIMCache struct {
 }
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
-// Prefers pvc.Name if explicitly set by the user in the NIMCache instance
+// Prefers pvc.Name if explicitly set by the user in the NIMCache instance.
 func (n *NIMCache) GetPVCName(pvc PersistentVolumeClaim) string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
 	if pvc.Name != "" {
@@ -270,12 +271,12 @@ func (n *NIMCache) GetGroupID() *int64 {
 	return n.Spec.GroupID
 }
 
-// GetTolerations returns tolerations configured for the NIMCache Job
+// GetTolerations returns tolerations configured for the NIMCache Job.
 func (n *NIMCache) GetTolerations() []corev1.Toleration {
 	return n.Spec.Tolerations
 }
 
-// GetNodeSelectors returns nodeselectors configured for the NIMCache Job
+// GetNodeSelectors returns nodeselectors configured for the NIMCache Job.
 func (n *NIMCache) GetNodeSelectors() map[string]string {
 	if n.Spec.NodeSelector == nil {
 		return map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true"}
@@ -283,7 +284,7 @@ func (n *NIMCache) GetNodeSelectors() map[string]string {
 	return n.Spec.NodeSelector
 }
 
-// GetRuntimeClassName return the runtime class name for the NIMCache Job
+// GetRuntimeClassName return the runtime class name for the NIMCache Job.
 func (n *NIMCache) GetRuntimeClassName() *string {
 	if n.Spec.RuntimeClassName == "" {
 		return nil
@@ -291,7 +292,7 @@ func (n *NIMCache) GetRuntimeClassName() *string {
 	return &n.Spec.RuntimeClassName
 }
 
-// GetProxySpec returns the proxy spec for the NIMService deployment
+// GetProxySpec returns the proxy spec for the NIMService deployment.
 func (n *NIMCache) GetProxySpec() *ProxySpec {
 	return n.Spec.Proxy
 }
@@ -352,7 +353,7 @@ func (n *NIMCache) GetInitContainers() []corev1.Container {
 
 // +kubebuilder:object:root=true
 
-// NIMCacheList contains a list of NIMCache
+// NIMCacheList contains a list of NIMCache.
 type NIMCacheList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

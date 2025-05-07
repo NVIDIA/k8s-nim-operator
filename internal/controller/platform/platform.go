@@ -19,12 +19,13 @@ package platform
 import (
 	"context"
 
-	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
 
-// Platform defines the methods required for an inference platform integration
+// Platform defines the methods required for an inference platform integration.
 type Platform interface {
 	Delete(ctx context.Context, r shared.Reconciler, resource client.Object) error
 	Sync(ctx context.Context, r shared.Reconciler, resource client.Object) (ctrl.Result, error)

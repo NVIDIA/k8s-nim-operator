@@ -25,7 +25,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NIMPipeline is the Schema for the nimpipelines API
+        description: NIMPipeline is the Schema for the nimpipelines API.
         properties:
           apiVersion:
             description: |-
@@ -45,18 +45,18 @@ spec:
           metadata:
             type: object
           spec:
-            description: NIMPipelineSpec defines the desired state of NIMPipeline
+            description: NIMPipelineSpec defines the desired state of NIMPipeline.
             properties:
               services:
                 description: NIMService configures attributes to deploy a NIM service
                   as part of the pipeline
                 items:
                   description: NIMServicePipelineSpec defines the desired state of
-                    NIMService as part of the NIMPipeline
+                    NIMService as part of the NIMPipeline.
                   properties:
                     dependencies:
                       items:
-                        description: ServiceDependency defines service dependencies
+                        description: ServiceDependency defines service dependencies.
                         properties:
                           envName:
                             description: EnvName is the dependent service endpoint
@@ -83,7 +83,7 @@ spec:
                     name:
                       type: string
                     spec:
-                      description: NIMServiceSpec defines the desired state of NIMService
+                      description: NIMServiceSpec defines the desired state of NIMService.
                       properties:
                         annotations:
                           additionalProperties:
@@ -221,11 +221,11 @@ spec:
                             type: object
                           type: array
                         expose:
-                          description: Expose defines attributes to expose the service
+                          description: Expose defines attributes to expose the service.
                           properties:
                             ingress:
                               description: Ingress defines attributes to enable ingress
-                                for the service
+                                for the service.
                               properties:
                                 annotations:
                                   additionalProperties:
@@ -516,7 +516,7 @@ spec:
                               type: object
                             service:
                               description: Service defines attributes to create a
-                                service
+                                service.
                               properties:
                                 annotations:
                                   additionalProperties:
@@ -543,7 +543,7 @@ spec:
                           format: int64
                           type: integer
                         image:
-                          description: Image defines image attributes
+                          description: Image defines image attributes.
                           properties:
                             pullPolicy:
                               type: string
@@ -565,7 +565,7 @@ spec:
                           type: object
                         livenessProbe:
                           description: Probe defines attributes for startup/liveness/readiness
-                            probes
+                            probes.
                           properties:
                             enabled:
                               type: boolean
@@ -728,7 +728,7 @@ spec:
                           type: object
                         metrics:
                           description: Metrics defines attributes to setup metrics
-                            collection
+                            collection.
                           properties:
                             enabled:
                               type: boolean
@@ -1127,7 +1127,7 @@ spec:
                           type: object
                         proxy:
                           description: ProxySpec defines the proxy configuration for
-                            NIMService
+                            NIMService.
                           properties:
                             certConfigMap:
                               type: string
@@ -1140,7 +1140,7 @@ spec:
                           type: object
                         readinessProbe:
                           description: Probe defines attributes for startup/liveness/readiness
-                            probes
+                            probes.
                           properties:
                             enabled:
                               type: boolean
@@ -1370,7 +1370,7 @@ spec:
                           type: string
                         scale:
                           description: Autoscaling defines attributes to automatically
-                            scale the service based on metrics
+                            scale the service based on metrics.
                           properties:
                             annotations:
                               additionalProperties:
@@ -1380,7 +1380,7 @@ spec:
                               type: boolean
                             hpa:
                               description: HorizontalPodAutoscalerSpec defines the
-                                parameters required to setup HPA
+                                parameters required to setup HPA.
                               properties:
                                 behavior:
                                   description: |-
@@ -1994,7 +1994,7 @@ spec:
                           type: object
                         startupProbe:
                           description: Probe defines attributes for startup/liveness/readiness
-                            probes
+                            probes.
                           properties:
                             enabled:
                               type: boolean
@@ -2165,7 +2165,7 @@ spec:
                               type: string
                             nimCache:
                               description: NIMCacheVolSpec defines the spec to use
-                                NIMCache volume
+                                NIMCache volume.
                               properties:
                                 name:
                                   type: string
@@ -2254,7 +2254,7 @@ spec:
                 type: array
             type: object
           status:
-            description: NIMPipelineStatus defines the observed state of NIMPipeline
+            description: NIMPipelineStatus defines the observed state of NIMPipeline.
             properties:
               conditions:
                 description: |-

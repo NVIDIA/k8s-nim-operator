@@ -27,15 +27,6 @@ import (
 	"strings"
 	"time"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
-	nimparserutils "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/utils"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	"gopkg.in/yaml.v2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -57,32 +48,42 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
+	nimparserutils "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/utils"
+	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 const (
-	// SelectedNIMProfilesAnnotationKey is the annotation key for auto-selected model profiles
+	// SelectedNIMProfilesAnnotationKey is the annotation key for auto-selected model profiles.
 	SelectedNIMProfilesAnnotationKey = "nvidia.com/selected-profiles"
 
-	// NIMCacheFinalizer is the finalizer annotation
+	// NIMCacheFinalizer is the finalizer annotation.
 	NIMCacheFinalizer = "finalizer.nimcache.apps.nvidia.com"
 
-	// AllProfiles represents all profiles in the NIM manifest
+	// AllProfiles represents all profiles in the NIM manifest.
 	AllProfiles = "all"
 
-	// NIMCacheRole is the name of the role for all NIMCache instances in the namespace
+	// NIMCacheRole is the name of the role for all NIMCache instances in the namespace.
 	NIMCacheRole = "nim-cache-role"
 
-	// NIMCacheRoleBinding is the name of the rolebinding for all NIMCache instances in the namespace
+	// NIMCacheRoleBinding is the name of the rolebinding for all NIMCache instances in the namespace.
 	NIMCacheRoleBinding = "nim-cache-rolebinding"
 
-	// NIMCacheServiceAccount is the name of the serviceaccount for all NIMCache instances in the namespace
+	// NIMCacheServiceAccount is the name of the serviceaccount for all NIMCache instances in the namespace.
 	NIMCacheServiceAccount = "nim-cache-sa"
 
 	// NIMCacheContainerName returns the name of the container used for NIM Cache operations.
 	NIMCacheContainerName = "nim-cache-ctr"
 )
 
-// NIMCacheReconciler reconciles a NIMCache object
+// NIMCacheReconciler reconciles a NIMCache object.
 type NIMCacheReconciler struct {
 	client.Client
 	scheme           *runtime.Scheme
@@ -93,10 +94,10 @@ type NIMCacheReconciler struct {
 	recorder         record.EventRecorder
 }
 
-// Ensure NIMCacheReconciler implements the Reconciler interface
+// Ensure NIMCacheReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NIMCacheReconciler{}
 
-// NewNIMCacheReconciler creates a new reconciler for NIMCache with the given platform
+// NewNIMCacheReconciler creates a new reconciler for NIMCache with the given platform.
 func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger, platform platform.Platform) *NIMCacheReconciler {
 	return &NIMCacheReconciler{
 		Client:   client,
@@ -179,7 +180,7 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Fetch container orchestrator type
-	_, err = r.GetOrchestratorType()
+	_, err = r.GetOrchestratorType(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
@@ -201,40 +202,40 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return result, nil
 }
 
-// GetScheme returns the scheme of the reconciler
+// GetScheme returns the scheme of the reconciler.
 func (r *NIMCacheReconciler) GetScheme() *runtime.Scheme {
 	return r.scheme
 }
 
-// GetLogger returns the logger of the reconciler
+// GetLogger returns the logger of the reconciler.
 func (r *NIMCacheReconciler) GetLogger() logr.Logger {
 	return r.log
 }
 
-// GetClient returns the client instance
+// GetClient returns the client instance.
 func (r *NIMCacheReconciler) GetClient() client.Client {
 	return r.Client
 }
 
-// GetUpdater returns the conditions updater instance
+// GetUpdater returns the conditions updater instance.
 func (r *NIMCacheReconciler) GetUpdater() conditions.Updater {
 	return r.updater
 }
 
-// GetRenderer returns the renderer instance
+// GetRenderer returns the renderer instance.
 func (r *NIMCacheReconciler) GetRenderer() render.Renderer {
 	return nil
 }
 
-// GetEventRecorder returns the event recorder
+// GetEventRecorder returns the event recorder.
 func (r *NIMCacheReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetOrchestratorType returns the container platform type
-func (r *NIMCacheReconciler) GetOrchestratorType() (k8sutil.OrchestratorType, error) {
+// GetOrchestratorType returns the container platform type.
+func (r *NIMCacheReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
-		orchestratorType, err := k8sutil.GetOrchestratorType(r.GetClient())
+		orchestratorType, err := k8sutil.GetOrchestratorType(ctx, r.GetClient())
 		if err != nil {
 			return k8sutil.Unknown, fmt.Errorf("unable to get container orchestrator type, %v", err)
 		}
@@ -256,15 +257,16 @@ func (r *NIMCacheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				// Type assert to NIMCache
 				if oldNIMCache, ok := e.ObjectOld.(*appsv1alpha1.NIMCache); ok {
-					newNIMCache := e.ObjectNew.(*appsv1alpha1.NIMCache)
+					newNIMCache, ok := e.ObjectNew.(*appsv1alpha1.NIMCache)
+					if ok {
+						// Handle case where object is marked for deletion
+						if !newNIMCache.ObjectMeta.DeletionTimestamp.IsZero() {
+							return true
+						}
 
-					// Handle case where object is marked for deletion
-					if !newNIMCache.ObjectMeta.DeletionTimestamp.IsZero() {
-						return true
+						// Handle only spec updates
+						return !reflect.DeepEqual(oldNIMCache.Spec, newNIMCache.Spec)
 					}
-
-					// Handle only spec updates
-					return !reflect.DeepEqual(oldNIMCache.Spec, newNIMCache.Spec)
 				}
 				// For other types we watch, reconcile them
 				return true
@@ -292,14 +294,14 @@ func (r *NIMCacheReconciler) cleanupNIMCache(ctx context.Context, nimCache *apps
 	// Delete associated stale pods in error
 	podList := &corev1.PodList{}
 	if job.Spec.Selector != nil {
-		if err := r.List(context.Background(), podList, client.MatchingLabels(job.Spec.Selector.MatchLabels)); err != nil {
+		if err := r.List(ctx, podList, client.MatchingLabels(job.Spec.Selector.MatchLabels)); err != nil {
 			logger.Error(err, "unable to list associated pods during cleanup", "job", jobName)
 			errList = append(errList, err)
 		}
 	}
 
 	for _, pod := range podList.Items {
-		if err := r.Delete(context.Background(), &pod); err != nil {
+		if err := r.Delete(ctx, &pod); err != nil {
 			logger.Error(err, "unable to delete associated pods during cleanup", "job", jobName, "pod", pod.Name)
 			errList = append(errList, err)
 		}
@@ -366,26 +368,23 @@ func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1
 		}
 
 		logger.Info("Successfully created Role", "Name", roleName)
-	} else {
-		// Role exists, check if it needs to be updated
-		if !roleEqual(existingRole, desiredRole) {
-			logger.Info("Updating existing Role", "Name", roleName)
-			existingRole.Rules = desiredRole.Rules
+	} else if !roleEqual(existingRole, desiredRole) { // Role exists, check if it needs to be updated
+		logger.Info("Updating existing Role", "Name", roleName)
+		existingRole.Rules = desiredRole.Rules
 
-			err = r.Update(ctx, existingRole)
-			if err != nil {
-				logger.Error(err, "Failed to update Role", "Name", roleName)
-				return err
-			}
-
-			logger.Info("Successfully updated Role", "Name", roleName)
+		err = r.Update(ctx, existingRole)
+		if err != nil {
+			logger.Error(err, "Failed to update Role", "Name", roleName)
+			return err
 		}
+
+		logger.Info("Successfully updated Role", "Name", roleName)
 	}
 
 	return nil
 }
 
-// Helper function to check if two Roles are equal
+// Helper function to check if two Roles are equal.
 func roleEqual(existing, desired *rbacv1.Role) bool {
 	return utils.IsEqual(existing, desired, "Rules")
 }
@@ -437,27 +436,24 @@ func (r *NIMCacheReconciler) reconcileRoleBinding(ctx context.Context, nimCache 
 		}
 
 		logger.Info("Successfully created RoleBinding", "Name", rbName)
-	} else {
-		// RoleBinding exists, check if it needs to be updated
-		if !roleBindingEqual(existingRB, desiredRB) {
-			logger.Info("Updating existing RoleBinding", "Name", rbName)
-			existingRB.RoleRef = desiredRB.RoleRef
-			existingRB.Subjects = desiredRB.Subjects
+	} else if !roleBindingEqual(existingRB, desiredRB) { // RoleBinding exists, check if it needs to be updated
+		logger.Info("Updating existing RoleBinding", "Name", rbName)
+		existingRB.RoleRef = desiredRB.RoleRef
+		existingRB.Subjects = desiredRB.Subjects
 
-			err = r.Update(ctx, existingRB)
-			if err != nil {
-				logger.Error(err, "Failed to update RoleBinding", "Name", rbName)
-				return err
-			}
-
-			logger.Info("Successfully updated RoleBinding", "Name", rbName)
+		err = r.Update(ctx, existingRB)
+		if err != nil {
+			logger.Error(err, "Failed to update RoleBinding", "Name", rbName)
+			return err
 		}
+
+		logger.Info("Successfully updated RoleBinding", "Name", rbName)
 	}
 
 	return nil
 }
 
-// Helper function to check if two RoleBindings are equal
+// Helper function to check if two RoleBindings are equal.
 func roleBindingEqual(existing, desired *rbacv1.RoleBinding) bool {
 	return utils.IsEqual(existing, desired, "RoleRef", "Subjects")
 }
@@ -540,7 +536,7 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 // Model selection required when
 // NGC source is set and
 // Model auto-selection is enabled and
-// Explicit model profiles are not provided by the user
+// Explicit model profiles are not provided by the user.
 func isModelSelectionRequired(nimCache *appsv1alpha1.NIMCache) bool {
 	if nimCache.Spec.Source.NGC != nil &&
 		len(nimCache.Spec.Source.NGC.Model.Profiles) == 0 {
@@ -928,7 +924,7 @@ func getCommand() []string {
 	}
 }
 
-// constructPodSpec constructs a Pod specification
+// constructPodSpec constructs a Pod specification.
 func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) *corev1.Pod {
 	labels := map[string]string{
 		"app":                          "k8s-nim-operator",
@@ -1109,7 +1105,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			outputPath = fmt.Sprintf("%v/%v", outputPath, *nimCache.Spec.Storage.HostPath)
 		}
 		var command []string
-		if nimCache.Spec.Source.DataStore.ModelName != nil && nimCache.Spec.Source.DataStore.CheckpointName != nil {
+		if nimCache.Spec.Source.DataStore.ModelName != nil && nimCache.Spec.Source.DataStore.CheckpointName != nil { // nolint:gocritic
 			command = []string{"datastore-tools", "checkpoint", "download", "--model-name", *nimCache.Spec.Source.DataStore.ModelName, "--checkpoint-name", *nimCache.Spec.Source.DataStore.CheckpointName, "--path", outputPath, "--end-point", nimCache.Spec.Source.DataStore.Endpoint}
 		} else if nimCache.Spec.Source.DataStore.DatasetName != nil {
 			command = []string{"datastore-tools", "dataset", "download", "--dataset-name", *nimCache.Spec.Source.DataStore.DatasetName, "--path", outputPath, "--end-point", nimCache.Spec.Source.DataStore.Endpoint}
@@ -1245,14 +1241,14 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	return job, nil
 }
 
-// getConfigMap retrieves the given ConfigMap
+// getConfigMap retrieves the given ConfigMap.
 func (r *NIMCacheReconciler) getConfigMap(ctx context.Context, name, namespace string) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, configMap)
 	return configMap, err
 }
 
-// extractNIMManifest extracts the NIMManifest from the ConfigMap data
+// extractNIMManifest extracts the NIMManifest from the ConfigMap data.
 func (r *NIMCacheReconciler) extractNIMManifest(ctx context.Context, configName, namespace string) (nimparser.NIMManifestInterface, error) {
 	configMap, err := r.getConfigMap(ctx, configName, namespace)
 	if err != nil {
@@ -1272,7 +1268,7 @@ func (r *NIMCacheReconciler) extractNIMManifest(ctx context.Context, configName,
 	return manifest, nil
 }
 
-// createManifestConfigMap creates a ConfigMap with the given model manifest data
+// createManifestConfigMap creates a ConfigMap with the given model manifest data.
 func (r *NIMCacheReconciler) createManifestConfigMap(ctx context.Context, nimCache *appsv1alpha1.NIMCache, manifestData *nimparser.NIMManifestInterface) error {
 	// Convert manifestData to YAML
 	manifestBytes, err := yaml.Marshal(manifestData)

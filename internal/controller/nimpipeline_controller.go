@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,11 +33,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
-// NIMPipelineReconciler reconciles a NIMPipeline object
+// NIMPipelineReconciler reconciles a NIMPipeline object.
 type NIMPipelineReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
@@ -46,7 +48,7 @@ type NIMPipelineReconciler struct {
 }
 
 const (
-	// NIMPipelineFinalizer is the finalizer annotation
+	// NIMPipelineFinalizer is the finalizer annotation.
 	NIMPipelineFinalizer = "finalizer.nimpipeline.apps.nvidia.com"
 )
 
@@ -363,7 +365,7 @@ func (r *NIMPipelineReconciler) deleteService(ctx context.Context, svc *appsv1al
 	return nil
 }
 
-// GetEventRecorder returns the event recorder
+// GetEventRecorder returns the event recorder.
 func (r *NIMPipelineReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
@@ -378,15 +380,16 @@ func (r *NIMPipelineReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				// Type assert to NIMPipeline
 				if oldNIMPipeline, ok := e.ObjectOld.(*appsv1alpha1.NIMPipeline); ok {
-					newNIMPipeline := e.ObjectNew.(*appsv1alpha1.NIMPipeline)
+					newNIMPipeline, ok := e.ObjectNew.(*appsv1alpha1.NIMPipeline)
+					if ok {
+						// Handle case where object is marked for deletion
+						if !newNIMPipeline.ObjectMeta.DeletionTimestamp.IsZero() {
+							return true
+						}
 
-					// Handle case where object is marked for deletion
-					if !newNIMPipeline.ObjectMeta.DeletionTimestamp.IsZero() {
-						return true
+						// Handle only spec updates
+						return !reflect.DeepEqual(oldNIMPipeline.Spec, newNIMPipeline.Spec)
 					}
-
-					// Handle only spec updates
-					return !reflect.DeepEqual(oldNIMPipeline.Spec, newNIMPipeline.Spec)
 				}
 				// For other types we watch, reconcile them
 				return true

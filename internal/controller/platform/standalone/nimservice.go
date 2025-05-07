@@ -21,14 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
-	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -46,39 +38,48 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
+	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
-// GetScheme returns the scheme of the reconciler
+// GetScheme returns the scheme of the reconciler.
 func (r *NIMServiceReconciler) GetScheme() *runtime.Scheme {
 	return r.scheme
 }
 
-// GetLogger returns the logger of the reconciler
+// GetLogger returns the logger of the reconciler.
 func (r *NIMServiceReconciler) GetLogger() logr.Logger {
 	return r.log
 }
 
-// GetClient returns the client instance
+// GetClient returns the client instance.
 func (r *NIMServiceReconciler) GetClient() client.Client {
 	return r.Client
 }
 
-// GetUpdater returns the conditions updater instance
+// GetUpdater returns the conditions updater instance.
 func (r *NIMServiceReconciler) GetUpdater() conditions.Updater {
 	return r.updater
 }
 
-// GetRenderer returns the renderer instance
+// GetRenderer returns the renderer instance.
 func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 	return r.renderer
 }
 
-// GetEventRecorder returns the event recorder
+// GetEventRecorder returns the event recorder.
 func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
-// GetOrchestratorType returns the container platform type
+// GetOrchestratorType returns the container platform type.
 func (r *NIMServiceReconciler) GetOrchestratorType() k8sutil.OrchestratorType {
 	return r.orchestratorType
 }
@@ -184,7 +185,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
 
 	// Select PVC for model store
-	if nimService.GetNIMCacheName() != "" {
+	if nimService.GetNIMCacheName() != "" { // nolint:gocritic
 		// Fetch PVC for the associated NIMCache instance and mount it
 		nimCachePVC, err := r.getNIMCachePVC(ctx, nimService)
 		if err != nil {
@@ -453,7 +454,7 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	return nil
 }
 
-// CheckDeploymentReadiness checks if the Deployment is ready
+// CheckDeploymentReadiness checks if the Deployment is ready.
 func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespacedName *types.NamespacedName) (string, bool, error) {
 	deployment := &appsv1.Deployment{}
 	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, deployment)
@@ -490,7 +491,7 @@ func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.Depl
 	return nil
 }
 
-// getNIMCachePVC returns PVC backing the NIM cache instance
+// getNIMCachePVC returns PVC backing the NIM cache instance.
 func (r *NIMServiceReconciler) getNIMCachePVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (*appsv1alpha1.PersistentVolumeClaim, error) {
 	logger := log.FromContext(ctx)
 
@@ -568,7 +569,7 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 	return &nimService.Spec.Storage.PVC, nil
 }
 
-// getNIMCacheProfile returns model profile info from the NIM cache instance
+// getNIMCacheProfile returns model profile info from the NIM cache instance.
 func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimService *appsv1alpha1.NIMService, profile string) (*appsv1alpha1.NIMProfile, error) {
 	logger := log.FromContext(ctx)
 
@@ -599,7 +600,7 @@ func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimServic
 	return nil, nil
 }
 
-// getTensorParallelismByProfile returns the value of tensor parallelism parameter in the given NIM profile
+// getTensorParallelismByProfile returns the value of tensor parallelism parameter in the given NIM profile.
 func (r *NIMServiceReconciler) getTensorParallelismByProfile(ctx context.Context, profile *appsv1alpha1.NIMProfile) (string, error) {
 	// List of possible keys for tensor parallelism
 	possibleKeys := []string{"tensorParallelism", "tp"}

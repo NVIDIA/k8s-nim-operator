@@ -17,16 +17,19 @@ limitations under the License.
 package shared
 
 import (
-	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"context"
+
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 )
 
-// Reconciler defines the methods required by a reconciler
+// Reconciler defines the methods required by a reconciler.
 type Reconciler interface {
 	client.Client
 	GetScheme() *runtime.Scheme
@@ -35,5 +38,5 @@ type Reconciler interface {
 	GetUpdater() conditions.Updater
 	GetRenderer() render.Renderer
 	GetEventRecorder() record.EventRecorder
-	GetOrchestratorType() (k8sutil.OrchestratorType, error)
+	GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error)
 }

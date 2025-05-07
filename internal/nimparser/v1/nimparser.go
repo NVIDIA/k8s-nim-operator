@@ -24,39 +24,40 @@ import (
 	"strconv"
 	"strings"
 
+	"gopkg.in/yaml.v2"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
-	"gopkg.in/yaml.v2"
 )
 
 const (
-	// BackendTypeTensorRT indicates tensortt backend
+	// BackendTypeTensorRT indicates tensortt backend.
 	BackendTypeTensorRT = "tensorrt"
 )
 
-// File represents the model files
+// File represents the model files.
 type File struct {
 	Name string `yaml:"name" json:"name,omitempty"`
 }
 
-// Src represents model source
+// Src represents model source.
 type Src struct {
 	RepoID string `yaml:"repo_id" json:"repo_id,omitempty"`
 	Files  []File `yaml:"files" json:"files,omitempty"`
 }
 
-// Component represents source and destination for model files
+// Component represents source and destination for model files.
 type Component struct {
 	Dst string `yaml:"dst" json:"dst,omitempty"`
 	Src Src    `yaml:"src" json:"src,omitempty"`
 }
 
-// Workspace represents workspace for model components
+// Workspace represents workspace for model components.
 type Workspace struct {
 	Components []Component `yaml:"components" json:"components,omitempty"`
 }
 
-// NIMProfile is the model profile supported by the NIM container
+// NIMProfile is the model profile supported by the NIM container.
 type NIMProfile struct {
 	Model        string            `yaml:"model" json:"model,omitempty"`
 	Release      string            `yaml:"release" json:"release,omitempty"`
@@ -65,10 +66,10 @@ type NIMProfile struct {
 	Workspace    Workspace         `yaml:"workspace" json:"workspace,omitempty"`
 }
 
-// NIMManifest is the model manifest file
+// NIMManifest is the model manifest file.
 type NIMManifest map[string]NIMProfile
 
-// UnmarshalYAML is the custom unmarshal function for Src
+// UnmarshalYAML is the custom unmarshal function for Src.
 func (s *Src) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var raw map[string]interface{}
 	if err := unmarshal(&raw); err != nil {
@@ -96,7 +97,7 @@ func (s *Src) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// UnmarshalYAML unmarshalls given yaml data into NIM manifest struct
+// UnmarshalYAML unmarshalls given yaml data into NIM manifest struct.
 func (f *File) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var name string
 	if err := unmarshal(&name); err != nil {
@@ -107,7 +108,7 @@ func (f *File) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func (manifest NIMManifest) MatchProfiles(modelSpec appsv1alpha1.ModelSpec, discoveredGPUs []string) ([]string, error) {
-	//TODO implement me
+	// TODO implement me
 	var selectedProfiles []string
 
 	for hash, profile := range manifest {

@@ -19,11 +19,6 @@ package standalone
 import (
 	"context"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,19 +26,25 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
 
 const (
-	// ManifestsDir is the directory to render k8s resource manifests
+	// ManifestsDir is the directory to render k8s resource manifests.
 	ManifestsDir = "/manifests"
 )
 
-// Standalone implements the Platform interface for standalone deployment
+// Standalone implements the Platform interface for standalone deployment.
 type Standalone struct{}
 
 // Define reconcilers for Standalone mode
 
-// NIMCacheReconciler represents the NIMCache reconciler instance for standalone mode
+// NIMCacheReconciler represents the NIMCache reconciler instance for standalone mode.
 type NIMCacheReconciler struct {
 	client.Client
 	scheme   *runtime.Scheme
@@ -52,7 +53,7 @@ type NIMCacheReconciler struct {
 	recorder record.EventRecorder
 }
 
-// NIMServiceReconciler represents the NIMService reconciler instance for standalone mode
+// NIMServiceReconciler represents the NIMService reconciler instance for standalone mode.
 type NIMServiceReconciler struct {
 	client.Client
 	scheme           *runtime.Scheme
@@ -63,7 +64,7 @@ type NIMServiceReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 }
 
-// NewNIMCacheReconciler returns NIMCacheReconciler for standalone mode
+// NewNIMCacheReconciler returns NIMCacheReconciler for standalone mode.
 func NewNIMCacheReconciler(r shared.Reconciler) *NIMCacheReconciler {
 	return &NIMCacheReconciler{
 		Client:   r.GetClient(),
@@ -74,9 +75,9 @@ func NewNIMCacheReconciler(r shared.Reconciler) *NIMCacheReconciler {
 	}
 }
 
-// NewNIMServiceReconciler returns NIMServiceReconciler for standalone mode
-func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
-	orchestratorType, _ := r.GetOrchestratorType()
+// NewNIMServiceReconciler returns NIMServiceReconciler for standalone mode.
+func NewNIMServiceReconciler(ctx context.Context, r shared.Reconciler) *NIMServiceReconciler {
+	orchestratorType, _ := r.GetOrchestratorType(ctx)
 
 	return &NIMServiceReconciler{
 		Client:           r.GetClient(),
@@ -88,12 +89,12 @@ func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
 	}
 }
 
-// Delete handles cleanup of resources created for standlone Standalone caching
+// Delete handles cleanup of resources created for standlone Standalone caching.
 func (s *Standalone) Delete(ctx context.Context, r shared.Reconciler, resource client.Object) error {
 	logger := r.GetLogger()
 
 	if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
-		reconciler := NewNIMServiceReconciler(r)
+		reconciler := NewNIMServiceReconciler(ctx, r)
 		err := reconciler.cleanupNIMService(ctx, nimService)
 		if err != nil {
 			logger.Error(err, "failed to cleanup resources", "name", nimService.Name)
@@ -104,12 +105,12 @@ func (s *Standalone) Delete(ctx context.Context, r shared.Reconciler, resource c
 	return errors.NewBadRequest("invalid resource type")
 }
 
-// Sync handles reconciliation for standalone Standalone caching
+// Sync handles reconciliation for standalone Standalone caching.
 func (s *Standalone) Sync(ctx context.Context, r shared.Reconciler, resource client.Object) (ctrl.Result, error) {
 	logger := r.GetLogger()
 
 	if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
-		reconciler := NewNIMServiceReconciler(r)
+		reconciler := NewNIMServiceReconciler(ctx, r)
 		reconciler.renderer = render.NewRenderer(ManifestsDir)
 		logger.Info("Reconciling NIMService instance", "nimservice", nimService.GetName())
 		result, err := reconciler.reconcileNIMService(ctx, nimService)

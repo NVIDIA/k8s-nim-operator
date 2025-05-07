@@ -19,14 +19,15 @@ package shared
 import (
 	"fmt"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
-// ConstructPVC constructs a PVC from the custom spec from the user
+// ConstructPVC constructs a PVC from the custom spec from the user.
 func ConstructPVC(pvc appsv1alpha1.PersistentVolumeClaim, pvcMeta metav1.ObjectMeta) (*corev1.PersistentVolumeClaim, error) {
 	size, err := resource.ParseQuantity(pvc.Size)
 	if err != nil {
