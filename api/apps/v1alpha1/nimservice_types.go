@@ -40,8 +40,6 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	// NIMAPIPort is the default port that the NIM serves on.
-	NIMAPIPort = 8000
 	// NIMServiceConditionReady indicates that the NIM deployment is ready.
 	NIMServiceConditionReady = "NIM_SERVICE_READY"
 	// NIMServiceConditionFailed indicates that the NIM deployment has failed.
@@ -199,7 +197,11 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_SERVER_PORT",
-			Value: fmt.Sprintf("%d", NIMAPIPort),
+			Value: fmt.Sprintf("%d", *n.Spec.Expose.Service.Port),
+		},
+		{
+			Name:  "NIM_HTTP_API_PORT",
+			Value: fmt.Sprintf("%d", *n.Spec.Expose.Service.Port),
 		},
 		{
 			Name:  "NIM_JSONL_LOGGING",
@@ -209,6 +211,21 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 			Name:  "NIM_LOG_LEVEL",
 			Value: "INFO",
 		},
+	}
+	if n.Spec.Expose.Service.GRPCPort != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "NIM_GRPC_API_PORT",
+			Value: fmt.Sprintf("%d", *n.Spec.Expose.Service.GRPCPort),
+		}, corev1.EnvVar{
+			Name:  "NIM_TRITON_GRPC_PORT",
+			Value: fmt.Sprintf("%d", *n.Spec.Expose.Service.GRPCPort),
+		})
+	}
+	if n.Spec.Expose.Service.MetricsPort != nil {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "NIM_TRITON_METRICS_PORT",
+			Value: fmt.Sprintf("%d", *n.Spec.Expose.Service.MetricsPort),
+		})
 	}
 
 	return envVars
@@ -681,10 +698,23 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 		{
 			Name:          DefaultNamedPortAPI,
 			Protocol:      corev1.ProtocolTCP,
-			ContainerPort: NIMAPIPort,
+			ContainerPort: *n.Spec.Expose.Service.Port,
 		},
 	}
-
+	if n.Spec.Expose.Service.GRPCPort != nil {
+		params.Ports = append(params.Ports, corev1.ContainerPort{
+			Name:          DefaultNamedPortGRPC,
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: *n.Spec.Expose.Service.GRPCPort,
+		})
+	}
+	if n.Spec.Expose.Service.MetricsPort != nil {
+		params.Ports = append(params.Ports, corev1.ContainerPort{
+			Name:          DefaultNamedPortMetrics,
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: *n.Spec.Expose.Service.MetricsPort,
+		})
+	}
 	return params
 }
 
@@ -759,6 +789,23 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 			Protocol:   corev1.ProtocolTCP,
 		},
 	}
+	if n.Spec.Expose.Service.GRPCPort != nil {
+		params.Ports = append(params.Ports, corev1.ServicePort{
+			Name:       DefaultNamedPortGRPC,
+			Port:       *n.Spec.Expose.Service.GRPCPort,
+			TargetPort: intstr.FromString(DefaultNamedPortGRPC),
+			Protocol:   corev1.ProtocolTCP,
+		})
+	}
+	if n.Spec.Expose.Service.MetricsPort != nil {
+		params.Ports = append(params.Ports, corev1.ServicePort{
+			Name:       DefaultNamedPortMetrics,
+			Port:       *n.Spec.Expose.Service.MetricsPort,
+			TargetPort: intstr.FromString(DefaultNamedPortMetrics),
+			Protocol:   corev1.ProtocolTCP,
+		})
+	}
+
 	return params
 }
 
@@ -884,6 +931,14 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 				Interval:      serviceMonitor.Interval,
 			},
 		},
+	}
+	if n.Spec.Expose.Service.MetricsPort != nil {
+		smSpec.Endpoints = append(smSpec.Endpoints, monitoringv1.Endpoint{
+			Path:          "/metrics",
+			Port:          DefaultNamedPortMetrics,
+			ScrapeTimeout: serviceMonitor.ScrapeTimeout,
+			Interval:      serviceMonitor.Interval,
+		})
 	}
 	params.SMSpec = smSpec
 	return params
