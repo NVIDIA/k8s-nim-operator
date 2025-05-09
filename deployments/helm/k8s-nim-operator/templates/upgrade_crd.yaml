@@ -86,6 +86,7 @@ spec:
         - name: upgrade-crd
           image: {{ include "k8s-nim-operator.fullimage" . }}
           imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+          resources: {{- toYaml .Values.operator.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
