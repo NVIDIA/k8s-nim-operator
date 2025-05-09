@@ -302,8 +302,24 @@ spec:
                         additionalProperties:
                           type: string
                         type: object
+                      grpcPort:
+                        description: |-
+                          GRPCPort is the GRPC serving port
+                          Note: This port is only applicable for NIMs that runs a Triton GRPC Inference Server.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1
+                        type: integer
+                      metricsPort:
+                        description: |-
+                          MetricsPort is the port for metrics
+                          Note: This port is only applicable for NIMs that runs a separate metrics endpoint on Triton Inference Server.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1
+                        type: integer
                       name:
-                        description: override the default service name
+                        description: Override the default service name
                         type: string
                       port:
                         default: 8000
