@@ -18,8 +18,8 @@ installation_namespace: nemo
 pvc:
   # Ignored when localPathProvisioner.enabled is true — in which case these will default to:
   # storage_class: "local-path" and volume_access_mode: "ReadWriteOnce"
-  storage_class: ""
-  volume_access_mode: ReadWriteMany
+  storage_class: "local-path"
+  volume_access_mode: ReadWriteOnce
 
 # Deploy a local-path CSI provisioner
 localPathProvisioner:
