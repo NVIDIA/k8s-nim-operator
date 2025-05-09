@@ -83,16 +83,17 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: upgrade-crd
-          image: {{ include "k8s-nim-operator.fullimage" . }}
-          imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-          command: ["crd-apply-tool"]
-          args:
-            - "--crds-dir=/opt/nim-operator/crds/"
+      - name: upgrade-crd
+        image: {{ include "k8s-nim-operator.fullimage" . }}
+        imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+        resources: {{- toYaml .Values.operator.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        command: ["crd-apply-tool"]
+        args:
+          - "--crds-dir=/opt/nim-operator/crds/"
       restartPolicy: OnFailure
 {{- end }}
