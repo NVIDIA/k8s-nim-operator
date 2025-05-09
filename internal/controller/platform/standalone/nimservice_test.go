@@ -192,6 +192,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Value: "9000",
 					},
 					{
+						Name:  "NIM_HTTP_API_PORT",
+						Value: "9000",
+					},
+					{
 						Name:  "NIM_JSONL_LOGGING",
 						Value: "1",
 					},
