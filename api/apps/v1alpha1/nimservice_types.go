@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
@@ -134,6 +135,8 @@ type NIMServiceList struct {
 // NIMServiceStorage defines the attributes of various storage targets used to store the model
 type NIMServiceStorage struct {
 	NIMCache NIMCacheVolSpec `json:"nimCache,omitempty"`
+	// SharedMemorySizeLimit sets the max size of the shared memory volume (emptyDir) used by NIMs for fast model runtime I/O.
+	SharedMemorySizeLimit *resource.Quantity `json:"sharedMemorySizeLimit,omitempty"`
 	// PersistentVolumeClaim is the pvc volume used for caching NIM
 	PVC PersistentVolumeClaim `json:"pvc,omitempty"`
 	// HostPath is the host path volume for caching NIM
@@ -448,7 +451,8 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 			Name: "dshm",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					Medium: corev1.StorageMediumMemory,
+					Medium:    corev1.StorageMediumMemory,
+					SizeLimit: n.Spec.Storage.SharedMemorySizeLimit,
 				},
 			},
 		},

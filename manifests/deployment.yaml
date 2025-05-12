@@ -121,6 +121,9 @@ spec:
         {{- if .EmptyDir }}
         emptyDir:
           medium: {{ .EmptyDir.Medium }}
+          {{- if .EmptyDir.SizeLimit }}
+          sizeLimit: {{ .EmptyDir.SizeLimit }}
+          {{- end }}
         {{- end }}
         {{- if .PersistentVolumeClaim }}
         persistentVolumeClaim:
