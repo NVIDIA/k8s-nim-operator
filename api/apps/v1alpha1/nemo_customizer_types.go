@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
@@ -150,6 +151,8 @@ type TrainingConfig struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// PodAffinity for the training jobs
 	PodAffinity *corev1.PodAffinity `json:"podAffinity,omitempty"`
+	// SharedMemorySizeLimit sets the max size of the shared memory volume (emptyDir) used by the training jobs for fast model runtime I/O.
+	SharedMemorySizeLimit *resource.Quantity `json:"sharedMemorySizeLimit,omitempty"`
 	// Resources for the training jobs
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
