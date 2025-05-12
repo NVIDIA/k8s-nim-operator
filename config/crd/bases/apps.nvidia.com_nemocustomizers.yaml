@@ -2525,6 +2525,15 @@ spec:
                       RunAIQueue is the Run.AI's scheduler queue to be used for training jobs.
                       Used only if the scheduler is set to runai.
                     type: string
+                  sharedMemorySizeLimit:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: SharedMemorySizeLimit sets the max size of the shared
+                      memory volume (emptyDir) used by the training jobs for fast
+                      model runtime I/O.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
                   timeout:
                     description: Timeout for the training job to complete
                     type: integer
