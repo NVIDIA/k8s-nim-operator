@@ -25,7 +25,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NIMService is the Schema for the nimservices API
+        description: NIMService is the Schema for the nimservices API.
         properties:
           apiVersion:
             description: |-
@@ -45,7 +45,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: NIMServiceSpec defines the desired state of NIMService
+            description: NIMServiceSpec defines the desired state of NIMService.
             properties:
               annotations:
                 additionalProperties:
@@ -180,11 +180,11 @@ spec:
                   type: object
                 type: array
               expose:
-                description: Expose defines attributes to expose the service
+                description: Expose defines attributes to expose the service.
                 properties:
                   ingress:
                     description: Ingress defines attributes to enable ingress for
-                      the service
+                      the service.
                     properties:
                       annotations:
                         additionalProperties:
@@ -466,7 +466,7 @@ spec:
                         type: object
                     type: object
                   service:
-                    description: Service defines attributes to create a service
+                    description: Service defines attributes to create a service.
                     properties:
                       annotations:
                         additionalProperties:
@@ -493,7 +493,7 @@ spec:
                 format: int64
                 type: integer
               image:
-                description: Image defines image attributes
+                description: Image defines image attributes.
                 properties:
                   pullPolicy:
                     type: string
@@ -515,7 +515,7 @@ spec:
                 type: object
               livenessProbe:
                 description: Probe defines attributes for startup/liveness/readiness
-                  probes
+                  probes.
                 properties:
                   enabled:
                     type: boolean
@@ -675,7 +675,7 @@ spec:
                     type: object
                 type: object
               metrics:
-                description: Metrics defines attributes to setup metrics collection
+                description: Metrics defines attributes to setup metrics collection.
                 properties:
                   enabled:
                     type: boolean
@@ -1068,7 +1068,7 @@ spec:
                     x-kubernetes-list-type: atomic
                 type: object
               proxy:
-                description: ProxySpec defines the proxy configuration for NIMService
+                description: ProxySpec defines the proxy configuration for NIMService.
                 properties:
                   certConfigMap:
                     type: string
@@ -1081,7 +1081,7 @@ spec:
                 type: object
               readinessProbe:
                 description: Probe defines attributes for startup/liveness/readiness
-                  probes
+                  probes.
                 properties:
                   enabled:
                     type: boolean
@@ -1307,7 +1307,7 @@ spec:
                 type: string
               scale:
                 description: Autoscaling defines attributes to automatically scale
-                  the service based on metrics
+                  the service based on metrics.
                 properties:
                   annotations:
                     additionalProperties:
@@ -1317,7 +1317,7 @@ spec:
                     type: boolean
                   hpa:
                     description: HorizontalPodAutoscalerSpec defines the parameters
-                      required to setup HPA
+                      required to setup HPA.
                     properties:
                       behavior:
                         description: |-
@@ -1913,7 +1913,7 @@ spec:
                 type: object
               startupProbe:
                 description: Probe defines attributes for startup/liveness/readiness
-                  probes
+                  probes.
                 properties:
                   enabled:
                     type: boolean
@@ -2081,7 +2081,7 @@ spec:
                     type: string
                   nimCache:
                     description: NIMCacheVolSpec defines the spec to use NIMCache
-                      volume
+                      volume.
                     properties:
                       name:
                         type: string
@@ -2120,6 +2120,15 @@ spec:
                     description: ReadOnly mode indicates if the volume should be mounted
                       as read-only
                     type: boolean
+                  sharedMemorySizeLimit:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: SharedMemorySizeLimit sets the max size of the shared
+                      memory volume (emptyDir) used by NIMs for fast model runtime
+                      I/O.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
                 type: object
               tolerations:
                 items:
@@ -2167,7 +2176,7 @@ spec:
             - image
             type: object
           status:
-            description: NIMServiceStatus defines the observed state of NIMService
+            description: NIMServiceStatus defines the observed state of NIMService.
             properties:
               availableReplicas:
                 format: int32
