@@ -335,6 +335,11 @@ spec:
                         type: string
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: 'unsupported field: spec.expose.service.grpcPort'
+                  rule: '!(has(self.service.grpcPort))'
+                - message: 'unsupported field: spec.expose.service.metricsPort'
+                  rule: '!(has(self.service.metricsPort))'
               groupID:
                 format: int64
                 type: integer

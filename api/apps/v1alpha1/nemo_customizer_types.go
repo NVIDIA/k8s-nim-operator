@@ -77,9 +77,11 @@ type NemoCustomizerSpec struct {
 	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
 	PodAffinity  *corev1.PodAffinity          `json:"podAffinity,omitempty"`
 	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Expose       ExposeV1                     `json:"expose,omitempty"`
-	Scale        Autoscaling                  `json:"scale,omitempty"`
-	Metrics      Metrics                      `json:"metrics,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
+	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
+	Expose  ExposeV1    `json:"expose,omitempty"`
+	Scale   Autoscaling `json:"scale,omitempty"`
+	Metrics Metrics     `json:"metrics,omitempty"`
 
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
