@@ -626,6 +626,12 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 	// Add PVC configuration
 	r.addWorkspacePVCConfig(ctx, trainingCfg, n)
 
+	emptyDir := map[string]interface{}{
+		"medium": "Memory",
+	}
+	if n.Spec.Training.SharedMemorySizeLimit != nil {
+		emptyDir["sizeLimit"] = n.Spec.Training.SharedMemorySizeLimit.String()
+	}
 	trainingCfg["volumes"] = []map[string]interface{}{
 		{
 			"name": "models",
@@ -635,10 +641,8 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 			},
 		},
 		{
-			"name": "dshm",
-			"emptyDir": map[string]interface{}{
-				"medium": "Memory",
-			},
+			"name":     "dshm",
+			"emptyDir": emptyDir,
 		},
 	}
 
