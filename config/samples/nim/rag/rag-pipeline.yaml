@@ -48,6 +48,8 @@ spec:
           service:
             type: ClusterIP
             port: 8000
+            grpcPort: 8001
+            metricsPort: 8002
     - name: nv-rerankqa-1b-v2
       enabled: true
       spec:
@@ -70,3 +72,5 @@ spec:
           service:
             type: ClusterIP
             port: 8000
+            grpcPort: 8001
+            metricsPort: 8002
