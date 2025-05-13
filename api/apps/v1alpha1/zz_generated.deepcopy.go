@@ -1134,6 +1134,11 @@ func (in *NIMServiceStatus) DeepCopy() *NIMServiceStatus {
 func (in *NIMServiceStorage) DeepCopyInto(out *NIMServiceStorage) {
 	*out = *in
 	out.NIMCache = in.NIMCache
+	if in.SharedMemorySizeLimit != nil {
+		in, out := &in.SharedMemorySizeLimit, &out.SharedMemorySizeLimit
+		x := (*in).DeepCopy()
+		*out = &x
+	}
 	in.PVC.DeepCopyInto(&out.PVC)
 	if in.HostPath != nil {
 		in, out := &in.HostPath, &out.HostPath
@@ -2382,6 +2387,11 @@ func (in *TrainingConfig) DeepCopyInto(out *TrainingConfig) {
 		in, out := &in.PodAffinity, &out.PodAffinity
 		*out = new(corev1.PodAffinity)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.SharedMemorySizeLimit != nil {
+		in, out := &in.SharedMemorySizeLimit, &out.SharedMemorySizeLimit
+		x := (*in).DeepCopy()
+		*out = &x
 	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources

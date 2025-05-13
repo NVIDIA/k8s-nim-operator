@@ -2204,6 +2204,15 @@ spec:
                               description: ReadOnly mode indicates if the volume should
                                 be mounted as read-only
                               type: boolean
+                            sharedMemorySizeLimit:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: SharedMemorySizeLimit sets the max size
+                                of the shared memory volume (emptyDir) used by NIMs
+                                for fast model runtime I/O.
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
                           type: object
                         tolerations:
                           items:
