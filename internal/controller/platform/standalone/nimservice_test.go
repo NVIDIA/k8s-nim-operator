@@ -394,9 +394,13 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 		// Start mock test server to serve nimservice endpoint.
 		testServerHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, err := w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
-			Expect(err).ToNot(HaveOccurred())
+			if r.URL.Path == "/v1/models" {
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
+				Expect(err).ToNot(HaveOccurred())
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
 		})
 		testServer = httptest.NewServer(testServerHandler)
 		http.DefaultTransport = &mockTransport{
@@ -772,9 +776,13 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 		It("should fail when models response is unmarshallable", func() {
 			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				_, err := w.Write([]byte(`{"data": "invalid response"}`))
-				Expect(err).ToNot(HaveOccurred())
+				if r.URL.Path == "/v1/models" {
+					w.WriteHeader(http.StatusOK)
+					_, err := w.Write([]byte(`{"data": "invalid response"}`))
+					Expect(err).ToNot(HaveOccurred())
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+				}
 			})
 			svc := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -800,10 +808,14 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 		It("should have empty model name when it cannot be inferred", func() {
 			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				// Set dummy object type for model.
-				_, err := w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "dummy", "root": "dummy-model", "parent": null}]}`))
-				Expect(err).ToNot(HaveOccurred())
+				if r.URL.Path == "/v1/models" {
+					w.WriteHeader(http.StatusOK)
+					// Set dummy object type for model.
+					_, err := w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model", "object": "dummy", "root": "dummy-model", "parent": null}]}`))
+					Expect(err).ToNot(HaveOccurred())
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+				}
 			})
 			svc := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -857,10 +869,14 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 		It("should succeed when nimservice has lora adapter models attached", func() {
 			testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				// Set dummy object type for model.
-				_, err := w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model-adapter1", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model-adapter2", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
-				Expect(err).ToNot(HaveOccurred())
+				if r.URL.Path == "/v1/models" {
+					w.WriteHeader(http.StatusOK)
+					// Set dummy object type for model.
+					_, err := w.Write([]byte(`{"object": "list", "data":[{"id": "dummy-model-adapter1", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model-adapter2", "object": "model", "root": "dummy-model", "parent": null}, {"id": "dummy-model", "object": "model", "root": "dummy-model", "parent": null}]}`))
+					Expect(err).ToNot(HaveOccurred())
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+				}
 			})
 			svc := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -888,6 +904,47 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(modelStatus.Name).To(Equal("dummy-model"))
 		})
 
+		Context("when nimservice only supports /v1/metadata", func() {
+			It("should succeed when nimservice only supports /v1/metadata", func() {
+				testServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/v1/models":
+						w.WriteHeader(http.StatusNotFound)
+					case "/v1/metadata":
+						w.WriteHeader(http.StatusOK)
+						_, err := w.Write([]byte(`{"modelInfo": [{"shortName": "dummy-model:dummy-version", "modelUrl": "ngc://org/team/dummy-model:dummy-version"}]}`))
+						Expect(err).ToNot(HaveOccurred())
+					default:
+						w.WriteHeader(http.StatusNotFound)
+					}
+				})
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-nimservice",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Type:      corev1.ServiceTypeClusterIP,
+						ClusterIP: "127.0.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Port: 8123,
+								Name: "service-port",
+							},
+						},
+					},
+				}
+				_ = client.Create(context.TODO(), svc)
+				err := reconciler.updateModelStatus(context.Background(), nimService)
+				Expect(err).ToNot(HaveOccurred())
+				modelStatus := nimService.Status.Model
+				Expect(modelStatus).ToNot(BeNil())
+				Expect(modelStatus.ClusterEndpoint).To(Equal("127.0.0.1:8123"))
+				Expect(modelStatus.ExternalEndpoint).To(Equal("test-nimservice.default.example.com"))
+				Expect(modelStatus.Name).To(Equal("dummy-model"))
+
+			})
+		})
 	})
 
 	Describe("getNIMModelEndpoints", func() {
