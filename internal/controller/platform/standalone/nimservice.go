@@ -19,6 +19,7 @@ package standalone
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -318,26 +319,70 @@ func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEn
 	// List nimservice /v1/models endpoint.
 	modelsList, err := nimmodels.ListModelsV1(ctx, nimServiceEndpoint)
 	if err != nil {
+		logger.Error(err, "Failed to list models", "endpoint", nimServiceEndpoint)
+		// Check if it's an HTTP error with a status code
+		if nimmodels.IsNotFound(err) {
+			// The endpoint does not exist
+			logger.V(2).Error(err, "URI does not exist", "uri", nimmodels.ModelsV1URI, "endpoint", nimServiceEndpoint)
+			metadata, err := nimmodels.GetMetadataV1(ctx, nimServiceEndpoint)
+			if err != nil {
+				logger.Error(err, "Failed to get metadata", "endpoint", nimServiceEndpoint)
+				if nimmodels.IsNotFound(err) {
+					logger.V(2).Error(err, "URI does not exist", "uri", nimmodels.MetadataV1URI, "endpoint", nimServiceEndpoint)
+					return "", nil
+				}
+				return "", err
+			}
+			modelName, err := getModelNameFromMetadata(metadata)
+			if err != nil {
+				logger.V(2).Error(err, "Failed to get model name from metadata", "endpoint", nimServiceEndpoint)
+				return "", nil
+			}
+
+			return modelName, nil
+		}
+
 		return "", err
 	}
 
-	if modelsList.Object == nimmodels.ObjectTypeList {
-		if len(modelsList.Data) == 1 {
-			return modelsList.Data[0].Id, nil
-		}
+	modelName, err := getModelNameFromModelsList(modelsList)
+	if err != nil {
+		logger.V(2).Error(err, "Failed to get model name from models list", "endpoint", nimServiceEndpoint)
+		return "", nil
+	}
+	return modelName, nil
+}
 
-		for _, model := range modelsList.Data {
-			if model.Object != nimmodels.ObjectTypeModel {
-				continue
-			}
-			if model.Root != nil && *model.Root == model.Id {
-				return model.Id, nil
-			}
+func getModelNameFromModelsList(modelsList *nimmodels.ModelsV1List) (string, error) {
+	if modelsList.Object != nimmodels.ObjectTypeList {
+		return "", fmt.Errorf("unexpected object type: %s", modelsList.Object)
+	}
+
+	if len(modelsList.Data) == 0 {
+		return "", fmt.Errorf("no models found")
+	}
+
+	if len(modelsList.Data) == 1 {
+		return modelsList.Data[0].Id, nil
+	}
+
+	for _, model := range modelsList.Data {
+		if model.Object != nimmodels.ObjectTypeModel {
+			continue
+		}
+		if model.Root != nil && *model.Root == model.Id {
+			return model.Id, nil
 		}
 	}
 
-	logger.Info("WARN: Failed to detect model name from /v1/models API response", "endpoint", nimServiceEndpoint)
-	return "", nil
+	return "", fmt.Errorf("no valid model found")
+}
+
+func getModelNameFromMetadata(metadata *nimmodels.MetadataV1) (string, error) {
+	if len(metadata.ModelInfo) == 0 {
+		return "", fmt.Errorf("no model info found")
+	}
+	return strings.Split(metadata.ModelInfo[0].ShortName, ":")[0], nil
 }
 
 func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, string, error) {

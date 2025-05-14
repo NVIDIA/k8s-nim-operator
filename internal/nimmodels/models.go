@@ -35,7 +35,8 @@ const (
 )
 
 const (
-	modelsV1URI = "/v1/models"
+	ModelsV1URI   = "/v1/models"
+	MetadataV1URI = "/v1/metadata"
 )
 
 type ModelsV1Info struct {
@@ -49,48 +50,89 @@ type ModelsV1List struct {
 	Data   []ModelsV1Info `json:"data"`
 }
 
-func getModelsV1URL(nimServiceEndpoint string) string {
-	return fmt.Sprintf("http://%s%s", nimServiceEndpoint, modelsV1URI)
+type MetadataV1ModelInfo struct {
+	ShortName string `json:"shortName"`
+	ModelUrl  string `json:"modelUrl"`
 }
 
-func ListModelsV1(ctx context.Context, nimServiceEndpoint string) (*ModelsV1List, error) {
+type MetadataV1 struct {
+	ModelInfo []MetadataV1ModelInfo `json:"modelInfo"`
+}
+
+func getURL(endpoint string, uri string) string {
+	return fmt.Sprintf("http://%s%s", endpoint, uri)
+}
+
+func processAPIResponse(resp *http.Response) error {
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+	return newAPIError(resp)
+}
+
+func doGetRequest(ctx context.Context, url string) ([]byte, error) {
 	logger := log.FromContext(ctx)
 
 	httpClient := http.Client{
 		Timeout: 30 * time.Second,
 	}
-	modelsURL := getModelsV1URL(nimServiceEndpoint)
-	modelsReq, err := http.NewRequest(http.MethodGet, modelsURL, nil)
+
+	resp, err := httpClient.Get(url)
 	if err != nil {
-		logger.Error(err, "Failed to prepare request for models endpoint", "url", modelsURL)
+		logger.Error(err, "GET request failed", "url", url)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Error(err, "Failed to read response", "url", url)
+		return nil, err
+	}
+	logger.V(4).Info("DEBUG: API response", "endpoint", url, "body", string(body))
+
+	err = processAPIResponse(resp)
+	if err != nil {
 		return nil, err
 	}
 
-	modelsResp, err := httpClient.Do(modelsReq)
+	return body, nil
+}
+
+func ListModelsV1(ctx context.Context, nimServiceEndpoint string) (*ModelsV1List, error) {
+	logger := log.FromContext(ctx)
+
+	modelsURL := getURL(nimServiceEndpoint, ModelsV1URI)
+	modelsBytes, err := doGetRequest(ctx, modelsURL)
 	if err != nil {
-		logger.Error(err, "Failed to make request for models endpoint", "url", modelsURL)
 		return nil, err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			logger.Error(err, "Failed to close response body", "url", modelsURL)
-		}
-	}(modelsResp.Body)
 
-	modelsData, err := io.ReadAll(modelsResp.Body)
-	if err != nil {
-		logger.Error(err, "Failed to read models api response", "url", modelsURL)
-		return nil, err
-	}
-	logger.V(2).Info("DEBUG: /v1/models API response", "data", string(modelsData))
-
-	var modelsList ModelsV1List
-	err = json.Unmarshal(modelsData, &modelsList)
+	var info ModelsV1List
+	err = json.Unmarshal(modelsBytes, &info)
 	if err != nil {
 		logger.Error(err, "Failed to unmarshal models response", "url", modelsURL)
 		return nil, err
 	}
 
-	return &modelsList, nil
+	return &info, nil
+}
+
+func GetMetadataV1(ctx context.Context, nimServiceEndpoint string) (*MetadataV1, error) {
+	logger := log.FromContext(ctx)
+
+	metadataURL := getURL(nimServiceEndpoint, MetadataV1URI)
+	metadataBytes, err := doGetRequest(ctx, metadataURL)
+	if err != nil {
+		return nil, err
+	}
+
+	var info MetadataV1
+	err = json.Unmarshal(metadataBytes, &info)
+	if err != nil {
+		logger.Error(err, "Failed to unmarshal metadata response", "url", metadataURL)
+		return nil, err
+	}
+
+	return &info, nil
 }
