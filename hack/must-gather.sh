@@ -20,10 +20,11 @@
 # This script collects logs and specs from:
 #   - GPU node status and descriptions
 #   - Kubernetes version info
+#   - Storage Info (StorageClass, PVC and PVs)
 #   - NIM Operator
-#   - NIMPipeline/NIMService/NIMCache CRs and pods
+#   - NIMPipeline/NIMService/NIMCache CRs, Pods and Ingress
 #   - NIM Model Manifest ConfigMaps
-#   - NeMo microservices CRs and pods (optional)
+#   - NeMo microservices CRs, Pods and Ingress (optional)
 #
 # Usage:
 #   export OPERATOR_NAMESPACE=<namespace where NIM Operator is installed>
