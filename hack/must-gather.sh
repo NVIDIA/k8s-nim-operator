@@ -1,5 +1,41 @@
 #!/usr/bin/env bash
 
+# Copyright 2025 NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+###############################################################################
+# NVIDIA NIM & NeMo Must-Gather Script
+#
+# This script collects logs and specs from:
+#   - GPU node status and descriptions
+#   - Kubernetes version info
+#   - NIM Operator
+#   - NIMPipeline/NIMService/NIMCache CRs and pods
+#   - NIM Model Manifest ConfigMaps
+#   - NeMo microservices CRs and pods (optional)
+#
+# Usage:
+#   export OPERATOR_NAMESPACE=<namespace where NIM Operator is installed>
+#   export NIM_NAMESPACE=<namespace where NIMService/NIMCache are deployed>
+#   export NEMO_NAMESPACE=<namespace where NeMo microservices are deployed>   # Optional
+#
+#   ./must-gather.sh
+#
+# Output will be saved to:
+#   ${ARTIFACT_DIR:-/tmp/nim-nemo-must-gather_<timestamp>}
+###############################################################################
+
 set -o nounset
 set -o errexit
 set -x
@@ -64,6 +100,17 @@ echo "Gathering NIMPipeline, NIMService and NIMCache CRs from $NIM_NAMESPACE"
 $K get nimcaches.apps.nvidia.com -n "$NIM_NAMESPACE" -oyaml > "$ARTIFACT_DIR/nim/nimcaches.yaml" || true
 $K get nimpipelines.apps.nvidia.com -n "$NIM_NAMESPACE" -oyaml > "$ARTIFACT_DIR/nim/nimpipelines.yaml" || true
 $K get nimservices.apps.nvidia.com -n "$NIM_NAMESPACE" -oyaml > "$ARTIFACT_DIR/nim/nimservices.yaml" || true
+
+echo "Gathering ConfigMaps in $NIM_NAMESPACE owned by NIMCache"
+mkdir -p "$ARTIFACT_DIR/nim/configmaps"
+
+for cm in $($K get configmaps -n "$NIM_NAMESPACE" -o name); do
+  # Check if the ownerReference has kind: NIMCache
+  if $K get "$cm" -n "$NIM_NAMESPACE" -o yaml | grep -A 5 'ownerReferences:' | grep -q 'kind: NIMCache'; then
+    cm_name=$(basename "$cm")
+    $K get "$cm" -n "$NIM_NAMESPACE" -oyaml > "$ARTIFACT_DIR/nim/configmaps/${cm_name}.yaml" || true
+  fi
+done
 
 echo "Gathering NIMService pods from $NIM_NAMESPACE"
 for pod in $($K get pods -n "$NIM_NAMESPACE" -l "app.kubernetes.io/part-of=nim-service,app.kubernetes.io/managed-by=k8s-nim-operator" -oname); do
