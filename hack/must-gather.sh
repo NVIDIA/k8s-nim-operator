@@ -69,6 +69,7 @@ $K get nodes -l nvidia.com/gpu.present=true -o wide > "$ARTIFACT_DIR/cluster/gpu
 echo "Gathering GPU node descriptions"
 $K describe nodes -l nvidia.com/gpu.present=true > "$ARTIFACT_DIR/cluster/gpu_nodes.descr" || true
 
+
 ######################################
 # NIM OPERATOR PODS
 ######################################
@@ -85,6 +86,25 @@ for pod in $(   ); do
   $K logs "$pod" -n "$OPERATOR_NAMESPACE" --all-containers --prefix > "$ARTIFACT_DIR/operator/${pod_name}.log" || true
   $K describe "$pod" -n "$OPERATOR_NAMESPACE" > "$ARTIFACT_DIR/operator/${pod_name}.descr" || true
 done
+
+######################################
+# STORAGE CLASSES, PVs, PVCs
+######################################
+echo "Gathering storage class, PVC and PV information"
+mkdir -p "$ARTIFACT_DIR/storage"
+
+$K get storageclass -oyaml > "$ARTIFACT_DIR/storage/storageclasses.yaml" || true
+$K get pv -oyaml > "$ARTIFACT_DIR/storage/persistentvolumes.yaml" || true
+
+echo "Gathering PVCs from NIM_NAMESPACE: $NIM_NAMESPACE"
+mkdir -p "$ARTIFACT_DIR/storage/nim"
+$K get pvc -n "$NIM_NAMESPACE" -oyaml > "$ARTIFACT_DIR/storage/nim/pvcs.yaml" || true
+
+if [[ -n "${NEMO_NAMESPACE:-}" ]]; then
+  echo "Gathering PVCs from NEMO_NAMESPACE: $NEMO_NAMESPACE"
+  mkdir -p "$ARTIFACT_DIR/storage/nemo"
+  $K get pvc -n "$NEMO_NAMESPACE" -oyaml > "$ARTIFACT_DIR/storage/nemo/pvcs.yaml" || true
+fi
 
 ######################################
 # NIM SERVICE & CACHE
@@ -119,6 +139,10 @@ for pod in $($K get pods -n "$NIM_NAMESPACE" -l "app.kubernetes.io/part-of=nim-s
   $K describe "$pod" -n "$NIM_NAMESPACE" > "$ARTIFACT_DIR/nim/${pod_name}.descr" || true
 done
 
+echo "Gathering Ingress configuration from $NIM_NAMESPACE"
+mkdir -p "$ARTIFACT_DIR/nim/ingress"
+$K get ingress -n "$NIM_NAMESPACE" -oyaml > "$ARTIFACT_DIR/nim/ingress/ingress.yaml" || true
+
 ######################################
 # NEMO MICROSERVICES
 ######################################
@@ -144,6 +168,10 @@ if [[ -n "${NEMO_NAMESPACE:-}" ]]; then
     $K logs "$pod" -n "$NEMO_NAMESPACE" --all-containers --prefix > "$ARTIFACT_DIR/nemo/${pod_name}.log" || true
     $K describe "$pod" -n "$NEMO_NAMESPACE" > "$ARTIFACT_DIR/nemo/${pod_name}.descr" || true
   done
+
+  echo "Gathering Ingress configuration from $NEMO_NAMESPACE"
+  mkdir -p "$ARTIFACT_DIR/nemo/ingress"
+  $K get ingress -n "$NEMO_NAMESPACE" -oyaml > "$ARTIFACT_DIR/nemo/ingress/ingress.yaml" || true
 else
   echo "Skipping NeMo microservice collection. NEMO_NAMESPACE not set."
 fi
