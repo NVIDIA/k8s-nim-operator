@@ -76,6 +76,7 @@ type NIMServiceSpec struct {
 	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
 	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
 	Scale          Autoscaling                  `json:"scale,omitempty"`
+	SchedulerName  string                       `json:"schedulerName,omitempty"`
 	Metrics        Metrics                      `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
@@ -693,6 +694,9 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	// Set runtime class
 	params.RuntimeClassName = n.GetRuntimeClassName()
 
+	// Set scheduler
+	params.SchedulerName = n.GetSchedulerName()
+
 	// Setup container ports for nimservice
 	params.Ports = []corev1.ContainerPort{
 		{
@@ -716,6 +720,11 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 		})
 	}
 	return params
+}
+
+// GetSchedulerName returns the scheduler name for the NIMService deployment.
+func (n *NIMService) GetSchedulerName() string {
+	return n.Spec.SchedulerName
 }
 
 // GetStatefulSetParams returns params to render StatefulSet from templates.
