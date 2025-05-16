@@ -212,7 +212,10 @@ func GetUpdateCaCertInitContainerCommand() []string {
 		"/bin/sh",
 		"-c",
 		"echo 'Copying CA certs from Config Map'; " +
+			"ls -l /custom; " +
 			"cp /custom/*.crt /usr/local/share/ca-certificates/; " +
+			"for f in /custom/*.pem; do cp \"$f\" \"/usr/local/share/ca-certificates/$(basename \"${f%.pem}\")-pem.crt\"; done;" +
+			"ls -l  /usr/local/share/ca-certificates/;" +
 			"echo 'Updating CA certs'; " +
 			"update-ca-certificates; " +
 			"echo 'CA certs updated'; " +
