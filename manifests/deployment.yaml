@@ -35,6 +35,9 @@ spec:
         {{- .PodAnnotations | yaml | nindent 8 }}
       {{- end }}
     spec:
+      {{- if .SchedulerName }}
+      schedulerName: {{ .SchedulerName }}
+      {{- end }}
       serviceAccountName: {{ .ServiceAccountName }}
       runtimeClassName: {{ .RuntimeClassName }}
       initContainers:

@@ -66,6 +66,7 @@ type DeploymentParams struct {
 	Image              string
 	ImagePullSecrets   []string
 	ImagePullPolicy    string
+	SchedulerName      string
 	Volumes            []corev1.Volume
 	VolumeMounts       []corev1.VolumeMount
 	Env                []corev1.EnvVar
