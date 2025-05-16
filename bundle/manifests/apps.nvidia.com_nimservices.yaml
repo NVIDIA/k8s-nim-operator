@@ -1927,6 +1927,8 @@ spec:
                     - maxReplicas
                     type: object
                 type: object
+              schedulerName:
+                type: string
               startupProbe:
                 description: Probe defines attributes for startup/liveness/readiness
                   probes.
