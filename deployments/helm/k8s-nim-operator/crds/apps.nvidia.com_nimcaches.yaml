@@ -244,22 +244,23 @@ spec:
                     properties:
                       authSecret:
                         description: The name of an existing auth secret containing
-                          the AUTH_TOKEN"
-                        type: string
-                      checkpointName:
+                          the HF_TOKEN
                         type: string
                       datasetName:
                         type: string
                       endpoint:
-                        description: The endpoint for datastore
+                        description: HF-compatible datastore endpoint
+                        pattern: ^http(s)?://.*$
                         type: string
                       modelName:
-                        description: Name of either model/checkpoint or dataset to
-                          download
+                        description: Name of either model or dataset to download
                         type: string
                       modelPuller:
                         description: ModelPuller is the container image that can pull
                           the model
+                        type: string
+                      namespace:
+                        default: default
                         type: string
                       pullSecret:
                         description: PullSecret for the model puller image
@@ -268,6 +269,7 @@ spec:
                     - authSecret
                     - endpoint
                     - modelPuller
+                    - namespace
                     type: object
                   ngc:
                     description: NGCSource represents models stored in NGC

@@ -110,13 +110,17 @@ type GPUSpec struct {
 
 // DataStoreSource references a model stored on NVIDIA DataStore service.
 type DataStoreSource struct {
-	// The endpoint for datastore
+	// HF-compatible datastore endpoint
+	// +kubebuilder:validation:Pattern=`^http(s)?://.*$`
 	Endpoint string `json:"endpoint"`
-	// Name of either model/checkpoint or dataset to download
-	ModelName      *string `json:"modelName,omitempty"`
-	CheckpointName *string `json:"checkpointName,omitempty"`
-	DatasetName    *string `json:"datasetName,omitempty"`
-	// The name of an existing auth secret containing the AUTH_TOKEN"
+	// +kubebuilder:default="default"
+	Namespace string `json:"namespace"`
+
+	// Name of either model or dataset to download
+	ModelName   *string `json:"modelName,omitempty"`
+	DatasetName *string `json:"datasetName,omitempty"`
+
+	// The name of an existing auth secret containing the HF_TOKEN
 	AuthSecret string `json:"authSecret"`
 	// ModelPuller is the container image that can pull the model
 	ModelPuller string `json:"modelPuller"`
