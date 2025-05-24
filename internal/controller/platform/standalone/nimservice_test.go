@@ -75,6 +75,15 @@ func sortVolumes(volumes []corev1.Volume) {
 	})
 }
 
+func getCondition(obj *appsv1alpha1.NIMService, conditionType string) *metav1.Condition {
+	for _, condition := range obj.Status.Conditions {
+		if condition.Type == conditionType {
+			return &condition
+		}
+	}
+	return nil
+}
+
 // Custom transport that redirects requests to a specific host.
 type mockTransport struct {
 	targetHost        string
@@ -609,6 +618,85 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(errors.IsNotFound(err)).To(Equal(true))
 		})
 
+	})
+
+	It("should be NotReady when nimcache is not ready", func() {
+		nimCache.Status = appsv1alpha1.NIMCacheStatus{
+			State: appsv1alpha1.NimCacheStatusNotReady,
+		}
+		Expect(client.Status().Update(context.TODO(), nimCache)).To(Succeed())
+		err := client.Create(context.TODO(), nimService)
+		Expect(err).NotTo(HaveOccurred())
+
+		result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		// Check that the NIMService is not ready.
+		namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+		obj := &appsv1alpha1.NIMService{}
+		err = client.Get(context.TODO(), namespacedName, obj)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusNotReady))
+		readyCondition := getCondition(obj, conditions.Ready)
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(readyCondition.Reason).To(Equal(conditions.ReasonNIMCacheNotReady))
+	})
+
+	It("should be Failed when nimcache is not found", func() {
+		testNimService := nimService.DeepCopy()
+		testNimService.Spec.Storage.NIMCache.Name = "invalid-nimcache"
+		err := client.Create(context.TODO(), testNimService)
+		Expect(err).NotTo(HaveOccurred())
+
+		result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		// Check that the NIMService is in failed state.
+		namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+		obj := &appsv1alpha1.NIMService{}
+		err = client.Get(context.TODO(), namespacedName, obj)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
+		failedCondition := getCondition(obj, conditions.Failed)
+		Expect(failedCondition).NotTo(BeNil())
+		Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(failedCondition.Reason).To(Equal(conditions.ReasonNIMCacheNotFound))
+	})
+
+	It("should be Failed when nimcache is in failed state", func() {
+		nimCache.Status = appsv1alpha1.NIMCacheStatus{
+			State: appsv1alpha1.NimCacheStatusFailed,
+			Conditions: []metav1.Condition{
+				{
+					Type:    conditions.Failed,
+					Status:  metav1.ConditionTrue,
+					Reason:  conditions.Failed,
+					Message: "NIMCache failed",
+				},
+			},
+		}
+		Expect(client.Status().Update(context.TODO(), nimCache)).To(Succeed())
+
+		err := client.Create(context.TODO(), nimService)
+		Expect(err).NotTo(HaveOccurred())
+
+		result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		// Check that the NIMService is in failed state.
+		namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+		obj := &appsv1alpha1.NIMService{}
+		err = client.Get(context.TODO(), namespacedName, obj)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
+		failedCondition := getCondition(obj, conditions.Failed)
+		Expect(failedCondition).NotTo(BeNil())
+		Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(failedCondition.Reason).To(Equal(conditions.ReasonNIMCacheFailed))
 	})
 
 	Describe("isDeploymentReady for setting status on NIMService", func() {
