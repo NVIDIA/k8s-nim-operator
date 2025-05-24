@@ -30,6 +30,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -187,6 +188,33 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	// Select PVC for model store
 	if nimService.GetNIMCacheName() != "" { // nolint:gocritic
+		nimCacheName := nimService.GetNIMCacheName()
+		nimCache := appsv1alpha1.NIMCache{}
+		if err := r.Get(ctx, types.NamespacedName{Name: nimCacheName, Namespace: nimService.GetNamespace()}, &nimCache); err != nil {
+			statusError := r.updater.SetConditionsFailed(ctx, nimService, conditions.ReasonNIMCacheFailed, err.Error())
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, err.Error())
+			if statusError != nil {
+				logger.Error(statusError, "failed to update status", "nimservice", nimService.Name)
+			}
+			return ctrl.Result{}, err
+		}
+		switch nimCache.Status.State {
+		case appsv1alpha1.NimCacheStatusReady:
+			logger.V(4).Info("NIMCache is ready", "nimcache", nimCacheName)
+		case appsv1alpha1.NimCacheStatusFailed:
+			msg := r.getNIMCacheFailedMessage(&nimCache)
+			err = r.updater.SetConditionsFailed(ctx, nimService, conditions.ReasonNIMCacheFailed, msg)
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, msg)
+		default:
+			msg := fmt.Sprintf("NIMCache %s not ready", nimCacheName)
+			err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
+				"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
+			if err != nil {
+				logger.Error(err, "failed to ", "nimservice", nimService.Name)
+			}
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, err
+		}
 		// Fetch PVC for the associated NIMCache instance and mount it
 		nimCachePVC, err := r.getNIMCachePVC(ctx, nimService)
 		if err != nil {
@@ -723,4 +751,12 @@ func (r *NIMServiceReconciler) assignGPUResources(ctx context.Context, nimServic
 	deploymentParams.Resources.Limits[gpuResourceName] = gpuQuantity
 
 	return nil
+}
+
+func (r *NIMServiceReconciler) getNIMCacheFailedMessage(nimCache *appsv1alpha1.NIMCache) string {
+	cond := meta.FindStatusCondition(nimCache.Status.Conditions, conditions.Failed)
+	if cond != nil {
+		return cond.Message
+	}
+	return ""
 }

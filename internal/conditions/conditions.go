@@ -61,6 +61,8 @@ const (
 	ReasonStatefulSetFailed = "StatefulsetFailed"
 	// ReasonSecretFailed indicates that the creation of secret has failed.
 	ReasonSecretFailed = "SecretFailed"
+	// ReasonNIMCacheFailed indicates that the NIMCache is in failed state.
+	ReasonNIMCacheFailed = "NIMCacheFailed"
 )
 
 // Updater is the condition updater.
