@@ -1060,6 +1060,46 @@ func (n *NemoCustomizer) GetSecretParams(secretMapData map[string]string) *rende
 	return params
 }
 
+// GetPVCName returns the name to be used for the PVC based on the custom spec
+// Prefers pvc.Name if explicitly set by the user in the NeMo Customizer instance.
+func (n *NemoCustomizer) GetPVCName() string {
+	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
+	if n.Spec.Training.ModelPVC.Name != "" {
+		pvcName = n.Spec.Training.ModelPVC.Name
+	}
+	return pvcName
+}
+
+// GetPVCParams returns parameters to render a PersistentVolumeClaim from templates.
+func (n *NemoCustomizer) GetPVCParams() *rendertypes.PVCParams {
+	params := &rendertypes.PVCParams{}
+
+	// Set metadata
+	params.Enabled = ptr.Deref(n.Spec.Training.ModelPVC.Create, false)
+	params.Name = n.GetPVCName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetPVCAnnotations()
+
+	// PVC-specific config
+	params.AccessMode = n.Spec.Training.ModelPVC.VolumeAccessMode
+	params.Storage = n.Spec.Training.ModelPVC.Size
+	params.StorageClassName = n.Spec.Training.ModelPVC.StorageClass
+
+	return params
+}
+
+// GetPVCAnnotations return custom PVC annotations setup by the user
+func (n *NemoCustomizer) GetPVCAnnotations() map[string]string {
+	// Get global customizer annotations
+	pvcAnnotations := n.GetAnnotations()
+
+	if n.Spec.Training.ModelPVC.Annotations != nil {
+		return utils.MergeMaps(pvcAnnotations, n.Spec.Training.ModelPVC.Annotations)
+	}
+	return pvcAnnotations
+}
+
 func init() {
 	SchemeBuilder.Register(&NemoCustomizer{}, &NemoCustomizerList{})
 }

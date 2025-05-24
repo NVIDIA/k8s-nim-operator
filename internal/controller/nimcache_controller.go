@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -507,39 +508,79 @@ func (r *NIMCacheReconciler) reconcileServiceAccount(ctx context.Context, nimCac
 
 func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
-	pvcName := shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)
+	pvcName := nimCache.GetPVCName()
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nimCache.GetNamespace()}
-	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, pvcNamespacedName, pvc)
+
+	existing := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, pvcNamespacedName, existing)
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return err
 	}
 
-	// If PVC does not exist, create a new one if creation flag is enabled
+	// PVC does not exist — create it if enabled
 	if err != nil {
-		if nimCache.Spec.Storage.PVC.Create != nil && *nimCache.Spec.Storage.PVC.Create {
-			pvc, err = shared.ConstructPVC(nimCache.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimCache.GetNamespace()})
+		if ptr.Deref(nimCache.Spec.Storage.PVC.Create, false) {
+			newPVC, err := shared.ConstructPVC(
+				nimCache.Spec.Storage.PVC,
+				metav1.ObjectMeta{Name: pvcName, Namespace: nimCache.GetNamespace()},
+			)
 			if err != nil {
-				logger.Error(err, "Failed to construct pvc", "name", pvcName)
+				logger.Error(err, "Failed to construct PVC", "name", pvcName)
 				return err
 			}
-			if err := controllerutil.SetControllerReference(nimCache, pvc, r.GetScheme()); err != nil {
+			if err := controllerutil.SetControllerReference(nimCache, newPVC, r.GetScheme()); err != nil {
 				return err
 			}
-			err = r.Create(ctx, pvc)
-			if err != nil {
-				logger.Error(err, "Failed to create pvc", "name", pvcName)
+			if err := r.Create(ctx, newPVC); err != nil {
+				logger.Error(err, "Failed to create PVC", "name", pvcName)
 				return err
 			}
-			logger.Info("Created PVC for NIM Cache", "pvc", pvc.Name)
 
-			conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for caching NIM model")
+			logger.Info("Created PVC for NIM Cache", "pvc", newPVC.Name)
+			conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "PVC has been created for caching NIM model")
 			nimCache.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
-		} else {
-			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
-			return err
+			return nil
+		}
+		logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
+		return err
+	}
+
+	// PVC exists — check for updates
+	desired := existing.DeepCopy()
+	updated := false
+
+	// Update annotations if different
+	if desired.Annotations == nil {
+		desired.Annotations = map[string]string{}
+	}
+	for k, v := range nimCache.Spec.Storage.PVC.Annotations {
+		if existing.Annotations[k] != v {
+			desired.Annotations[k] = v
+			updated = true
 		}
 	}
+
+	// Update size if larger than the previous value
+	requestedSize, err := resource.ParseQuantity(nimCache.Spec.Storage.PVC.Size)
+	if err != nil {
+		logger.Error(err, "Invalid PVC size in spec", "size", nimCache.Spec.Storage.PVC.Size)
+		return err
+	}
+	existingSize := existing.Spec.Resources.Requests[corev1.ResourceStorage]
+	if requestedSize.Cmp(existingSize) > 0 {
+		desired.Spec.Resources.Requests[corev1.ResourceStorage] = requestedSize
+		updated = true
+	}
+
+	// Patch only if spec is changed
+	if updated {
+		if err := r.Patch(ctx, desired, client.MergeFrom(existing)); err != nil {
+			logger.Error(err, "Failed to update PVC", "name", pvcName)
+			return err
+		}
+		logger.Info("Updated PVC metadata or size", "pvc", pvcName)
+	}
+
 	return nil
 }
 
@@ -763,7 +804,7 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 		logger.Info("Job completed", "job", jobName)
 		conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionJobCompleted, metav1.ConditionTrue, "JobCompleted", "The Job to cache NIM has successfully completed")
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusReady
-		nimCache.Status.PVC = shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)
+		nimCache.Status.PVC = nimCache.GetPVCName()
 
 		selectedProfiles, err := getSelectedProfiles(nimCache)
 		if err != nil {
@@ -854,7 +895,7 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 	// Reconcile PVC
 	err = r.reconcilePVC(ctx, nimCache)
 	if err != nil {
-		logger.Error(err, "reconciliation of pvc failed", "pvc", shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC))
+		logger.Error(err, "reconciliation of pvc failed", "pvc", nimCache.GetPVCName())
 		return ctrl.Result{}, err
 	}
 
@@ -1044,7 +1085,7 @@ func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (s
 
 func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) (*batchv1.Job, error) {
 	logger := r.GetLogger()
-	pvcName := shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)
+	pvcName := nimCache.GetPVCName()
 	labels := map[string]string{
 		"app":                          "k8s-nim-operator",
 		"app.kubernetes.io/name":       nimCache.Name,

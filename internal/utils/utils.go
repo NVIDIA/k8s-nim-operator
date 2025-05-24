@@ -326,6 +326,8 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 		return updateRole(castedObj, desired.(*rbacv1.Role)) //nolint:forcetypeassert
 	case *rbacv1.RoleBinding:
 		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding)) //nolint:forcetypeassert
+	case *corev1.PersistentVolumeClaim:
+		return updatePersistentVolumeClaim(castedObj, desired.(*corev1.PersistentVolumeClaim)) //nolint:forcetypeassert)
 	default:
 		panic("unsupported obj type")
 	}
@@ -416,5 +418,12 @@ func updateRoleBinding(obj, desired *rbacv1.RoleBinding) *rbacv1.RoleBinding {
 	obj.SetLabels(desired.GetLabels())
 	obj.Subjects = desired.Subjects
 	obj.RoleRef = desired.RoleRef
+	return obj
+}
+
+func updatePersistentVolumeClaim(obj, desired *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaim {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
 	return obj
 }

@@ -788,6 +788,11 @@ spec:
               pvc:
                 description: PVC defines the PersistentVolumeClaim for the datastore
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations for the PVC
+                    type: object
                   create:
                     description: Create indicates to create a new PVC
                     type: boolean

@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -156,23 +157,6 @@ type NIMCacheStorage struct {
 	HostPath *string `json:"hostPath,omitempty"`
 }
 
-// PersistentVolumeClaim defines the attributes of PVC used as a source for caching NIM model.
-type PersistentVolumeClaim struct {
-	// Create indicates to create a new PVC
-	Create *bool `json:"create,omitempty"`
-	// Name is the name of the PVC
-	Name string `json:"name,omitempty"`
-	// StorageClass to be used for PVC creation. Leave it as empty if the PVC is already created or
-	// a default storage class is set in the cluster.
-	StorageClass string `json:"storageClass,omitempty"`
-	// Size of the NIM cache in Gi, used during PVC creation
-	Size string `json:"size,omitempty"`
-	// VolumeAccessMode is the volume access mode of the PVC
-	VolumeAccessMode corev1.PersistentVolumeAccessMode `json:"volumeAccessMode,omitempty"`
-	// SubPath is the path inside the PVC that should be mounted
-	SubPath string `json:"subPath,omitempty"`
-}
-
 // NIMCacheStatus defines the observed state of NIMCache.
 type NIMCacheStatus struct {
 	State      string             `json:"state,omitempty"`
@@ -271,10 +255,10 @@ type NIMCache struct {
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
 // Prefers pvc.Name if explicitly set by the user in the NIMCache instance.
-func (n *NIMCache) GetPVCName(pvc PersistentVolumeClaim) string {
+func (n *NIMCache) GetPVCName() string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
-	if pvc.Name != "" {
-		pvcName = pvc.Name
+	if n.Spec.Storage.PVC.Name != "" {
+		pvcName = n.Spec.Storage.PVC.Name
 	}
 	return pvcName
 }
@@ -411,6 +395,24 @@ func (d *NemoDataStoreSource) GetEndpoint() string {
 
 func (d *NemoDataStoreSource) GetNamespace() string {
 	return d.Namespace
+}
+
+// GetPVCParams returns parameters to render a PersistentVolumeClaim from templates.
+func (n *NIMCache) GetPVCParams() *rendertypes.PVCParams {
+	params := &rendertypes.PVCParams{}
+
+	// Set metadata
+	params.Enabled = ptr.Deref(n.Spec.Storage.PVC.Create, false)
+	params.Name = n.GetPVCName()
+	params.Namespace = n.GetNamespace()
+	params.Annotations = n.Spec.Storage.PVC.Annotations
+
+	// PVC-specific config
+	params.AccessMode = n.Spec.Storage.PVC.VolumeAccessMode
+	params.Storage = n.Spec.Storage.PVC.Size
+	params.StorageClassName = n.Spec.Storage.PVC.StorageClass
+
+	return params
 }
 
 // +kubebuilder:object:root=true
