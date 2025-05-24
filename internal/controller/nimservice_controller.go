@@ -28,12 +28,15 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -216,6 +219,22 @@ func (r *NIMServiceReconciler) GetOrchestratorType(ctx context.Context) (k8sutil
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nimservice-controller")
+	err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&appsv1alpha1.NIMService{},
+		"spec.storage.nimCache.name",
+		func(rawObj client.Object) []string {
+			nimService, ok := rawObj.(*appsv1alpha1.NIMService)
+			if !ok {
+				return []string{}
+			}
+			return []string{nimService.Spec.Storage.NIMCache.Name}
+		},
+	)
+	if err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMService{}).
 		Owns(&appsv1.Deployment{}).
@@ -245,7 +264,37 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return true
 			},
 		}).
+		Watches(
+			&appsv1alpha1.NIMCache{},
+			handler.EnqueueRequestsFromMapFunc(r.mapNIMCacheToNIMService),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
+	nimCache, ok := obj.(*appsv1alpha1.NIMCache)
+	if !ok {
+		return []ctrl.Request{}
+	}
+
+	// Get all NIMServices that reference this NIMCache
+	var nimServices appsv1alpha1.NIMServiceList
+	if err := r.List(ctx, &nimServices, client.MatchingFields{"spec.storage.nimCache.name": nimCache.GetName()}, client.InNamespace(nimCache.GetNamespace())); err != nil {
+		return []ctrl.Request{}
+	}
+
+	// Enqueue reconciliation for each matching NIMService
+	requests := make([]ctrl.Request, len(nimServices.Items))
+	for i, item := range nimServices.Items {
+		requests[i] = ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.Name,
+				Namespace: item.Namespace,
+			},
+		}
+	}
+	return requests
 }
 
 func (r *NIMServiceReconciler) refreshMetrics(ctx context.Context) {
