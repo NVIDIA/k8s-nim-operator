@@ -109,11 +109,6 @@ func (in *DataStoreSource) DeepCopyInto(out *DataStoreSource) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.CheckpointName != nil {
-		in, out := &in.CheckpointName, &out.CheckpointName
-		*out = new(string)
-		**out = **in
-	}
 	if in.DatasetName != nil {
 		in, out := &in.DatasetName, &out.DatasetName
 		*out = new(string)

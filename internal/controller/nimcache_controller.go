@@ -555,18 +555,20 @@ func isModelSelectionDone(nimCache *appsv1alpha1.NIMCache) bool {
 }
 
 func getSelectedProfiles(nimCache *appsv1alpha1.NIMCache) ([]string, error) {
-	// Return profiles explicitly specified by the user in the spec
-	if len(nimCache.Spec.Source.NGC.Model.Profiles) > 0 {
-		return nimCache.Spec.Source.NGC.Model.Profiles, nil
-	} else if isModelSelectionRequired(nimCache) {
-		// Retrieve the selected profiles from the annotation
-		var selectedProfiles []string
-		if annotation, exists := nimCache.Annotations[SelectedNIMProfilesAnnotationKey]; exists {
-			if err := json.Unmarshal([]byte(annotation), &selectedProfiles); err != nil {
-				return nil, err
-			}
+	if nimCache.Spec.Source.NGC != nil {
+		if len(nimCache.Spec.Source.NGC.Model.Profiles) > 0 {
+			return nimCache.Spec.Source.NGC.Model.Profiles, nil
 		}
-		return selectedProfiles, nil
+
+		if isModelSelectionDone(nimCache) {
+			var selectedProfiles []string
+			if annotation, exists := nimCache.Annotations[SelectedNIMProfilesAnnotationKey]; exists {
+				if err := json.Unmarshal([]byte(annotation), &selectedProfiles); err != nil {
+					return nil, err
+				}
+			}
+			return selectedProfiles, nil
+		}
 	}
 	return nil, nil
 }
@@ -1105,19 +1107,27 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			outputPath = fmt.Sprintf("%v/%v", outputPath, *nimCache.Spec.Storage.HostPath)
 		}
 		var command []string
-		if nimCache.Spec.Source.DataStore.ModelName != nil && nimCache.Spec.Source.DataStore.CheckpointName != nil { // nolint:gocritic
-			command = []string{"datastore-tools", "checkpoint", "download", "--model-name", *nimCache.Spec.Source.DataStore.ModelName, "--checkpoint-name", *nimCache.Spec.Source.DataStore.CheckpointName, "--path", outputPath, "--end-point", nimCache.Spec.Source.DataStore.Endpoint}
+
+		if nimCache.Spec.Source.DataStore.ModelName != nil { // nolint:gocritic
+			hfRepo := fmt.Sprintf("%s/%s", nimCache.Spec.Source.DataStore.Namespace, *nimCache.Spec.Source.DataStore.ModelName)
+			command = []string{"huggingface-cli", "download", "--local-dir", outputPath, "--repo-type", "model", hfRepo}
 		} else if nimCache.Spec.Source.DataStore.DatasetName != nil {
-			command = []string{"datastore-tools", "dataset", "download", "--dataset-name", *nimCache.Spec.Source.DataStore.DatasetName, "--path", outputPath, "--end-point", nimCache.Spec.Source.DataStore.Endpoint}
+			hfRepo := fmt.Sprintf("%s/%s", nimCache.Spec.Source.DataStore.Namespace, *nimCache.Spec.Source.DataStore.DatasetName)
+			command = []string{"huggingface-cli", "download", "--local-dir", outputPath, "--repo-type", "dataset", hfRepo}
 		} else {
-			return nil, errors.NewBadRequest("either datasetName or (modelName and checkpointName) must be provided")
+			return nil, errors.NewBadRequest("either modelName or datasetName must be provided")
 		}
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
 				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.DataStore.ModelPuller,
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
-				Env:     []corev1.EnvVar{},
+				Env: []corev1.EnvVar{
+					{
+						Name:  "HF_ENDPOINT",
+						Value: nimCache.Spec.Source.DataStore.Endpoint,
+					},
+				},
 				VolumeMounts: []corev1.VolumeMount{
 					{
 						Name:      "nim-cache-volume",
@@ -1152,6 +1162,8 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Name: nimCache.Spec.Source.DataStore.PullSecret,
 			},
 		}
+		// Merge env with the user provided values
+		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.Spec.Env)
 	} else if nimCache.Spec.Source.NGC != nil {
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
