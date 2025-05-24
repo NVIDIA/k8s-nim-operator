@@ -30,6 +30,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -179,16 +180,55 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	}
 
-	deploymentParams := nimService.GetDeploymentParams()
 	var modelPVC *appsv1alpha1.PersistentVolumeClaim
 	modelProfile := ""
 
-	deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
-
 	// Select PVC for model store
-	if nimService.GetNIMCacheName() != "" { // nolint:gocritic
+	nimCacheName := nimService.GetNIMCacheName()
+	if nimCacheName != "" { // nolint:gocritic
+		nimCache := appsv1alpha1.NIMCache{}
+		if err := r.Get(ctx, types.NamespacedName{Name: nimCacheName, Namespace: nimService.GetNamespace()}, &nimCache); err != nil {
+			// Fail the NIMService if the NIMCache is not found
+			if errors.IsNotFound(err) {
+				msg := fmt.Sprintf("NIMCache %s not found", nimCacheName)
+				statusUpdateErr := r.updater.SetConditionsFailed(ctx, nimService, conditions.ReasonNIMCacheNotFound, msg)
+				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, msg)
+				logger.Info(msg, "nimcache", nimCacheName, "nimservice", nimService.Name)
+				if statusUpdateErr != nil {
+					logger.Error(statusUpdateErr, "failed to update status", "nimservice", nimService.Name)
+					return ctrl.Result{}, statusUpdateErr
+				}
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, err
+		}
+
+		switch nimCache.Status.State {
+		case appsv1alpha1.NimCacheStatusReady:
+			logger.V(4).Info("NIMCache is ready", "nimcache", nimCacheName, "nimservice", nimService.Name)
+		case appsv1alpha1.NimCacheStatusFailed:
+			msg := r.getNIMCacheFailedMessage(&nimCache)
+			err = r.updater.SetConditionsFailed(ctx, nimService, conditions.ReasonNIMCacheFailed, msg)
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, msg)
+			logger.Info(msg, "nimcache", nimCacheName, "nimservice", nimService.Name)
+			if err != nil {
+				logger.Error(err, "failed to update status", "nimservice", nimService.Name)
+			}
+			return ctrl.Result{}, err
+		default:
+			msg := fmt.Sprintf("NIMCache %s not ready", nimCacheName)
+			err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.ReasonNIMCacheNotReady, msg)
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
+				"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
+			logger.V(4).Info(msg, "nimservice", nimService.Name)
+			if err != nil {
+				logger.Error(err, "failed to update status", "nimservice", nimService.Name)
+			}
+			return ctrl.Result{}, err
+		}
+
 		// Fetch PVC for the associated NIMCache instance and mount it
-		nimCachePVC, err := r.getNIMCachePVC(ctx, nimService)
+		nimCachePVC, err := r.getNIMCachePVC(&nimCache)
 		if err != nil {
 			logger.Error(err, "unable to obtain pvc backing the nimcache instance")
 			return ctrl.Result{}, err
@@ -215,6 +255,10 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		logger.Error(err, "failed to determine PVC for model-store")
 		return ctrl.Result{}, err
 	}
+
+	deploymentParams := nimService.GetDeploymentParams()
+	deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
+
 	// Setup volume mounts with model store
 	deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
 	deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
@@ -537,26 +581,9 @@ func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.Depl
 }
 
 // getNIMCachePVC returns PVC backing the NIM cache instance.
-func (r *NIMServiceReconciler) getNIMCachePVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (*appsv1alpha1.PersistentVolumeClaim, error) {
-	logger := log.FromContext(ctx)
-
-	if nimService.GetNIMCacheName() == "" {
-		// NIM cache PVC is not used
-		return nil, nil
-	}
-	// Lookup NIMCache instance in the same namespace as the NIMService instance
-	nimCache := &appsv1alpha1.NIMCache{}
-	if err := r.Get(ctx, types.NamespacedName{Name: nimService.GetNIMCacheName(), Namespace: nimService.Namespace}, nimCache); err != nil {
-		logger.Error(err, "unable to fetch nimcache", "nimcache", nimService.GetNIMCacheName(), "nimservice", nimService.Name)
-		return nil, err
-	}
-	// Get the status of NIMCache
-	if nimCache.Status.State != appsv1alpha1.NimCacheStatusReady {
-		return nil, fmt.Errorf("nimcache %s is not ready, nimservice %s", nimCache.GetName(), nimService.GetName())
-	}
-
+func (r *NIMServiceReconciler) getNIMCachePVC(nimCache *appsv1alpha1.NIMCache) (*appsv1alpha1.PersistentVolumeClaim, error) {
 	if nimCache.Status.PVC == "" {
-		return nil, fmt.Errorf("missing PVC for the nimcache instance %s, nimservice %s", nimCache.GetName(), nimService.GetName())
+		return nil, fmt.Errorf("missing PVC for the nimcache instance %s", nimCache.GetName())
 	}
 
 	if nimCache.Spec.Storage.PVC.Name == "" {
@@ -564,6 +591,14 @@ func (r *NIMServiceReconciler) getNIMCachePVC(ctx context.Context, nimService *a
 	}
 	// Get the underlying PVC for the NIMCache instance
 	return &nimCache.Spec.Storage.PVC, nil
+}
+
+func (r *NIMServiceReconciler) getNIMCacheFailedMessage(nimCache *appsv1alpha1.NIMCache) string {
+	cond := meta.FindStatusCondition(nimCache.Status.Conditions, conditions.Failed)
+	if cond != nil && cond.Status == metav1.ConditionTrue {
+		return cond.Message
+	}
+	return ""
 }
 
 func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *appsv1alpha1.NIMService) (*appsv1alpha1.PersistentVolumeClaim, error) {
