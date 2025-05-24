@@ -1974,6 +1974,11 @@ spec:
                     description: ModelPVC is the persistent storage for models used
                       for finetuning
                     properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations for the PVC
+                        type: object
                       create:
                         description: Create indicates to create a new PVC
                         type: boolean

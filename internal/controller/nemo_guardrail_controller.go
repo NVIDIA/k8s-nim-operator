@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -283,7 +284,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 	renderer := r.GetRenderer()
 
 	// Sync serviceaccount
-	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &corev1.ServiceAccount{}, nemoGuardrail.GetName(), func() (client.Object, error) {
 		return renderer.ServiceAccount(nemoGuardrail.GetServiceAccountParams())
 	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
 	if err != nil {
@@ -291,7 +292,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 	}
 
 	// Sync role
-	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &rbacv1.Role{}, nemoGuardrail.GetName(), func() (client.Object, error) {
 		return renderer.Role(nemoGuardrail.GetRoleParams())
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
@@ -299,7 +300,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 	}
 
 	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &rbacv1.RoleBinding{}, nemoGuardrail.GetName(), func() (client.Object, error) {
 		return renderer.RoleBinding(nemoGuardrail.GetRoleBindingParams())
 	}, "rolebinding", conditions.ReasonRoleBindingFailed)
 	if err != nil {
@@ -307,13 +308,17 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 	}
 
 	// Sync ConfigStore PVC
-	if nemoGuardrail.Spec.ConfigStore.PVC != nil {
-		if err = r.reconcilePVC(ctx, nemoGuardrail); err != nil {
+	if nemoGuardrail.Spec.ConfigStore.PVC != nil && ptr.Deref(nemoGuardrail.Spec.ConfigStore.PVC.Create, false) {
+		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &corev1.PersistentVolumeClaim{}, nemoGuardrail.GetPVCName(), func() (client.Object, error) {
+			return renderer.PVC(nemoGuardrail.GetPVCParams())
+		}, "persistentvolumeclaim", conditions.ReasonPVCFailed)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 	}
+
 	// Sync service
-	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &corev1.Service{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &corev1.Service{}, nemoGuardrail.GetName(), func() (client.Object, error) {
 		return renderer.Service(nemoGuardrail.GetServiceParams())
 	}, "service", conditions.ReasonServiceFailed)
 	if err != nil {
@@ -322,7 +327,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 
 	// Sync ingress
 	if nemoGuardrail.IsIngressEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &networkingv1.Ingress{}, nemoGuardrail.GetName(), func() (client.Object, error) {
 			return renderer.Ingress(nemoGuardrail.GetIngressParams())
 		}, "ingress", conditions.ReasonIngressFailed)
 		if err != nil {
@@ -337,7 +342,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 
 	// Sync HPA
 	if nemoGuardrail.IsAutoScalingEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, nemoGuardrail.GetName(), func() (client.Object, error) {
 			return renderer.HPA(nemoGuardrail.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
 		if err != nil {
@@ -353,7 +358,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 
 	// Sync Service Monitor
 	if nemoGuardrail.IsServiceMonitorEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &monitoringv1.ServiceMonitor{}, nemoGuardrail.GetName(), func() (client.Object, error) {
 			return renderer.ServiceMonitor(nemoGuardrail.GetServiceMonitorParams())
 		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
 		if err != nil {
@@ -370,7 +375,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 	logger.Info("Reconciling", "volumes", nemoGuardrail.GetVolumes())
 
 	// Sync deployment
-	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &appsv1.Deployment{}, nemoGuardrail.GetName(), func() (client.Object, error) {
 		return renderer.Deployment(deploymentParams)
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
@@ -403,45 +408,10 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 	return ctrl.Result{}, nil
 }
 
-func (r *NemoGuardrailReconciler) reconcilePVC(ctx context.Context, nemoGuardrail *appsv1alpha1.NemoGuardrail) error {
-	logger := r.GetLogger()
-	pvcName := shared.GetPVCName(nemoGuardrail, *nemoGuardrail.Spec.ConfigStore.PVC)
-	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nemoGuardrail.GetNamespace()}
-	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, pvcNamespacedName, pvc)
-	if err != nil && client.IgnoreNotFound(err) != nil {
-		return err
-	}
-
-	// If PVC does not exist, create a new one if creation flag is enabled
-	if err != nil {
-		if nemoGuardrail.Spec.ConfigStore.PVC.Create != nil && *nemoGuardrail.Spec.ConfigStore.PVC.Create {
-			pvc, err = shared.ConstructPVC(*nemoGuardrail.Spec.ConfigStore.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoGuardrail.GetNamespace()})
-			if err != nil {
-				logger.Error(err, "Failed to construct pvc", "name", pvcName)
-				return err
-			}
-			if err := controllerutil.SetControllerReference(nemoGuardrail, pvc, r.GetScheme()); err != nil {
-				return err
-			}
-			err = r.Create(ctx, pvc)
-			if err != nil {
-				logger.Error(err, "Failed to create pvc", "name", pvcName)
-				return err
-			}
-			logger.Info("Created PVC for NEMO Guardrail ConfigStore", "pvc", pvc.Name)
-		} else {
-			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nemoGuardrail *appsv1alpha1.NemoGuardrail, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nemoGuardrail *appsv1alpha1.NemoGuardrail, renderer *render.Renderer, obj client.Object, objName string, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: nemoGuardrail.GetName(), Namespace: nemoGuardrail.GetNamespace()}
+	namespacedName := types.NamespacedName{Name: objName, Namespace: nemoGuardrail.GetNamespace()}
 	err := r.Get(ctx, namespacedName, obj)
 	if err != nil && !errors.IsNotFound(err) {
 		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))

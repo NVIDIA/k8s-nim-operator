@@ -278,20 +278,24 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 		}
 	}()
 
-	err = r.reconcilePVC(ctx, nemoDatastore)
-	if err != nil {
-		logger.Error(err, "reconciliation of pvc failed", "pvc", nemoDatastore.GetPVCName())
-		return ctrl.Result{}, err
-	}
-
 	// Generate annotation for the current operator-version and apply to all resources
 	// Get generic name for all resources
 	namespacedName := types.NamespacedName{Name: nemoDatastore.GetName(), Namespace: nemoDatastore.GetNamespace()}
 
 	renderer := r.GetRenderer()
 
+	// Sync PVC for model storage
+	if ptr.Deref(nemoDatastore.Spec.PVC.Create, false) {
+		err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &corev1.PersistentVolumeClaim{}, nemoDatastore.GetPVCName(), func() (client.Object, error) {
+			return renderer.PVC(nemoDatastore.GetPVCParams())
+		}, "persistentvolumeclaim", conditions.ReasonPVCFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Sync serviceaccount
-	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &corev1.ServiceAccount{}, nemoDatastore.GetName(), func() (client.Object, error) {
 		return renderer.ServiceAccount(nemoDatastore.GetServiceAccountParams())
 	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
 	if err != nil {
@@ -299,7 +303,7 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 	}
 
 	// Sync role
-	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &rbacv1.Role{}, nemoDatastore.GetName(), func() (client.Object, error) {
 		return renderer.Role(nemoDatastore.GetRoleParams())
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
@@ -307,7 +311,7 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 	}
 
 	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &rbacv1.RoleBinding{}, nemoDatastore.GetName(), func() (client.Object, error) {
 		return renderer.RoleBinding(nemoDatastore.GetRoleBindingParams())
 	}, "rolebinding", conditions.ReasonRoleBindingFailed)
 	if err != nil {
@@ -315,7 +319,7 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 	}
 
 	// Sync service
-	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &corev1.Service{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &corev1.Service{}, nemoDatastore.GetName(), func() (client.Object, error) {
 		return renderer.Service(nemoDatastore.GetServiceParams())
 	}, "service", conditions.ReasonServiceFailed)
 	if err != nil {
@@ -324,7 +328,7 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 
 	// Sync ingress
 	if nemoDatastore.IsIngressEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &networkingv1.Ingress{}, nemoDatastore.GetName(), func() (client.Object, error) {
 			return renderer.Ingress(nemoDatastore.GetIngressParams())
 		}, "ingress", conditions.ReasonIngressFailed)
 		if err != nil {
@@ -339,7 +343,7 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 
 	// Sync HPA
 	if nemoDatastore.IsAutoScalingEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, nemoDatastore.GetName(), func() (client.Object, error) {
 			return renderer.HPA(nemoDatastore.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
 		if err != nil {
@@ -355,7 +359,7 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 
 	// Sync Service Monitor
 	if nemoDatastore.IsServiceMonitorEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &monitoringv1.ServiceMonitor{}, nemoDatastore.GetName(), func() (client.Object, error) {
 			return renderer.ServiceMonitor(nemoDatastore.GetServiceMonitorParams())
 		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
 		if err != nil {
@@ -372,7 +376,7 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 	logger.Info("Reconciling", "volumes", nemoDatastore.GetVolumes())
 
 	// Sync deployment
-	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &appsv1.Deployment{}, nemoDatastore.GetName(), func() (client.Object, error) {
 		result, err := renderer.Deployment(deploymentParams)
 		if err != nil {
 			return nil, err
@@ -420,45 +424,10 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 	return ctrl.Result{}, nil
 }
 
-func (r *NemoDatastoreReconciler) reconcilePVC(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore) error {
-	logger := r.GetLogger()
-	pvcName := nemoDatastore.GetPVCName()
-	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nemoDatastore.GetNamespace()}
-	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, pvcNamespacedName, pvc)
-	if err != nil && client.IgnoreNotFound(err) != nil {
-		return err
-	}
-
-	// If PVC does not exist, create a new one if creation flag is enabled
-	if err != nil {
-		if nemoDatastore.ShouldCreatePersistentStorage() {
-			pvc, err = shared.ConstructPVC(*nemoDatastore.Spec.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoDatastore.GetNamespace()})
-			if err != nil {
-				logger.Error(err, "Failed to construct pvc", "name", pvcName)
-				return err
-			}
-			if err := controllerutil.SetControllerReference(nemoDatastore, pvc, r.GetScheme()); err != nil {
-				return err
-			}
-			err = r.Create(ctx, pvc)
-			if err != nil {
-				logger.Error(err, "Failed to create pvc", "name", pvcName)
-				return err
-			}
-			logger.Info("Created PVC for NeMo Datastore", "pvc", pvc.Name)
-		} else {
-			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *NemoDatastoreReconciler) renderAndSyncResource(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore, renderer *render.Renderer, obj client.Object, objName string, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: nemoDatastore.GetName(), Namespace: nemoDatastore.GetNamespace()}
+	namespacedName := types.NamespacedName{Name: objName, Namespace: nemoDatastore.GetNamespace()}
 	err := r.Get(ctx, namespacedName, obj)
 	if err != nil && !errors.IsNotFound(err) {
 		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))

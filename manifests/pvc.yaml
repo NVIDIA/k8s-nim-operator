@@ -1,0 +1,24 @@
+{{- if .Enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  labels:
+  {{- if .Labels }}
+{{ .Labels | yaml | indent 4 }}
+  {{- end }}
+  annotations:
+  {{- if .Annotations }}
+{{ .Annotations | yaml | indent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .AccessMode }}
+  resources:
+    requests:
+      storage: {{ .Storage }}
+  {{- if .StorageClassName }}
+  storageClassName: {{ .StorageClassName }}
+  {{- end }}
+{{- end }}

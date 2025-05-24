@@ -437,5 +437,34 @@ var _ = Describe("K8s Resources Rendering", func() {
 			// The data is added as a multi-line string, so verify with newline appended
 			Expect(cm.Data["config.yaml"]).To(Equal("test-data\n"))
 		})
+
+		It("should render PVC template correctly", func() {
+			params := types.PVCParams{
+				Enabled:    true,
+				Name:       "test-pvc",
+				Namespace:  "default",
+				AccessMode: corev1.ReadWriteOnce,
+				Storage:    "10Gi",
+				Labels: map[string]string{
+					"app": "k8s-nim-operator",
+				},
+				Annotations: map[string]string{
+					"nvidia.com/annotation": "value",
+				},
+				StorageClassName: "nfs",
+			}
+
+			r := render.NewRenderer(templatesDir)
+			pvc, err := r.PVC(&params)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvc).NotTo(BeNil())
+			Expect(pvc.Name).To(Equal("test-pvc"))
+			Expect(pvc.Namespace).To(Equal("default"))
+			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("10Gi")))
+			Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))
+			Expect(pvc.Annotations["nvidia.com/annotation"]).To(Equal("value"))
+			Expect(pvc.Labels["app"]).To(Equal("k8s-nim-operator"))
+			Expect(*pvc.Spec.StorageClassName).To(Equal("nfs"))
+		})
 	})
 })

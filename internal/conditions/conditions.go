@@ -67,6 +67,8 @@ const (
 	ReasonNIMCacheNotFound = "NIMCacheNotFound"
 	// ReasonNIMCacheNotReady indicates that the NIMCache is not ready.
 	ReasonNIMCacheNotReady = "NIMCacheNotReady"
+	// ReasonPVCFailed indicates that the creation of PVC has failed.
+	ReasonPVCFailed = "PVCFailed"
 )
 
 // Updater is the condition updater.

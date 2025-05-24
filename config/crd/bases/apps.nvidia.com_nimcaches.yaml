@@ -420,6 +420,11 @@ spec:
                     description: PersistentVolumeClaim is the pvc volume used for
                       caching NIM
                     properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations for the PVC
+                        type: object
                       create:
                         description: Create indicates to create a new PVC
                         type: boolean
