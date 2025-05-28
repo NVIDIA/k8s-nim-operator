@@ -239,31 +239,38 @@ spec:
                 description: Source is the NIM model source to cache
                 properties:
                   dataStore:
-                    description: NGCSource represents models stored in NVIDIA DataStore
-                      service
+                    description: DataStore represents models stored in NVIDIA NeMo
+                      DataStore service
                     properties:
                       authSecret:
-                        description: The name of an existing auth secret containing
-                          the HF_TOKEN
+                        description: authSecret is the name of the secret containing
+                          the "HF_TOKEN" token
+                        minLength: 1
                         type: string
                       datasetName:
+                        description: datasetName is the name of the dataset
                         type: string
                       endpoint:
-                        description: HF-compatible datastore endpoint
-                        pattern: ^http(s)?://.*$
+                        description: Endpoint is the HuggingFace endpoint from NeMo
+                          DataStore
+                        pattern: ^https?://.*/v1/hf/?$
                         type: string
                       modelName:
-                        description: Name of either model or dataset to download
+                        description: modelName is the name of the model
                         type: string
                       modelPuller:
-                        description: ModelPuller is the container image that can pull
-                          the model
+                        description: modelPuller is the containerized huggingface-cli
+                          image to pull the data
+                        minLength: 1
                         type: string
                       namespace:
                         default: default
+                        description: Namespace is the namespace within NeMo DataStore
                         type: string
                       pullSecret:
-                        description: PullSecret for the model puller image
+                        description: pullSecret is the name of the image pull secret
+                          for the modelPuller image
+                        minLength: 1
                         type: string
                     required:
                     - authSecret
@@ -271,6 +278,54 @@ spec:
                     - modelPuller
                     - namespace
                     type: object
+                    x-kubernetes-validations:
+                    - message: Exactly one of modelName or datasetName must be defined
+                      rule: '(has(self.modelName) ? 1 : 0) + (has(self.datasetName)
+                        ? 1 : 0) == 1'
+                  externalDataStore:
+                    description: ExternalDataStore represents models stored in external
+                      data store
+                    properties:
+                      authSecret:
+                        description: authSecret is the name of the secret containing
+                          the "HF_TOKEN" token
+                        minLength: 1
+                        type: string
+                      datasetName:
+                        description: datasetName is the name of the dataset
+                        type: string
+                      endpoint:
+                        description: Endpoint is the HuggingFace endpoint
+                        pattern: ^https?://.*$
+                        type: string
+                      modelName:
+                        description: modelName is the name of the model
+                        type: string
+                      modelPuller:
+                        description: modelPuller is the containerized huggingface-cli
+                          image to pull the data
+                        minLength: 1
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace within the HF-compatible
+                          external data store
+                        minLength: 1
+                        type: string
+                      pullSecret:
+                        description: pullSecret is the name of the image pull secret
+                          for the modelPuller image
+                        minLength: 1
+                        type: string
+                    required:
+                    - authSecret
+                    - endpoint
+                    - modelPuller
+                    - namespace
+                    type: object
+                    x-kubernetes-validations:
+                    - message: Exactly one of modelName or datasetName must be defined
+                      rule: '(has(self.modelName) ? 1 : 0) + (has(self.datasetName)
+                        ? 1 : 0) == 1'
                   ngc:
                     description: NGCSource represents models stored in NGC
                     properties:
@@ -349,6 +404,11 @@ spec:
                     - modelPuller
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: Exactly one of ngc, dataStore, or externalDataStore must
+                    be defined
+                  rule: '(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) +
+                    (has(self.externalDataStore) ? 1 : 0) == 1'
               storage:
                 description: Storage is the target storage for caching NIM model
                 properties:

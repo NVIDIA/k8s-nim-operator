@@ -1101,18 +1101,38 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 	}
 
-	if nimCache.Spec.Source.DataStore != nil {
+	if nimCache.Spec.Source.DataStore != nil || nimCache.Spec.Source.ExternalDataStore != nil {
+		if nimCache.Spec.Source.DataStore != nil && nimCache.Spec.Source.ExternalDataStore != nil {
+			return nil, errors.NewBadRequest("both dataStore and externalDataStore cannot be set")
+		}
+		dataStore := &appsv1alpha1.DataStoreFields{}
+		hfEndpoint := ""
+		hfNamespace := ""
+		if nimCache.Spec.Source.DataStore != nil {
+			hfEndpoint = nimCache.Spec.Source.DataStore.Endpoint
+			hfNamespace = nimCache.Spec.Source.DataStore.Namespace
+			dataStore = &nimCache.Spec.Source.DataStore.DataStoreFields
+		} else if nimCache.Spec.Source.ExternalDataStore != nil {
+			hfEndpoint = nimCache.Spec.Source.ExternalDataStore.Endpoint
+			hfNamespace = nimCache.Spec.Source.ExternalDataStore.Namespace
+			dataStore = &nimCache.Spec.Source.ExternalDataStore.DataStoreFields
+		}
+
 		outputPath := "/output"
 		if nimCache.Spec.Storage.HostPath != nil {
 			outputPath = fmt.Sprintf("%v/%v", outputPath, *nimCache.Spec.Storage.HostPath)
 		}
-		var command []string
 
-		if nimCache.Spec.Source.DataStore.ModelName != nil { // nolint:gocritic
-			hfRepo := fmt.Sprintf("%s/%s", nimCache.Spec.Source.DataStore.Namespace, *nimCache.Spec.Source.DataStore.ModelName)
+		if dataStore.ModelName != nil && dataStore.DatasetName != nil {
+			return nil, errors.NewBadRequest("both modelName and datasetName cannot be set")
+		}
+
+		var command []string
+		if dataStore.ModelName != nil { // nolint:gocritic
+			hfRepo := fmt.Sprintf("%s/%s", hfNamespace, *dataStore.ModelName)
 			command = []string{"huggingface-cli", "download", "--local-dir", outputPath, "--repo-type", "model", hfRepo}
-		} else if nimCache.Spec.Source.DataStore.DatasetName != nil {
-			hfRepo := fmt.Sprintf("%s/%s", nimCache.Spec.Source.DataStore.Namespace, *nimCache.Spec.Source.DataStore.DatasetName)
+		} else if dataStore.DatasetName != nil {
+			hfRepo := fmt.Sprintf("%s/%s", hfNamespace, *dataStore.DatasetName)
 			command = []string{"huggingface-cli", "download", "--local-dir", outputPath, "--repo-type", "dataset", hfRepo}
 		} else {
 			return nil, errors.NewBadRequest("either modelName or datasetName must be provided")
@@ -1125,7 +1145,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Env: []corev1.EnvVar{
 					{
 						Name:  "HF_ENDPOINT",
-						Value: nimCache.Spec.Source.DataStore.Endpoint,
+						Value: hfEndpoint,
 					},
 				},
 				VolumeMounts: []corev1.VolumeMount{
@@ -1159,11 +1179,9 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 		job.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 			{
-				Name: nimCache.Spec.Source.DataStore.PullSecret,
+				Name: dataStore.PullSecret,
 			},
 		}
-		// Merge env with the user provided values
-		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.Spec.Env)
 	} else if nimCache.Spec.Source.NGC != nil {
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
@@ -1232,23 +1250,24 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
 			}
 		}
+	}
 
-		// Merge env with the user provided values
-		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.Spec.Env)
+	// Merge env with the user provided values
+	job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.Spec.Env)
 
-		// Inject custom CA certificates when running in a proxy envronment
-		if nimCache.Spec.CertConfig != nil {
-			logger.Error(err, "Deprecated field 'CertConfig' is used. Please migrate to 'Proxy' field on NIMCache.\"")
-			return nil, err
-		}
+	// Inject custom CA certificates when running in a proxy envronment
+	if nimCache.Spec.CertConfig != nil {
+		err := errors.NewBadRequest("Deprecated field 'CertConfig' is used. Please migrate to 'Proxy' field on NIMCache.\"")
+		logger.Error(err, err.Error())
+		return nil, err
+	}
 
-		if nimCache.GetProxySpec() != nil {
-			job.Spec.Template.Spec.InitContainers = nimCache.GetInitContainers()
-			job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.GetEnvWithProxy())
-			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
-			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, k8sutil.GetVolumesForUpdatingCaCert(nimCache.Spec.Proxy.CertConfigMap)...)
+	if nimCache.GetProxySpec() != nil {
+		job.Spec.Template.Spec.InitContainers = nimCache.GetInitContainers()
+		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.GetEnvWithProxy())
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, k8sutil.GetVolumesForUpdatingCaCert(nimCache.Spec.Proxy.CertConfigMap)...)
 
-		}
 	}
 	return job, nil
 }
