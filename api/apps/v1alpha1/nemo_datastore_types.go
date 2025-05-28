@@ -87,6 +87,8 @@ type NemoDatastoreSpec struct {
 	// Secrets contains the pre-requisite secrets that must be created before deploying the datastore CR
 	Secrets Secrets `json:"secrets"`
 	// PVC defines the PersistentVolumeClaim for the datastore
+	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.size) && self.size != '')", message=".spec.pvc.size is required for pvc creation"
+	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != '')", message=".spec.pvc.volumeAccessMode  is required for pvc creation"
 	PVC *PersistentVolumeClaim `json:"pvc,omitempty"`
 }
 

@@ -152,6 +152,8 @@ type GPUSpec struct {
 // NIMCacheStorage defines the attributes of various storage targets used to store the model.
 type NIMCacheStorage struct {
 	// PersistentVolumeClaim is the pvc volume used for caching NIM
+	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.size) && self.size != '')", message=".spec.storage.pvc.size is required for pvc creation"
+	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != '')", message=".spec.storage.pvc.volumeAccessMode  is required for pvc creation"
 	PVC PersistentVolumeClaim `json:"pvc,omitempty"`
 	// HostPath is the host path volume for caching NIM
 	HostPath *string `json:"hostPath,omitempty"`

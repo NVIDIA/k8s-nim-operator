@@ -130,6 +130,8 @@ type TrainingConfig struct {
 	// +kubebuilder:validation:Optional
 	ConfigMap *ConfigMapRef `json:"configMap,omitempty"`
 	// ModelPVC is the persistent storage for models used for finetuning
+	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.size) && self.size != '')", message=".spec.trainingConfig.modelPVC.size is required for pvc creation"
+	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != '')", message=".spec.trainingConfig.modelPVC.volumeAccessMode  is required for pvc creation"
 	ModelPVC PersistentVolumeClaim `json:"modelPVC"`
 	// WorkspacePVC is the PVC config for NemoTrainingJob, which automatically creates one for each job
 	WorkspacePVC WorkspacePVCConfig `json:"workspacePVC"`

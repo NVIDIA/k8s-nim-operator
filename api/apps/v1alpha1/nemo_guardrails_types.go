@@ -107,8 +107,10 @@ type NIMEndpoint struct {
 //
 // +kubebuilder:validation:XValidation:rule="!(has(self.configMap) && has(self.pvc))", message="Cannot set both ConfigMap and PVC in ConfigStore"
 type GuardrailConfig struct {
-	ConfigMap *ConfigMapRef          `json:"configMap,omitempty"`
-	PVC       *PersistentVolumeClaim `json:"pvc,omitempty"`
+	ConfigMap *ConfigMapRef `json:"configMap,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.size) && self.size != '')", message=".spec.configStore.pvc.size is required for pvc creation"
+	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != '')", message=".spec.configStore.pvc.volumeAccessMode  is required for pvc creation"
+	PVC *PersistentVolumeClaim `json:"pvc,omitempty"`
 }
 
 // NemoGuardrailStatus defines the observed state of NemoGuardrail.
