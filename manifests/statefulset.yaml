@@ -89,10 +89,10 @@ spec:
       {{- if .Tolerations }}
       tolerations:
         {{- range .Tolerations }}
-        - key: {{ .Key }}
-          operator: {{ .Operator }}
-          value: {{ .Value }}
-          effect: {{ .Effect }}
+        - key: {{ .Key | quote }}
+          operator: {{ .Operator | quote }}
+          value: {{ .Value | quote }}
+          effect: {{ .Effect | quote }}
         {{- end }}
       {{- end }}
       {{- if .ImagePullSecrets }}
