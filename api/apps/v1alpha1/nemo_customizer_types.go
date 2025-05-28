@@ -1089,10 +1089,10 @@ func (n *NemoCustomizer) GetPVCParams() *rendertypes.PVCParams {
 	return params
 }
 
-// GetPVCAnnotations return custom PVC annotations setup by the user
+// GetPVCAnnotations return custom PVC annotations setup by the user.
 func (n *NemoCustomizer) GetPVCAnnotations() map[string]string {
 	// Get global customizer annotations
-	pvcAnnotations := n.GetAnnotations()
+	pvcAnnotations := n.GetNemoCustomizerAnnotations()
 
 	if n.Spec.Training.ModelPVC.Annotations != nil {
 		return utils.MergeMaps(pvcAnnotations, n.Spec.Training.ModelPVC.Annotations)

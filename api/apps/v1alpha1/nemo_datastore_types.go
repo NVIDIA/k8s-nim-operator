@@ -1089,7 +1089,7 @@ func (n *NemoDatastore) GetPVCParams() *rendertypes.PVCParams {
 
 func (n *NemoDatastore) GetPVCAnnotations() map[string]string {
 	// Get global service annotations
-	pvcAnnotations := n.GetServiceAnnotations()
+	pvcAnnotations := n.GetNemoDatastoreAnnotations()
 
 	if n.Spec.PVC.Annotations != nil {
 		return utils.MergeMaps(pvcAnnotations, n.Spec.PVC.Annotations)
