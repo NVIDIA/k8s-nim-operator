@@ -1,0 +1,44 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: meta-llama3-1b-instruct-datastore
+spec:
+  source:
+    dataStore:
+      endpoint: http://nemodatastore-sample.nemo.svc.cluster.local:8000/v1/hf
+      modelName: "llama-3-1b-instruct"  # default/llama-3-1b-instruct model must be present in NeMo DataStore
+      authSecret: hf-auth
+      modelPuller: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04
+      pullSecret: nvcrimagepullsecret
+  storage:
+    pvc:
+      create: true
+      storageClass: ""
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+---
+
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama3-1b-instruct
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: 1.3.3
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama3-1b-instruct-datastore
+      profile: ''
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
