@@ -147,23 +147,24 @@ func CleanupResource(ctx context.Context, k8sClient client.Client, obj client.Ob
 }
 
 // SyncResource sync the current object with the desired object spec.
-func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Object, desired client.Object) error {
+func SyncResource(ctx context.Context, k8sClient client.Client, current client.Object, desired client.Object) error {
 	logger := log.FromContext(ctx)
 
-	if !utils.IsSpecChanged(obj, desired) {
-		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
+	if !utils.IsSpecChanged(current, desired) {
+		logger.V(2).Info("Object spec has not changed, skipping update", "current", current)
 		return nil
 	}
 	logger.V(2).Info("Object spec has changed, updating")
-	if obj == nil || obj.GetName() == "" || obj.GetNamespace() == "" {
+	if current == nil || current.GetName() == "" || current.GetNamespace() == "" {
 		err := k8sClient.Create(ctx, desired)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := k8sClient.Update(ctx, utils.UpdateObject(obj, desired))
-		if err != nil {
-			return err
+		// Merge and update
+		patch := client.MergeFrom(current.DeepCopyObject().(client.Object))
+		if err := k8sClient.Patch(ctx, utils.UpdateObject(current, desired), patch); err != nil {
+			return fmt.Errorf("failed to patch object: %w", err)
 		}
 	}
 	return nil
