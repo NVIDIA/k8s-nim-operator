@@ -58,13 +58,53 @@ type NIMCacheSpec struct {
 	Proxy            *ProxySpec `json:"proxy,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) + (has(self.externalDataStore) ? 1 : 0) == 1",message="Exactly one of ngc, dataStore, or externalDataStore must be defined"
 // NIMSource defines the source for caching NIM model.
 type NIMSource struct {
 	// NGCSource represents models stored in NGC
 	NGC *NGCSource `json:"ngc,omitempty"`
 
-	// NGCSource represents models stored in NVIDIA DataStore service
-	DataStore *DataStoreSource `json:"dataStore,omitempty"`
+	// DataStore represents models stored in NVIDIA NeMo DataStore service
+	DataStore *NemoDataStoreSource `json:"dataStore,omitempty"`
+	// ExternalDataStore represents models stored in external data store
+	ExternalDataStore *ExternalDataStoreSource `json:"externalDataStore,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="(has(self.modelName) ? 1 : 0) + (has(self.datasetName) ? 1 : 0) == 1",message="Exactly one of modelName or datasetName must be defined"
+type DataStoreFields struct {
+	// modelName is the name of the model
+	ModelName *string `json:"modelName,omitempty"`
+	// datasetName is the name of the dataset
+	DatasetName *string `json:"datasetName,omitempty"`
+	// authSecret is the name of the secret containing the "HF_TOKEN" token
+	// +kubebuilder:validation:MinLength=1
+	AuthSecret string `json:"authSecret"`
+	// modelPuller is the containerized huggingface-cli image to pull the data
+	// +kubebuilder:validation:MinLength=1
+	ModelPuller string `json:"modelPuller"`
+	// pullSecret is the name of the image pull secret for the modelPuller image
+	// +kubebuilder:validation:MinLength=1
+	PullSecret string `json:"pullSecret,omitempty"`
+}
+
+type NemoDataStoreSource struct {
+	// Endpoint is the HuggingFace endpoint from NeMo DataStore
+	// +kubebuilder:validation:Pattern=`^https?://.*/v1/hf/?$`
+	Endpoint string `json:"endpoint"`
+	// Namespace is the namespace within NeMo DataStore
+	// +kubebuilder:default="default"
+	Namespace       string `json:"namespace"`
+	DataStoreFields `json:",inline"`
+}
+
+type ExternalDataStoreSource struct {
+	// Endpoint is the HuggingFace endpoint
+	// +kubebuilder:validation:Pattern=`^https?://.*$`
+	Endpoint string `json:"endpoint"`
+	// Namespace is the namespace within the HF-compatible external data store
+	// +kubebuilder:validation:MinLength=1
+	Namespace       string `json:"namespace"`
+	DataStoreFields `json:",inline"`
 }
 
 // NGCSource references a model stored on NVIDIA NGC.
@@ -106,26 +146,6 @@ type GPUSpec struct {
 	Product string `json:"product,omitempty"`
 	// IDs are the device-ids for a specific GPU SKU
 	IDs []string `json:"ids,omitempty"`
-}
-
-// DataStoreSource references a model stored on NVIDIA DataStore service.
-type DataStoreSource struct {
-	// HF-compatible datastore endpoint
-	// +kubebuilder:validation:Pattern=`^http(s)?://.*$`
-	Endpoint string `json:"endpoint"`
-	// +kubebuilder:default="default"
-	Namespace string `json:"namespace"`
-
-	// Name of either model or dataset to download
-	ModelName   *string `json:"modelName,omitempty"`
-	DatasetName *string `json:"datasetName,omitempty"`
-
-	// The name of an existing auth secret containing the HF_TOKEN
-	AuthSecret string `json:"authSecret"`
-	// ModelPuller is the container image that can pull the model
-	ModelPuller string `json:"modelPuller"`
-	// PullSecret for the model puller image
-	PullSecret string `json:"pullSecret,omitempty"`
 }
 
 // NIMCacheStorage defines the attributes of various storage targets used to store the model.
