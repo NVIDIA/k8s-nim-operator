@@ -432,9 +432,13 @@ spec:
                         description: Name is the name of the PVC
                         type: string
                       size:
-                        description: Size of the NIM cache in Gi, used during PVC
-                          creation
+                        description: Size of the NIM cache in Gi. Required if Create
+                          is true.
                         type: string
+                        x-kubernetes-validations:
+                        - message: Size is required for PVC creation
+                          rule: '!(self.create == true) || self.size != null && self.size
+                            != '''''
                       storageClass:
                         description: |-
                           StorageClass to be used for PVC creation. Leave it as empty if the PVC is already created or
@@ -445,9 +449,13 @@ spec:
                           be mounted
                         type: string
                       volumeAccessMode:
-                        description: VolumeAccessMode is the volume access mode of
-                          the PVC
+                        description: VolumeAccessMode is the access mode of the PVC.
+                          Required if Create is true.
                         type: string
+                        x-kubernetes-validations:
+                        - message: VolumeAccessMode is required for PVC creation
+                          rule: '!(self.create == true) || self.volumeAccessMode !=
+                            null && self.volumeAccessMode != '''''
                     type: object
                 type: object
               tolerations:
