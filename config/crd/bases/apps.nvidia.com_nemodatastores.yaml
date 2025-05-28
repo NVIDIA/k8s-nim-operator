@@ -800,7 +800,8 @@ spec:
                     description: Name is the name of the PVC
                     type: string
                   size:
-                    description: Size of the NIM cache in Gi, used during PVC creation
+                    description: Size of the NIM cache in Gi. Required if Create is
+                      true.
                     type: string
                   storageClass:
                     description: |-
@@ -812,8 +813,8 @@ spec:
                       mounted
                     type: string
                   volumeAccessMode:
-                    description: VolumeAccessMode is the volume access mode of the
-                      PVC
+                    description: VolumeAccessMode is the access mode of the PVC. Required
+                      if Create is true.
                     type: string
                 type: object
               replicas:

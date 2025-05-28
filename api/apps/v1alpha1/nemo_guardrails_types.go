@@ -788,7 +788,7 @@ func (n *NemoGuardrail) GetPVCParams() *rendertypes.PVCParams {
 
 func (n *NemoGuardrail) GetPVCAnnotations() map[string]string {
 	// Get global service annotations
-	pvcAnnotations := n.GetServiceAnnotations()
+	pvcAnnotations := n.GetNemoGuardrailAnnotations()
 
 	if n.Spec.ConfigStore.PVC.Annotations != nil {
 		return utils.MergeMaps(pvcAnnotations, n.Spec.ConfigStore.PVC.Annotations)

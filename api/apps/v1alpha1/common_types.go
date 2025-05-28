@@ -227,9 +227,13 @@ type PersistentVolumeClaim struct {
 	// StorageClass to be used for PVC creation. Leave it as empty if the PVC is already created or
 	// a default storage class is set in the cluster.
 	StorageClass string `json:"storageClass,omitempty"`
-	// Size of the NIM cache in Gi, used during PVC creation
+	// Size of the NIM cache in Gi. Required if Create is true.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Rule="!(self.create == true) || self.size != null && self.size != ''"
 	Size string `json:"size,omitempty"`
-	// VolumeAccessMode is the volume access mode of the PVC
+	// VolumeAccessMode is the access mode of the PVC. Required if Create is true.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Rule="!(self.create == true) || self.volumeAccessMode != null && self.volumeAccessMode != ''"
 	VolumeAccessMode corev1.PersistentVolumeAccessMode `json:"volumeAccessMode,omitempty"`
 	// SubPath is the path inside the PVC that should be mounted
 	SubPath string `json:"subPath,omitempty"`

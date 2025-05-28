@@ -131,11 +131,11 @@ test-e2e:
 .PHONY: lint
 lint: golangci-lint
 	$(GOLANGCI_LINT) config path
-	$(GOLANGCI_LINT) run -v
+	$(GOLANGCI_LINT) run -v --timeout=5m
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
-	$(GOLANGCI_LINT) run --fix
+	$(GOLANGCI_LINT) run --fix --timeout=5m
 
 ##@ Build
 

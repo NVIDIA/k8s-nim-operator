@@ -327,7 +327,7 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 	case *rbacv1.RoleBinding:
 		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding)) //nolint:forcetypeassert
 	case *corev1.PersistentVolumeClaim:
-		return updatePersistentVolumeClaim(castedObj, desired.(*corev1.PersistentVolumeClaim)) //nolint:forcetypeassert)
+		return updatePersistentVolumeClaim(castedObj, desired.(*corev1.PersistentVolumeClaim)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
