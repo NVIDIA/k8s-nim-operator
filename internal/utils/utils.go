@@ -421,9 +421,22 @@ func updateRoleBinding(obj, desired *rbacv1.RoleBinding) *rbacv1.RoleBinding {
 	return obj
 }
 
-func updatePersistentVolumeClaim(obj, desired *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaim {
-	obj.SetAnnotations(desired.GetAnnotations())
-	obj.SetLabels(desired.GetLabels())
-	obj.Spec = *desired.Spec.DeepCopy()
-	return obj
+func updatePersistentVolumeClaim(current, desired *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaim {
+	// Copy the current object (patch target)
+	patchObj := current.DeepCopy()
+
+	// Metadata updates
+	patchObj.SetAnnotations(desired.GetAnnotations())
+	patchObj.SetLabels(desired.GetLabels())
+
+	// Update only the allowed mutable field: resources.requests
+	if patchObj.Spec.Resources.Requests == nil {
+		patchObj.Spec.Resources.Requests = corev1.ResourceList{}
+	}
+	for k, v := range desired.Spec.Resources.Requests {
+		patchObj.Spec.Resources.Requests[k] = v
+	}
+
+	// Leave all other fields (like volumeName, accessModes, etc.) unchanged
+	return patchObj
 }
