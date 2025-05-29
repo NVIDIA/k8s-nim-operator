@@ -277,12 +277,13 @@ spec:
                     - endpoint
                     - modelPuller
                     - namespace
+                    - pullSecret
                     type: object
                     x-kubernetes-validations:
                     - message: Exactly one of modelName or datasetName must be defined
                       rule: '(has(self.modelName) ? 1 : 0) + (has(self.datasetName)
                         ? 1 : 0) == 1'
-                  huggingFaceHub:
+                  hf:
                     description: HuggingFaceHub represents models stored in HuggingFace
                       Hub
                     properties:
@@ -321,6 +322,7 @@ spec:
                     - endpoint
                     - modelPuller
                     - namespace
+                    - pullSecret
                     type: object
                     x-kubernetes-validations:
                     - message: Exactly one of modelName or datasetName must be defined
@@ -405,10 +407,9 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-validations:
-                - message: Exactly one of ngc, dataStore, or huggingFaceHub must be
-                    defined
+                - message: Exactly one of ngc, dataStore, or hf must be defined
                   rule: '(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) +
-                    (has(self.huggingFaceHub) ? 1 : 0) == 1'
+                    (has(self.hf) ? 1 : 0) == 1'
               storage:
                 description: Storage is the target storage for caching NIM model
                 properties:
