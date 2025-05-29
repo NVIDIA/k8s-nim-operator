@@ -83,6 +83,16 @@ const (
 	NIMCacheContainerName = "nim-cache-ctr"
 )
 
+type HFInterface interface {
+	GetModelName() *string
+	GetDatasetName() *string
+	GetAuthSecret() string
+	GetModelPuller() string
+	GetPullSecret() string
+	GetEndpoint() string
+	GetNamespace() string
+}
+
 // NIMCacheReconciler reconciles a NIMCache object.
 type NIMCacheReconciler struct {
 	client.Client
@@ -1101,21 +1111,12 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 	}
 
-	if nimCache.Spec.Source.DataStore != nil || nimCache.Spec.Source.HuggingFaceHub != nil {
-		if nimCache.Spec.Source.DataStore != nil && nimCache.Spec.Source.HuggingFaceHub != nil {
-			return nil, errors.NewBadRequest("both dataStore and externalDataStore cannot be set")
-		}
-		dataStore := &appsv1alpha1.DataStoreFields{}
-		hfEndpoint := ""
-		hfNamespace := ""
+	if nimCache.Spec.Source.DataStore != nil || nimCache.Spec.Source.HF != nil {
+		var hfDataSource HFInterface
 		if nimCache.Spec.Source.DataStore != nil {
-			hfEndpoint = nimCache.Spec.Source.DataStore.Endpoint
-			hfNamespace = nimCache.Spec.Source.DataStore.Namespace
-			dataStore = &nimCache.Spec.Source.DataStore.DataStoreFields
-		} else if nimCache.Spec.Source.HuggingFaceHub != nil {
-			hfEndpoint = nimCache.Spec.Source.HuggingFaceHub.Endpoint
-			hfNamespace = nimCache.Spec.Source.HuggingFaceHub.Namespace
-			dataStore = &nimCache.Spec.Source.HuggingFaceHub.DataStoreFields
+			hfDataSource = nimCache.Spec.Source.DataStore
+		} else if nimCache.Spec.Source.HF != nil {
+			hfDataSource = nimCache.Spec.Source.HF
 		}
 
 		outputPath := "/output"
@@ -1123,16 +1124,12 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			outputPath = fmt.Sprintf("%v/%v", outputPath, *nimCache.Spec.Storage.HostPath)
 		}
 
-		if dataStore.ModelName != nil && dataStore.DatasetName != nil {
-			return nil, errors.NewBadRequest("both modelName and datasetName cannot be set")
-		}
-
 		var command []string
-		if dataStore.ModelName != nil { // nolint:gocritic
-			hfRepo := fmt.Sprintf("%s/%s", hfNamespace, *dataStore.ModelName)
+		if hfDataSource.GetModelName() != nil { // nolint:gocritic
+			hfRepo := fmt.Sprintf("%s/%s", hfDataSource.GetNamespace(), *hfDataSource.GetModelName())
 			command = []string{"huggingface-cli", "download", "--local-dir", outputPath, "--repo-type", "model", hfRepo}
-		} else if dataStore.DatasetName != nil {
-			hfRepo := fmt.Sprintf("%s/%s", hfNamespace, *dataStore.DatasetName)
+		} else if hfDataSource.GetDatasetName() != nil {
+			hfRepo := fmt.Sprintf("%s/%s", hfDataSource.GetNamespace(), *hfDataSource.GetDatasetName())
 			command = []string{"huggingface-cli", "download", "--local-dir", outputPath, "--repo-type", "dataset", hfRepo}
 		} else {
 			return nil, errors.NewBadRequest("either modelName or datasetName must be provided")
@@ -1145,7 +1142,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Env: []corev1.EnvVar{
 					{
 						Name:  "HF_ENDPOINT",
-						Value: hfEndpoint,
+						Value: hfDataSource.GetEndpoint(),
 					},
 				},
 				VolumeMounts: []corev1.VolumeMount{
@@ -1179,7 +1176,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 		job.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 			{
-				Name: dataStore.PullSecret,
+				Name: hfDataSource.GetPullSecret(),
 			},
 		}
 	} else if nimCache.Spec.Source.NGC != nil {

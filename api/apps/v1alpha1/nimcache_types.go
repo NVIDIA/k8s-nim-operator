@@ -58,7 +58,7 @@ type NIMCacheSpec struct {
 	Proxy            *ProxySpec `json:"proxy,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) + (has(self.huggingFaceHub) ? 1 : 0) == 1",message="Exactly one of ngc, dataStore, or huggingFaceHub must be defined"
+// +kubebuilder:validation:XValidation:rule="(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) + (has(self.hf) ? 1 : 0) == 1",message="Exactly one of ngc, dataStore, or hf must be defined"
 // NIMSource defines the source for caching NIM model.
 type NIMSource struct {
 	// NGCSource represents models stored in NGC
@@ -67,11 +67,11 @@ type NIMSource struct {
 	// DataStore represents models stored in NVIDIA NeMo DataStore service
 	DataStore *NemoDataStoreSource `json:"dataStore,omitempty"`
 	// HuggingFaceHub represents models stored in HuggingFace Hub
-	HuggingFaceHub *HuggingFaceHubSource `json:"huggingFaceHub,omitempty"`
+	HF *HuggingFaceHubSource `json:"hf,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="(has(self.modelName) ? 1 : 0) + (has(self.datasetName) ? 1 : 0) == 1",message="Exactly one of modelName or datasetName must be defined"
-type DataStoreFields struct {
+type DSHFCommonFields struct {
 	// modelName is the name of the model
 	ModelName *string `json:"modelName,omitempty"`
 	// datasetName is the name of the dataset
@@ -84,7 +84,7 @@ type DataStoreFields struct {
 	ModelPuller string `json:"modelPuller"`
 	// pullSecret is the name of the image pull secret for the modelPuller image
 	// +kubebuilder:validation:MinLength=1
-	PullSecret string `json:"pullSecret,omitempty"`
+	PullSecret string `json:"pullSecret"`
 }
 
 type NemoDataStoreSource struct {
@@ -93,8 +93,8 @@ type NemoDataStoreSource struct {
 	Endpoint string `json:"endpoint"`
 	// Namespace is the namespace within NeMo DataStore
 	// +kubebuilder:default="default"
-	Namespace       string `json:"namespace"`
-	DataStoreFields `json:",inline"`
+	Namespace        string `json:"namespace"`
+	DSHFCommonFields `json:",inline"`
 }
 
 type HuggingFaceHubSource struct {
@@ -103,8 +103,8 @@ type HuggingFaceHubSource struct {
 	Endpoint string `json:"endpoint"`
 	// Namespace is the namespace within the HuggingFace Hub
 	// +kubebuilder:validation:MinLength=1
-	Namespace       string `json:"namespace"`
-	DataStoreFields `json:",inline"`
+	Namespace        string `json:"namespace"`
+	DSHFCommonFields `json:",inline"`
 }
 
 // NGCSource references a model stored on NVIDIA NGC.
@@ -369,12 +369,48 @@ func (n *NIMCache) GetInitContainers() []corev1.Container {
 			initContainerList[0].Image = n.Spec.Source.NGC.ModelPuller
 		} else if n.Spec.Source.DataStore != nil {
 			initContainerList[0].Image = n.Spec.Source.DataStore.ModelPuller
-		} else if n.Spec.Source.HuggingFaceHub != nil {
-			initContainerList[0].Image = n.Spec.Source.HuggingFaceHub.ModelPuller
+		} else if n.Spec.Source.HF != nil {
+			initContainerList[0].Image = n.Spec.Source.HF.ModelPuller
 		}
 		return initContainerList
 	}
 	return []corev1.Container{}
+}
+
+func (d *DSHFCommonFields) GetModelName() *string {
+	return d.ModelName
+}
+
+func (d *DSHFCommonFields) GetDatasetName() *string {
+	return d.DatasetName
+}
+
+func (d *DSHFCommonFields) GetAuthSecret() string {
+	return d.AuthSecret
+}
+
+func (d *DSHFCommonFields) GetModelPuller() string {
+	return d.ModelPuller
+}
+
+func (d *DSHFCommonFields) GetPullSecret() string {
+	return d.PullSecret
+}
+
+func (d *HuggingFaceHubSource) GetEndpoint() string {
+	return d.Endpoint
+}
+
+func (d *HuggingFaceHubSource) GetNamespace() string {
+	return d.Namespace
+}
+
+func (d *NemoDataStoreSource) GetEndpoint() string {
+	return d.Endpoint
+}
+
+func (d *NemoDataStoreSource) GetNamespace() string {
+	return d.Namespace
 }
 
 // +kubebuilder:object:root=true
