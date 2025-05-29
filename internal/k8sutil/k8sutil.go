@@ -161,11 +161,9 @@ func SyncResource(ctx context.Context, k8sClient client.Client, current client.O
 			return err
 		}
 	} else {
-		// Merge and update
-		obj := current.DeepCopyObject().(client.Object)
-		patch := client.MergeFrom(obj)
-		if err := k8sClient.Patch(ctx, utils.UpdateObject(current, desired), patch); err != nil {
-			return fmt.Errorf("failed to patch object: %w", err)
+		err := k8sClient.Update(ctx, utils.UpdateObject(current, desired))
+		if err != nil {
+			return err
 		}
 	}
 	return nil
