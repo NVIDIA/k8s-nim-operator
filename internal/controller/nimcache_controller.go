@@ -33,7 +33,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -561,7 +560,7 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 	}
 
 	// Update size if larger than the previous value
-	requestedSize, err := resource.ParseQuantity(nimCache.Spec.Storage.PVC.Size)
+	requestedSize, err := apiResource.ParseQuantity(nimCache.Spec.Storage.PVC.Size)
 	if err != nil {
 		logger.Error(err, "Invalid PVC size in spec", "size", nimCache.Spec.Storage.PVC.Size)
 		return err
