@@ -282,9 +282,9 @@ spec:
                     - message: Exactly one of modelName or datasetName must be defined
                       rule: '(has(self.modelName) ? 1 : 0) + (has(self.datasetName)
                         ? 1 : 0) == 1'
-                  externalDataStore:
-                    description: ExternalDataStore represents models stored in external
-                      data store
+                  huggingFaceHub:
+                    description: HuggingFaceHub represents models stored in HuggingFace
+                      Hub
                     properties:
                       authSecret:
                         description: authSecret is the name of the secret containing
@@ -307,8 +307,8 @@ spec:
                         minLength: 1
                         type: string
                       namespace:
-                        description: Namespace is the namespace within the HF-compatible
-                          external data store
+                        description: Namespace is the namespace within the HuggingFace
+                          Hub
                         minLength: 1
                         type: string
                       pullSecret:
@@ -405,10 +405,10 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-validations:
-                - message: Exactly one of ngc, dataStore, or externalDataStore must
-                    be defined
+                - message: Exactly one of ngc, dataStore, or huggingFaceHub must be
+                    defined
                   rule: '(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) +
-                    (has(self.externalDataStore) ? 1 : 0) == 1'
+                    (has(self.huggingFaceHub) ? 1 : 0) == 1'
               storage:
                 description: Storage is the target storage for caching NIM model
                 properties:
