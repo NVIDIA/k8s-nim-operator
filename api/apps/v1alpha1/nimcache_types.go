@@ -58,7 +58,7 @@ type NIMCacheSpec struct {
 	Proxy            *ProxySpec `json:"proxy,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) + (has(self.externalDataStore) ? 1 : 0) == 1",message="Exactly one of ngc, dataStore, or externalDataStore must be defined"
+// +kubebuilder:validation:XValidation:rule="(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) + (has(self.huggingFaceHub) ? 1 : 0) == 1",message="Exactly one of ngc, dataStore, or huggingFaceHub must be defined"
 // NIMSource defines the source for caching NIM model.
 type NIMSource struct {
 	// NGCSource represents models stored in NGC
@@ -66,8 +66,8 @@ type NIMSource struct {
 
 	// DataStore represents models stored in NVIDIA NeMo DataStore service
 	DataStore *NemoDataStoreSource `json:"dataStore,omitempty"`
-	// ExternalDataStore represents models stored in external data store
-	ExternalDataStore *ExternalDataStoreSource `json:"externalDataStore,omitempty"`
+	// HuggingFaceHub represents models stored in HuggingFace Hub
+	HuggingFaceHub *HuggingFaceHubSource `json:"huggingFaceHub,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="(has(self.modelName) ? 1 : 0) + (has(self.datasetName) ? 1 : 0) == 1",message="Exactly one of modelName or datasetName must be defined"
@@ -97,11 +97,11 @@ type NemoDataStoreSource struct {
 	DataStoreFields `json:",inline"`
 }
 
-type ExternalDataStoreSource struct {
+type HuggingFaceHubSource struct {
 	// Endpoint is the HuggingFace endpoint
 	// +kubebuilder:validation:Pattern=`^https?://.*$`
 	Endpoint string `json:"endpoint"`
-	// Namespace is the namespace within the HF-compatible external data store
+	// Namespace is the namespace within the HuggingFace Hub
 	// +kubebuilder:validation:MinLength=1
 	Namespace       string `json:"namespace"`
 	DataStoreFields `json:",inline"`
@@ -365,10 +365,12 @@ func (n *NIMCache) GetInitContainers() []corev1.Container {
 				VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
 			},
 		}
-		if n.Spec.Source.NGC != nil {
+		if n.Spec.Source.NGC != nil { // nolint:gocritic
 			initContainerList[0].Image = n.Spec.Source.NGC.ModelPuller
 		} else if n.Spec.Source.DataStore != nil {
 			initContainerList[0].Image = n.Spec.Source.DataStore.ModelPuller
+		} else if n.Spec.Source.HuggingFaceHub != nil {
+			initContainerList[0].Image = n.Spec.Source.HuggingFaceHub.ModelPuller
 		}
 		return initContainerList
 	}

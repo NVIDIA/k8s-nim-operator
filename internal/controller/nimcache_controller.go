@@ -1101,8 +1101,8 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 	}
 
-	if nimCache.Spec.Source.DataStore != nil || nimCache.Spec.Source.ExternalDataStore != nil {
-		if nimCache.Spec.Source.DataStore != nil && nimCache.Spec.Source.ExternalDataStore != nil {
+	if nimCache.Spec.Source.DataStore != nil || nimCache.Spec.Source.HuggingFaceHub != nil {
+		if nimCache.Spec.Source.DataStore != nil && nimCache.Spec.Source.HuggingFaceHub != nil {
 			return nil, errors.NewBadRequest("both dataStore and externalDataStore cannot be set")
 		}
 		dataStore := &appsv1alpha1.DataStoreFields{}
@@ -1112,10 +1112,10 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			hfEndpoint = nimCache.Spec.Source.DataStore.Endpoint
 			hfNamespace = nimCache.Spec.Source.DataStore.Namespace
 			dataStore = &nimCache.Spec.Source.DataStore.DataStoreFields
-		} else if nimCache.Spec.Source.ExternalDataStore != nil {
-			hfEndpoint = nimCache.Spec.Source.ExternalDataStore.Endpoint
-			hfNamespace = nimCache.Spec.Source.ExternalDataStore.Namespace
-			dataStore = &nimCache.Spec.Source.ExternalDataStore.DataStoreFields
+		} else if nimCache.Spec.Source.HuggingFaceHub != nil {
+			hfEndpoint = nimCache.Spec.Source.HuggingFaceHub.Endpoint
+			hfNamespace = nimCache.Spec.Source.HuggingFaceHub.Namespace
+			dataStore = &nimCache.Spec.Source.HuggingFaceHub.DataStoreFields
 		}
 
 		outputPath := "/output"
