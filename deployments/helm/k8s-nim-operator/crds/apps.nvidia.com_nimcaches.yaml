@@ -344,7 +344,7 @@ spec:
                               GPUs
                             type: boolean
                           engine:
-                            description: Engine is the backend engine (tensort_llm,
+                            description: Engine is the backend engine (tensorrt_llm,
                               vllm)
                             type: string
                           gpus:
