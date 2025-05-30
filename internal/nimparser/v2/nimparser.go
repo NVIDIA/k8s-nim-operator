@@ -88,13 +88,12 @@ func (manifest NIMManifest) MatchProfiles(modelSpec appsv1alpha1.ModelSpec, disc
 
 		// Fallback to deprecated "backend" tag for non LLM Models
 		if backend == "" {
-			if deprecatedBackend, ok := profile.Tags["backend"]; ok {
-				if deprecatedBackend == "triton" {
-					backend = "tensorrt"
-				} else {
-					backend = deprecatedBackend
-				}
-			}
+			backend = profile.Tags["backend"]
+		}
+
+		// modespec.Engine value can be "tensorrt_llm". If backend tag is "triton", convert it to "tensorrt".
+		if backend == "triton" {
+			backend = "tensorrt"
 		}
 
 		if modelSpec.Engine != "" && !strings.Contains(backend, strings.TrimSuffix(modelSpec.Engine, "_llm")) {
