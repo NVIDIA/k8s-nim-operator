@@ -80,8 +80,20 @@ func (manifest NIMManifest) MatchProfiles(modelSpec appsv1alpha1.ModelSpec, disc
 
 		// Determine backend type
 		backend := profile.Tags["llm_engine"]
+
+		// Use "model_type" if "llm_engine" is empty for non LLM models
+		if backend == "" {
+			backend = profile.Tags["model_type"]
+		}
+
+		// Fallback to deprecated "backend" tag for non LLM Models
 		if backend == "" {
 			backend = profile.Tags["backend"]
+		}
+
+		// modespec.Engine value can be "tensorrt_llm". If backend tag is "triton", convert it to "tensorrt".
+		if backend == "triton" {
+			backend = "tensorrt"
 		}
 
 		if modelSpec.Engine != "" && !strings.Contains(backend, strings.TrimSuffix(modelSpec.Engine, "_llm")) {

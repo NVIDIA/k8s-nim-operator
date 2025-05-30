@@ -126,7 +126,7 @@ type ModelSpec struct {
 	Profiles []string `json:"profiles,omitempty"`
 	// Precision is the precision for model quantization
 	Precision string `json:"precision,omitempty"`
-	// Engine is the backend engine (tensort_llm, vllm)
+	// Engine is the backend engine (tensorrt_llm, vllm)
 	Engine string `json:"engine,omitempty"`
 	// TensorParallelism is the minimum GPUs required for the model computations
 	TensorParallelism string `json:"tensorParallelism,omitempty"`
