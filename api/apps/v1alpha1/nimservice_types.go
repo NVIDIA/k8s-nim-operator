@@ -85,6 +85,8 @@ type NIMServiceSpec struct {
 	GroupID          *int64     `json:"groupID,omitempty"`
 	RuntimeClassName string     `json:"runtimeClassName,omitempty"`
 	Proxy            *ProxySpec `json:"proxy,omitempty"`
+
+	ResourceClaims []corev1.PodResourceClaim `json:"resourceClaims,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume.
@@ -719,6 +721,8 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 			ContainerPort: *n.Spec.Expose.Service.MetricsPort,
 		})
 	}
+
+	params.PodResourceClaims = n.GetResourceClaims()
 	return params
 }
 
@@ -992,6 +996,10 @@ func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
 // GetProxySpec returns the proxy spec for the NIMService deployment.
 func (n *NIMService) GetProxySpec() *ProxySpec {
 	return n.Spec.Proxy
+}
+
+func (n *NIMService) GetResourceClaims() []corev1.PodResourceClaim {
+	return n.Spec.ResourceClaims
 }
 
 func init() {
