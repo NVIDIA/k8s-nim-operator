@@ -22,42 +22,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
 // ConstructPVC constructs a PVC from the custom spec from the user.
 func ConstructPVC(pvc appsv1alpha1.PersistentVolumeClaim, pvcMeta metav1.ObjectMeta) (*corev1.PersistentVolumeClaim, error) {
-	if pvc.Size == "" {
-		return nil, fmt.Errorf("PVC size must be specified")
-	}
-
 	size, err := resource.ParseQuantity(pvc.Size)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse size for PVC creation %s: %v", pvcMeta.Name, err)
+		return nil, fmt.Errorf("failed to parse size for pvc creation %s, err %v", pvcMeta.Name, err)
 	}
-
-	if pvc.VolumeAccessMode == "" {
-		return nil, fmt.Errorf("volume access mode must be specified for PVC %s", pvcMeta.Name)
-	}
-
-	if pvcMeta.Name == "" {
-		return nil, fmt.Errorf("PVC metadata name must be specified")
-	}
-
-	// Merge annotations from pvc into pvcMeta
-	if pvc.Annotations != nil {
-		if pvcMeta.Annotations == nil {
-			pvcMeta.Annotations = make(map[string]string)
-		}
-		for key, value := range pvc.Annotations {
-			if key == "" {
-				return nil, fmt.Errorf("annotation key cannot be empty in PVC %s", pvcMeta.Name)
-			}
-			pvcMeta.Annotations[key] = value
-		}
-	}
-
 	claim := &corev1.PersistentVolumeClaim{
 		ObjectMeta: pvcMeta,
 		Spec: corev1.PersistentVolumeClaimSpec{
@@ -75,4 +50,12 @@ func ConstructPVC(pvc appsv1alpha1.PersistentVolumeClaim, pvcMeta metav1.ObjectM
 	}
 
 	return claim, nil
+}
+
+func GetPVCName(parent client.Object, pvc appsv1alpha1.PersistentVolumeClaim) string {
+	pvcName := fmt.Sprintf("%s-pvc", parent.GetName())
+	if pvc.Name != "" {
+		pvcName = pvc.Name
+	}
+	return pvcName
 }

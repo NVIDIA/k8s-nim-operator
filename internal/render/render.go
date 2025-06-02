@@ -74,7 +74,6 @@ type Renderer interface {
 	ServiceMonitor(params *types.ServiceMonitorParams) (*monitoringv1.ServiceMonitor, error)
 	ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error)
 	Secret(params *types.SecretParams) (*corev1.Secret, error)
-	PVC(params *types.PVCParams) (*corev1.PersistentVolumeClaim, error)
 }
 
 // TemplateData is used by the templating engine to render templates.
@@ -406,21 +405,4 @@ func (r *textTemplateRenderer) Secret(params *types.SecretParams) (*corev1.Secre
 		return nil, fmt.Errorf("error converting unstructured object to Secret: %w", err)
 	}
 	return secret, nil
-}
-
-// PVC renders a PersistentVolumeClaim spec with the given templating data.
-func (r *textTemplateRenderer) PVC(params *types.PVCParams) (*corev1.PersistentVolumeClaim, error) {
-	objs, err := r.renderFile(path.Join(r.directory, "pvc.yaml"), &TemplateData{Data: params})
-	if err != nil {
-		return nil, err
-	}
-	if len(objs) == 0 {
-		return nil, nil
-	}
-	pvc := &corev1.PersistentVolumeClaim{}
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, pvc)
-	if err != nil {
-		return nil, fmt.Errorf("error converting unstructured object to PVC: %w", err)
-	}
-	return pvc, nil
 }

@@ -217,24 +217,3 @@ type NGCSecret struct {
 	// +kubebuilder:default:="NGC_API_KEY"
 	Key string `json:"key"`
 }
-
-// PersistentVolumeClaim defines the attributes of PVC used as a source for caching NIM model.
-type PersistentVolumeClaim struct {
-	// Create indicates to create a new PVC
-	Create *bool `json:"create,omitempty"`
-	// Name is the name of the PVC
-	Name string `json:"name,omitempty"`
-	// StorageClass to be used for PVC creation. Leave it as empty if the PVC is already created or
-	// a default storage class is set in the cluster.
-	StorageClass string `json:"storageClass,omitempty"`
-	// Size of the NIM cache in Gi. Required if Create is true.
-	// +kubebuilder:validation:Optional
-	Size string `json:"size,omitempty"`
-	// VolumeAccessMode is the access mode of the PVC. Required if Create is true.
-	// +kubebuilder:validation:Optional
-	VolumeAccessMode corev1.PersistentVolumeAccessMode `json:"volumeAccessMode,omitempty"`
-	// SubPath is the path inside the PVC that should be mounted
-	SubPath string `json:"subPath,omitempty"`
-	// Annotations for the PVC
-	Annotations map[string]string `json:"annotations,omitempty"`
-}

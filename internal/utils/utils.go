@@ -326,8 +326,6 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 		return updateRole(castedObj, desired.(*rbacv1.Role)) //nolint:forcetypeassert
 	case *rbacv1.RoleBinding:
 		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding)) //nolint:forcetypeassert
-	case *corev1.PersistentVolumeClaim:
-		return updatePersistentVolumeClaim(castedObj, desired.(*corev1.PersistentVolumeClaim)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
@@ -419,24 +417,4 @@ func updateRoleBinding(obj, desired *rbacv1.RoleBinding) *rbacv1.RoleBinding {
 	obj.Subjects = desired.Subjects
 	obj.RoleRef = desired.RoleRef
 	return obj
-}
-
-func updatePersistentVolumeClaim(current, desired *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaim {
-	// Copy the current object (patch target)
-	patchObj := current.DeepCopy()
-
-	// Metadata updates
-	patchObj.SetAnnotations(desired.GetAnnotations())
-	patchObj.SetLabels(desired.GetLabels())
-
-	// Update only the allowed mutable field: resources.requests
-	if patchObj.Spec.Resources.Requests == nil {
-		patchObj.Spec.Resources.Requests = corev1.ResourceList{}
-	}
-	for k, v := range desired.Spec.Resources.Requests {
-		patchObj.Spec.Resources.Requests[k] = v
-	}
-
-	// Leave all other fields (like volumeName, accessModes, etc.) unchanged
-	return patchObj
 }
