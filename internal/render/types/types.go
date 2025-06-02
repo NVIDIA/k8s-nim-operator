@@ -85,6 +85,7 @@ type DeploymentParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	PodResourceClaims  []corev1.PodResourceClaim
 }
 
 // StatefulSetParams holds the parameters for rendering a StatefulSet template.
