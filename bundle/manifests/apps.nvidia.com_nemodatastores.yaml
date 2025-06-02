@@ -788,11 +788,19 @@ spec:
               pvc:
                 description: PVC defines the PersistentVolumeClaim for the datastore
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations for the PVC
+                    type: object
                   create:
-                    description: Create indicates to create a new PVC
+                    description: |-
+                      Create specifies whether to create a new PersistentVolumeClaim (PVC).
+                      If set to false, an existing PVC must be referenced via the `Name` field.
                     type: boolean
                   name:
-                    description: Name is the name of the PVC
+                    description: Name of the PVC to use. Required if `Create` is false
+                      (i.e., using an existing PVC).
                     type: string
                   size:
                     description: Size of the NIM cache in Gi, used during PVC creation
@@ -811,6 +819,13 @@ spec:
                       PVC
                     type: string
                 type: object
+                x-kubernetes-validations:
+                - message: size is required for pvc creation
+                  rule: '!has(self.create) || !self.create || (has(self.size) && self.size
+                    != "")'
+                - message: volumeAccessMode is required for pvc creation
+                  rule: '!has(self.create) || !self.create || (has(self.volumeAccessMode)
+                    && self.volumeAccessMode != "")'
               replicas:
                 default: 1
                 minimum: 1

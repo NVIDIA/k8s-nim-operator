@@ -217,3 +217,25 @@ type NGCSecret struct {
 	// +kubebuilder:default:="NGC_API_KEY"
 	Key string `json:"key"`
 }
+
+// PersistentVolumeClaim defines the attributes of PVC.
+// +kubebuilder:validation:XValidation:rule="!has(self.create) || !self.create || (has(self.size) && self.size != \"\")", message="size is required for pvc creation"
+// +kubebuilder:validation:XValidation:rule="!has(self.create) || !self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != \"\")", message="volumeAccessMode is required for pvc creation"
+type PersistentVolumeClaim struct {
+	// Create specifies whether to create a new PersistentVolumeClaim (PVC).
+	// If set to false, an existing PVC must be referenced via the `Name` field.
+	Create *bool `json:"create,omitempty"`
+	// Name of the PVC to use. Required if `Create` is false (i.e., using an existing PVC).
+	Name string `json:"name,omitempty"`
+	// StorageClass to be used for PVC creation. Leave it as empty if the PVC is already created or
+	// a default storage class is set in the cluster.
+	StorageClass string `json:"storageClass,omitempty"`
+	// Size of the NIM cache in Gi, used during PVC creation
+	Size string `json:"size,omitempty"`
+	// VolumeAccessMode is the volume access mode of the PVC
+	VolumeAccessMode corev1.PersistentVolumeAccessMode `json:"volumeAccessMode,omitempty"`
+	// SubPath is the path inside the PVC that should be mounted
+	SubPath string `json:"subPath,omitempty"`
+	// Annotations for the PVC
+	Annotations map[string]string `json:"annotations,omitempty"`
+}

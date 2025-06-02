@@ -49,6 +49,10 @@ func ConstructPVC(pvc appsv1alpha1.PersistentVolumeClaim, pvcMeta metav1.ObjectM
 		claim.Spec.StorageClassName = &pvc.StorageClass
 	}
 
+	if pvc.Annotations != nil {
+		claim.Annotations = pvc.Annotations
+	}
+
 	return claim, nil
 }
 
