@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -615,49 +614,6 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			err = client.Get(context.TODO(), namespacedName, ingress)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsNotFound(err)).To(Equal(true))
-		})
-
-		It("should update the ModelPVC size and annotations when NemoCustomizer is updated", func() {
-			namespacedName := types.NamespacedName{Name: nemoCustomizer.Name, Namespace: "default"}
-
-			// Create initial NemoCustomizer
-			err := client.Create(context.TODO(), nemoCustomizer)
-			Expect(err).NotTo(HaveOccurred())
-			err = client.Create(context.TODO(), secrets)
-			Expect(err).NotTo(HaveOccurred())
-
-			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespacedName})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-
-			// Confirm PVC exists with initial values
-			pvc := &corev1.PersistentVolumeClaim{}
-			pvcName := types.NamespacedName{Name: nemoCustomizer.GetPVCName(), Namespace: namespacedName.Namespace}
-			Eventually(func() error {
-				return client.Get(context.TODO(), pvcName, pvc)
-			}, time.Second*10).Should(Succeed())
-			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("5Gi")))
-
-			// Update NemoCustomizer with new PVC size and annotations
-			updatedCustomizer := &appsv1alpha1.NemoCustomizer{}
-			Expect(client.Get(context.TODO(), namespacedName, updatedCustomizer)).To(Succeed())
-			updatedCustomizer.Spec.Training.ModelPVC.Size = "10Gi"
-			updatedCustomizer.Spec.Training.ModelPVC.Annotations = map[string]string{
-				"updated-annotation": "yes",
-			}
-			Expect(client.Update(context.TODO(), updatedCustomizer)).To(Succeed())
-
-			// Reconcile again
-			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespacedName})
-			Expect(err).ToNot(HaveOccurred())
-
-			// Verify updated PVC spec
-			Eventually(func() corev1.ResourceList {
-				_ = client.Get(context.TODO(), pvcName, pvc)
-				return pvc.Spec.Resources.Requests
-			}, time.Second*10).Should(HaveKeyWithValue(corev1.ResourceStorage, resource.MustParse("10Gi")))
-
-			Expect(pvc.Annotations).To(HaveKeyWithValue("updated-annotation", "yes"))
 		})
 	})
 })

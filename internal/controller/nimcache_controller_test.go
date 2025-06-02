@@ -42,6 +42,7 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	nimparserv1 "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/v1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
 
 var _ = Describe("NIMCache Controller", func() {
@@ -115,23 +116,8 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{
-						NGC: &appsv1alpha1.NGCSource{
-							ModelPuller: "test-container",
-							PullSecret:  "my-secret",
-						},
-					},
-					Storage: appsv1alpha1.NIMCacheStorage{
-						PVC: appsv1alpha1.PersistentVolumeClaim{
-							Create:           ptr.To[bool](true),
-							StorageClass:     "standard",
-							Size:             "1Gi",
-							VolumeAccessMode: corev1.ReadWriteOnce,
-							Annotations: map[string]string{
-								"my-custom-annotation": "import-volume",
-							},
-						},
-					},
+					Source:           appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
+					Storage:          appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
 					RuntimeClassName: runtimeClassName,
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
@@ -155,17 +141,13 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(job.Spec.Template.Spec.RuntimeClassName).To(Equal(&runtimeClassName))
 			Expect(job.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"feature.node.kubernetes.io/pci-10de.present": "true"}))
 
-			// Check if the PVC was created and has the correct annotations
-			pvc := &corev1.PersistentVolumeClaim{}
-			pvcName := types.NamespacedName{Name: "test-nimcache-pvc", Namespace: "default"}
-
-			// Wait for reconciliation to complete and PVC to be created
+			// Check if the PVC was created
+			// Wait for reconciliation to complete with a timeout
 			Eventually(func() error {
+				pvc := &corev1.PersistentVolumeClaim{}
+				pvcName := types.NamespacedName{Name: "test-nimcache-pvc", Namespace: "default"}
 				return cli.Get(ctx, pvcName, pvc)
 			}, time.Second*10).Should(Succeed())
-
-			// Check for specific annotation
-			Expect(pvc.Annotations).To(HaveKeyWithValue("my-custom-annotation", "import-volume"))
 		})
 
 		It("should return an error if the PVC size is not specified", func() {
@@ -188,75 +170,7 @@ var _ = Describe("NIMCache Controller", func() {
 			// Reconcile the resource
 			_, err := reconciler.reconcileNIMCache(ctx, NIMCache)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("PVC size must be specified"))
-		})
-
-		It("should update the PVC size and annotations when NIMCache is updated", func() {
-			ctx := context.TODO()
-			nimcacheName := types.NamespacedName{Name: "test-nimcache", Namespace: "default"}
-
-			initialNIMCache := &appsv1alpha1.NIMCache{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      nimcacheName.Name,
-					Namespace: nimcacheName.Namespace,
-				},
-				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{
-						NGC: &appsv1alpha1.NGCSource{
-							ModelPuller: "test-container",
-							PullSecret:  "my-secret",
-						},
-					},
-					Storage: appsv1alpha1.NIMCacheStorage{
-						PVC: appsv1alpha1.PersistentVolumeClaim{
-							Create:           ptr.To[bool](true),
-							StorageClass:     "standard",
-							Size:             "1Gi",
-							VolumeAccessMode: corev1.ReadWriteOnce,
-							Annotations: map[string]string{
-								"initial-annotation": "true",
-							},
-						},
-					},
-					RuntimeClassName: "test-class",
-				},
-				Status: appsv1alpha1.NIMCacheStatus{
-					State: appsv1alpha1.NimCacheStatusNotReady,
-				},
-			}
-			Expect(cli.Create(ctx, initialNIMCache)).To(Succeed())
-
-			// Initial reconcile to create PVC
-			_, err := reconciler.reconcileNIMCache(ctx, initialNIMCache)
-			Expect(err).ToNot(HaveOccurred())
-
-			pvc := &corev1.PersistentVolumeClaim{}
-			Eventually(func() error {
-				return cli.Get(ctx, types.NamespacedName{Name: "test-nimcache-pvc", Namespace: "default"}, pvc)
-			}, time.Second*10).Should(Succeed())
-			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("1Gi")))
-			Expect(pvc.Annotations).To(HaveKeyWithValue("initial-annotation", "true"))
-
-			// Update NIMCache with new size and annotations
-			updated := &appsv1alpha1.NIMCache{}
-			Expect(cli.Get(ctx, nimcacheName, updated)).To(Succeed())
-			updated.Spec.Storage.PVC.Size = "2Gi"
-			updated.Spec.Storage.PVC.Annotations = map[string]string{
-				"updated-annotation": "yes",
-			}
-			Expect(cli.Update(ctx, updated)).To(Succeed())
-
-			// Reconcile again
-			_, err = reconciler.reconcileNIMCache(ctx, updated)
-			Expect(err).ToNot(HaveOccurred())
-
-			// Verify PVC reflects the updated size and annotations
-			Eventually(func() corev1.ResourceList {
-				_ = cli.Get(ctx, types.NamespacedName{Name: "test-nimcache-pvc", Namespace: "default"}, pvc)
-				return pvc.Spec.Resources.Requests
-			}, time.Second*10).Should(HaveKeyWithValue(corev1.ResourceStorage, resource.MustParse("2Gi")))
-
-			Expect(pvc.Annotations).To(HaveKeyWithValue("updated-annotation", "yes"))
+			Expect(err.Error()).To(ContainSubstring("failed to parse size for pvc creation"))
 		})
 	})
 
@@ -270,7 +184,7 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
 					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi", VolumeAccessMode: corev1.ReadWriteOnce}},
+					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
 					State: "Initializing",
@@ -319,7 +233,7 @@ var _ = Describe("NIMCache Controller", func() {
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
 					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "test-container", PullSecret: "my-secret"}},
-					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi", VolumeAccessMode: corev1.ReadWriteOnce}},
+					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
 				},
 				Status: appsv1alpha1.NIMCacheStatus{
 					State: "Initializing",
@@ -531,7 +445,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
-			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(nimCache.GetPVCName()))
+			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)))
 		})
 
 		It("should construct a job with multiple profiles", func() {
@@ -562,7 +476,7 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(*job.Spec.Template.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
 			Expect(*job.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
-			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(nimCache.GetPVCName()))
+			Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal(shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)))
 		})
 
 		It("should construct a job set to download all profiles", func() {

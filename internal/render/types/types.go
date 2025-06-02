@@ -227,15 +227,3 @@ type SecretParams struct {
 	// Key-value pairs representing filenames and their content
 	SecretMapData map[string]string
 }
-
-// PVCParams holds the parameters for rendering a PVC template.
-type PVCParams struct {
-	Enabled          bool
-	Name             string
-	Namespace        string
-	Labels           map[string]string
-	Annotations      map[string]string
-	AccessMode       corev1.PersistentVolumeAccessMode
-	Storage          string
-	StorageClassName string
-}

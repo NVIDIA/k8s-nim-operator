@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -294,7 +293,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	renderer := r.GetRenderer()
 
 	// Sync serviceaccount
-	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.ServiceAccount{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
 		return renderer.ServiceAccount(nemoCustomizer.GetServiceAccountParams())
 	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
 	if err != nil {
@@ -302,7 +301,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Sync role
-	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &rbacv1.Role{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
 		return renderer.Role(nemoCustomizer.GetRoleParams())
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
@@ -310,7 +309,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &rbacv1.RoleBinding{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
 		return renderer.RoleBinding(nemoCustomizer.GetRoleBindingParams())
 	}, "rolebinding", conditions.ReasonRoleBindingFailed)
 	if err != nil {
@@ -318,7 +317,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	// Sync service
-	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.Service{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.Service{}, func() (client.Object, error) {
 		return renderer.Service(nemoCustomizer.GetServiceParams())
 	}, "service", conditions.ReasonServiceFailed)
 	if err != nil {
@@ -327,7 +326,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 
 	// Sync ingress
 	if nemoCustomizer.IsIngressEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &networkingv1.Ingress{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
 			return renderer.Ingress(nemoCustomizer.GetIngressParams())
 		}, "ingress", conditions.ReasonIngressFailed)
 		if err != nil {
@@ -342,7 +341,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 
 	// Sync HPA
 	if nemoCustomizer.IsAutoScalingEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
 			return renderer.HPA(nemoCustomizer.GetHPAParams())
 		}, "hpa", conditions.ReasonHPAFailed)
 		if err != nil {
@@ -358,7 +357,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 
 	// Sync Service Monitor
 	if nemoCustomizer.IsServiceMonitorEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &monitoringv1.ServiceMonitor{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
 			return renderer.ServiceMonitor(nemoCustomizer.GetServiceMonitorParams())
 		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
 		if err != nil {
@@ -372,7 +371,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		return ctrl.Result{}, fmt.Errorf("rendering customizer config: %w", err)
 	}
 
-	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.ConfigMap{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.ConfigMap{}, func() (client.Object, error) {
 		return renderer.ConfigMap(nemoCustomizer.GetConfigMapParams(customizerConfigYAML))
 	}, "configmap", conditions.ReasonConfigMapFailed)
 	if err != nil {
@@ -391,21 +390,16 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		"dsn": encoded,
 	}
 	// Sync Customizer Secret
-	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.Secret{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.Secret{}, func() (client.Object, error) {
 		return renderer.Secret(nemoCustomizer.GetSecretParams(secretMapData))
 	}, "secret", conditions.ReasonSecretFailed)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Sync PVC for model storage
-	if ptr.Deref(nemoCustomizer.Spec.Training.ModelPVC.Create, false) {
-		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &corev1.PersistentVolumeClaim{}, nemoCustomizer.GetPVCName(), func() (client.Object, error) {
-			return renderer.PVC(nemoCustomizer.GetPVCParams())
-		}, "persistentvolumeclaim", conditions.ReasonPVCFailed)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+	// Sync Customizer PVC for model storage
+	if err = r.reconcilePVC(ctx, nemoCustomizer); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Get params to render Deployment resource
@@ -429,7 +423,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	deploymentParams.VolumeMounts = nemoCustomizer.GetVolumeMounts()
 
 	// Sync deployment
-	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &appsv1.Deployment{}, nemoCustomizer.GetName(), func() (client.Object, error) {
+	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
 		return renderer.Deployment(deploymentParams)
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
@@ -460,6 +454,41 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NemoCustomizerReconciler) reconcilePVC(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer) error {
+	logger := r.GetLogger()
+	pvcName := shared.GetPVCName(nemoCustomizer, nemoCustomizer.Spec.Training.ModelPVC)
+	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nemoCustomizer.GetNamespace()}
+	pvc := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, pvcNamespacedName, pvc)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	// If PVC does not exist, create a new one if creation flag is enabled
+	if err != nil {
+		if nemoCustomizer.Spec.Training.ModelPVC.Create != nil && *nemoCustomizer.Spec.Training.ModelPVC.Create {
+			pvc, err = shared.ConstructPVC(nemoCustomizer.Spec.Training.ModelPVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoCustomizer.GetNamespace()})
+			if err != nil {
+				logger.Error(err, "Failed to construct pvc", "name", pvcName)
+				return err
+			}
+			if err := controllerutil.SetControllerReference(nemoCustomizer, pvc, r.GetScheme()); err != nil {
+				return err
+			}
+			err = r.Create(ctx, pvc)
+			if err != nil {
+				logger.Error(err, "Failed to create pvc", "name", pvcName)
+				return err
+			}
+			logger.Info("Created PVC for NeMo Customizer model storage", "pvc", pvc.Name)
+		} else {
+			logger.Error(err, "PVC doesn't exist and auto-creation is not enabled", "name", pvcNamespacedName)
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *NemoCustomizerReconciler) renderCustomizerConfig(ctx context.Context, n *appsv1alpha1.NemoCustomizer) ([]byte, error) {
@@ -609,7 +638,7 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 		{
 			"name": "models",
 			"persistentVolumeClaim": map[string]interface{}{
-				"claimName": n.GetPVCName(),
+				"claimName": shared.GetPVCName(n, n.Spec.Training.ModelPVC),
 				"readOnly":  true,
 			},
 		},
@@ -665,10 +694,10 @@ func (r *NemoCustomizerReconciler) addModelConfig(ctx context.Context, cfg map[s
 	return nil
 }
 
-func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer, renderer *render.Renderer, obj client.Object, objName string, renderFunc func() (client.Object, error), conditionType string, reason string) error {
+func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: objName, Namespace: nemoCustomizer.GetNamespace()}
+	namespacedName := types.NamespacedName{Name: nemoCustomizer.GetName(), Namespace: nemoCustomizer.GetNamespace()}
 	err := r.Get(ctx, namespacedName, obj)
 	if err != nil && !errors.IsNotFound(err) {
 		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))

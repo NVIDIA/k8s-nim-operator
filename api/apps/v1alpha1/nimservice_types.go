@@ -147,10 +147,10 @@ type NIMServiceStorage struct {
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
 // Prefers pvc.Name if explicitly set by the user in the NIMService instance.
-func (n *NIMService) GetPVCName() string {
+func (n *NIMService) GetPVCName(pvc PersistentVolumeClaim) string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
-	if n.Spec.Storage.PVC.Name != "" {
-		pvcName = n.Spec.Storage.PVC.Name
+	if pvc.Name != "" {
+		pvcName = pvc.Name
 	}
 	return pvcName
 }
@@ -463,7 +463,7 @@ func (n *NIMService) GetVolumesMounts() []corev1.Volume {
 }
 
 // GetVolumes returns volumes for the NIMService container.
-func (n *NIMService) GetVolumes(pvcName string) []corev1.Volume {
+func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume {
 	// TODO: Fetch actual PVC name from associated NIMCache obj
 	volumes := []corev1.Volume{
 		{
@@ -479,7 +479,7 @@ func (n *NIMService) GetVolumes(pvcName string) []corev1.Volume {
 			Name: "model-store",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvcName,
+					ClaimName: modelPVC.Name,
 					ReadOnly:  n.GetStorageReadOnly(),
 				},
 			},
@@ -494,12 +494,12 @@ func (n *NIMService) GetVolumes(pvcName string) []corev1.Volume {
 }
 
 // GetVolumeMounts returns volumes for the NIMService container.
-func (n *NIMService) GetVolumeMounts(pvcSubPath string) []corev1.VolumeMount {
+func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "model-store",
 			MountPath: "/model-store",
-			SubPath:   pvcSubPath,
+			SubPath:   modelPVC.SubPath,
 		},
 		{
 			Name:      "dshm",
@@ -951,35 +951,6 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 	}
 	params.SMSpec = smSpec
 	return params
-}
-
-// GetPVCParams returns parameters to render a PersistentVolumeClaim from templates.
-func (n *NIMService) GetPVCParams() *rendertypes.PVCParams {
-	params := &rendertypes.PVCParams{}
-
-	// Set metadata
-	params.Enabled = ptr.Deref(n.Spec.Storage.PVC.Create, false)
-	params.Name = n.GetPVCName()
-	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetPVCAnnotations()
-
-	// PVC-specific config
-	params.AccessMode = n.Spec.Storage.PVC.VolumeAccessMode
-	params.Storage = n.Spec.Storage.PVC.Size
-	params.StorageClassName = n.Spec.Storage.PVC.StorageClass
-
-	return params
-}
-
-func (n *NIMService) GetPVCAnnotations() map[string]string {
-	// Get global service annotations
-	pvcAnnotations := n.GetNIMServiceAnnotations()
-
-	if n.Spec.Storage.PVC.Annotations != nil {
-		return utils.MergeMaps(pvcAnnotations, n.Spec.Storage.PVC.Annotations)
-	}
-	return pvcAnnotations
 }
 
 func (n *NIMService) GetIngressAnnotations() map[string]string {

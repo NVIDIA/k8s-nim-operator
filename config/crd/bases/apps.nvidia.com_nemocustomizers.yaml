@@ -1974,11 +1974,6 @@ spec:
                     description: ModelPVC is the persistent storage for models used
                       for finetuning
                     properties:
-                      annotations:
-                        additionalProperties:
-                          type: string
-                        description: Annotations for the PVC
-                        type: object
                       create:
                         description: Create indicates to create a new PVC
                         type: boolean
@@ -1986,8 +1981,8 @@ spec:
                         description: Name is the name of the PVC
                         type: string
                       size:
-                        description: Size of the NIM cache in Gi. Required if Create
-                          is true.
+                        description: Size of the NIM cache in Gi, used during PVC
+                          creation
                         type: string
                       storageClass:
                         description: |-
@@ -1999,18 +1994,10 @@ spec:
                           be mounted
                         type: string
                       volumeAccessMode:
-                        description: VolumeAccessMode is the access mode of the PVC.
-                          Required if Create is true.
+                        description: VolumeAccessMode is the volume access mode of
+                          the PVC
                         type: string
                     type: object
-                    x-kubernetes-validations:
-                    - message: .spec.trainingConfig.modelPVC.size is required for
-                        pvc creation
-                      rule: '!self.create || (has(self.size) && self.size != '''')'
-                    - message: .spec.trainingConfig.modelPVC.volumeAccessMode  is
-                        required for pvc creation
-                      rule: '!self.create || (has(self.volumeAccessMode) && self.volumeAccessMode
-                        != '''')'
                   networkConfig:
                     description: NetworkConfig is the network configuration for multi-node
                       training

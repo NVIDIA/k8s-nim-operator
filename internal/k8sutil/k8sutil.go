@@ -147,21 +147,21 @@ func CleanupResource(ctx context.Context, k8sClient client.Client, obj client.Ob
 }
 
 // SyncResource sync the current object with the desired object spec.
-func SyncResource(ctx context.Context, k8sClient client.Client, current client.Object, desired client.Object) error {
+func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Object, desired client.Object) error {
 	logger := log.FromContext(ctx)
 
-	if !utils.IsSpecChanged(current, desired) {
-		logger.V(2).Info("Object spec has not changed, skipping update", "current", current)
+	if !utils.IsSpecChanged(obj, desired) {
+		logger.V(2).Info("Object spec has not changed, skipping update", "obj", obj)
 		return nil
 	}
 	logger.V(2).Info("Object spec has changed, updating")
-	if current == nil || current.GetName() == "" || current.GetNamespace() == "" {
+	if obj == nil || obj.GetName() == "" || obj.GetNamespace() == "" {
 		err := k8sClient.Create(ctx, desired)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := k8sClient.Update(ctx, utils.UpdateObject(current, desired))
+		err := k8sClient.Update(ctx, utils.UpdateObject(obj, desired))
 		if err != nil {
 			return err
 		}

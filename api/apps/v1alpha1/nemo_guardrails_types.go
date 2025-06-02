@@ -107,10 +107,8 @@ type NIMEndpoint struct {
 //
 // +kubebuilder:validation:XValidation:rule="!(has(self.configMap) && has(self.pvc))", message="Cannot set both ConfigMap and PVC in ConfigStore"
 type GuardrailConfig struct {
-	ConfigMap *ConfigMapRef `json:"configMap,omitempty"`
-	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.size) && self.size != '')", message=".spec.configStore.pvc.size is required for pvc creation"
-	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != '')", message=".spec.configStore.pvc.volumeAccessMode  is required for pvc creation"
-	PVC *PersistentVolumeClaim `json:"pvc,omitempty"`
+	ConfigMap *ConfigMapRef          `json:"configMap,omitempty"`
+	PVC       *PersistentVolumeClaim `json:"pvc,omitempty"`
 }
 
 // NemoGuardrailStatus defines the observed state of NemoGuardrail.
@@ -146,10 +144,10 @@ type NemoGuardrailList struct {
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
 // Prefers pvc.Name if explicitly set by the user in the NemoGuardrail instance.
-func (n *NemoGuardrail) GetPVCName() string {
+func (n *NemoGuardrail) GetPVCName(pvc PersistentVolumeClaim) string {
 	pvcName := fmt.Sprintf("%s-pvc", n.GetName())
-	if n.Spec.ConfigStore.PVC != nil && n.Spec.ConfigStore.PVC.Name != "" {
-		pvcName = n.Spec.ConfigStore.PVC.Name
+	if pvc.Name != "" {
+		pvcName = pvc.Name
 	}
 	return pvcName
 }
@@ -763,39 +761,6 @@ func (n *NemoGuardrail) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 	}
 	params.SMSpec = smSpec
 	return params
-}
-
-// GetPVCParams returns parameters to render a PersistentVolumeClaim from templates.
-func (n *NemoGuardrail) GetPVCParams() *rendertypes.PVCParams {
-	params := &rendertypes.PVCParams{}
-
-	if n.Spec.ConfigStore.PVC == nil {
-		return nil
-	}
-
-	// Set metadata
-	params.Enabled = ptr.Deref(n.Spec.ConfigStore.PVC.Create, false)
-	params.Name = n.GetPVCName()
-	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetPVCAnnotations()
-
-	// PVC-specific config
-	params.AccessMode = n.Spec.ConfigStore.PVC.VolumeAccessMode
-	params.Storage = n.Spec.ConfigStore.PVC.Size
-	params.StorageClassName = n.Spec.ConfigStore.PVC.StorageClass
-
-	return params
-}
-
-func (n *NemoGuardrail) GetPVCAnnotations() map[string]string {
-	// Get global service annotations
-	pvcAnnotations := n.GetNemoGuardrailAnnotations()
-
-	if n.Spec.ConfigStore.PVC.Annotations != nil {
-		return utils.MergeMaps(pvcAnnotations, n.Spec.ConfigStore.PVC.Annotations)
-	}
-	return pvcAnnotations
 }
 
 func (n *NemoGuardrail) GetIngressAnnotations() map[string]string {

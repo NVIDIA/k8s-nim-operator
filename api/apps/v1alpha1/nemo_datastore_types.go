@@ -87,8 +87,6 @@ type NemoDatastoreSpec struct {
 	// Secrets contains the pre-requisite secrets that must be created before deploying the datastore CR
 	Secrets Secrets `json:"secrets"`
 	// PVC defines the PersistentVolumeClaim for the datastore
-	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.size) && self.size != '')", message=".spec.pvc.size is required for pvc creation"
-	// +kubebuilder:validation:XValidation:rule="!self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != '')", message=".spec.pvc.volumeAccessMode  is required for pvc creation"
 	PVC *PersistentVolumeClaim `json:"pvc,omitempty"`
 }
 
@@ -1068,35 +1066,6 @@ func (n *NemoDatastore) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 	}
 	params.SMSpec = smSpec
 	return params
-}
-
-// GetPVCParams returns parameters to render a PersistentVolumeClaim from templates.
-func (n *NemoDatastore) GetPVCParams() *rendertypes.PVCParams {
-	params := &rendertypes.PVCParams{}
-
-	// Set metadata
-	params.Enabled = ptr.Deref(n.Spec.PVC.Create, false)
-	params.Name = n.GetPVCName()
-	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetPVCAnnotations()
-
-	// PVC-specific config
-	params.AccessMode = n.Spec.PVC.VolumeAccessMode
-	params.Storage = n.Spec.PVC.Size
-	params.StorageClassName = n.Spec.PVC.StorageClass
-
-	return params
-}
-
-func (n *NemoDatastore) GetPVCAnnotations() map[string]string {
-	// Get global service annotations
-	pvcAnnotations := n.GetNemoDatastoreAnnotations()
-
-	if n.Spec.PVC.Annotations != nil {
-		return utils.MergeMaps(pvcAnnotations, n.Spec.PVC.Annotations)
-	}
-	return pvcAnnotations
 }
 
 func (n *NemoDatastore) GetIngressAnnotations() map[string]string {

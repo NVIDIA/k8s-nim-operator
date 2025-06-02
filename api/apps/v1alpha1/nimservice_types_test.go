@@ -27,14 +27,14 @@ import (
 func TestGetVolumes(t *testing.T) {
 	tests := []struct {
 		name       string
-		modelPVC   string
+		modelPVC   PersistentVolumeClaim
 		desired    []corev1.Volume
 		nimService *NIMService
 	}{
 		{
 			name:       "Storage read only is nil",
 			nimService: &NIMService{Spec: NIMServiceSpec{Storage: NIMServiceStorage{}}},
-			modelPVC:   "test-pvc",
+			modelPVC:   PersistentVolumeClaim{Name: "test-pvc"},
 			desired: []corev1.Volume{
 				{
 					Name: "dshm",
@@ -58,7 +58,7 @@ func TestGetVolumes(t *testing.T) {
 		{
 			name:       "Storage read only is false",
 			nimService: &NIMService{Spec: NIMServiceSpec{Storage: NIMServiceStorage{ReadOnly: &[]bool{false}[0]}}},
-			modelPVC:   "test-pvc",
+			modelPVC:   PersistentVolumeClaim{Name: "test-pvc"},
 			desired: []corev1.Volume{
 				{
 					Name: "dshm",
@@ -82,7 +82,7 @@ func TestGetVolumes(t *testing.T) {
 		{
 			name:       "Storage read only is true",
 			nimService: &NIMService{Spec: NIMServiceSpec{Storage: NIMServiceStorage{ReadOnly: &[]bool{true}[0]}}},
-			modelPVC:   "test-pvc",
+			modelPVC:   PersistentVolumeClaim{Name: "test-pvc"},
 			desired: []corev1.Volume{
 				{
 					Name: "dshm",
