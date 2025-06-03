@@ -299,6 +299,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		if len(initContainers) > 0 {
 			result.Spec.Template.Spec.InitContainers = initContainers
 		}
+		// Update Container resources with DRA resource claims.
+		shared.UpdateContainerResourceClaims(result.Spec.Template.Spec.Containers, nimService.Spec.ResourceClaims)
 		return result, err
 
 	}, "deployment", conditions.ReasonDeploymentFailed)
@@ -707,6 +709,12 @@ func (r *NIMServiceReconciler) getTensorParallelismByProfile(ctx context.Context
 // If the TP value is not present, the function defaults to allocating 1 GPU.
 func (r *NIMServiceReconciler) assignGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile, deploymentParams *rendertypes.DeploymentParams) error {
 	logger := log.FromContext(ctx)
+
+	// TODO: Refine this to detect GPU claims and only assign GPU resources if no GPU claims are present.
+	if len(nimService.GetResourceClaims()) > 0 {
+		logger.Info("Resource claims found, skipping GPU resource assignment", "resourceClaims", nimService.GetResourceClaims())
+		return nil
+	}
 
 	// TODO: Make the resource name configurable
 	const gpuResourceName = corev1.ResourceName("nvidia.com/gpu")

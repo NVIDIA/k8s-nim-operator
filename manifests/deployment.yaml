@@ -103,9 +103,9 @@ spec:
           {{ . | yaml | nindent 10 }}
         {{- end }}
         {{- if .PodResourceClaims }}
-        resourceClaims:
-          {{- .PodResourceClaims | yaml | nindent 10 }}
-        {{- end }}
+      resourceClaims:
+        {{- .PodResourceClaims | yaml | nindent 10 }}
+      {{- end }}
       volumes:
       {{- range .Volumes }}
       - name: {{ .Name }}
