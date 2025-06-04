@@ -34,6 +34,7 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
+	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	securityv1 "github.com/openshift/api/security/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -76,6 +77,7 @@ type Renderer interface {
 	ServiceMonitor(params *types.ServiceMonitorParams) (*monitoringv1.ServiceMonitor, error)
 	ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error)
 	Secret(params *types.SecretParams) (*corev1.Secret, error)
+	InferenceService(params *types.InferenceServiceParams) (*kservev1beta1.InferenceService, error)
 }
 
 // TemplateData is used by the templating engine to render templates.
@@ -424,4 +426,23 @@ func (r *textTemplateRenderer) Secret(params *types.SecretParams) (*corev1.Secre
 		return nil, fmt.Errorf("error converting unstructured object to Secret: %w", err)
 	}
 	return secret, nil
+}
+
+// InferenceService renders a InferenceService spec with given templating data.
+func (r *textTemplateRenderer) InferenceService(params *types.InferenceServiceParams) (*kservev1beta1.InferenceService, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "inferenceservice.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(objs) == 0 {
+		return nil, nil
+	}
+
+	inferenceService := &kservev1beta1.InferenceService{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, inferenceService)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to InferenceService: %w", err)
+	}
+	return inferenceService, nil
 }

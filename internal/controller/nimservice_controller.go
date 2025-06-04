@@ -22,6 +22,7 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -106,6 +107,7 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 // +kubebuilder:rbac:groups=leaderworkerset.x-k8s.io,resources=leaderworkersets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list
+// +kubebuilder:rbac:groups=serving.kserve.io,resources=inferenceservices,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -302,6 +304,14 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	if lwsCRDExists {
 		nimServiceBuilder = nimServiceBuilder.Owns(&lwsv1.LeaderWorkerSet{})
+	}
+
+	isvcCRDExists, err := k8sutil.CRDExists(r.discoveryClient, kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"))
+	if err != nil {
+		return err
+	}
+	if isvcCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Owns(&kservev1beta1.InferenceService{})
 	}
 
 	return nimServiceBuilder.Complete(r)
