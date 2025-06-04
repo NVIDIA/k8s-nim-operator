@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"strings"
 
-	yaml "gopkg.in/yaml.v2"
+	yaml "sigs.k8s.io/yaml"
 
 	nimparser "github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
 	nimparserv1 "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/v1"
