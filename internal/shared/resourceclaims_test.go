@@ -5,14 +5,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
 func TestUpdateContainerResourceClaims(t *testing.T) {
 	tests := []struct {
-		name           string
-		containers     []corev1.Container
-		resourceClaims []corev1.PodResourceClaim
-		expected       []corev1.Container
+		name         string
+		containers   []corev1.Container
+		draResources []appsv1alpha1.DRAResource
+		expected     []corev1.Container
 	}{
 		{
 			name: "add new resource claim to empty containers",
@@ -24,7 +26,7 @@ func TestUpdateContainerResourceClaims(t *testing.T) {
 					},
 				},
 			},
-			resourceClaims: []corev1.PodResourceClaim{
+			draResources: []appsv1alpha1.DRAResource{
 				{
 					Name: "claim1",
 				},
@@ -56,7 +58,7 @@ func TestUpdateContainerResourceClaims(t *testing.T) {
 					},
 				},
 			},
-			resourceClaims: []corev1.PodResourceClaim{
+			draResources: []appsv1alpha1.DRAResource{
 				{
 					Name: "new-claim",
 				},
@@ -91,7 +93,7 @@ func TestUpdateContainerResourceClaims(t *testing.T) {
 					},
 				},
 			},
-			resourceClaims: []corev1.PodResourceClaim{
+			draResources: []appsv1alpha1.DRAResource{
 				{
 					Name: "existing-claim",
 				},
@@ -125,7 +127,7 @@ func TestUpdateContainerResourceClaims(t *testing.T) {
 					},
 				},
 			},
-			resourceClaims: []corev1.PodResourceClaim{
+			draResources: []appsv1alpha1.DRAResource{
 				{
 					Name: "claim1",
 				},
@@ -186,7 +188,7 @@ func TestUpdateContainerResourceClaims(t *testing.T) {
 					},
 				},
 			},
-			resourceClaims: []corev1.PodResourceClaim{
+			draResources: []appsv1alpha1.DRAResource{
 				{
 					Name: "claim1",
 				},
@@ -217,6 +219,43 @@ func TestUpdateContainerResourceClaims(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "add resource claims with requests",
+			containers: []corev1.Container{
+				{
+					Name: "container1",
+					Resources: corev1.ResourceRequirements{
+						Claims: []corev1.ResourceClaim{},
+					},
+				},
+			},
+			draResources: []appsv1alpha1.DRAResource{
+				{
+					Name: "claim1",
+					Requests: []string{
+						"request1",
+						"request2",
+					},
+				},
+			},
+			expected: []corev1.Container{
+				{
+					Name: "container1",
+					Resources: corev1.ResourceRequirements{
+						Claims: []corev1.ResourceClaim{
+							{
+								Name:    "claim1",
+								Request: "request1",
+							},
+							{
+								Name:    "claim1",
+								Request: "request2",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -225,7 +264,7 @@ func TestUpdateContainerResourceClaims(t *testing.T) {
 			containers := make([]corev1.Container, len(tt.containers))
 			copy(containers, tt.containers)
 
-			UpdateContainerResourceClaims(containers, tt.resourceClaims)
+			UpdateContainerResourceClaims(containers, tt.draResources)
 
 			// Compare the results
 			assert.Equal(t, tt.expected, containers)
