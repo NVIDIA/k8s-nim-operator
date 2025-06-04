@@ -18,9 +18,11 @@ package shared
 
 import (
 	corev1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
-func UpdateContainerResourceClaims(containers []corev1.Container, resourceClaims []corev1.PodResourceClaim) {
+func UpdateContainerResourceClaims(containers []corev1.Container, resourceClaims []appsv1alpha1.DRAResource) {
 	for _, rc := range resourceClaims {
 		var found bool
 		// Check if the resource claim is already referenced by a container.
@@ -36,9 +38,19 @@ func UpdateContainerResourceClaims(containers []corev1.Container, resourceClaims
 		// Add unreferenced resource claims to containers to prevent container-runtime from overprovisioning.
 		if !found {
 			for idx := range containers {
-				containers[idx].Resources.Claims = append(containers[idx].Resources.Claims, corev1.ResourceClaim{
-					Name: rc.Name,
-				})
+				if len(rc.Requests) == 0 {
+					containers[idx].Resources.Claims = append(containers[idx].Resources.Claims, corev1.ResourceClaim{
+						Name: rc.Name,
+					})
+					continue
+				}
+
+				for _, request := range rc.Requests {
+					containers[idx].Resources.Claims = append(containers[idx].Resources.Claims, corev1.ResourceClaim{
+						Name:    rc.Name,
+						Request: request,
+					})
+				}
 			}
 		}
 	}
