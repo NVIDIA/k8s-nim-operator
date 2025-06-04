@@ -71,6 +71,8 @@ const (
 	ReasonNIMCacheNotReady = "NIMCacheNotReady"
 	// ReasonDRAResourcesUnsupported indicates that the DRA resources are not supported on this cluster version.
 	ReasonDRAResourcesUnsupported = "DRAResourcesUnsupported"
+	// ReasonInferenceServiceFailed indicates that the creation of inferenceservice has failed.
+	ReasonInferenceServiceFailed = "InferenceServiceFailed"
 )
 
 // Updater is the condition updater.

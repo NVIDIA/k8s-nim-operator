@@ -605,15 +605,16 @@ func (r *NIMServiceReconciler) updateResourceClaimStatus(ctx context.Context, ni
 func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEndpoint string) (string, error) {
 	logger := log.FromContext(ctx)
 
+	httpScheme := "http"
 	// List nimservice /v1/models endpoint.
-	modelsList, err := nimmodels.ListModelsV1(ctx, nimServiceEndpoint)
+	modelsList, err := nimmodels.ListModelsV1(ctx, nimServiceEndpoint, httpScheme)
 	if err != nil {
 		logger.Error(err, "Failed to list models", "endpoint", nimServiceEndpoint)
 		// Check if err is an HTTP error with a status code
 		if nimmodels.IsNotFound(err) {
 			// The endpoint does not exist
 			logger.V(2).Error(err, "URI does not exist", "uri", nimmodels.ModelsV1URI, "endpoint", nimServiceEndpoint)
-			metadata, err := nimmodels.GetMetadataV1(ctx, nimServiceEndpoint)
+			metadata, err := nimmodels.GetMetadataV1(ctx, nimServiceEndpoint, httpScheme)
 			if err != nil {
 				logger.Error(err, "Failed to get metadata", "endpoint", nimServiceEndpoint)
 				if nimmodels.IsNotFound(err) {

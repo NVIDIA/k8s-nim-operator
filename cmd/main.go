@@ -21,7 +21,9 @@ import (
 	"flag"
 	"os"
 
+	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	monitoring "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
@@ -58,6 +60,7 @@ func init() {
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(monitoring.AddToScheme(scheme))
 	utilruntime.Must(lws.AddToScheme(scheme))
+	utilruntime.Must(kservev1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

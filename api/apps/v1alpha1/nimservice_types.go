@@ -26,6 +26,7 @@ import (
 	"maps"
 	"os"
 
+	kserveconstants "github.com/kserve/kserve/pkg/constants"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -1439,6 +1440,281 @@ func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
 // GetProxySpec returns the proxy spec for the NIMService deployment.
 func (n *NIMService) GetProxySpec() *ProxySpec {
 	return n.Spec.Proxy
+}
+
+// GetInferenceServiceParams returns params to render InferenceService from templates.
+func (n *NIMService) GetInferenceServiceParams(
+	deploymentMode kserveconstants.DeploymentModeType) *rendertypes.InferenceServiceParams {
+
+	params := &rendertypes.InferenceServiceParams{}
+
+	// Set metadata
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetNIMServiceAnnotations()
+	params.PodAnnotations = n.GetNIMServiceAnnotations()
+	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
+
+	// Set template spec
+	if !n.IsAutoScalingEnabled() || deploymentMode != kserveconstants.RawDeployment {
+		params.MinReplicas = ptr.To[int32](int32(n.GetReplicas()))
+	} else {
+		params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
+
+		minReplicas, maxReplicas, metric, metricType, target := n.GetInferenceServiceHPAParams()
+		if minReplicas != nil {
+			params.MinReplicas = minReplicas
+		}
+		if maxReplicas > 0 {
+			params.MaxReplicas = ptr.To[int32](maxReplicas)
+		}
+		if metric != "" {
+			params.ScaleMetric = metric
+		}
+		if metricType != "" {
+			params.ScaleMetricType = metricType
+		}
+		if target > 0 {
+			params.ScaleTarget = ptr.To(target)
+		}
+	}
+
+	params.NodeSelector = n.GetNodeSelector()
+	params.Tolerations = n.GetTolerations()
+	params.Affinity = n.GetPodAffinity()
+	params.ImagePullSecrets = n.GetImagePullSecrets()
+	params.ImagePullPolicy = n.GetImagePullPolicy()
+
+	// Set labels and selectors
+	params.SelectorLabels = n.GetSelectorLabels()
+
+	// Set container spec
+	params.ContainerName = n.GetContainerName()
+	params.Env = n.GetEnv()
+	params.Args = n.GetArgs()
+	params.Command = n.GetCommand()
+	params.Resources = n.GetResources()
+	params.Image = n.GetImage()
+
+	// Set container probes
+	if IsProbeEnabled(n.Spec.LivenessProbe) {
+		params.LivenessProbe = n.GetInferenceServiceLivenessProbe(deploymentMode)
+	}
+	if IsProbeEnabled(n.Spec.ReadinessProbe) {
+		params.ReadinessProbe = n.GetInferenceServiceReadinessProbe(deploymentMode)
+	}
+	if IsProbeEnabled(n.Spec.StartupProbe) {
+		params.StartupProbe = n.GetInferenceServiceStartupProbe(deploymentMode)
+	}
+
+	params.UserID = n.GetUserID()
+	params.GroupID = n.GetGroupID()
+
+	// Set service account
+	params.ServiceAccountName = n.GetServiceAccountName()
+
+	// Set runtime class
+	params.RuntimeClassName = n.GetRuntimeClassName()
+
+	// Set scheduler
+	params.SchedulerName = n.GetSchedulerName()
+
+	params.Ports = n.GetInferenceServicePorts(deploymentMode)
+
+	return params
+}
+
+// GetInferenceServiceLivenessProbe returns liveness probe for the NIMService container.
+func (n *NIMService) GetInferenceServiceLivenessProbe(modeType kserveconstants.DeploymentModeType) *corev1.Probe {
+	if modeType == kserveconstants.RawDeployment {
+		if n.Spec.LivenessProbe.Probe == nil {
+			return n.GetDefaultLivenessProbe()
+		}
+	} else {
+		if n.Spec.LivenessProbe.Probe == nil {
+			probe := &corev1.Probe{
+				InitialDelaySeconds: 15,
+				TimeoutSeconds:      1,
+				PeriodSeconds:       10,
+				SuccessThreshold:    1,
+				FailureThreshold:    3,
+			}
+			if n.Spec.Expose.Service.GRPCPort != nil {
+				probe.ProbeHandler = corev1.ProbeHandler{
+					GRPC: &corev1.GRPCAction{
+						Port: *n.Spec.Expose.Service.GRPCPort,
+					},
+				}
+			} else {
+				probe.ProbeHandler = corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/v1/health/live",
+						Port: intstr.FromInt32(*n.Spec.Expose.Service.Port),
+					},
+				}
+			}
+			return probe
+		}
+	}
+
+	return n.Spec.LivenessProbe.Probe
+}
+
+// GetInferenceServiceReadinessProbe returns readiness probe for the NIMService container.
+func (n *NIMService) GetInferenceServiceReadinessProbe(modeType kserveconstants.DeploymentModeType) *corev1.Probe {
+	if modeType == kserveconstants.RawDeployment {
+		if n.Spec.ReadinessProbe.Probe == nil {
+			return n.GetDefaultReadinessProbe()
+		}
+	} else {
+		if n.Spec.ReadinessProbe.Probe == nil {
+			probe := &corev1.Probe{
+				InitialDelaySeconds: 15,
+				TimeoutSeconds:      1,
+				PeriodSeconds:       10,
+				SuccessThreshold:    1,
+				FailureThreshold:    3,
+			}
+			if n.Spec.Expose.Service.GRPCPort != nil {
+				probe.ProbeHandler = corev1.ProbeHandler{
+					GRPC: &corev1.GRPCAction{
+						Port: *n.Spec.Expose.Service.GRPCPort,
+					},
+				}
+			} else {
+				probe.ProbeHandler = corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/v1/health/ready",
+						Port: intstr.FromInt32(*n.Spec.Expose.Service.Port),
+					},
+				}
+			}
+			return probe
+		}
+	}
+
+	return n.Spec.ReadinessProbe.Probe
+}
+
+// GetInferenceServiceStartupProbe returns startup probe for the NIMService container.
+func (n *NIMService) GetInferenceServiceStartupProbe(modeType kserveconstants.DeploymentModeType) *corev1.Probe {
+	if modeType == kserveconstants.RawDeployment {
+		if n.Spec.StartupProbe.Probe == nil {
+			return n.GetDefaultStartupProbe()
+		}
+	} else {
+		if n.Spec.StartupProbe.Probe == nil {
+			probe := &corev1.Probe{
+				InitialDelaySeconds: 30,
+				TimeoutSeconds:      1,
+				PeriodSeconds:       10,
+				SuccessThreshold:    1,
+				FailureThreshold:    30,
+			}
+			if n.Spec.Expose.Service.GRPCPort != nil {
+				probe.ProbeHandler = corev1.ProbeHandler{
+					GRPC: &corev1.GRPCAction{
+						Port: *n.Spec.Expose.Service.GRPCPort,
+					},
+				}
+			} else {
+				probe.ProbeHandler = corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/v1/health/ready",
+						Port: intstr.FromInt32(*n.Spec.Expose.Service.Port),
+					},
+				}
+			}
+			return probe
+		}
+	}
+
+	return n.Spec.StartupProbe.Probe
+}
+
+// GetInferenceServicePorts returns ports for the NIMService container.
+func (n *NIMService) GetInferenceServicePorts(modeType kserveconstants.DeploymentModeType) []corev1.ContainerPort {
+	ports := []corev1.ContainerPort{}
+
+	// Setup container ports for nimservice
+	if modeType == kserveconstants.RawDeployment {
+		ports = append(ports, corev1.ContainerPort{
+			Name:          DefaultNamedPortAPI,
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: *n.Spec.Expose.Service.Port,
+		})
+		if n.Spec.Expose.Service.GRPCPort != nil {
+			ports = append(ports, corev1.ContainerPort{
+				Name:          DefaultNamedPortGRPC,
+				Protocol:      corev1.ProtocolTCP,
+				ContainerPort: *n.Spec.Expose.Service.GRPCPort,
+			})
+		}
+		if n.Spec.Expose.Service.MetricsPort != nil {
+			ports = append(ports, corev1.ContainerPort{
+				Name:          DefaultNamedPortMetrics,
+				Protocol:      corev1.ProtocolTCP,
+				ContainerPort: *n.Spec.Expose.Service.MetricsPort,
+			})
+		}
+	} else {
+		ports = append(ports, corev1.ContainerPort{
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: *n.Spec.Expose.Service.Port,
+		})
+		if n.Spec.Expose.Service.GRPCPort != nil {
+			ports = append(ports, corev1.ContainerPort{
+				Protocol:      corev1.ProtocolTCP,
+				ContainerPort: *n.Spec.Expose.Service.GRPCPort,
+			})
+		}
+	}
+
+	return ports
+}
+
+// GetInferenceServiceHPAParams returns the HPA spec for the NIMService deployment.
+func (n *NIMService) GetInferenceServiceHPAParams() (*int32, int32, string, string, int32) {
+	hpa := n.GetHPA()
+
+	var minReplicas *int32
+	var maxReplicas int32
+	var metric string
+	var metricType string
+	var target int32
+
+	if hpa.MinReplicas != nil {
+		minReplicas = hpa.MinReplicas
+	}
+	maxReplicas = hpa.MaxReplicas
+
+	for _, m := range hpa.Metrics {
+		if m.Type == autoscalingv2.ResourceMetricSourceType && m.Resource != nil {
+			if m.Resource.Name == corev1.ResourceCPU || m.Resource.Name == corev1.ResourceMemory {
+				metric = string(m.Resource.Name)
+				metricType = string(m.Resource.Target.Type)
+
+				switch m.Resource.Target.Type {
+				case autoscalingv2.UtilizationMetricType:
+					if m.Resource.Target.AverageUtilization != nil {
+						target = *m.Resource.Target.AverageUtilization
+					}
+				case autoscalingv2.ValueMetricType:
+					if m.Resource.Target.Value != nil {
+						target = int32((*m.Resource.Target.Value).Value())
+					}
+				case autoscalingv2.AverageValueMetricType:
+					if m.Resource.Target.AverageValue != nil {
+						target = int32((*m.Resource.Target.AverageValue).Value())
+					}
+				}
+				break
+			}
+		}
+	}
+
+	return minReplicas, maxReplicas, metric, metricType, target
 }
 
 func init() {

@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strings"
 
+	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -346,6 +347,8 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding)) //nolint:forcetypeassert
 	case *lwsv1.LeaderWorkerSet:
 		return updateLeaderWorkerSet(castedObj, desired.(*lwsv1.LeaderWorkerSet)) //nolint:forcetypeassert
+	case *kservev1beta1.InferenceService:
+		return updateInferenceService(castedObj, desired.(*kservev1beta1.InferenceService)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
@@ -443,6 +446,13 @@ func updateRoleBinding(obj, desired *rbacv1.RoleBinding) *rbacv1.RoleBinding {
 	obj.SetLabels(desired.GetLabels())
 	obj.Subjects = desired.Subjects
 	obj.RoleRef = desired.RoleRef
+	return obj
+}
+
+func updateInferenceService(obj, desired *kservev1beta1.InferenceService) *kservev1beta1.InferenceService {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
 	return obj
 }
 
