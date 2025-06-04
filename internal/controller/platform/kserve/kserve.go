@@ -19,60 +19,26 @@ package kserve
 import (
 	"context"
 
-	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
 
 // KServe implements the Platform interface for KServe.
 type KServe struct{}
 
-// Define reconcilers for KServe platform
-
-// NIMCacheReconciler represents the NIMCache reconciler instance for KServe platform.
-type NIMCacheReconciler struct {
-	shared.Reconciler
-	client.Client
-	scheme *runtime.Scheme
-	log    logr.Logger
-}
-
-// NIMServiceReconciler represents the NIMService reconciler instance for KServe platform.
-type NIMServiceReconciler struct {
-	client.Client
-	scheme *runtime.Scheme
-	log    logr.Logger
-}
-
-// NewNIMCacheReconciler returns NIMCacheReconciler for KServe platform.
-func NewNIMCacheReconciler(r shared.Reconciler) *NIMCacheReconciler {
-	return &NIMCacheReconciler{
-		Client: r.GetClient(),
-		scheme: r.GetScheme(),
-		log:    r.GetLogger(),
-	}
-}
-
-// NewNIMServiceReconciler returns NIMServiceReconciler for KServe platform.
-func NewNIMServiceReconciler(r shared.Reconciler) *NIMServiceReconciler {
-	return &NIMServiceReconciler{
-		Client: r.GetClient(),
-		scheme: r.GetScheme(),
-		log:    r.GetLogger(),
-	}
-}
-
 // Delete handles cleanup of resources created for NIM caching.
 func (k *KServe) Delete(ctx context.Context, r shared.Reconciler, resource client.Object) error {
 	logger := r.GetLogger()
 
-	if nimService, ok := resource.(*appsv1alpha1.NIMService); ok {
-		reconciler := NewNIMServiceReconciler(r)
+	nimService, ok := resource.(*appsv1alpha1.NIMService)
+	if ok {
+		reconciler := NewNIMServiceReconciler(ctx, r)
 		err := reconciler.cleanupNIMService(ctx, nimService)
 		if err != nil {
 			logger.Error(err, "failed to cleanup nimservice resources", "name", nimService.Name)
@@ -81,11 +47,35 @@ func (k *KServe) Delete(ctx context.Context, r shared.Reconciler, resource clien
 		return nil
 	}
 	return errors.NewBadRequest("invalid resource type")
-
 }
 
 // Sync handles reconciliation of Kserve resources.
-func (k *KServe) Sync(ctx context.Context, r shared.Reconciler, resource client.Object) (ctrl.Result, error) {
-	// TODO: add reconciliation logic specific to Kserve modelcache
-	return ctrl.Result{}, nil
+func (s *KServe) Sync(ctx context.Context, r shared.Reconciler, resource client.Object) (ctrl.Result, error) {
+	logger := r.GetLogger()
+
+	nimService, ok := resource.(*appsv1alpha1.NIMService)
+	if ok {
+		reconciler := NewNIMServiceReconciler(ctx, r)
+
+		logger.Info("Reconciling NIMService instance", "nimservice", nimService.GetName())
+		result, err := reconciler.reconcileNIMService(ctx, nimService)
+
+		if err != nil {
+			if errors.IsConflict(err) {
+				// Ignore conflict errors and retry.
+				return ctrl.Result{Requeue: true}, nil
+			}
+
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, "ReconcileFailed",
+				"NIMService %s failed, msg: %s", nimService.Name, err.Error())
+
+			errConditionUpdate := reconciler.updater.SetConditionsFailed(ctx, nimService, conditions.Failed, err.Error())
+			if errConditionUpdate != nil {
+				logger.Error(err, "Unable to update status")
+				return result, errConditionUpdate
+			}
+		}
+		return result, err
+	}
+	return ctrl.Result{}, errors.NewBadRequest("invalid resource type")
 }
