@@ -64,13 +64,18 @@ type NIMServiceSpec struct {
 	// The name of an existing pull secret containing the NGC_API_KEY
 	AuthSecret string `json:"authSecret"`
 	// Storage is the target storage for caching NIM model if NIMCache is not provided
-	Storage        NIMServiceStorage            `json:"storage,omitempty"`
-	Labels         map[string]string            `json:"labels,omitempty"`
-	Annotations    map[string]string            `json:"annotations,omitempty"`
-	NodeSelector   map[string]string            `json:"nodeSelector,omitempty"`
-	Tolerations    []corev1.Toleration          `json:"tolerations,omitempty"`
-	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
+	Storage      NIMServiceStorage   `json:"storage,omitempty"`
+	Labels       map[string]string   `json:"labels,omitempty"`
+	Annotations  map[string]string   `json:"annotations,omitempty"`
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+	PodAffinity  *corev1.PodAffinity `json:"podAffinity,omitempty"`
+	// Resources is the resource requirements for the NIMService deployment.
+	//
+	// Note: Only traditional resources like cpu/memory and custom device plugin resources are supported here.
+	// Any DRA claim references are ignored. Use DRAResources instead for those.
 	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
+	DRAResources   []DRAResource                `json:"draResources,omitempty"`
 	Expose         Expose                       `json:"expose,omitempty"`
 	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
 	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
@@ -364,7 +369,14 @@ func (n *NIMService) GetImagePullPolicy() string {
 
 // GetResources returns resources to allocate to the NIMService container.
 func (n *NIMService) GetResources() *corev1.ResourceRequirements {
-	return n.Spec.Resources
+	if n.Spec.Resources == nil {
+		return nil
+	}
+
+	return &corev1.ResourceRequirements{
+		Requests: n.Spec.Resources.Requests,
+		Limits:   n.Spec.Resources.Limits,
+	}
 }
 
 // IsProbeEnabled returns true if a given liveness/readiness/startup probe is enabled.
@@ -719,6 +731,8 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 			ContainerPort: *n.Spec.Expose.Service.MetricsPort,
 		})
 	}
+
+	params.PodResourceClaims = n.GetPodResourceClaims()
 	return params
 }
 
@@ -992,6 +1006,18 @@ func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
 // GetProxySpec returns the proxy spec for the NIMService deployment.
 func (n *NIMService) GetProxySpec() *ProxySpec {
 	return n.Spec.Proxy
+}
+
+func (n *NIMService) GetPodResourceClaims() []corev1.PodResourceClaim {
+	claims := make([]corev1.PodResourceClaim, len(n.Spec.DRAResources))
+	for idx, resource := range n.Spec.DRAResources {
+		claims[idx] = corev1.PodResourceClaim{
+			Name:                      resource.Name,
+			ResourceClaimName:         resource.ResourceClaimName,
+			ResourceClaimTemplateName: resource.ResourceClaimTemplateName,
+		}
+	}
+	return claims
 }
 
 func init() {
