@@ -559,6 +559,91 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(deployment.Spec.Template.Spec.Tolerations).To(Equal(nimService.Spec.Tolerations))
 		})
 
+		Describe("spec reconciliation with DRAResources", func() {
+			It("should request resource claims", func() {
+				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
+					{
+						ResourceClaimName: ptr.To("test-resource-claim"),
+					},
+				}
+				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+				err := client.Create(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+				deployment := &appsv1.Deployment{}
+				err = client.Get(context.TODO(), nimServiceKey, deployment)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Pod spec validations.
+				podSpec := deployment.Spec.Template.Spec
+				Expect(podSpec.ResourceClaims).To(HaveLen(1))
+				Expect(podSpec.ResourceClaims[0].ResourceClaimName).To(Equal(ptr.To("test-resource-claim")))
+
+				// Container spec validations.
+				Expect(podSpec.Containers[0].Resources.Claims).To(HaveLen(1))
+				Expect(podSpec.Containers[0].Resources.Claims[0].Name).To(Equal(podSpec.ResourceClaims[0].Name))
+			})
+
+			It("should request resource claims templates", func() {
+				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
+					{
+						ResourceClaimTemplateName: ptr.To("test-resource-claim-template"),
+					},
+				}
+				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+				err := client.Create(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+				deployment := &appsv1.Deployment{}
+				err = client.Get(context.TODO(), nimServiceKey, deployment)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Pod spec validations.
+				podSpec := deployment.Spec.Template.Spec
+				Expect(podSpec.ResourceClaims).To(HaveLen(1))
+				Expect(podSpec.ResourceClaims[0].ResourceClaimTemplateName).To(Equal(ptr.To("test-resource-claim-template")))
+
+				// Container spec validations.
+				Expect(podSpec.Containers[0].Resources.Claims).To(HaveLen(1))
+				Expect(podSpec.Containers[0].Resources.Claims[0].Name).To(Equal(podSpec.ResourceClaims[0].Name))
+			})
+
+			It("should only contain the requests from the resource claims", func() {
+				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
+					{
+						ResourceClaimName: ptr.To("test-resource-claim"),
+						Requests:          []string{"test-request-1", "test-request-2"},
+					},
+				}
+				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+				err := client.Create(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				deployment := &appsv1.Deployment{}
+				err = client.Get(context.TODO(), nimServiceKey, deployment)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Pod spec validations.
+				podSpec := deployment.Spec.Template.Spec
+				Expect(podSpec.ResourceClaims).To(HaveLen(1))
+				Expect(podSpec.ResourceClaims[0].ResourceClaimName).To(Equal(ptr.To("test-resource-claim")))
+
+				// Container spec validations.
+				Expect(podSpec.Containers[0].Resources.Claims).To(HaveLen(2))
+				Expect(podSpec.Containers[0].Resources.Claims[0].Name).To(Equal(podSpec.ResourceClaims[0].Name))
+				Expect(podSpec.Containers[0].Resources.Claims[0].Request).To(Equal("test-request-1"))
+				Expect(podSpec.Containers[0].Resources.Claims[1].Name).To(Equal(podSpec.ResourceClaims[0].Name))
+				Expect(podSpec.Containers[0].Resources.Claims[1].Request).To(Equal("test-request-2"))
+			})
+		})
+
 		It("should delete Deployment when the NIMService is deleted", func() {
 			nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
 			err := client.Create(context.TODO(), nimService)
