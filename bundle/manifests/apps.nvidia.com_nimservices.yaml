@@ -63,19 +63,16 @@ spec:
                   type: string
                 type: array
               draResources:
+                description: DRAResources is the list of DRA resource claims to be
+                  used for the NIMService deployment.
                 items:
                   description: |-
                     DRAResource references exactly one ResourceClaim, either directly
                     or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim.
 
-                    It adds a name to it that uniquely identifies the ResourceClaim.
-                    NIMService containers that need access to the ResourceClaim will automatically reference it with this name.
+                    When creating the NIMService pods, it adds a name (`DNS_LABEL` format) to it
+                    that uniquely identifies the DRA resource.
                   properties:
-                    name:
-                      description: |-
-                        Name uniquely identifies this resource claim.
-                        This must be a DNS_LABEL.
-                      type: string
                     requests:
                       description: |-
                         Requests is the list of requests in the referenced ResourceClaim/ResourceClaimTemplate
@@ -100,18 +97,11 @@ spec:
                         object in the same namespace as the pods for this NIMService.
 
                         The template will be used to create a new ResourceClaim, which will
-                        be bound to the pods created for this NIMService. When the pod is deleted,
-                        the ResourceClaim will also be deleted. The pod name and resource name, along
-                        with a generated component, will be used to form a unique name for the
-                        ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
-
-                        Modifying this field will result in the NIMService going to Failed state.
+                        be bound to the pods created for this NIMService.
 
                         Exactly one of ResourceClaimName and ResourceClaimTemplateName must
                         be set.
                       type: string
-                  required:
-                  - name
                   type: object
                 type: array
               env:
@@ -2326,6 +2316,45 @@ spec:
                   - type
                   type: object
                 type: array
+              draResourceStatuses:
+                description: DRAResourceStatuses is the status of the DRA resources.
+                items:
+                  description: DRAResourceStatus defines the status of the DRAResource.
+                  properties:
+                    name:
+                      description: |-
+                        Name is the generated name of the DRAResource referenced in the NIMService
+                        pod template as `spec.resourceClaims[].name`.
+                      type: string
+                    resourceClaimTemplateName:
+                      description: |-
+                        ResourceClaimTemplateName is the name of the ResourceClaimTemplate that was
+                        used to generate the ResourceClaim for an instance of NIMService.
+                      type: string
+                    resourceClaims:
+                      description: |-
+                        ResourceClaims is the status of generated resource claims.
+
+                        This list is empty if ResourceClaimTemplateName is not set.
+                      items:
+                        description: DRAResourceClaimStatus defines the status of
+                          the DRAResourceClaim.
+                        properties:
+                          name:
+                            description: Name is the name of the ResourceClaim that
+                              was generated for a NIMService pod.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               model:
                 description: ModelStatus defines the configuration of the NIMService
                   model.

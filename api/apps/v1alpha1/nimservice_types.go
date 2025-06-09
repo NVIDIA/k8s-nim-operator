@@ -74,15 +74,16 @@ type NIMServiceSpec struct {
 	//
 	// Note: Only traditional resources like cpu/memory and custom device plugin resources are supported here.
 	// Any DRA claim references are ignored. Use DRAResources instead for those.
-	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
-	DRAResources   []DRAResource                `json:"draResources,omitempty"`
-	Expose         Expose                       `json:"expose,omitempty"`
-	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
-	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
-	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
-	Scale          Autoscaling                  `json:"scale,omitempty"`
-	SchedulerName  string                       `json:"schedulerName,omitempty"`
-	Metrics        Metrics                      `json:"metrics,omitempty"`
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	// DRAResources is the list of DRA resource claims to be used for the NIMService deployment.
+	DRAResources   []DRAResource `json:"draResources,omitempty"`
+	Expose         Expose        `json:"expose,omitempty"`
+	LivenessProbe  Probe         `json:"livenessProbe,omitempty"`
+	ReadinessProbe Probe         `json:"readinessProbe,omitempty"`
+	StartupProbe   Probe         `json:"startupProbe,omitempty"`
+	Scale          Autoscaling   `json:"scale,omitempty"`
+	SchedulerName  string        `json:"schedulerName,omitempty"`
+	Metrics        Metrics       `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
 	Replicas         int        `json:"replicas,omitempty"`
@@ -104,6 +105,10 @@ type NIMServiceStatus struct {
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
 	State             string             `json:"state,omitempty"`
 	Model             *ModelStatus       `json:"model,omitempty"`
+	// DRAResourceStatuses is the status of the DRA resources.
+	// +listType=map
+	// +listMapKey=name
+	DRAResourceStatuses []DRAResourceStatus `json:"draResourceStatuses,omitempty"`
 }
 
 // ModelStatus defines the configuration of the NIMService model.
@@ -111,6 +116,26 @@ type ModelStatus struct {
 	Name             string `json:"name"`
 	ClusterEndpoint  string `json:"clusterEndpoint"`
 	ExternalEndpoint string `json:"externalEndpoint"`
+}
+
+// DRAResourceStatus defines the status of the DRAResource.
+type DRAResourceStatus struct {
+	// Name is the generated name of the DRAResource referenced in the NIMService
+	// pod template as `spec.resourceClaims[].name`.
+	Name string `json:"name"`
+	// ResourceClaimTemplateName is the name of the ResourceClaimTemplate that was
+	// used to generate the ResourceClaim for an instance of NIMService.
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
+	// ResourceClaims is the status of generated resource claims.
+	//
+	// This list is empty if ResourceClaimTemplateName is not set.
+	ResourceClaims []DRAResourceClaimStatus `json:"resourceClaims,omitempty"`
+}
+
+// DRAResourceClaimStatus defines the status of the DRAResourceClaim.
+type DRAResourceClaimStatus struct {
+	// Name is the name of the ResourceClaim that was generated for a NIMService pod.
+	Name string `json:"name"`
 }
 
 // +genclient
@@ -731,8 +756,6 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 			ContainerPort: *n.Spec.Expose.Service.MetricsPort,
 		})
 	}
-
-	params.PodResourceClaims = n.GetPodResourceClaims()
 	return params
 }
 
@@ -1006,18 +1029,6 @@ func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
 // GetProxySpec returns the proxy spec for the NIMService deployment.
 func (n *NIMService) GetProxySpec() *ProxySpec {
 	return n.Spec.Proxy
-}
-
-func (n *NIMService) GetPodResourceClaims() []corev1.PodResourceClaim {
-	claims := make([]corev1.PodResourceClaim, len(n.Spec.DRAResources))
-	for idx, resource := range n.Spec.DRAResources {
-		claims[idx] = corev1.PodResourceClaim{
-			Name:                      resource.Name,
-			ResourceClaimName:         resource.ResourceClaimName,
-			ResourceClaimTemplateName: resource.ResourceClaimTemplateName,
-		}
-	}
-	return claims
 }
 
 func init() {

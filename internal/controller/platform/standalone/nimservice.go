@@ -289,6 +289,10 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		// TODO: assign GPU resources and node selector that is required for the selected profile
 	}
 
+	// Setup pod resource claims
+	draResources := shared.GenerateNamedDRAResources(nimService)
+	deploymentParams.PodResourceClaims = shared.GetPodResourceClaims(draResources)
+
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, nimService, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
 		result, err := renderer.Deployment(deploymentParams)
@@ -300,7 +304,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			result.Spec.Template.Spec.InitContainers = initContainers
 		}
 		// Update Container resources with DRA resource claims.
-		shared.UpdateContainerResourceClaims(result.Spec.Template.Spec.Containers, nimService.Spec.DRAResources)
+		shared.UpdateContainerResourceClaims(result.Spec.Template.Spec.Containers, draResources)
 		return result, err
 
 	}, "deployment", conditions.ReasonDeploymentFailed)
