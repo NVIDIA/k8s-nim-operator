@@ -283,7 +283,7 @@ var _ = Describe("DRA resourceclaim tests", func() {
 
 			name1 := generateUniquePodClaimName(nameCache, nimServiceName, resource)
 			Expect(name1).To(HavePrefix(expectedPrefix(testClaimHash, 0)))
-			Expect(name1).To(HaveSuffix("-1"))
+			Expect(name1).To(HaveSuffix("-0"))
 		})
 
 		It("should generate unique name for ResourceClaimTemplateName", func() {
@@ -293,7 +293,7 @@ var _ = Describe("DRA resourceclaim tests", func() {
 
 			name1 := generateUniquePodClaimName(nameCache, nimServiceName, resource)
 			Expect(name1).To(HavePrefix(expectedPrefix(testTemplateHash, 1)))
-			Expect(name1).To(HaveSuffix("-1"))
+			Expect(name1).To(HaveSuffix("-0"))
 		})
 
 		It("should handle different templateswith same name", func() {
@@ -309,9 +309,9 @@ var _ = Describe("DRA resourceclaim tests", func() {
 
 			Expect(name1).ToNot(Equal(name2))
 			Expect(name1).To(HavePrefix(expectedPrefix(testTemplateHash, 1)))
-			Expect(name1).To(HaveSuffix("-1"))
+			Expect(name1).To(HaveSuffix("-0"))
 			Expect(name2).To(HavePrefix(expectedPrefix(testTemplateHash, 1)))
-			Expect(name2).To(HaveSuffix("-2"))
+			Expect(name2).To(HaveSuffix("-1"))
 		})
 
 		It("should handle claims and templates with different names", func() {
@@ -327,7 +327,7 @@ var _ = Describe("DRA resourceclaim tests", func() {
 
 			Expect(name1).ToNot(Equal(name2))
 			Expect(name1).To(HavePrefix(expectedPrefix(testClaim1Hash, 0)))
-			Expect(name1).To(HaveSuffix("-1"))
+			Expect(name1).To(HaveSuffix("-0"))
 			Expect(name2).To(HavePrefix(expectedPrefix(testTemplateHash, 1)))
 			Expect(name2).To(HaveSuffix("-1"))
 		})
@@ -346,8 +346,8 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			// The names should be different due to the counter, but the prefix should be the same
 			Expect(name1).ToNot(Equal(name2))
 			Expect(name1).To(HavePrefix(expectedPrefix(testClaimHash, 0)))
-			Expect(name1).To(HaveSuffix("-1"))
-			Expect(name2).To(HavePrefix(expectedPrefix(testClaimHash, 1)))
+			Expect(name1).To(HaveSuffix("-0"))
+			Expect(name2).To(HavePrefix(expectedPrefix(testClaimHash, 0)))
 			Expect(name2).To(HaveSuffix("-1"))
 		})
 	})

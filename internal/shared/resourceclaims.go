@@ -100,7 +100,7 @@ func generateUniquePodClaimName(nameCache map[string]int, nimServiceName string,
 	if ok {
 		nameCache[uniqueName] = count + 1
 	} else {
-		nameCache[uniqueName] = 1
+		nameCache[uniqueName] = 0
 	}
 	return fmt.Sprintf("%s-%d", uniqueName, nameCache[uniqueName])
 }
