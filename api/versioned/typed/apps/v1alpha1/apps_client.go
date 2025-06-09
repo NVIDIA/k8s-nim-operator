@@ -27,6 +27,7 @@ import (
 
 type AppsV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	NIMBuildsGetter
 	NIMCachesGetter
 	NIMPipelinesGetter
 	NIMServicesGetter
@@ -40,6 +41,10 @@ type AppsV1alpha1Interface interface {
 // AppsV1alpha1Client is used to interact with features provided by the apps group.
 type AppsV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AppsV1alpha1Client) NIMBuilds(namespace string) NIMBuildInterface {
+	return newNIMBuilds(c, namespace)
 }
 
 func (c *AppsV1alpha1Client) NIMCaches(namespace string) NIMCacheInterface {
