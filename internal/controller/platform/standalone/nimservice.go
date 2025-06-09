@@ -686,24 +686,6 @@ func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimServic
 	return nil, nil
 }
 
-// getTensorParallelismByProfile returns the value of tensor parallelism parameter in the given NIM profile.
-func (r *NIMServiceReconciler) getTensorParallelismByProfile(ctx context.Context, profile *appsv1alpha1.NIMProfile) (string, error) {
-	// List of possible keys for tensor parallelism
-	possibleKeys := []string{"tensorParallelism", "tp"}
-
-	tensorParallelism := ""
-
-	// Iterate through possible keys and return the first valid value
-	for _, key := range possibleKeys {
-		if value, exists := profile.Config[key]; exists {
-			tensorParallelism = value
-			break
-		}
-	}
-
-	return tensorParallelism, nil
-}
-
 // assignGPUResources automatically assigns GPU resources to the NIMService based on the provided profile,
 // but retains any user-specified GPU resources if they are explicitly provided.
 //
@@ -737,7 +719,7 @@ func (r *NIMServiceReconciler) assignGPUResources(ctx context.Context, nimServic
 
 	// If no user-provided GPU resource is found, proceed with auto-assignment
 	// Get tensorParallelism from the profile
-	tensorParallelism, err := r.getTensorParallelismByProfile(ctx, profile)
+	tensorParallelism, err := utils.GetTensorParallelismByProfileTags(profile.Config)
 	if err != nil {
 		logger.Error(err, "Failed to retrieve tensorParallelism")
 		return err
