@@ -64,20 +64,26 @@ type NIMServiceSpec struct {
 	// The name of an existing pull secret containing the NGC_API_KEY
 	AuthSecret string `json:"authSecret"`
 	// Storage is the target storage for caching NIM model if NIMCache is not provided
-	Storage        NIMServiceStorage            `json:"storage,omitempty"`
-	Labels         map[string]string            `json:"labels,omitempty"`
-	Annotations    map[string]string            `json:"annotations,omitempty"`
-	NodeSelector   map[string]string            `json:"nodeSelector,omitempty"`
-	Tolerations    []corev1.Toleration          `json:"tolerations,omitempty"`
-	PodAffinity    *corev1.PodAffinity          `json:"podAffinity,omitempty"`
-	Resources      *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Expose         Expose                       `json:"expose,omitempty"`
-	LivenessProbe  Probe                        `json:"livenessProbe,omitempty"`
-	ReadinessProbe Probe                        `json:"readinessProbe,omitempty"`
-	StartupProbe   Probe                        `json:"startupProbe,omitempty"`
-	Scale          Autoscaling                  `json:"scale,omitempty"`
-	SchedulerName  string                       `json:"schedulerName,omitempty"`
-	Metrics        Metrics                      `json:"metrics,omitempty"`
+	Storage      NIMServiceStorage   `json:"storage,omitempty"`
+	Labels       map[string]string   `json:"labels,omitempty"`
+	Annotations  map[string]string   `json:"annotations,omitempty"`
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+	PodAffinity  *corev1.PodAffinity `json:"podAffinity,omitempty"`
+	// Resources is the resource requirements for the NIMService deployment.
+	//
+	// Note: Only traditional resources like cpu/memory and custom device plugin resources are supported here.
+	// Any DRA claim references are ignored. Use DRAResources instead for those.
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	// DRAResources is the list of DRA resource claims to be used for the NIMService deployment.
+	DRAResources   []DRAResource `json:"draResources,omitempty"`
+	Expose         Expose        `json:"expose,omitempty"`
+	LivenessProbe  Probe         `json:"livenessProbe,omitempty"`
+	ReadinessProbe Probe         `json:"readinessProbe,omitempty"`
+	StartupProbe   Probe         `json:"startupProbe,omitempty"`
+	Scale          Autoscaling   `json:"scale,omitempty"`
+	SchedulerName  string        `json:"schedulerName,omitempty"`
+	Metrics        Metrics       `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
 	Replicas         int        `json:"replicas,omitempty"`
@@ -99,6 +105,10 @@ type NIMServiceStatus struct {
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
 	State             string             `json:"state,omitempty"`
 	Model             *ModelStatus       `json:"model,omitempty"`
+	// DRAResourceStatuses is the status of the DRA resources.
+	// +listType=map
+	// +listMapKey=name
+	DRAResourceStatuses []DRAResourceStatus `json:"draResourceStatuses,omitempty"`
 }
 
 // ModelStatus defines the configuration of the NIMService model.
@@ -106,6 +116,26 @@ type ModelStatus struct {
 	Name             string `json:"name"`
 	ClusterEndpoint  string `json:"clusterEndpoint"`
 	ExternalEndpoint string `json:"externalEndpoint"`
+}
+
+// DRAResourceStatus defines the status of the DRAResource.
+type DRAResourceStatus struct {
+	// Name is the generated name of the DRAResource referenced in the NIMService
+	// pod template as `spec.resourceClaims[].name`.
+	Name string `json:"name"`
+	// ResourceClaimTemplateName is the name of the ResourceClaimTemplate that was
+	// used to generate the ResourceClaim for an instance of NIMService.
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
+	// ResourceClaims is the status of generated resource claims.
+	//
+	// This list is empty if ResourceClaimTemplateName is not set.
+	ResourceClaims []DRAResourceClaimStatus `json:"resourceClaims,omitempty"`
+}
+
+// DRAResourceClaimStatus defines the status of the DRAResourceClaim.
+type DRAResourceClaimStatus struct {
+	// Name is the name of the ResourceClaim that was generated for a NIMService pod.
+	Name string `json:"name"`
 }
 
 // +genclient
@@ -364,7 +394,14 @@ func (n *NIMService) GetImagePullPolicy() string {
 
 // GetResources returns resources to allocate to the NIMService container.
 func (n *NIMService) GetResources() *corev1.ResourceRequirements {
-	return n.Spec.Resources
+	if n.Spec.Resources == nil {
+		return nil
+	}
+
+	return &corev1.ResourceRequirements{
+		Requests: n.Spec.Resources.Requests,
+		Limits:   n.Spec.Resources.Limits,
+	}
 }
 
 // IsProbeEnabled returns true if a given liveness/readiness/startup probe is enabled.

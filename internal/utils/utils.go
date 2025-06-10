@@ -89,6 +89,14 @@ func GetStringHash(s string) string {
 	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
 }
 
+func GetTruncatedStringHash(s string, length int) string {
+	hash := GetStringHash(s)
+	if len(hash) <= length {
+		return hash
+	}
+	return hash[:length]
+}
+
 // MergeMaps merges two maps and ensures no duplicate key-value pairs.
 func MergeMaps(m1, m2 map[string]string) map[string]string {
 	merged := make(map[string]string)

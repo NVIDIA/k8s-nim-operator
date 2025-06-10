@@ -239,3 +239,34 @@ type PersistentVolumeClaim struct {
 	// Annotations for the PVC
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
+
+// DRAResource references exactly one ResourceClaim, either directly
+// or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim.
+//
+// When creating the NIMService pods, it adds a name (`DNS_LABEL` format) to it
+// that uniquely identifies the DRA resource.
+type DRAResource struct {
+	// ResourceClaimName is the name of a ResourceClaim object in the same
+	// namespace as the NIMService.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
+	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
+
+	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+	// object in the same namespace as the pods for this NIMService.
+	//
+	// The template will be used to create a new ResourceClaim, which will
+	// be bound to the pods created for this NIMService.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
+
+	// Requests is the list of requests in the referenced ResourceClaim/ResourceClaimTemplate
+	// to be made available to the model container of the NIMService pods.
+	//
+	// If empty, everything from the claim is made available, otherwise
+	// only the result of this subset of requests.
+	Requests []string `json:"requests,omitempty"`
+}
