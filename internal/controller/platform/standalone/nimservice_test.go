@@ -61,7 +61,6 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 )
 
 func sortEnvVars(envVars []corev1.EnvVar) {
@@ -1403,30 +1402,30 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 	})
 
-	Describe("assignGPUResources", func() {
-		It("should retain user-provided GPU resources and not override them", func() {
+	Describe("addGPUResources", func() {
+		It("should not provide GPU resources if user has already provided them", func() {
 			profile := &appsv1alpha1.NIMProfile{
 				Name:   "test-profile",
 				Config: map[string]string{"tp": "4"},
 			}
 
 			// Initialize deployment params with user-provided GPU resources
-			deploymentParams := &rendertypes.DeploymentParams{
-				Resources: &corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
-					},
+			nimService.Spec.Resources = &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
 				},
 			}
 
-			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
 
 			// Ensure the user-provided GPU resources (8) are retained and not overridden
-			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
-			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
 		})
 
 		It("should assign GPU resources when tensor parallelism is provided", func() {
@@ -1434,12 +1433,29 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Name:   "test-profile",
 				Config: map[string]string{"tp": "4"},
 			}
-			// Initialize deployment params with no user-provided GPU resources
-			deploymentParams := &rendertypes.DeploymentParams{}
 
-			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
-			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
-			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
+
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
+		})
+
+		It("should respect non GPU resources after adding GPU resources", func() {
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{},
+			}
+
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
+
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("250m")))
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("64Mi")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("500m")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("128Mi")))
 		})
 
 		It("should assign 1 GPU resource if tensor parallelism is not provided", func() {
@@ -1447,12 +1463,13 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Name:   "test-profile",
 				Config: map[string]string{},
 			}
-			// Initialize deployment params with no user-provided GPU resources
-			deploymentParams := &rendertypes.DeploymentParams{}
 
-			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
-			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
-			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
+
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
 		})
 
 		It("should return an error if tensor parallelism cannot be parsed", func() {
@@ -1460,10 +1477,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Name:   "test-profile",
 				Config: map[string]string{"tp": "invalid"},
 			}
-			// Initialize deployment params with no user-provided GPU resources
-			deploymentParams := &rendertypes.DeploymentParams{}
 
-			err := reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)
+			_, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).To(HaveOccurred())
 		})
 	})

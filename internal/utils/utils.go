@@ -35,6 +35,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
+
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -342,9 +344,18 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 		return updateRole(castedObj, desired.(*rbacv1.Role)) //nolint:forcetypeassert
 	case *rbacv1.RoleBinding:
 		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding)) //nolint:forcetypeassert
+	case *lwsv1.LeaderWorkerSet:
+		return updateLeaderWorkerSet(castedObj, desired.(*lwsv1.LeaderWorkerSet)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
+}
+
+func updateLeaderWorkerSet(obj, desired *lwsv1.LeaderWorkerSet) *lwsv1.LeaderWorkerSet {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
 }
 
 func updateDeployment(obj, desired *appsv1.Deployment) *appsv1.Deployment {
