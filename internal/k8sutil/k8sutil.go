@@ -22,10 +22,13 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -287,4 +290,31 @@ func GetRawYAMLFromConfigMap(ctx context.Context, k8sClient client.Client, names
 	}
 
 	return raw, nil
+}
+
+func CRDExists(crdName string) (bool, error) {
+	scheme := runtime.NewScheme()
+	if err := apiextensionsv1.AddToScheme(scheme); err != nil {
+		return false, fmt.Errorf("failed to add CRD scheme: %w", err)
+	}
+
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return false, fmt.Errorf("failed to load kubeconfig: %w", err)
+	}
+
+	k8sClient, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		return false, fmt.Errorf("failed to create client: %w", err)
+	}
+	var crd apiextensionsv1.CustomResourceDefinition
+	err = k8sClient.Get(context.Background(), client.ObjectKey{Name: crdName}, &crd)
+	if err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }

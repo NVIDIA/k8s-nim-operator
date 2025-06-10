@@ -42,6 +42,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/kserve"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/standalone"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -54,6 +55,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(monitoring.AddToScheme(scheme))
+	utilruntime.Must(lws.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
