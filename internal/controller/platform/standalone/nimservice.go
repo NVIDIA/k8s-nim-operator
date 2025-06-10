@@ -22,6 +22,14 @@ import (
 	"strings"
 	"time"
 
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
+	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -40,15 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
-	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
-	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
-	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
+	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 )
 
 // GetScheme returns the scheme of the reconciler.
@@ -109,6 +109,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	// Sync serviceaccount
 	err = r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
+		logger.Info("Rendering serviceaccount", "nimservice", nimService.Name)
 		return renderer.ServiceAccount(nimService.GetServiceAccountParams())
 	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
 	if err != nil {
@@ -117,6 +118,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	// Sync role
 	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+		logger.Info("Rendering role", "nimservice", nimService.Name)
 		return renderer.Role(nimService.GetRoleParams())
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
@@ -125,6 +127,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	// Sync rolebinding
 	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+		logger.Info("Rendering rolebinding", "nimservice", nimService.Name)
 		return renderer.RoleBinding(nimService.GetRoleBindingParams())
 	}, "rolebinding", conditions.ReasonRoleBindingFailed)
 	if err != nil {
@@ -133,6 +136,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	// Sync service
 	err = r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.Service{}, func() (client.Object, error) {
+		logger.Info("Rendering service", "nimservice", nimService.Name)
 		return renderer.Service(nimService.GetServiceParams())
 	}, "service", conditions.ReasonServiceFailed)
 	if err != nil {
@@ -142,6 +146,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	// Sync ingress
 	if nimService.IsIngressEnabled() {
 		err = r.renderAndSyncResource(ctx, nimService, &renderer, &networkingv1.Ingress{}, func() (client.Object, error) {
+			logger.Info("Rendering ingress", "nimservice", nimService.Name)
 			return renderer.Ingress(nimService.GetIngressParams())
 		}, "ingress", conditions.ReasonIngressFailed)
 		if err != nil {
@@ -256,58 +261,115 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	deploymentParams := nimService.GetDeploymentParams()
-	deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
+	profileEnv := corev1.EnvVar{}
+	var profile *appsv1alpha1.NIMProfile
+	var gpuResources *corev1.ResourceRequirements
+	var initContainers []corev1.Container
+	var renderFunc func() (client.Object, error)
+	var conType, failedCon string
+	var renderObj client.Object
 
-	// Setup volume mounts with model store
-	deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
-	deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
-
-	// Setup env for explicit override profile is specified
 	if modelProfile != "" {
-		profileEnv := corev1.EnvVar{
+		profileEnv = corev1.EnvVar{
 			Name:  "NIM_MODEL_PROFILE",
 			Value: modelProfile,
 		}
-		deploymentParams.Env = append(deploymentParams.Env, profileEnv)
 
 		// Retrieve and set profile details from NIMCache
-		var profile *appsv1alpha1.NIMProfile
 		profile, err = r.getNIMCacheProfile(ctx, nimService, modelProfile)
 		if err != nil {
 			logger.Error(err, "Failed to get cached NIM profile")
 			return ctrl.Result{}, err
 		}
 
-		// Auto assign GPU resources in case of the optimized profile
 		if profile != nil {
-			if err = r.assignGPUResources(ctx, nimService, profile, deploymentParams); err != nil {
+			gpuResources, err = r.getGPUResources(ctx, nimService, profile)
+			if err != nil {
+				logger.Error(err, "Failed to get GPU resources")
 				return ctrl.Result{}, err
 			}
 		}
+	}
 
-		// TODO: assign GPU resources and node selector that is required for the selected profile
+	initContainers = nimService.GetInitContainers()
+
+	if nimService.Spec.MultiNode != nil {
+		logger.Info("Multi-node NIMService detected!", "nimservice", nimService.Name)
+		lwsParams := nimService.GetLWSParams()
+		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
+		lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(*modelPVC)
+		lwsParams.WorkerVolumes = nimService.GetWorkerVolumes(*modelPVC)
+		lwsParams.LeaderVolumeMounts = nimService.GetLeaderVolumeMounts(*modelPVC)
+		lwsParams.WorkerVolumeMounts = nimService.GetWorkerVolumeMounts(*modelPVC)
+		if modelProfile != "" {
+			lwsParams.WorkerEnvs = append(lwsParams.WorkerEnvs, profileEnv)
+			lwsParams.LeaderEnvs = append(lwsParams.LeaderEnvs, profileEnv)
+			if profile != nil {
+				lwsParams.Resources = gpuResources
+			}
+		}
+		renderFunc = func() (client.Object, error) {
+			result, err := renderer.LeaderWorkerSet(lwsParams)
+			if err != nil {
+				return nil, err
+			}
+			if len(initContainers) > 0 {
+				result.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.InitContainers = initContainers
+				result.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.InitContainers = initContainers
+			}
+			return result, nil
+		}
+		conType = "LeaderWorkerSet"
+		failedCon = conditions.ReasonLeaderWorkerSetFailed
+		renderObj = &lws.LeaderWorkerSet{}
+
+		// Create configmap for MPI
+		err = r.createMultiNodeVolumeObjects(ctx, nimService)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to create multi-node volumes: %v", err)
+		}
+	} else {
+		deploymentParams := nimService.GetDeploymentParams()
+		deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
+		// Setup volume mounts with model store
+		deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
+		deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
+		if modelProfile != "" {
+			deploymentParams.Env = append(deploymentParams.Env, profileEnv)
+			// Auto assign GPU resources in case of the optimized profile
+			if profile != nil {
+				deploymentParams.Resources = gpuResources
+			}
+		}
+		renderFunc = func() (client.Object, error) {
+			result, err := renderer.Deployment(deploymentParams)
+			if err != nil {
+				return nil, err
+			}
+			if len(initContainers) > 0 {
+				result.Spec.Template.Spec.InitContainers = initContainers
+			}
+			return result, nil
+		}
+		conType = "Deployment"
+		failedCon = conditions.ReasonDeploymentFailed
+		renderObj = &appsv1.Deployment{}
 	}
 
 	// Sync deployment
-	err = r.renderAndSyncResource(ctx, nimService, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
-		result, err := renderer.Deployment(deploymentParams)
-		if err != nil {
-			return nil, err
-		}
-		initContainers := nimService.GetInitContainers()
-		if len(initContainers) > 0 {
-			result.Spec.Template.Spec.InitContainers = initContainers
-		}
-		return result, err
-
-	}, "deployment", conditions.ReasonDeploymentFailed)
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, renderObj, renderFunc, conType, failedCon)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Wait for deployment
-	msg, ready, err := r.isDeploymentReady(ctx, &namespacedName)
+	var msg string
+	var ready bool
+	if nimService.Spec.MultiNode != nil {
+		msg, ready, err = r.isLeaderWorkerSetReady(ctx, nimService)
+	} else {
+		msg, ready, err = r.isDeploymentReady(ctx, &namespacedName)
+	}
+
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -339,6 +401,95 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	return ctrl.Result{}, nil
 }
 
+func (r *NIMServiceReconciler) createMultiNodeVolumeObjects(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
+	if err := r.createMultiNodeConfigMap(ctx, nimService, nimService.GetMPIConfigParams()); err != nil {
+		return fmt.Errorf("failed to create MPI configmap for %s: %v", nimService.Name, err)
+	}
+
+	if err := r.createMultiNodeConfigMap(ctx, nimService, nimService.GetMPIScriptConfigParams()); err != nil {
+		return fmt.Errorf("failed to create MPI script configmap for %s: %v", nimService.Name, err)
+	}
+
+	if err := r.createMultiNodeSSHPK(ctx, nimService); err != nil {
+		return fmt.Errorf("failed to create MPI SSH secret for %s: %v", nimService.Name, err)
+	}
+	return nil
+}
+
+func (r *NIMServiceReconciler) createMultiNodeSSHPK(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
+	secretParams, err := nimService.GetMPISSHSecretParams()
+	if err != nil {
+		return err
+	}
+
+	namespacedName := types.NamespacedName{
+		Name:      secretParams.Name,
+		Namespace: secretParams.Namespace,
+	}
+	secret := &corev1.Secret{}
+	err = r.Get(ctx, namespacedName, secret)
+	if err == nil {
+		// secret already exists, do nothing
+		return nil
+	}
+	if client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	err = r.renderAndSyncResource(ctx, nimService, &r.renderer, &corev1.Secret{}, func() (client.Object, error) {
+		return r.renderer.Secret(secretParams)
+	}, "secret", conditions.ReasonSecretFailed)
+	if err != nil {
+		return fmt.Errorf("failed to create MPI SSH secret %s: %v", secretParams.Name, err)
+	}
+
+	err = r.Get(ctx, namespacedName, secret)
+	if err != nil {
+		return fmt.Errorf("failed to get secret %s: %v", namespacedName, err)
+	}
+	err = controllerutil.SetOwnerReference(nimService, secret, r.Scheme())
+	if err != nil {
+		return fmt.Errorf("failed to set owner reference for secret %s: %v", namespacedName, err)
+	}
+
+	return nil
+}
+
+func (r *NIMServiceReconciler) createMultiNodeConfigMap(ctx context.Context, nimService *appsv1alpha1.NIMService, cmParams *rendertypes.ConfigMapParams) error {
+	renderer := r.GetRenderer()
+
+	namespacedName := types.NamespacedName{
+		Name:      cmParams.Name,
+		Namespace: cmParams.Namespace,
+	}
+	cm := &corev1.ConfigMap{}
+	err := r.Get(ctx, namespacedName, cm)
+	if err == nil {
+		return nil
+	}
+	if client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ConfigMap{}, func() (client.Object, error) {
+		return renderer.ConfigMap(cmParams)
+	}, "configmap", conditions.ReasonConfigMapFailed)
+	if err != nil {
+		return fmt.Errorf("failed to create configmap %s: %v", cmParams.Name, err)
+	}
+
+	err = r.Get(ctx, namespacedName, cm)
+	if err != nil {
+		return fmt.Errorf("failed to get configmap %s: %v", namespacedName, err)
+	}
+	err = controllerutil.SetOwnerReference(nimService, cm, r.Scheme())
+	if err != nil {
+		return fmt.Errorf("failed to set owner reference for configmap %s: %v", cmParams.Name, err)
+	}
+
+	return nil
+}
+
 func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
 	clusterEndpoint, externalEndpoint, err := r.getNIMModelEndpoints(ctx, nimService)
 	if err != nil {
@@ -364,7 +515,7 @@ func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEn
 	modelsList, err := nimmodels.ListModelsV1(ctx, nimServiceEndpoint)
 	if err != nil {
 		logger.Error(err, "Failed to list models", "endpoint", nimServiceEndpoint)
-		// Check if it's an HTTP error with a status code
+		// Check if iterr's an HTTP error with a status code
 		if nimmodels.IsNotFound(err) {
 			// The endpoint does not exist
 			logger.V(2).Error(err, "URI does not exist", "uri", nimmodels.ModelsV1URI, "endpoint", nimServiceEndpoint)
@@ -483,21 +634,9 @@ func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimServ
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
-		return err
-	}
-	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
-		return nil
-	}
-
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, namespacedName)
+		logger.Error(err, "failed to render", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "nimservice", nimService.Name)
@@ -522,6 +661,23 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		return nil
 	}
 
+	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
+
+	err = r.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
+		return err
+	}
+	// Don't do anything if CR is unchanged.
+	if err == nil {
+		logger.Info("resource exists", "conditionType", conditionType, "namespacedName", namespacedName)
+		if !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
+			logger.Info("resource is unchanged", "conditionType", conditionType, "namespacedName", namespacedName)
+			return nil
+		}
+		logger.Info("resource is changed", "conditionType", conditionType, "namespacedName", namespacedName)
+	}
+
 	if err = controllerutil.SetControllerReference(nimService, resource, r.GetScheme()); err != nil {
 		logger.Error(err, "failed to set owner", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
@@ -541,6 +697,24 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		return err
 	}
 	return nil
+}
+
+func (r *NIMServiceReconciler) isLeaderWorkerSetReady(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, bool, error) {
+	leaderWorkerSet := &lws.LeaderWorkerSet{}
+	err := r.Get(ctx, client.ObjectKey{Name: nimService.GetLWSName(), Namespace: nimService.GetNamespace()}, leaderWorkerSet)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+
+	for _, cond := range leaderWorkerSet.Status.Conditions {
+		if cond.Type == string(lws.LeaderWorkerSetAvailable) && cond.Status == metav1.ConditionTrue {
+			return fmt.Sprintf("leaderworkerset %q is ready", leaderWorkerSet.Name), true, nil
+		}
+	}
+	return fmt.Sprintf("leaderworkerset %q is not ready", leaderWorkerSet.Name), false, nil
 }
 
 // CheckDeploymentReadiness checks if the Deployment is ready.
@@ -696,6 +870,47 @@ func (r *NIMServiceReconciler) getTensorParallelismByProfile(ctx context.Context
 	}
 
 	return tensorParallelism, nil
+}
+
+func (r *NIMServiceReconciler) getGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile) (*corev1.ResourceRequirements, error) {
+	logger := log.FromContext(ctx)
+	// TODO: Make the resource name configurable
+	const gpuResourceName = corev1.ResourceName("nvidia.com/gpu")
+
+	// Check if the user has already provided a GPU resource quantity in the requests or limits
+	if nimService.Spec.Resources != nil {
+		if _, gpuRequested := nimService.Spec.Resources.Requests[gpuResourceName]; gpuRequested {
+			logger.V(2).Info("User has provided GPU resource requests, skipping auto-assignment", "gpuResource", gpuResourceName)
+			return nil, nil
+		}
+		if _, gpuLimit := nimService.Spec.Resources.Limits[gpuResourceName]; gpuLimit {
+			logger.V(2).Info("User has provided GPU resource limits, skipping auto-assignment", "gpuResource", gpuResourceName)
+			return nil, nil
+		}
+	}
+
+	// If no user-provided GPU resource is found, proceed with auto-assignment
+	// Get tensorParallelism from the profile
+	tensorParallelism, err := r.getTensorParallelismByProfile(ctx, profile)
+	if err != nil {
+		logger.Error(err, "Failed to retrieve tensorParallelism")
+		return nil, err
+	}
+
+	resources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{},
+		Limits:   corev1.ResourceList{},
+	}
+	gpuQuality := apiResource.MustParse("1")
+	if tensorParallelism != "" {
+		gpuQuality, err = apiResource.ParseQuantity(tensorParallelism)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse tensorParallelism: %w", err)
+		}
+	}
+	resources.Requests[gpuResourceName] = gpuQuality
+	resources.Limits[gpuResourceName] = gpuQuality
+	return &resources, nil
 }
 
 // assignGPUResources automatically assigns GPU resources to the NIMService based on the provided profile,
