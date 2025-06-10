@@ -81,6 +81,7 @@ spec:
                         If empty, everything from the claim is made available, otherwise
                         only the result of this subset of requests.
                       items:
+                        minLength: 1
                         type: string
                       type: array
                     resourceClaimName:
@@ -90,6 +91,9 @@ spec:
 
                         Exactly one of ResourceClaimName and ResourceClaimTemplateName must
                         be set.
+                      maxLength: 253
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
                       type: string
                     resourceClaimTemplateName:
                       description: |-
@@ -101,8 +105,15 @@ spec:
 
                         Exactly one of ResourceClaimName and ResourceClaimTemplateName must
                         be set.
+                      maxLength: 253
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
                       type: string
                   type: object
+                  x-kubernetes-validations:
+                  - message: exactly one of spec.resourceClaimName and spec.resourceClaimTemplateName
+                      must be set.
+                    rule: has(self.resourceClaimName) != has(self.resourceClaimTemplateName)
                 type: array
               env:
                 items:

@@ -245,12 +245,17 @@ type PersistentVolumeClaim struct {
 //
 // When creating the NIMService pods, it adds a name (`DNS_LABEL` format) to it
 // that uniquely identifies the DRA resource.
+// +kubebuilder:validation:XValidation:rule="has(self.resourceClaimName) != has(self.resourceClaimTemplateName)",message="exactly one of spec.resourceClaimName and spec.resourceClaimTemplateName must be set."
 type DRAResource struct {
 	// ResourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as the NIMService.
 	//
 	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
 	// be set.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
 	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
 
 	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -261,6 +266,10 @@ type DRAResource struct {
 	//
 	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
 	// be set.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
 
 	// Requests is the list of requests in the referenced ResourceClaim/ResourceClaimTemplate
@@ -268,5 +277,7 @@ type DRAResource struct {
 	//
 	// If empty, everything from the claim is made available, otherwise
 	// only the result of this subset of requests.
+	//
+	// +kubebuilder:validation:items:MinLength=1
 	Requests []string `json:"requests,omitempty"`
 }
