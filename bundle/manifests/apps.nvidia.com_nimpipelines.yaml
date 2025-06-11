@@ -103,7 +103,8 @@ spec:
                           type: array
                         draResources:
                           description: DRAResources is the list of DRA resource claims
-                            to be used for the NIMService deployment.
+                            to be used for the NIMService deployment or leader worker
+                            set.
                           items:
                             description: |-
                               DRAResource references exactly one ResourceClaim, either directly
@@ -829,6 +830,42 @@ spec:
                                   type: string
                               type: object
                           type: object
+                        multiNode:
+                          description: NimServiceMultiNodeConfig defines the configuration
+                            for multi-node NIMService.
+                          properties:
+                            backendType:
+                              default: lws
+                              description: BackendType specifies the backend type
+                                for the multi-node NIMService. Currently only LWS
+                                is supported.
+                              enum:
+                              - lws
+                              type: string
+                            gpusPerPod:
+                              default: 1
+                              description: GPUSPerPod specifies the number of GPUs
+                                for each instance. In most cases, this should match
+                                `resources.limits.nvidia.com/gpu`.
+                              type: integer
+                            mpi:
+                              description: MPI config for NIMService using LeaderWorkerSet
+                              properties:
+                                mpiStartTimeout:
+                                  default: 300
+                                  description: MPIStartTimeout specifies the timeout
+                                    in seconds for starting the cluster.
+                                  type: integer
+                              required:
+                              - mpiStartTimeout
+                              type: object
+                            size:
+                              default: 1
+                              description: Size specifies the number of pods to create
+                                for the multi-node NIMService.
+                              minimum: 1
+                              type: integer
+                          type: object
                         nodeSelector:
                           additionalProperties:
                             type: string
@@ -1372,7 +1409,7 @@ spec:
                           type: integer
                         resources:
                           description: |-
-                            Resources is the resource requirements for the NIMService deployment.
+                            Resources is the resource requirements for the NIMService deployment or leader worker set.
 
                             Note: Only traditional resources like cpu/memory and custom device plugin resources are supported here.
                             Any DRA claim references are ignored. Use DRAResources instead for those.
@@ -2381,6 +2418,11 @@ spec:
                       - authSecret
                       - image
                       type: object
+                      x-kubernetes-validations:
+                      - message: autoScaling must be nil or disabled when multiNode
+                          is set
+                        rule: '!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled)
+                          && self.scale.enabled)'
                   type: object
                 type: array
             type: object
