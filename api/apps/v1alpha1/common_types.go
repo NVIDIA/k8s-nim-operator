@@ -292,3 +292,23 @@ type DRAResource struct {
 	// +kubebuilder:validation:items:MinLength=1
 	Requests []string `json:"requests,omitempty"`
 }
+
+// DRAResourceStatus defines the status of the DRAResource.
+type DRAResourceStatus struct {
+	// Name is the generated name of the DRAResource referenced in the NIMService
+	// pod template as `spec.resourceClaims[].name`.
+	Name string `json:"name"`
+	// ResourceClaimTemplateName is the name of the ResourceClaimTemplate that was
+	// used to generate the ResourceClaim for an instance of NIMService.
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
+	// ResourceClaims is the status of used resource claims.
+	//
+	// This list is empty if ResourceClaimTemplateName is not set.
+	ResourceClaims []DRAResourceClaimStatus `json:"resourceClaims,omitempty"`
+}
+
+// DRAResourceClaimStatus defines the status of the DRAResourceClaim.
+type DRAResourceClaimStatus struct {
+	// Name is the name of the ResourceClaim.
+	Name string `json:"name"`
+}
