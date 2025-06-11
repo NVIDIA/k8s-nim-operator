@@ -20,6 +20,31 @@
     stdin: "{{ lookup('template', 'pvc.yaml.j2') }}"
     executable: /bin/bash
 
+- name: Get Kube API resources
+  command: kubectl api-resources --verbs=list --namespaced -o name
+  register: api_resources
+
+- name: Check if the current cluster is OpenShift
+  set_fact:
+    is_openshift: "{{ 'routes.route.openshift.io' in api_resources.stdout_lines }}"
+
+- name: OpenShift - Prepare RBAC to use anyuid SCC
+  ansible.builtin.template:
+    src: ocp-rbac.yaml.j2
+    dest: jupyter-ocp-rbac.yaml
+  when: is_openshift
+
+- name: OpenShift - apply RBAC to use anyuid SCC
+  command: kubectl apply -f jupyter-ocp-rbac.yaml
+  when: is_openshift
+
+- name: Create a service account
+  ansible.builtin.shell: |
+    kubectl apply -f -
+  args:
+    stdin: "{{ lookup('template', 'serviceaccount.yaml.j2') }}"
+    executable: /bin/bash
+
 - name: Deploy Jupyter Notebook
   ansible.builtin.shell: |
     kubectl apply -f -

@@ -1,0 +1,26 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: scc-anyuid
+  namespace: {{ namespace }}
+rules:
+- apiGroups: ['security.openshift.io']
+  resources: ['securitycontextconstraints']
+  verbs: ['use']
+  resourceNames: ['anyuid']
+
+--- 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jupyter-scc-anyuid-binding
+  namespace: {{ namespace }}
+subjects:
+- kind: ServiceAccount
+  name: jupyter
+  namespace: {{ namespace }}
+roleRef:
+  kind: Role
+  name: scc-anyuid
+  apiGroup: rbac.authorization.k8s.io
