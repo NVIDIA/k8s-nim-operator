@@ -541,7 +541,7 @@ spec:
                       alive or ready to receive traffic.
                     properties:
                       exec:
-                        description: Exec specifies the action to take.
+                        description: Exec specifies a command to execute in the container.
                         properties:
                           command:
                             description: |-
@@ -562,7 +562,7 @@ spec:
                         format: int32
                         type: integer
                       grpc:
-                        description: GRPC specifies an action involving a GRPC port.
+                        description: GRPC specifies a GRPC HealthCheckRequest.
                         properties:
                           port:
                             description: Port number of the gRPC service. Number must
@@ -581,7 +581,7 @@ spec:
                         - port
                         type: object
                       httpGet:
-                        description: HTTPGet specifies the http request to perform.
+                        description: HTTPGet specifies an HTTP GET request to perform.
                         properties:
                           host:
                             description: |-
@@ -648,8 +648,7 @@ spec:
                         format: int32
                         type: integer
                       tcpSocket:
-                        description: TCPSocket specifies an action involving a TCP
-                          port.
+                        description: TCPSocket specifies a connection to a TCP port.
                         properties:
                           host:
                             description: 'Optional: Host name to connect to, defaults
@@ -722,6 +721,45 @@ spec:
                         pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                         type: string
                     type: object
+                type: object
+              multiNode:
+                description: NimServiceMultiNodeConfig defines the configuration for
+                  multi-node NIMService.
+                properties:
+                  backendType:
+                    default: lws
+                    description: BackendType specifies the backend type for the multi-node
+                      NIMService. Currently only LWS is supported.
+                    enum:
+                    - lws
+                    type: string
+                  gpusPerWorker:
+                    default: 1
+                    description: GPUPerWorker specifies the number of GPUs for each
+                      worker. In most cases, this should match `resources.limits.nvidia.com/gpu`.
+                    type: integer
+                  mpi:
+                    description: MPI config for NIMService using LeaderWorkerSet
+                    properties:
+                      customMPIStartScript:
+                        description: |-
+                          CustomMPIStartScript specifies the custom MPI start script to use.
+                          A default start script will be used if this is not specified.
+                        type: string
+                      mpiStartTimeout:
+                        default: 300
+                        description: MPIStartTimeout specifies the timeout in seconds
+                          for starting the cluster.
+                        type: integer
+                    required:
+                    - mpiStartTimeout
+                    type: object
+                  workers:
+                    default: 1
+                    description: Workers specifies how many worker pods per multi-node
+                      replica to launch.
+                    minimum: 1
+                    type: integer
                 type: object
               nodeSelector:
                 additionalProperties:
@@ -1107,7 +1145,7 @@ spec:
                       alive or ready to receive traffic.
                     properties:
                       exec:
-                        description: Exec specifies the action to take.
+                        description: Exec specifies a command to execute in the container.
                         properties:
                           command:
                             description: |-
@@ -1128,7 +1166,7 @@ spec:
                         format: int32
                         type: integer
                       grpc:
-                        description: GRPC specifies an action involving a GRPC port.
+                        description: GRPC specifies a GRPC HealthCheckRequest.
                         properties:
                           port:
                             description: Port number of the gRPC service. Number must
@@ -1147,7 +1185,7 @@ spec:
                         - port
                         type: object
                       httpGet:
-                        description: HTTPGet specifies the http request to perform.
+                        description: HTTPGet specifies an HTTP GET request to perform.
                         properties:
                           host:
                             description: |-
@@ -1214,8 +1252,7 @@ spec:
                         format: int32
                         type: integer
                       tcpSocket:
-                        description: TCPSocket specifies an action involving a TCP
-                          port.
+                        description: TCPSocket specifies a connection to a TCP port.
                         properties:
                           host:
                             description: 'Optional: Host name to connect to, defaults
@@ -1466,7 +1503,6 @@ spec:
                                 each pod of the current scale target (e.g. CPU or memory). Such metrics are
                                 built in to Kubernetes, and have special scaling options on top of those
                                 available to normal per-pod metrics using the "pods" source.
-                                This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
                               properties:
                                 container:
                                   description: container is the name of the container
@@ -1913,8 +1949,6 @@ spec:
                               description: |-
                                 type is the type of metric source.  It should be one of "ContainerResource", "External",
                                 "Object", "Pods" or "Resource", each mapping to a matching field in the object.
-                                Note: "ContainerResource" type is available on when the feature-gate
-                                HPAContainerMetrics is enabled
                               type: string
                           required:
                           - type
@@ -1941,7 +1975,7 @@ spec:
                       alive or ready to receive traffic.
                     properties:
                       exec:
-                        description: Exec specifies the action to take.
+                        description: Exec specifies a command to execute in the container.
                         properties:
                           command:
                             description: |-
@@ -1962,7 +1996,7 @@ spec:
                         format: int32
                         type: integer
                       grpc:
-                        description: GRPC specifies an action involving a GRPC port.
+                        description: GRPC specifies a GRPC HealthCheckRequest.
                         properties:
                           port:
                             description: Port number of the gRPC service. Number must
@@ -1981,7 +2015,7 @@ spec:
                         - port
                         type: object
                       httpGet:
-                        description: HTTPGet specifies the http request to perform.
+                        description: HTTPGet specifies an HTTP GET request to perform.
                         properties:
                           host:
                             description: |-
@@ -2048,8 +2082,7 @@ spec:
                         format: int32
                         type: integer
                       tcpSocket:
-                        description: TCPSocket specifies an action involving a TCP
-                          port.
+                        description: TCPSocket specifies a connection to a TCP port.
                         properties:
                           host:
                             description: 'Optional: Host name to connect to, defaults
@@ -2208,6 +2241,10 @@ spec:
             - authSecret
             - image
             type: object
+            x-kubernetes-validations:
+            - message: autoScaling must be nil or disabled when multiNode is set
+              rule: '!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled)
+                && self.scale.enabled)'
           status:
             description: NIMServiceStatus defines the observed state of NIMService.
             properties:
