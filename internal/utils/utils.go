@@ -44,6 +44,9 @@ const (
 
 	// NvidiaAnnotationParentSpecHashKey indicates annotation name for applied hash by the operator.
 	NvidiaAnnotationParentSpecHashKey = "nvidia.com/parent-spec-hash"
+
+	// DRAPodClaimNameAnnotationKey indicates annotation name for the identifier of a resource claim template in a pod spec.
+	DRAPodClaimNameAnnotationKey = "resource.kubernetes.io/pod-claim-name"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix

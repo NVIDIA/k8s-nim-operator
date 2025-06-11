@@ -290,8 +290,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	// Setup pod resource claims
-	draResources := shared.GenerateNamedDRAResources(nimService)
-	deploymentParams.PodResourceClaims = shared.GetPodResourceClaims(draResources)
+	namedDraResources := shared.GenerateNamedDRAResources(nimService)
+	deploymentParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
 
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, nimService, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
@@ -304,7 +304,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			result.Spec.Template.Spec.InitContainers = initContainers
 		}
 		// Update Container resources with DRA resource claims.
-		shared.UpdateContainerResourceClaims(result.Spec.Template.Spec.Containers, draResources)
+		shared.UpdateContainerResourceClaims(result.Spec.Template.Spec.Containers, namedDraResources)
 		return result, err
 
 	}, "deployment", conditions.ReasonDeploymentFailed)
@@ -312,12 +312,24 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	// Wait for deployment
+	// check if deployment is ready
 	msg, ready, err := r.isDeploymentReady(ctx, &namespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
+	if len(namedDraResources) > 0 {
+		// Update NIMServiceStatus with resource claims.
+		updateErr := r.updateResourceClaimStatus(ctx, nimService, namedDraResources)
+		if updateErr != nil {
+			logger.Info("WARN: Resource claim status update failed, will retry in 5 seconds", "error", updateErr.Error())
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+	}
+
+	// TODO: Rework NIMService Status to split into MODIFY and APPLY phases for better readability
+	// (Currently we're using `updater.SetConditions*` to implicitly take all previous changes and
+	// apply them along with the conditions.)
 	if !ready {
 		// Update status as NotReady
 		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
@@ -338,10 +350,9 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	if err != nil {
-		logger.Error(err, "Unable to update status")
+		logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.Ready)
 		return ctrl.Result{}, err
 	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -360,6 +371,19 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 		ExternalEndpoint: externalEndpoint,
 	}
 
+	return nil
+}
+
+func (r *NIMServiceReconciler) updateResourceClaimStatus(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources []shared.NamedDRAResource) error {
+	logger := log.FromContext(ctx)
+
+	resourceClaimStatus, err := shared.GenerateDRAResourceStatus(ctx, r.GetClient(), nimService.GetNamespace(), namedDraResources)
+	if err != nil {
+		logger.Error(err, "Failed to generate resource claim status", "nimservice", nimService.Name)
+		return err
+	}
+
+	nimService.Status.DRAResourceStatuses = resourceClaimStatus
 	return nil
 }
 

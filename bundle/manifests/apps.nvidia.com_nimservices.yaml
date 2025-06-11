@@ -594,7 +594,7 @@ spec:
                       alive or ready to receive traffic.
                     properties:
                       exec:
-                        description: Exec specifies the action to take.
+                        description: Exec specifies a command to execute in the container.
                         properties:
                           command:
                             description: |-
@@ -615,7 +615,7 @@ spec:
                         format: int32
                         type: integer
                       grpc:
-                        description: GRPC specifies an action involving a GRPC port.
+                        description: GRPC specifies a GRPC HealthCheckRequest.
                         properties:
                           port:
                             description: Port number of the gRPC service. Number must
@@ -634,7 +634,7 @@ spec:
                         - port
                         type: object
                       httpGet:
-                        description: HTTPGet specifies the http request to perform.
+                        description: HTTPGet specifies an HTTP GET request to perform.
                         properties:
                           host:
                             description: |-
@@ -701,8 +701,7 @@ spec:
                         format: int32
                         type: integer
                       tcpSocket:
-                        description: TCPSocket specifies an action involving a TCP
-                          port.
+                        description: TCPSocket specifies a connection to a TCP port.
                         properties:
                           host:
                             description: 'Optional: Host name to connect to, defaults
@@ -861,7 +860,6 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                 Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array
@@ -876,7 +874,6 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                 Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array
@@ -1041,7 +1038,6 @@ spec:
                             pod labels will be ignored. The default value is empty.
                             The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                             Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                            This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                           items:
                             type: string
                           type: array
@@ -1056,7 +1052,6 @@ spec:
                             pod labels will be ignored. The default value is empty.
                             The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                             Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                            This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                           items:
                             type: string
                           type: array
@@ -1160,7 +1155,7 @@ spec:
                       alive or ready to receive traffic.
                     properties:
                       exec:
-                        description: Exec specifies the action to take.
+                        description: Exec specifies a command to execute in the container.
                         properties:
                           command:
                             description: |-
@@ -1181,7 +1176,7 @@ spec:
                         format: int32
                         type: integer
                       grpc:
-                        description: GRPC specifies an action involving a GRPC port.
+                        description: GRPC specifies a GRPC HealthCheckRequest.
                         properties:
                           port:
                             description: Port number of the gRPC service. Number must
@@ -1200,7 +1195,7 @@ spec:
                         - port
                         type: object
                       httpGet:
-                        description: HTTPGet specifies the http request to perform.
+                        description: HTTPGet specifies an HTTP GET request to perform.
                         properties:
                           host:
                             description: |-
@@ -1267,8 +1262,7 @@ spec:
                         format: int32
                         type: integer
                       tcpSocket:
-                        description: TCPSocket specifies an action involving a TCP
-                          port.
+                        description: TCPSocket specifies a connection to a TCP port.
                         properties:
                           host:
                             description: 'Optional: Host name to connect to, defaults
@@ -1407,7 +1401,9 @@ spec:
                               policies:
                                 description: |-
                                   policies is a list of potential scaling polices which can be used during scaling.
-                                  At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+                                  If not set, use the default values:
+                                  - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window.
+                                  - For scale down: allow all pods to be removed in a 15s window.
                                 items:
                                   description: HPAScalingPolicy is a single policy
                                     which must hold true for a specified past interval.
@@ -1450,6 +1446,24 @@ spec:
                                   - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
                                 format: int32
                                 type: integer
+                              tolerance:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: |-
+                                  tolerance is the tolerance on the ratio between the current and desired
+                                  metric value under which no updates are made to the desired number of
+                                  replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not
+                                  set, the default cluster-wide tolerance is applied (by default 10%).
+
+                                  For example, if autoscaling is configured with a memory consumption target of 100Mi,
+                                  and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
+                                  triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
+
+                                  This is an alpha field and requires enabling the HPAConfigurableTolerance
+                                  feature gate.
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
                             type: object
                           scaleUp:
                             description: |-
@@ -1462,7 +1476,9 @@ spec:
                               policies:
                                 description: |-
                                   policies is a list of potential scaling polices which can be used during scaling.
-                                  At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+                                  If not set, use the default values:
+                                  - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window.
+                                  - For scale down: allow all pods to be removed in a 15s window.
                                 items:
                                   description: HPAScalingPolicy is a single policy
                                     which must hold true for a specified past interval.
@@ -1505,6 +1521,24 @@ spec:
                                   - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
                                 format: int32
                                 type: integer
+                              tolerance:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: |-
+                                  tolerance is the tolerance on the ratio between the current and desired
+                                  metric value under which no updates are made to the desired number of
+                                  replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not
+                                  set, the default cluster-wide tolerance is applied (by default 10%).
+
+                                  For example, if autoscaling is configured with a memory consumption target of 100Mi,
+                                  and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
+                                  triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
+
+                                  This is an alpha field and requires enabling the HPAConfigurableTolerance
+                                  feature gate.
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
                             type: object
                         type: object
                       maxReplicas:
@@ -1523,7 +1557,6 @@ spec:
                                 each pod of the current scale target (e.g. CPU or memory). Such metrics are
                                 built in to Kubernetes, and have special scaling options on top of those
                                 available to normal per-pod metrics using the "pods" source.
-                                This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
                               properties:
                                 container:
                                   description: container is the name of the container
@@ -1970,8 +2003,6 @@ spec:
                               description: |-
                                 type is the type of metric source.  It should be one of "ContainerResource", "External",
                                 "Object", "Pods" or "Resource", each mapping to a matching field in the object.
-                                Note: "ContainerResource" type is available on when the feature-gate
-                                HPAContainerMetrics is enabled
                               type: string
                           required:
                           - type
@@ -1998,7 +2029,7 @@ spec:
                       alive or ready to receive traffic.
                     properties:
                       exec:
-                        description: Exec specifies the action to take.
+                        description: Exec specifies a command to execute in the container.
                         properties:
                           command:
                             description: |-
@@ -2019,7 +2050,7 @@ spec:
                         format: int32
                         type: integer
                       grpc:
-                        description: GRPC specifies an action involving a GRPC port.
+                        description: GRPC specifies a GRPC HealthCheckRequest.
                         properties:
                           port:
                             description: Port number of the gRPC service. Number must
@@ -2038,7 +2069,7 @@ spec:
                         - port
                         type: object
                       httpGet:
-                        description: HTTPGet specifies the http request to perform.
+                        description: HTTPGet specifies an HTTP GET request to perform.
                         properties:
                           host:
                             description: |-
@@ -2105,8 +2136,7 @@ spec:
                         format: int32
                         type: integer
                       tcpSocket:
-                        description: TCPSocket specifies an action involving a TCP
-                          port.
+                        description: TCPSocket specifies a connection to a TCP port.
                         properties:
                           host:
                             description: 'Optional: Host name to connect to, defaults
@@ -2344,7 +2374,7 @@ spec:
                       type: string
                     resourceClaims:
                       description: |-
-                        ResourceClaims is the status of generated resource claims.
+                        ResourceClaims is the status of used resource claims.
 
                         This list is empty if ResourceClaimTemplateName is not set.
                       items:
@@ -2352,8 +2382,7 @@ spec:
                           the DRAResourceClaim.
                         properties:
                           name:
-                            description: Name is the name of the ResourceClaim that
-                              was generated for a NIMService pod.
+                            description: Name is the name of the ResourceClaim.
                             type: string
                         required:
                         - name
