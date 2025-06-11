@@ -20,3 +20,7 @@
   shell: kubectl delete configmap notebook-config -n {{ namespace }}
   ignore_errors: true
 
+- name: Delete Jupyter ServiceAccount
+  shell: kubectl delete sa jupyter -n {{ namespace }}
+  ignore_errors: true
+
