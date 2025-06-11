@@ -591,7 +591,8 @@ spec:
                                 alive or ready to receive traffic.
                               properties:
                                 exec:
-                                  description: Exec specifies the action to take.
+                                  description: Exec specifies a command to execute
+                                    in the container.
                                   properties:
                                     command:
                                       description: |-
@@ -612,8 +613,7 @@ spec:
                                   format: int32
                                   type: integer
                                 grpc:
-                                  description: GRPC specifies an action involving
-                                    a GRPC port.
+                                  description: GRPC specifies a GRPC HealthCheckRequest.
                                   properties:
                                     port:
                                       description: Port number of the gRPC service.
@@ -632,7 +632,7 @@ spec:
                                   - port
                                   type: object
                                 httpGet:
-                                  description: HTTPGet specifies the http request
+                                  description: HTTPGet specifies an HTTP GET request
                                     to perform.
                                   properties:
                                     host:
@@ -700,7 +700,7 @@ spec:
                                   format: int32
                                   type: integer
                                 tcpSocket:
-                                  description: TCPSocket specifies an action involving
+                                  description: TCPSocket specifies a connection to
                                     a TCP port.
                                   properties:
                                     host:
@@ -775,6 +775,29 @@ spec:
                                   pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                                   type: string
                               type: object
+                          type: object
+                        multiNode:
+                          description: NimServiceMultiNodeConfig defines the configuration
+                            for multi-node NIMService.
+                          properties:
+                            clusterStartTimeout:
+                              default: 300
+                              description: ClusterStartTimeout specifies the timeout
+                                in seconds for starting the cluster.
+                              type: integer
+                            gpusPerNode:
+                              default: 1
+                              description: GPUPerNode specifies the number of GPUs
+                                for each pod. In most cases, this should match `resources.limits.nvidia.com/gpu`.
+                              type: integer
+                            workers:
+                              default: 1
+                              description: Workers specifies how many worker pods
+                                per multi-node replica to launch.
+                              minimum: 1
+                              type: integer
+                          required:
+                          - clusterStartTimeout
                           type: object
                         nodeSelector:
                           additionalProperties:
@@ -1166,7 +1189,8 @@ spec:
                                 alive or ready to receive traffic.
                               properties:
                                 exec:
-                                  description: Exec specifies the action to take.
+                                  description: Exec specifies a command to execute
+                                    in the container.
                                   properties:
                                     command:
                                       description: |-
@@ -1187,8 +1211,7 @@ spec:
                                   format: int32
                                   type: integer
                                 grpc:
-                                  description: GRPC specifies an action involving
-                                    a GRPC port.
+                                  description: GRPC specifies a GRPC HealthCheckRequest.
                                   properties:
                                     port:
                                       description: Port number of the gRPC service.
@@ -1207,7 +1230,7 @@ spec:
                                   - port
                                   type: object
                                 httpGet:
-                                  description: HTTPGet specifies the http request
+                                  description: HTTPGet specifies an HTTP GET request
                                     to perform.
                                   properties:
                                     host:
@@ -1275,7 +1298,7 @@ spec:
                                   format: int32
                                   type: integer
                                 tcpSocket:
-                                  description: TCPSocket specifies an action involving
+                                  description: TCPSocket specifies a connection to
                                     a TCP port.
                                   properties:
                                     host:
@@ -1531,7 +1554,6 @@ spec:
                                           each pod of the current scale target (e.g. CPU or memory). Such metrics are
                                           built in to Kubernetes, and have special scaling options on top of those
                                           available to normal per-pod metrics using the "pods" source.
-                                          This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
                                         properties:
                                           container:
                                             description: container is the name of
@@ -1994,8 +2016,6 @@ spec:
                                         description: |-
                                           type is the type of metric source.  It should be one of "ContainerResource", "External",
                                           "Object", "Pods" or "Resource", each mapping to a matching field in the object.
-                                          Note: "ContainerResource" type is available on when the feature-gate
-                                          HPAContainerMetrics is enabled
                                         type: string
                                     required:
                                     - type
@@ -2022,7 +2042,8 @@ spec:
                                 alive or ready to receive traffic.
                               properties:
                                 exec:
-                                  description: Exec specifies the action to take.
+                                  description: Exec specifies a command to execute
+                                    in the container.
                                   properties:
                                     command:
                                       description: |-
@@ -2043,8 +2064,7 @@ spec:
                                   format: int32
                                   type: integer
                                 grpc:
-                                  description: GRPC specifies an action involving
-                                    a GRPC port.
+                                  description: GRPC specifies a GRPC HealthCheckRequest.
                                   properties:
                                     port:
                                       description: Port number of the gRPC service.
@@ -2063,7 +2083,7 @@ spec:
                                   - port
                                   type: object
                                 httpGet:
-                                  description: HTTPGet specifies the http request
+                                  description: HTTPGet specifies an HTTP GET request
                                     to perform.
                                   properties:
                                     host:
@@ -2131,7 +2151,7 @@ spec:
                                   format: int32
                                   type: integer
                                 tcpSocket:
-                                  description: TCPSocket specifies an action involving
+                                  description: TCPSocket specifies a connection to
                                     a TCP port.
                                   properties:
                                     host:
