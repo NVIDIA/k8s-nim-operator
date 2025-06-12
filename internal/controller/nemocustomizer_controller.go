@@ -569,12 +569,19 @@ func (r *NemoCustomizerReconciler) addModelDownloadJobsConfig(ctx context.Contex
 		"ngcAPISecretKey":         n.Spec.ModelDownloadJobs.NGCSecret.Key,
 		"ngcSecretName":           n.Spec.ModelDownloadJobs.NGCSecret.Name,
 		"ngcSecretKey":            n.Spec.ModelDownloadJobs.NGCSecret.Key,
-		"hfSecretName":            n.Spec.ModelDownloadJobs.HFSecret.Name,
-		"hfSecretKey":             n.Spec.ModelDownloadJobs.HFSecret.Key,
 		"securityContext":         n.Spec.ModelDownloadJobs.SecurityContext,
 		"ttlSecondsAfterFinished": n.Spec.ModelDownloadJobs.TTLSecondsAfterFinished,
 		"pollIntervalSeconds":     n.Spec.ModelDownloadJobs.PollIntervalSeconds,
 	}
+
+	// add HF secret only if present
+	if n.Spec.ModelDownloadJobs.HFSecret.Name != "" {
+		if modelDownloadJobs, ok := cfg["model_download_jobs"].(map[string]interface{}); ok {
+			modelDownloadJobs["hfSecretName"] = n.Spec.ModelDownloadJobs.HFSecret.Name
+			modelDownloadJobs["hfSecretKey"] = n.Spec.ModelDownloadJobs.HFSecret.Key
+		}
+	}
+
 	return nil
 }
 

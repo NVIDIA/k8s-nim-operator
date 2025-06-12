@@ -32,7 +32,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
-// ErrConfigMapKeyNotFound indicates an error that the given key is missing from the config map
+// ErrConfigMapKeyNotFound indicates an error that the given key is missing from the config map.
 var ErrConfigMapKeyNotFound = goerrors.New("configmap key not found")
 
 // OrchestratorType is the underlying container orchestrator type.
