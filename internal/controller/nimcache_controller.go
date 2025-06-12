@@ -1137,7 +1137,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
 				Name:    NIMCacheContainerName,
-				Image:   nimCache.Spec.Source.DataStore.ModelPuller,
+				Image:   hfDataSource.GetModelPuller(),
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
 				Env: []corev1.EnvVar{
 					{
