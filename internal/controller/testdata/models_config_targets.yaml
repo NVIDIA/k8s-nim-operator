@@ -1,28 +1,15 @@
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nemo-training-config
-  namespace: nemo
-data:
-  training: |
-    # Optional additional configuration for training jobs
-    container_defaults:
-      imagePullPolicy: IfNotPresent
-
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nemo-model-config
-  namespace: nemo
+  name: nemo-model-config-targets
+  namespace: default
 data:
   customizationTargets: |
     overrideExistingTargets: true
     targets:
       meta/llama-3.1-8b-instruct@2.0:
         base_model: meta/llama-3.1-8b-instruct
-        enabled: true
+        enabled: false
         model_path: llama-3_1-8b-instruct_2_0
         model_uri: ngc://nvidia/nemo/llama-3_1-8b-instruct-nemo:2.0
         name: llama-3.1-8b-instruct@2.0
@@ -49,7 +36,7 @@ data:
         precision: bf16-mixed
       meta/llama-3.2-1b-instruct@2.0:
         base_model: meta/llama-3.2-1b-instruct
-        enabled: true
+        enabled: false
         model_path: llama32_1b-instruct_2_0
         model_uri: ngc://nvidia/nemo/llama-3_2-1b-instruct:2.0
         name: llama-3.2-1b-instruct@2.0
