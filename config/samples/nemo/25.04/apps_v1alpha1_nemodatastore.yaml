@@ -30,7 +30,7 @@ spec:
       port: 8000
   image:
     repository: nvcr.io/nvidia/nemo-microservices/datastore
-    tag: "25.06"
+    tag: "25.04"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
