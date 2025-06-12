@@ -218,6 +218,17 @@ type NGCSecret struct {
 	Key string `json:"key"`
 }
 
+// HFSecret represents the secret and key details for HuggingFace.
+type HFSecret struct {
+	// Name of the Kubernetes secret containing HF_TOKEN key
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Key in the key containing the actual token value
+	// +kubebuilder:default:="HF_TOKEN"
+	Key string `json:"key"`
+}
+
 // PersistentVolumeClaim defines the attributes of PVC.
 // +kubebuilder:validation:XValidation:rule="!has(self.create) || !self.create || (has(self.size) && self.size != \"\")", message="size is required for pvc creation"
 // +kubebuilder:validation:XValidation:rule="!has(self.create) || !self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != \"\")", message="volumeAccessMode is required for pvc creation"
