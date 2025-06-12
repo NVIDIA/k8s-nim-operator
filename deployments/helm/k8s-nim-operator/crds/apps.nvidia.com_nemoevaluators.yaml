@@ -291,35 +291,24 @@ spec:
                 description: EvaluationImages defines the external images used for
                   evaluation
                 properties:
+                  agenticEval:
+                    type: string
+                  bfcl:
+                    type: string
                   bigcodeEvalHarness:
-                    minLength: 1
                     type: string
                   llmAsJudge:
-                    minLength: 1
                     type: string
                   lmEvalHarness:
-                    minLength: 1
                     type: string
                   mtBench:
-                    minLength: 1
                     type: string
                   rag:
-                    minLength: 1
                     type: string
                   retriever:
-                    minLength: 1
                     type: string
                   similarityMetrics:
-                    minLength: 1
                     type: string
-                required:
-                - bigcodeEvalHarness
-                - llmAsJudge
-                - lmEvalHarness
-                - mtBench
-                - rag
-                - retriever
-                - similarityMetrics
                 type: object
               expose:
                 description: ExposeV1 defines attributes to expose the service.

@@ -119,21 +119,17 @@ type NemoEvaluatorSpec struct {
 	EvaluationImages EvaluationImages `json:"evaluationImages"`
 }
 
+// EvaluationImages for different evaluation targets
 type EvaluationImages struct {
-	// +kubebuilder:validation:MinLength=1
-	BigcodeEvalHarness string `json:"bigcodeEvalHarness"`
-	// +kubebuilder:validation:MinLength=1
-	LmEvalHarness string `json:"lmEvalHarness"`
-	// +kubebuilder:validation:MinLength=1
-	SimilarityMetrics string `json:"similarityMetrics"`
-	// +kubebuilder:validation:MinLength=1
-	LlmAsJudge string `json:"llmAsJudge"`
-	// +kubebuilder:validation:MinLength=1
-	MtBench string `json:"mtBench"`
-	// +kubebuilder:validation:MinLength=1
-	Retriever string `json:"retriever"`
-	// +kubebuilder:validation:MinLength=1
-	Rag string `json:"rag"`
+	BigcodeEvalHarness string `json:"bigcodeEvalHarness,omitempty"`
+	LmEvalHarness      string `json:"lmEvalHarness,omitempty"`
+	SimilarityMetrics  string `json:"similarityMetrics,omitempty"`
+	LlmAsJudge         string `json:"llmAsJudge,omitempty"`
+	MtBench            string `json:"mtBench,omitempty"`
+	Retriever          string `json:"retriever,omitempty"`
+	Rag                string `json:"rag,omitempty"`
+	BFCL               string `json:"bfcl,omitempty"`
+	AgenticEval        string `json:"agenticEval,omitempty"`
 }
 
 // NemoEvaluatorStatus defines the observed state of NemoEvaluator.
@@ -196,6 +192,14 @@ func (ei EvaluationImages) GetEvaluationImageEnv() []corev1.EnvVar {
 		{
 			Name:  "RAG",
 			Value: ei.Rag,
+		},
+		{
+			Name:  "BFCL",
+			Value: ei.BFCL,
+		},
+		{
+			Name:  "AGENTIC_EVAL",
+			Value: ei.AgenticEval,
 		},
 	}
 }
