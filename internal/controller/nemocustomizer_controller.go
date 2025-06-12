@@ -511,15 +511,15 @@ func (r *NemoCustomizerReconciler) renderCustomizerConfig(ctx context.Context, n
 		return nil, err
 	}
 
-	if err := r.addModelConfig(ctx, cfg, n); err != nil {
+	if err := r.addModelConfig(ctx, n, cfg); err != nil {
 		return nil, err
 	}
 
-	if err := r.addCustomizationTargetConfig(ctx, cfg, n); err != nil {
+	if err := r.addCustomizationTargetConfig(ctx, n, cfg); err != nil {
 		return nil, err
 	}
 
-	if err := r.addCustomizationConfigTemplates(ctx, cfg, n); err != nil {
+	if err := r.addCustomizationConfigTemplates(ctx, n, cfg); err != nil {
 		return nil, err
 	}
 
@@ -700,7 +700,7 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 	return nil
 }
 
-func (r *NemoCustomizerReconciler) addModelConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
+func (r *NemoCustomizerReconciler) addModelConfig(ctx context.Context, n *appsv1alpha1.NemoCustomizer, cfg map[string]interface{}) error {
 	modelsRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.Models.Name, "models")
 	if err != nil {
 		if goerrors.Is(err, k8sutil.ErrConfigMapKeyNotFound) {
@@ -719,7 +719,7 @@ func (r *NemoCustomizerReconciler) addModelConfig(ctx context.Context, cfg map[s
 	return nil
 }
 
-func (r *NemoCustomizerReconciler) addCustomizationTargetConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
+func (r *NemoCustomizerReconciler) addCustomizationTargetConfig(ctx context.Context, n *appsv1alpha1.NemoCustomizer, cfg map[string]interface{}) error {
 	customizationTargetsRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.Models.Name, "customizationTargets")
 	if err != nil {
 		if goerrors.Is(err, k8sutil.ErrConfigMapKeyNotFound) {
@@ -738,7 +738,7 @@ func (r *NemoCustomizerReconciler) addCustomizationTargetConfig(ctx context.Cont
 	return nil
 }
 
-func (r *NemoCustomizerReconciler) addCustomizationConfigTemplates(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
+func (r *NemoCustomizerReconciler) addCustomizationConfigTemplates(ctx context.Context, n *appsv1alpha1.NemoCustomizer, cfg map[string]interface{}) error {
 	customizationConfigTemplatesRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.Models.Name, "customizationConfigTemplates")
 	if err != nil {
 		if goerrors.Is(err, k8sutil.ErrConfigMapKeyNotFound) {
