@@ -30,6 +30,7 @@ import (
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -59,6 +60,7 @@ type NIMServiceReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
+	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
 	Platform         platform.Platform
@@ -70,7 +72,7 @@ type NIMServiceReconciler struct {
 var _ shared.Reconciler = &NIMServiceReconciler{}
 
 // NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform.
-func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
+func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
 		Client:          client,
 		scheme:          scheme,
@@ -194,6 +196,11 @@ func (r *NIMServiceReconciler) GetConfig() *rest.Config {
 // GetUpdater returns the conditions updater instance.
 func (r *NIMServiceReconciler) GetUpdater() conditions.Updater {
 	return r.updater
+}
+
+// GetDiscoveryClient returns the discovery client instance.
+func (r *NIMServiceReconciler) GetDiscoveryClient() discovery.DiscoveryInterface {
+	return r.discoveryClient
 }
 
 // GetRenderer returns the renderer instance.

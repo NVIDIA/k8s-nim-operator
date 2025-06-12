@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -207,6 +208,11 @@ func (r *NemoCustomizerReconciler) GetConfig() *rest.Config {
 // GetUpdater returns the conditions updater instance.
 func (r *NemoCustomizerReconciler) GetUpdater() conditions.Updater {
 	return r.updater
+}
+
+// GetDiscoveryClient returns the discovery client instance.
+func (r *NemoCustomizerReconciler) GetDiscoveryClient() discovery.DiscoveryInterface {
+	return nil
 }
 
 // GetRenderer returns the renderer instance.
