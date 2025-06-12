@@ -67,6 +67,8 @@ const (
 	ReasonNIMCacheNotFound = "NIMCacheNotFound"
 	// ReasonNIMCacheNotReady indicates that the NIMCache is not ready.
 	ReasonNIMCacheNotReady = "NIMCacheNotReady"
+	// ReasonDRAResourcesUnsupported indicates that the DRA resources are not supported on this cluster version.
+	ReasonDRAResourcesUnsupported = "DRAResourcesUnsupported"
 )
 
 // Updater is the condition updater.
