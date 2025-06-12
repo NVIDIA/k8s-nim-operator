@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"reflect"
 
+	goerrors "errors"
+
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -513,6 +515,14 @@ func (r *NemoCustomizerReconciler) renderCustomizerConfig(ctx context.Context, n
 		return nil, err
 	}
 
+	if err := r.addCustomizationTargetConfig(ctx, cfg, n); err != nil {
+		return nil, err
+	}
+
+	if err := r.addCustomizationConfigTemplates(ctx, cfg, n); err != nil {
+		return nil, err
+	}
+
 	return yaml.Marshal(cfg)
 }
 
@@ -557,6 +567,10 @@ func (r *NemoCustomizerReconciler) addModelDownloadJobsConfig(ctx context.Contex
 		"imagePullSecrets":        pullSecrets,
 		"ngcAPISecret":            n.Spec.ModelDownloadJobs.NGCSecret.Name,
 		"ngcAPISecretKey":         n.Spec.ModelDownloadJobs.NGCSecret.Key,
+		"ngcSecretName":           n.Spec.ModelDownloadJobs.NGCSecret.Name,
+		"ngcSecretKey":            n.Spec.ModelDownloadJobs.NGCSecret.Key,
+		"hfSecretName":            n.Spec.ModelDownloadJobs.HFSecret.Name,
+		"hfSecretKey":             n.Spec.ModelDownloadJobs.HFSecret.Key,
 		"securityContext":         n.Spec.ModelDownloadJobs.SecurityContext,
 		"ttlSecondsAfterFinished": n.Spec.ModelDownloadJobs.TTLSecondsAfterFinished,
 		"pollIntervalSeconds":     n.Spec.ModelDownloadJobs.PollIntervalSeconds,
@@ -682,6 +696,10 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 func (r *NemoCustomizerReconciler) addModelConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
 	modelsRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.Models.Name, "models")
 	if err != nil {
+		if goerrors.Is(err, k8sutil.ErrConfigMapKeyNotFound) {
+			// Ignore missing models key
+			return nil
+		}
 		return fmt.Errorf("loading models config: %w", err)
 	}
 
@@ -691,6 +709,44 @@ func (r *NemoCustomizerReconciler) addModelConfig(ctx context.Context, cfg map[s
 	}
 
 	cfg["models"] = models
+	return nil
+}
+
+func (r *NemoCustomizerReconciler) addCustomizationTargetConfig(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
+	customizationTargetsRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.Models.Name, "customizationTargets")
+	if err != nil {
+		if goerrors.Is(err, k8sutil.ErrConfigMapKeyNotFound) {
+			// Ignore missing customizationTargetConfig key
+			return nil
+		}
+		return fmt.Errorf("loading models config: %w", err)
+	}
+
+	var customizationTargets map[string]interface{}
+	if err := yaml.Unmarshal([]byte(customizationTargetsRaw), &customizationTargets); err != nil {
+		return fmt.Errorf("parsing customization targets config: %w", err)
+	}
+
+	cfg["customizationTargets"] = customizationTargets
+	return nil
+}
+
+func (r *NemoCustomizerReconciler) addCustomizationConfigTemplates(ctx context.Context, cfg map[string]interface{}, n *appsv1alpha1.NemoCustomizer) error {
+	customizationConfigTemplatesRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), n.Spec.Models.Name, "customizationConfigTemplates")
+	if err != nil {
+		if goerrors.Is(err, k8sutil.ErrConfigMapKeyNotFound) {
+			// Ignore missing customizationConfigTemplates key
+			return nil
+		}
+		return fmt.Errorf("loading models config: %w", err)
+	}
+
+	var customizationConfigTemplates map[string]interface{}
+	if err := yaml.Unmarshal([]byte(customizationConfigTemplatesRaw), &customizationConfigTemplates); err != nil {
+		return fmt.Errorf("parsing customization config templates config: %w", err)
+	}
+
+	cfg["customizationConfigTemplates"] = customizationConfigTemplates
 	return nil
 }
 

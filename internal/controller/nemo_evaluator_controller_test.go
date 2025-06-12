@@ -465,7 +465,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 				corev1.EnvVar{Name: "RETRIEVER", Value: nemoEvaluator.Spec.EvaluationImages.Retriever},
 				corev1.EnvVar{Name: "RAG", Value: nemoEvaluator.Spec.EvaluationImages.Rag},
 				corev1.EnvVar{Name: "BFCL", Value: nemoEvaluator.Spec.EvaluationImages.BFCL},
-				corev1.EnvVar{Name: "AgenticEval", Value: nemoEvaluator.Spec.EvaluationImages.AgenticEval},
+				corev1.EnvVar{Name: "AGENTIC_EVAL", Value: nemoEvaluator.Spec.EvaluationImages.AgenticEval},
 			))
 		})
 
