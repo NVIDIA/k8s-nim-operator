@@ -119,7 +119,7 @@ type NemoEvaluatorSpec struct {
 	EvaluationImages EvaluationImages `json:"evaluationImages"`
 }
 
-// EvaluationImages for different evaluation targets
+// EvaluationImages for different evaluation targets.
 type EvaluationImages struct {
 	BigcodeEvalHarness string `json:"bigcodeEvalHarness,omitempty"`
 	LmEvalHarness      string `json:"lmEvalHarness,omitempty"`

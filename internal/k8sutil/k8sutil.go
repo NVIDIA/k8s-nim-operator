@@ -18,6 +18,7 @@ package k8sutil
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -30,6 +31,9 @@ import (
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
+
+// ErrConfigMapKeyNotFound indicates an error that the given key is missing from the config map
+var ErrConfigMapKeyNotFound = goerrors.New("configmap key not found")
 
 // OrchestratorType is the underlying container orchestrator type.
 type OrchestratorType string
@@ -283,7 +287,7 @@ func GetRawYAMLFromConfigMap(ctx context.Context, k8sClient client.Client, names
 
 	raw, ok := cm.Data[configMapKey]
 	if !ok {
-		return "", fmt.Errorf("key %q not found in ConfigMap %q", configMapKey, configMapName)
+		return "", fmt.Errorf("%w: key %q not found in ConfigMap %q", ErrConfigMapKeyNotFound, configMapKey, configMapName)
 	}
 
 	return raw, nil

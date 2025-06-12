@@ -419,6 +419,22 @@ spec:
               modelDownloadJobs:
                 description: Model download job configuration
                 properties:
+                  hfSecret:
+                    description: HFSecret is the secret containing the HF_TOKEN key
+                    properties:
+                      key:
+                        default: HF_TOKEN
+                        description: Key in the key containing the actual token value
+                        type: string
+                      name:
+                        description: Name of the Kubernetes secret containing HF_TOKEN
+                          key
+                        minLength: 1
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
                   image:
                     description: Docker image used for model download jobs
                     minLength: 1
@@ -664,7 +680,6 @@ spec:
                     type: integer
                 required:
                 - image
-                - ngcAPISecret
                 - pollIntervalSeconds
                 - ttlSecondsAfterFinished
                 type: object
