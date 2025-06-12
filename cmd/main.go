@@ -26,6 +26,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	discovery "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -147,6 +148,12 @@ func main() {
 
 	updater := conditions.NewUpdater(mgr.GetClient())
 
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(ctrl.GetConfigOrDie())
+	if err != nil {
+		setupLog.Error(err, "unable to create discovery client")
+		os.Exit(1)
+	}
+
 	if err = controller.NewNIMCacheReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
@@ -161,6 +168,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NIMService"),
 		platformImpl,

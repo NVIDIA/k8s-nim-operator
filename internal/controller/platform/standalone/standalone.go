@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,6 +60,7 @@ type NIMServiceReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
+	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	recorder         record.EventRecorder
 	orchestratorType k8sutil.OrchestratorType
@@ -84,6 +86,7 @@ func NewNIMServiceReconciler(ctx context.Context, r shared.Reconciler) *NIMServi
 		scheme:           r.GetScheme(),
 		log:              r.GetLogger(),
 		updater:          r.GetUpdater(),
+		discoveryClient:  r.GetDiscoveryClient(),
 		recorder:         r.GetEventRecorder(),
 		orchestratorType: orchestratorType,
 	}

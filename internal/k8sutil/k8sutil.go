@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -291,4 +292,15 @@ func GetRawYAMLFromConfigMap(ctx context.Context, k8sClient client.Client, names
 	}
 
 	return raw, nil
+}
+
+func GetClusterVersion(discoveryClient discovery.DiscoveryInterface) (string, error) {
+	if discoveryClient == nil {
+		return "", fmt.Errorf("client not provided")
+	}
+	versionInfo, err := discoveryClient.ServerVersion()
+	if err != nil {
+		return "", err
+	}
+	return versionInfo.GitVersion, nil
 }

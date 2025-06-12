@@ -21,6 +21,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,4 +40,5 @@ type Reconciler interface {
 	GetRenderer() render.Renderer
 	GetEventRecorder() record.EventRecorder
 	GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error)
+	GetDiscoveryClient() discovery.DiscoveryInterface
 }

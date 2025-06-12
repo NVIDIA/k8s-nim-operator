@@ -18,51 +18,68 @@ package k8sutil
 
 import (
 	"context"
-	"testing"
+	"sync"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/version"
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	testing "k8s.io/client-go/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestDetectPlatform(t *testing.T) {
-	tests := []struct {
-		name     string
-		labels   map[string]string
-		expected OrchestratorType
-	}{
-		{"TKGS platform detected", map[string]string{"node.vmware.com/tkg": "true"}, TKGS},
-		{"OpenShift platform detected", map[string]string{"node.openshift.io/os_id": "rhcos"}, OpenShift},
-		{"GKE platform detected", map[string]string{"cloud.google.com/gke-nodepool": "default-pool"}, GKE},
-		{"EKS platform detected", map[string]string{"eks.amazonaws.com/nodegroup": "my-node-group"}, EKS},
-		{"AKS platform detected", map[string]string{"kubernetes.azure.com/cluster": "my-aks-cluster"}, AKS},
-		{"OKE platform detected", map[string]string{"oke.oraclecloud.com/cluster": "my-oke-cluster"}, OKE},
-		{"HPE Ezmeral platform detected", map[string]string{"ezmeral.hpe.com/cluster": "my-ezmeral-cluster"}, Ezmeral},
-		{"Rancher RKE platform detected", map[string]string{"rke.cattle.io/version": "v1.2.3"}, RKE},
-		{"Unknown platform", map[string]string{}, K8s},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a fake client with nodes containing the given labels
+var _ = Describe("K8s util tests", func() {
+	DescribeTable("DetectPlatform tests",
+		func(labels map[string]string, expected OrchestratorType) {
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "test-node",
-					Labels: tt.labels,
+					Labels: labels,
 				},
 			}
 			fakeClient := fake.NewClientBuilder().WithObjects(node).Build()
 
-			// Detect container platform
 			platform, err := GetOrchestratorType(context.TODO(), fakeClient)
-			if err != nil {
-				t.Fatalf("GetContainerPlatform failed: %v", err)
-			}
+			Expect(err).NotTo(HaveOccurred())
+			Expect(platform).To(Equal(expected))
+		},
+		Entry("TKGS platform detected", map[string]string{"node.vmware.com/tkg": "true"}, TKGS),
+		Entry("OpenShift platform detected", map[string]string{"node.openshift.io/os_id": "rhcos"}, OpenShift),
+		Entry("GKE platform detected", map[string]string{"cloud.google.com/gke-nodepool": "default-pool"}, GKE),
+		Entry("EKS platform detected", map[string]string{"eks.amazonaws.com/nodegroup": "my-node-group"}, EKS),
+		Entry("AKS platform detected", map[string]string{"kubernetes.azure.com/cluster": "my-aks-cluster"}, AKS),
+		Entry("OKE platform detected", map[string]string{"oke.oraclecloud.com/cluster": "my-oke-cluster"}, OKE),
+		Entry("HPE Ezmeral platform detected", map[string]string{"ezmeral.hpe.com/cluster": "my-ezmeral-cluster"}, Ezmeral),
+		Entry("Rancher RKE platform detected", map[string]string{"rke.cattle.io/version": "v1.2.3"}, RKE),
+		Entry("Unknown platform", map[string]string{}, K8s),
+	)
 
-			// Verify if the detected platform matches the expected type
-			if platform != tt.expected {
-				t.Errorf("expected %v, got %v", tt.expected, platform)
+	Context("GetClusterVersion", func() {
+		var fakeDiscovery *discoveryfake.FakeDiscovery
+
+		BeforeEach(func() {
+			fakeDiscovery = &discoveryfake.FakeDiscovery{
+				Fake: &testing.Fake{
+					RWMutex: sync.RWMutex{},
+				},
+				FakedServerVersion: &version.Info{
+					GitVersion: "v1.33.0",
+				},
 			}
 		})
-	}
-}
+
+		It("should return error when discovery client is nil", func() {
+			version, err := GetClusterVersion(nil)
+			Expect(err).To(HaveOccurred())
+			Expect(version).To(BeEmpty())
+		})
+
+		It("should return cluster version when server version is available", func() {
+			version, err := GetClusterVersion(fakeDiscovery)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(version).To(Equal("v1.33.0"))
+		})
+	})
+})
