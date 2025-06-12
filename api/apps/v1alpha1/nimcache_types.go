@@ -211,7 +211,7 @@ const (
 
 // EnvFromSecrets return the list of secrets that should be mounted as env vars.
 func (s *NIMSource) EnvFromSecrets() []corev1.EnvFromSource {
-	if s.NGC != nil && s.NGC.AuthSecret != "" {
+	if s.NGC != nil && s.NGC.AuthSecret != "" { // nolint:gocritic
 		return []corev1.EnvFromSource{
 			{
 				SecretRef: &corev1.SecretEnvSource{
@@ -227,6 +227,16 @@ func (s *NIMSource) EnvFromSecrets() []corev1.EnvFromSource {
 				SecretRef: &corev1.SecretEnvSource{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: s.DataStore.AuthSecret,
+					},
+				},
+			},
+		}
+	} else if s.HF != nil && s.HF.AuthSecret != "" {
+		return []corev1.EnvFromSource{
+			{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: s.HF.AuthSecret,
 					},
 				},
 			},
