@@ -109,10 +109,12 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		Expect(err).ToNot(HaveOccurred())
 		trainingCM := loadConfigMapFromFile(filepath.Join(testDataDir, "training_config.yaml"))
 		modelsCM := loadConfigMapFromFile(filepath.Join(testDataDir, "models_config.yaml"))
+		modelTargetsCM := loadConfigMapFromFile(filepath.Join(testDataDir, "models_config_targets.yaml"))
 
 		// Register the test ConfigMaps in the cluster
 		Expect(reconciler.GetClient().Create(ctx, trainingCM)).To(Succeed())
 		Expect(reconciler.GetClient().Create(ctx, modelsCM)).To(Succeed())
+		Expect(reconciler.GetClient().Create(ctx, modelTargetsCM)).To(Succeed())
 
 		nemoCustomizer = &appsv1alpha1.NemoCustomizer{
 			ObjectMeta: metav1.ObjectMeta{
@@ -365,6 +367,13 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		if err := k8sClient.Get(ctx, modelsCMName, modelsCM); err == nil {
 			Expect(k8sClient.Delete(ctx, modelsCM)).To(Succeed())
 		}
+
+		// Delete the models targets config
+		modelTargetsCMName := types.NamespacedName{Name: "nemo-model-target-config", Namespace: "default"}
+		modelTargetsCM := &corev1.ConfigMap{}
+		if err := k8sClient.Get(ctx, modelTargetsCMName, modelTargetsCM); err == nil {
+			Expect(k8sClient.Delete(ctx, modelTargetsCM)).To(Succeed())
+		}
 	})
 
 	Describe("Reconcile", func() {
@@ -569,6 +578,74 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			models, ok := parsed["models"].(map[string]interface{})
 			Expect(ok).To(BeTrue(), "expected 'models' to be a map")
 			Expect(models).To(HaveKey("meta/llama-3.1-8b-instruct"))
+
+			Expect(parsed).To(HaveKeyWithValue("entity_store_url", "http://nemoentitystore-sample.nemo.svc.cluster.local:8000"))
+			Expect(parsed).To(HaveKeyWithValue("nemo_data_store_url", "http://nemodatastore-sample.nemo.svc.cluster.local:8000"))
+			Expect(parsed).To(HaveKeyWithValue("mlflow_tracking_url", "http://mlflow-tracking.nemo.svc.cluster.local:80"))
+		})
+
+		It("should create customizer config with model targets and templates", func() {
+			namespacedName := types.NamespacedName{Name: nemoCustomizer.Name, Namespace: "default"}
+
+			// use models config map with targets and templates
+			nemoCustomizer.Spec.Models.Name = "nemo-model-config-targets"
+
+			err := client.Create(context.TODO(), nemoCustomizer)
+			Expect(err).NotTo(HaveOccurred())
+			err = client.Create(context.TODO(), secrets)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			err = client.Get(ctx, namespacedName, nemoCustomizer)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(nemoCustomizer.Finalizers).To(ContainElement(NemoCustomizerFinalizer))
+
+			// Check that the customizer config map was created
+			configMap := &corev1.ConfigMap{}
+			err = client.Get(context.TODO(), types.NamespacedName{
+				Name:      nemoCustomizer.Name,
+				Namespace: nemoCustomizer.Namespace,
+			}, configMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify metadata
+			Expect(configMap.Name).To(Equal(nemoCustomizer.GetName()))
+			Expect(configMap.Namespace).To(Equal(nemoCustomizer.Namespace))
+			// Verify key exists
+			Expect(configMap.Data).To(HaveKey("config.yaml"))
+			configData := configMap.Data["config.yaml"]
+			Expect(configData).NotTo(BeEmpty())
+
+			// Verify presence of top-level keys
+			Expect(configData).To(ContainSubstring("training:"))
+			Expect(configData).To(ContainSubstring("customizationTargets:"))
+			Expect(configData).To(ContainSubstring("customizationConfigTemplates:"))
+			Expect(configData).ToNot(ContainSubstring("models:")) // "models" is deprecated from NMR v25.06
+			Expect(configData).To(ContainSubstring("model_download_jobs:"))
+
+			// Unmarshal the full merged config
+			var parsed map[string]interface{}
+			err = yaml.Unmarshal([]byte(configData), &parsed)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Validate model download jobs config with new secret params from NMR v25.06
+			training, ok := parsed["model_download_jobs"].(map[string]interface{})
+			Expect(ok).To(BeTrue(), "expected 'training' to be a map")
+			Expect(training).To(HaveKey("ngcSecretName"))
+			Expect(training).To(HaveKey("ngcSecretKey"))
+
+			// Validate model targets
+			modelTargets, ok := parsed["customizationTargets"].(map[string]interface{})
+			Expect(ok).To(BeTrue(), "expected 'modelTargets' to be a map")
+			Expect(modelTargets).To(HaveKey("targets"))
+
+			// Validate model config templates
+			configTemplates, ok := parsed["customizationConfigTemplates"].(map[string]interface{})
+			Expect(ok).To(BeTrue(), "expected 'configTemplates' to be a map")
+			Expect(configTemplates).To(HaveKey("templates"))
 
 			Expect(parsed).To(HaveKeyWithValue("entity_store_url", "http://nemoentitystore-sample.nemo.svc.cluster.local:8000"))
 			Expect(parsed).To(HaveKeyWithValue("nemo_data_store_url", "http://nemodatastore-sample.nemo.svc.cluster.local:8000"))
