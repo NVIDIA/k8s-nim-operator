@@ -245,7 +245,7 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	nimServiceBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMService{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -278,13 +278,21 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&appsv1alpha1.NIMCache{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNIMCacheToNIMService),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Watches(
+		)
+
+	crdExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
+	if err != nil {
+		return err
+	}
+	if crdExists {
+		nimServiceBuilder = nimServiceBuilder.Watches(
 			&resourcev1beta2.ResourceClaim{},
 			handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+		)
+	}
+
+	return nimServiceBuilder.Complete(r)
 }
 
 func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {

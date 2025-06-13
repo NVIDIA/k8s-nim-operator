@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	discoveryfake "k8s.io/client-go/discovery/fake"
 	testing "k8s.io/client-go/testing"
@@ -80,6 +81,91 @@ var _ = Describe("K8s util tests", func() {
 			version, err := GetClusterVersion(fakeDiscovery)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(version).To(Equal("v1.33.0"))
+		})
+	})
+
+	Context("CRDExists", func() {
+		var fakeDiscovery *discoveryfake.FakeDiscovery
+
+		BeforeEach(func() {
+			fakeDiscovery = &discoveryfake.FakeDiscovery{
+				Fake: &testing.Fake{
+					RWMutex: sync.RWMutex{},
+				},
+			}
+		})
+
+		It("should return error when discovery client is nil", func() {
+			exists, err := CRDExists(nil, schema.GroupVersionResource{
+				Group:    "test.example.com",
+				Version:  "v1",
+				Resource: "testresources",
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
+
+		It("should return false when CRD is not found", func() {
+			fakeDiscovery.Resources = []*metav1.APIResourceList{
+				{
+					GroupVersion: "test.example.com/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name: "otherresources",
+						},
+					},
+				},
+			}
+
+			exists, err := CRDExists(fakeDiscovery, schema.GroupVersionResource{
+				Group:    "test.example.com",
+				Version:  "v1",
+				Resource: "testresources",
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
+
+		It("should return true when CRD exists", func() {
+			fakeDiscovery.Resources = []*metav1.APIResourceList{
+				{
+					GroupVersion: "test.example.com/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name: "testresources",
+						},
+					},
+				},
+			}
+
+			exists, err := CRDExists(fakeDiscovery, schema.GroupVersionResource{
+				Group:    "test.example.com",
+				Version:  "v1",
+				Resource: "testresources",
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeTrue())
+		})
+
+		It("should return false when group version is not found", func() {
+			fakeDiscovery.Resources = []*metav1.APIResourceList{
+				{
+					GroupVersion: "other.example.com/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name: "testresources",
+						},
+					},
+				},
+			}
+
+			exists, err := CRDExists(fakeDiscovery, schema.GroupVersionResource{
+				Group:    "test.example.com",
+				Version:  "v1",
+				Resource: "testresources",
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
 		})
 	})
 })
