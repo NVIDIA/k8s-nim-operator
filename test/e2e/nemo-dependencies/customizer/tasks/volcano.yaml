@@ -6,16 +6,40 @@
 - name: Update Helm repositories cache
   command: helm repo update
 
+- name: Get Kube API resources
+  command: kubectl api-resources --verbs=list --namespaced -o name
+  register: api_resources
+
+- name: Check if the current cluster is OpenShift
+  set_fact:
+    is_openshift: "{{ 'routes.route.openshift.io' in api_resources.stdout_lines }}"
+
+- name: OpenShift - Prepare RBAC to use hostmount-anyuid SCC
+  ansible.builtin.template:
+    src: volcano-oc-rbac.yaml.j2
+    dest: volcano-oc-rbac.yaml
+  when: is_openshift 
+
+- name: OpenShift - apply RBAC to use hostmount-anyuid SCC
+  command: kubectl apply -f volcano-oc-rbac.yaml
+  when: is_openshift 
+
 - name: Install Volcano Helm chart in Kubernetes cluster
   shell: |
     helm upgrade --install {{ volcano.helm_repo_name }} {{ volcano.chart_name }} \
       --namespace {{ namespace }} \
       --version {{ volcano.chart_version }}
 
-- name: Wait for Volcano pods to be created (timeout = 300s)
-  shell: |
-    timeout 300s bash -c 'until kubectl get pods -n {{ namespace }} | grep -q volcano; do sleep 1; done'
-  register: wait_result
+- name: Wait for Volcano deployments to be available
+  command: kubectl rollout status deployment/{{ item }} -n {{ namespace }} --timeout=300s
+  loop:
+    - volcano-scheduler
+    - volcano-admission
+    - volcano-controllers
+  register: rollout_status
+  retries: 5
+  delay: 10
+  until: rollout_status.rc == 0
 
 - name: Run Volcano Job if validation is enabled
   block:
