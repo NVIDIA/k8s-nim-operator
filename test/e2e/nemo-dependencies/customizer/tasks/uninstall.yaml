@@ -13,9 +13,10 @@
   ignore_errors: true
 
 - name: Delete Volcano Kubernetes resources
-  shell: kubectl get {{ item }} | egrep 'volcano|mlflow' | awk '{print $1}' | xargs kubectl delete {{ item }}
+  shell: kubectl get {{ item }} -n {{ namespace }} | egrep 'volcano|mlflow' | awk '{print $1}' | xargs kubectl delete {{ item }} -n {{ namespace }}
   loop:
     - crd
+    - serviceaccount
     - clusterrole
     - clusterrolebinding
     - mutatingwebhookconfiguration
