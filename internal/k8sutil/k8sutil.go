@@ -24,6 +24,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/utils/ptr"
@@ -296,11 +297,31 @@ func GetRawYAMLFromConfigMap(ctx context.Context, k8sClient client.Client, names
 
 func GetClusterVersion(discoveryClient discovery.DiscoveryInterface) (string, error) {
 	if discoveryClient == nil {
-		return "", fmt.Errorf("client not provided")
+		return "", fmt.Errorf("discoveryClient not provided")
 	}
 	versionInfo, err := discoveryClient.ServerVersion()
 	if err != nil {
 		return "", err
 	}
 	return versionInfo.GitVersion, nil
+}
+
+func CRDExists(discoveryClient discovery.DiscoveryInterface, gvr schema.GroupVersionResource) (bool, error) {
+	if discoveryClient == nil {
+		return false, fmt.Errorf("discoveryClient not provided")
+	}
+	resources, err := discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
+	if err != nil {
+		// If the resource is not found, then the CRD is not enabled.
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	for _, resource := range resources.APIResources {
+		if resource.Name == gvr.Resource {
+			return true, nil
+		}
+	}
+	return false, nil
 }
