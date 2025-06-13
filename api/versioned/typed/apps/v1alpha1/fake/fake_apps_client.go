@@ -27,6 +27,10 @@ type FakeAppsV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAppsV1alpha1) NIMBuilds(namespace string) v1alpha1.NIMBuildInterface {
+	return &FakeNIMBuilds{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) NIMCaches(namespace string) v1alpha1.NIMCacheInterface {
 	return &FakeNIMCaches{c, namespace}
 }
