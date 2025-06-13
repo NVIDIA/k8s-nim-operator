@@ -31,11 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
@@ -87,7 +85,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 					Services: []appsv1alpha1.NIMServicePipelineSpec{
 						{
 							Name:    "nim-llm-service",
-							Enabled: utils.BoolPtr(true),
+							Enabled: ptr.To(true),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Image: appsv1alpha1.Image{
 									Repository: "llm-nim-container",
@@ -108,7 +106,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 						},
 						{
 							Name:    "nim-embedding-service",
-							Enabled: utils.BoolPtr(false),
+							Enabled: ptr.To(false),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Image: appsv1alpha1.Image{
 									Repository: "llm-embedding-container",
@@ -154,7 +152,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 					Services: []appsv1alpha1.NIMServicePipelineSpec{
 						{
 							Name:    "nim-llm-service",
-							Enabled: utils.BoolPtr(true),
+							Enabled: ptr.To(true),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Image: appsv1alpha1.Image{
 									Repository: "llm-nim-container",
@@ -175,7 +173,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 						},
 						{
 							Name:    "nim-embedding-service",
-							Enabled: utils.BoolPtr(false),
+							Enabled: ptr.To(false),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Image: appsv1alpha1.Image{
 									Repository: "llm-embedding-container",
@@ -198,7 +196,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 			namespacedName := types.NamespacedName{Name: "test-pipeline", Namespace: "default"}
 			Expect(client.Get(context.TODO(), namespacedName, updatePipeline)).To(Succeed())
 
-			updatePipeline.Spec.Services[1].Enabled = utils.BoolPtr(true)
+			updatePipeline.Spec.Services[1].Enabled = ptr.To(true)
 			Expect(client.Update(ctx, updatePipeline)).To(Succeed())
 
 			// Reconcile the resource
@@ -214,7 +212,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 
 			// Disable nim-llm-service in the pipeline spec
-			updatePipeline.Spec.Services[0].Enabled = utils.BoolPtr(false)
+			updatePipeline.Spec.Services[0].Enabled = ptr.To(false)
 			Expect(client.Update(ctx, updatePipeline)).To(Succeed())
 
 			// Reconcile the resource
@@ -241,7 +239,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 					Services: []appsv1alpha1.NIMServicePipelineSpec{
 						{
 							Name:    "nim-llm-service",
-							Enabled: utils.BoolPtr(true),
+							Enabled: ptr.To(true),
 							Spec: appsv1alpha1.NIMServiceSpec{
 								Image: appsv1alpha1.Image{
 									Repository: "llm-nim-container",
