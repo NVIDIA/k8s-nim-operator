@@ -52,6 +52,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	"k8s.io/apimachinery/pkg/version"
 
@@ -142,6 +143,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(networkingv1.AddToScheme(scheme)).To(Succeed())
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
+		Expect(lwsv1.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -1013,6 +1015,67 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 	})
 
+	Describe("LWS deployment for multi-node inferencing NIMService", func() {
+		AfterEach(func() {
+			lws := &lwsv1.LeaderWorkerSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-lws",
+					Namespace: "default",
+				},
+			}
+			err := client.Delete(context.TODO(), lws)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should report ready when LWS is available", func() {
+			lws := &lwsv1.LeaderWorkerSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-lws",
+					Namespace: "default",
+				},
+				Status: lwsv1.LeaderWorkerSetStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(lwsv1.LeaderWorkerSetAvailable),
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			}
+			err := client.Create(context.TODO(), lws)
+			Expect(err).NotTo(HaveOccurred())
+			msg, ready, err := reconciler.isLeaderWorkerSetReady(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(Equal(true))
+			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is ready", lws.Name)))
+		})
+		It("should report not ready when LWS is not available", func() {
+			lws := &lwsv1.LeaderWorkerSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-lws",
+					Namespace: "default",
+				},
+				Status: lwsv1.LeaderWorkerSetStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(lwsv1.LeaderWorkerSetProgressing),
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   string(lwsv1.LeaderWorkerSetAvailable),
+							Status: metav1.ConditionFalse,
+						},
+					},
+				},
+			}
+			err := client.Create(context.TODO(), lws)
+			Expect(err).NotTo(HaveOccurred())
+			msg, ready, err := reconciler.isLeaderWorkerSetReady(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(Equal(false))
+			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is not ready", lws.Name)))
+		})
+	})
 	Describe("update model status on NIMService", func() {
 		BeforeEach(func() {
 			ingress := &networkingv1.Ingress{
@@ -1470,6 +1533,23 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
 			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
+		})
+
+		It("should assign GPU resource equal to multiNode.GPUSPerPod in multi-node deployment", func() {
+			nimService.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{
+				GPUSPerPod: 2,
+			}
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{"tp": "4"},
+			}
+
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
+
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("2")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("2")))
 		})
 
 		It("should return an error if tensor parallelism cannot be parsed", func() {
