@@ -129,6 +129,157 @@ var _ = Describe("K8s Resources Rendering", func() {
 	templatesDir := filepath.Join(path.Dir(path.Dir(cwd)), "manifests")
 
 	Context("Rendering templates", func() {
+		It("should render LeaderWorkerSet template correctly", func() {
+			params := types.LeaderWorkerSetParams{
+				Name:             "test-lws",
+				Namespace:        "default",
+				Labels:           map[string]string{"app": "test-app"},
+				Annotations:      map[string]string{"annotation-key": "annotation-value"},
+				Replicas:         3,
+				Size:             2,
+				Image:            "nim-llm:latest",
+				ImagePullSecrets: []string{"ngc-secret"},
+				LeaderVolumes: []corev1.Volume{
+					{
+						Name: "test-leader-volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "test-leader-pvc",
+							},
+						},
+					},
+				},
+				WorkerVolumes: []corev1.Volume{
+					{
+						Name: "test-worker-volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "test-worker-pvc",
+							},
+						},
+					},
+				},
+				LeaderVolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "test-leader-volume",
+						MountPath: "/data",
+					},
+				},
+				WorkerVolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "test-worker-volume",
+						MountPath: "/data",
+					},
+				},
+				LeaderEnvs: []corev1.EnvVar{
+					{
+						Name:  "LEADER_ENV_VAR",
+						Value: "value",
+					},
+				},
+				WorkerEnvs: []corev1.EnvVar{
+					{
+						Name:  "WORKER_ENV_VAR",
+						Value: "value",
+					},
+				},
+				Ports: []corev1.ContainerPort{
+					{
+						ContainerPort: 8080,
+					},
+				},
+				Resources: &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+						corev1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("250m"),
+						corev1.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				},
+				ReadinessProbe: &corev1.Probe{
+					InitialDelaySeconds: 15,
+					TimeoutSeconds:      1,
+					PeriodSeconds:       10,
+					SuccessThreshold:    1,
+					FailureThreshold:    3,
+					ProbeHandler: corev1.ProbeHandler{
+						HTTPGet: &corev1.HTTPGetAction{
+							Path: "/v1/health/live",
+							Port: intstr.FromString("8080"),
+						},
+					},
+				},
+				LivenessProbe: &corev1.Probe{
+					InitialDelaySeconds: 15,
+					TimeoutSeconds:      1,
+					PeriodSeconds:       10,
+					SuccessThreshold:    1,
+					FailureThreshold:    3,
+					ProbeHandler: corev1.ProbeHandler{
+						HTTPGet: &corev1.HTTPGetAction{
+							Path: "/v1/health/ready",
+							Port: intstr.FromString("8080"),
+						},
+					},
+				},
+				StartupProbe: &corev1.Probe{
+					InitialDelaySeconds: 15,
+					TimeoutSeconds:      1,
+					PeriodSeconds:       10,
+					SuccessThreshold:    1,
+					FailureThreshold:    3,
+					ProbeHandler: corev1.ProbeHandler{
+						HTTPGet: &corev1.HTTPGetAction{
+							Path: "/v1/health/ready",
+							Port: intstr.FromString("8080"),
+						},
+					},
+				},
+				NodeSelector: map[string]string{"disktype": "ssd"},
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "key1",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				},
+			}
+
+			r := render.NewRenderer(templatesDir)
+			lws, err := r.LeaderWorkerSet(&params)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(lws.Name).To(Equal("test-lws"))
+			Expect(lws.Namespace).To(Equal("default"))
+			Expect(lws.Labels["app"]).To(Equal("test-app"))
+			Expect(lws.Annotations["annotation-key"]).To(Equal("annotation-value"))
+			Expect(*lws.Spec.Replicas).To(Equal(int32(3)))
+			Expect(*lws.Spec.LeaderWorkerTemplate.Size).To(Equal(int32(2)))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0].Name).To(Equal("nim-leader"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0].Image).To(Equal("nim-llm:latest"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers[0].Name).To(Equal("nim-worker"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers[0].Image).To(Equal("nim-llm:latest"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Volumes[0].Name).To(Equal("test-leader-volume"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal("test-leader-pvc"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Volumes[0].Name).To(Equal("test-worker-volume"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal("test-worker-pvc"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0].VolumeMounts[0].Name).To(Equal("test-leader-volume"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0].VolumeMounts[0].MountPath).To(Equal("/data"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers[0].VolumeMounts[0].Name).To(Equal("test-worker-volume"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers[0].VolumeMounts[0].MountPath).To(Equal("/data"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0].ReadinessProbe).ToNot(BeNil())
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0].StartupProbe).ToNot(BeNil())
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0].LivenessProbe).ToNot(BeNil())
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.ImagePullSecrets[0].Name).To(Equal("ngc-secret"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.ImagePullSecrets[0].Name).To(Equal("ngc-secret"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0].Ports[0].ContainerPort).To(Equal(int32(8080)))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers[0].Ports[0].ContainerPort).To(Equal(int32(8080)))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.NodeSelector).To(Equal(map[string]string{"disktype": "ssd"}))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.NodeSelector).To(Equal(map[string]string{"disktype": "ssd"}))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Tolerations).To(Equal([]corev1.Toleration{{Key: "key1", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule}}))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Tolerations).To(Equal([]corev1.Toleration{{Key: "key1", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule}}))
+		})
 		It("should render Deployment template correctly", func() {
 			params := types.DeploymentParams{
 				Name:          "test-deployment",
