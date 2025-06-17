@@ -19,7 +19,6 @@ package shared
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
@@ -122,78 +121,52 @@ func GetPodResourceClaims(draResources []NamedDRAResource) []corev1.PodResourceC
 	return claims
 }
 
-func GenerateDRAResourceStatus(ctx context.Context, client client.Client, namespace string, draResources []NamedDRAResource) ([]appsv1alpha1.DRAResourceStatus, error) {
+func GenerateDRAResourceStatuses(ctx context.Context, client client.Client, namespace string, draResources []NamedDRAResource) ([]appsv1alpha1.DRAResourceStatus, error) {
 	statuses := make([]appsv1alpha1.DRAResourceStatus, len(draResources))
 	for idx, resource := range draResources {
-		status := appsv1alpha1.DRAResourceStatus{
-			Name: resource.Name,
-		}
-		status.ResourceClaims = make([]appsv1alpha1.DRAResourceClaimStatus, 0)
-		// Process resource claim template.
-		if resource.ResourceClaimTemplateName != nil {
-			status.ResourceClaimTemplateName = resource.ResourceClaimTemplateName
-		}
-
-		claimStatuses, err := generateDRAResourceClaimStatus(ctx, client, namespace, &resource)
+		status, err := generateDRAResourceStatus(ctx, client, namespace, &resource)
 		if err != nil {
 			return nil, err
 		}
-		status.ResourceClaims = claimStatuses
-		statuses[idx] = status
+		statuses[idx] = *status
 	}
 	return statuses, nil
 }
 
-func generateDRAResourceClaimStatus(ctx context.Context, client client.Client, namespace string, resource *NamedDRAResource) ([]appsv1alpha1.DRAResourceClaimStatus, error) {
-	claimStatuses := make([]appsv1alpha1.DRAResourceClaimStatus, 0)
-	// For resource claims, verify the resource claim exists before adding it to the status.
+func generateDRAResourceStatus(ctx context.Context, client client.Client, namespace string, resource *NamedDRAResource) (*appsv1alpha1.DRAResourceStatus, error) {
+	status := &appsv1alpha1.DRAResourceStatus{
+		Name: resource.Name,
+	}
 	if resource.ResourceClaimName != nil {
 		claim, err := k8sutil.GetResourceClaim(ctx, client, *resource.ResourceClaimName, namespace)
 		if err != nil {
 			return nil, err
 		}
-		claimStatus := appsv1alpha1.DRAResourceClaimStatus{
-			Name:  claim.GetName(),
-			State: getDRAResourceClaimState(claim),
-		}
-		claimStatuses = append(claimStatuses, claimStatus)
-		return claimStatuses, nil
+		status.ResourceClaimStatus = getDRAResourceClaimStatus(claim)
+		return status, nil
 	}
-
-	// For resource claim templates, we need to fetch all resource claims that match the pod claim name.
 	if resource.ResourceClaimTemplateName != nil {
+		claimTemplateStatus := appsv1alpha1.DRAResourceClaimTemplateStatusInfo{
+			Name: *resource.ResourceClaimTemplateName,
+		}
+
 		resourceClaims, err := k8sutil.ListResourceClaimsByPodClaimName(ctx, client, namespace, resource.Name)
 		if err != nil {
 			return nil, err
 		}
 		for _, claim := range resourceClaims {
-			// Ignore claims that are being deleted.
-			if claim.GetDeletionTimestamp() != nil {
-				continue
-			}
-			claimStatuses = append(claimStatuses, appsv1alpha1.DRAResourceClaimStatus{
-				Name:  claim.GetName(),
-				State: getDRAResourceClaimState(&claim),
-			})
+			claimStatus := getDRAResourceClaimStatus(&claim)
+			claimTemplateStatus.ResourceClaimStatuses = append(claimTemplateStatus.ResourceClaimStatuses, *claimStatus)
 		}
+		status.ResourceClaimTemplateStatus = &claimTemplateStatus
 	}
-	return claimStatuses, nil
+	return status, nil
 }
 
-func getDRAResourceClaimState(claim *resourcev1beta2.ResourceClaim) string {
-	var states []string
-	if claim.GetDeletionTimestamp() != nil {
-		states = append(states, "deleted")
+func getDRAResourceClaimStatus(resourceClaim *resourcev1beta2.ResourceClaim) *appsv1alpha1.DRAResourceClaimStatusInfo {
+	claimStatus := &appsv1alpha1.DRAResourceClaimStatusInfo{
+		Name:  resourceClaim.GetName(),
+		State: k8sutil.GetResourceClaimState(resourceClaim),
 	}
-	if claim.Status.Allocation == nil {
-		if claim.GetDeletionTimestamp() == nil {
-			states = append(states, "pending")
-		}
-	} else {
-		states = append(states, "allocated")
-		if len(claim.Status.ReservedFor) > 0 {
-			states = append(states, "reserved")
-		}
-	}
-	return strings.Join(states, ",")
+	return claimStatus
 }

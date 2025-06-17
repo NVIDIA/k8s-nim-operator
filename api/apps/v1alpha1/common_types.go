@@ -294,17 +294,22 @@ type DRAResource struct {
 }
 
 // DRAResourceStatus defines the status of the DRAResource.
+// +kubebuilder:validation:XValidation:rule="has(self.resourceClaimStatus) != has(self.resourceClaimTemplateStatus)",message="exactly one of resourceClaimStatus and resourceClaimTemplateStatus must be set."
 type DRAResourceStatus struct {
+	// Name is the pod claim name referenced in the pod spec as `spec.resourceClaims[].name` for this DRA resource.
 	Name string `json:"name"`
-	// ResourceClaimTemplateName is the name of the ResourceClaimTemplate that was
-	// used to generate the ResourceClaim for an instance of NIMService.
-	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
-	// ResourceClaims is the status of resource claims.
-	ResourceClaims []DRAResourceClaimStatus `json:"resourceClaims,omitempty"`
+	// ResourceClaimStatus is the status of the resource claim in this DRA resource.
+	//
+	// Exactly one of resourceClaimStatus and resourceClaimTemplateStatus will be set.
+	ResourceClaimStatus *DRAResourceClaimStatusInfo `json:"resourceClaimStatus,omitempty"`
+	// ResourceClaimTemplateStatus is the status of the resource claim template in this DRA resource.
+	//
+	// Exactly one of resourceClaimStatus and resourceClaimTemplateStatus will be set.
+	ResourceClaimTemplateStatus *DRAResourceClaimTemplateStatusInfo `json:"resourceClaimTemplateStatus,omitempty"`
 }
 
-// DRAResourceClaimStatus defines the status of the DRAResourceClaim.
-type DRAResourceClaimStatus struct {
+// DRAResourceClaimStatusInfo defines the status of a ResourceClaim referenced in the DRAResource.
+type DRAResourceClaimStatusInfo struct {
 	// Name is the name of the ResourceClaim.
 	Name string `json:"name"`
 	// State is the state of the ResourceClaim.
@@ -316,4 +321,12 @@ type DRAResourceClaimStatus struct {
 	//
 	// +kubebuilder:validation:default=pending
 	State string `json:"state"`
+}
+
+// DRAResourceClaimTemplateStatusInfo defines the status of a ResourceClaimTemplate referenced in the DRAResource.
+type DRAResourceClaimTemplateStatusInfo struct {
+	// Name is the name of the resource claim template.
+	Name string `json:"name"`
+	// ResourceClaimStatuses is the statuses of the generated resource claims from this resource claim template.
+	ResourceClaimStatuses []DRAResourceClaimStatusInfo `json:"resourceClaimStatuses,omitempty"`
 }
