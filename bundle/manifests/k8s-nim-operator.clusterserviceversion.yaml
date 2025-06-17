@@ -744,9 +744,12 @@ spec:
               resources:
               - events
               verbs:
+              - get
               - create
               - patch
               - update
+              - list
+              - watch
       clusterPermissions:
         - serviceAccountName: k8s-nim-operator
           rules:
@@ -763,9 +766,12 @@ spec:
               resources:
               - events
               verbs:
+              - get
               - create
               - patch
               - update
+              - list
+              - watch
             - apiGroups:
                 - ''
               resources:
@@ -1206,6 +1212,18 @@ spec:
               - get
               - list
               - watch
+            - apiGroups:
+              - run.ai
+              resources:
+              - trainingworkloads
+              - runaijobs
+              verbs:
+              - get
+              - list
+              - watch
+              - delete
+              - patch
+              - update
             - apiGroups:
               - nvidia.com
               resources:

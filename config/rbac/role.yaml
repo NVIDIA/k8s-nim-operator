@@ -30,8 +30,11 @@ rules:
   - events
   verbs:
   - create
+  - get
+  - list
   - patch
   - update
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -213,6 +216,19 @@ rules:
   - route.openshift.io
   resources:
   - routes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - run.ai
+  resources:
+  - runaijobs
+  - trainingworkloads
   verbs:
   - create
   - delete
