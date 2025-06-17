@@ -192,10 +192,10 @@ type ModelDownloadJobsConfig struct {
 	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
 
 	// NGCSecret is the secret containing the NGC API key
-	NGCSecret NGCSecret `json:"ngcAPISecret,omitempty"`
+	NGCSecret *NGCSecret `json:"ngcAPISecret,omitempty"`
 
 	// HFSecret is the secret containing the HF_TOKEN key
-	HFSecret HFSecret `json:"hfSecret,omitempty"`
+	HFSecret *HFSecret `json:"hfSecret,omitempty"`
 
 	// Optional security context for the job pods
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
