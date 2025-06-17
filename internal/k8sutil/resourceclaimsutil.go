@@ -19,6 +19,7 @@ limitations under the License.
 import (
 	"context"
 	"sort"
+	"strings"
 
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,4 +55,22 @@ func GetResourceClaim(ctx context.Context, k8sclient client.Client, name string,
 		return nil, err
 	}
 	return claim, nil
+}
+
+func GetResourceClaimState(claim *resourcev1beta2.ResourceClaim) string {
+	var states []string
+	if claim.GetDeletionTimestamp() != nil {
+		states = append(states, "deleted")
+	}
+	if claim.Status.Allocation == nil {
+		if claim.GetDeletionTimestamp() == nil {
+			states = append(states, "pending")
+		}
+	} else {
+		states = append(states, "allocated")
+		if len(claim.Status.ReservedFor) > 0 {
+			states = append(states, "reserved")
+		}
+	}
+	return strings.Join(states, ",")
 }
