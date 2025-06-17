@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -36,9 +35,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -223,6 +224,23 @@ func (r *NIMBuildReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.O
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nimbuild-controller")
+
+	err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&appsv1alpha1.NIMBuild{},
+		"spec.nimCacheRef",
+		func(rawObj client.Object) []string {
+			nimBuild, ok := rawObj.(*appsv1alpha1.NIMBuild)
+			if !ok {
+				return []string{}
+			}
+			return []string{nimBuild.Spec.NIMCacheRef}
+		},
+	)
+	if err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMBuild{}).
 		Owns(&corev1.Pod{}).
@@ -238,15 +256,50 @@ func (r *NIMBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 							return true
 						}
 
-						// Handle only spec updates
-						return !reflect.DeepEqual(oldNIMBuild.Spec, newNIMBuild.Spec)
+						// Allow only status updates
+						// Reject updates that change anything other than status
+						// Spec is immutable
+						if !reflect.DeepEqual(oldNIMBuild.Spec, newNIMBuild.Spec) {
+							return false
+						}
+						// Allow if only status changed
+						return !reflect.DeepEqual(oldNIMBuild.Status, newNIMBuild.Status)
 					}
 				}
 				// For other types we watch, reconcile them
 				return true
 			},
-		}).
+		}).Watches(
+		&appsv1alpha1.NIMCache{},
+		handler.EnqueueRequestsFromMapFunc(r.mapNIMCacheToNIMBuild),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	).
 		Complete(r)
+}
+
+func (r *NIMBuildReconciler) mapNIMCacheToNIMBuild(ctx context.Context, obj client.Object) []ctrl.Request {
+	nimCache, ok := obj.(*appsv1alpha1.NIMCache)
+	if !ok {
+		return []ctrl.Request{}
+	}
+
+	// Get all NIMBuilds that reference this NIMCache
+	var nimBuilds appsv1alpha1.NIMBuildList
+	if err := r.List(ctx, &nimBuilds, client.MatchingFields{"spec.nimCacheRef": nimCache.GetName()}, client.InNamespace(nimCache.GetNamespace())); err != nil {
+		return []ctrl.Request{}
+	}
+
+	// Enqueue reconciliation for each matching NIMBuild object
+	requests := make([]ctrl.Request, len(nimBuilds.Items))
+	for i, item := range nimBuilds.Items {
+		requests[i] = ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.Name,
+				Namespace: item.Namespace,
+			},
+		}
+	}
+	return requests
 }
 
 func (r *NIMBuildReconciler) cleanupNIMBuild(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild) error {
@@ -289,29 +342,38 @@ func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *ap
 	nimCache := &appsv1alpha1.NIMCache{}
 	if err := r.Get(ctx, nimCacheNamespacedName, nimCache); err != nil {
 		logger.Error(err, "unable to fetch NIMCache for NIMBuild", "NIMCache", nimCacheNamespacedName)
+		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNIMCacheNotFound, metav1.ConditionTrue, "NIMCache not found", "Not able to get NIMCache for NIMBuild")
+		nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
 		return ctrl.Result{}, err
 	}
 
-	if nimCache.Status.State == appsv1alpha1.NimCacheStatusReady {
+	switch nimCache.Status.State {
+	case appsv1alpha1.NimCacheStatusReady:
+		logger.V(4).Info("NIMCache is ready", "nimcache", nimCache.Name, "nimservice", nimBuild.Name)
+	case appsv1alpha1.NimCacheStatusFailed:
+		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNimCacheFailed, metav1.ConditionTrue, "NIMCache failed", "NIMCache is failed. NIMBuild can not progress")
+		nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
+		return ctrl.Result{}, nil
+	default:
+		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionWaitForNimCache, metav1.ConditionTrue, "NIMCache not ready", "Waiting for NIMCache to be ready before building engines")
+		nimBuild.Status.State = appsv1alpha1.NimBuildStatusPending
+		return ctrl.Result{}, nil
+	}
+
+	if !meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted) {
 		err := r.reconcileEngineBuild(ctx, nimBuild, nimCache)
 		if err != nil {
 			logger.Error(err, "reconciliation of nimbuild failed")
 			return ctrl.Result{}, err
 		}
+	}
 
-		if meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted) && !meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionModelManifestPodCompleted) {
-			err = r.reconcileLocalModelManifest(ctx, nimBuild, nimCache)
-			if err != nil {
-				logger.Error(err, "reconciliation of nimbuild failed")
-				return ctrl.Result{}, err
-			}
+	if meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted) && !meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionModelManifestPodCompleted) {
+		err := r.reconcileLocalModelManifest(ctx, nimBuild, nimCache)
+		if err != nil {
+			logger.Error(err, "reconciliation of nimbuild failed")
+			return ctrl.Result{}, err
 		}
-
-	} else {
-		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionWaitForNimCache, metav1.ConditionTrue, "NIMCache not ready", "Waiting for NIMCache to be ready before building engines")
-		nimBuild.Status.State = appsv1alpha1.NimBuildStatusPending
-		return ctrl.Result{RequeueAfter: time.Second * 30}, nil
-
 	}
 
 	err := r.updateNIMBuildStatus(ctx, nimBuild)
@@ -325,9 +387,9 @@ func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *ap
 func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
 	buildableProfile := appsv1alpha1.NIMProfile{}
-	if nimBuild.Spec.ProfileName == "" {
+	if nimBuild.Spec.Profile == "" {
 		buildableProfiles := getBuildableProfiles(nimCache)
-		if buildableProfiles != nil {
+		if len(buildableProfiles) > 0 {
 			switch {
 			case len(buildableProfiles) > 1:
 				logger.Info("Multiple buildable profiles found", "Profiles", buildableProfiles)
@@ -351,9 +413,9 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 			nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
 		}
 	} else {
-		foundProfile := getBuildableProfileByName(nimCache, nimBuild.Spec.ProfileName)
+		foundProfile := getBuildableProfileByName(nimCache, nimBuild.Spec.Profile)
 		if foundProfile == nil {
-			logger.Info("No buildable profiles found", "ProfileName", nimBuild.Spec.ProfileName)
+			logger.Info("No buildable profiles found", "ProfileName", nimBuild.Spec.Profile)
 			conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNoBuildableProfilesFound, metav1.ConditionTrue, "NoBuildableProfilesFound", "No buildable profiles found, please select a valid profile from the NIM cache")
 			nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
 			return nil
@@ -475,7 +537,6 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 		"sidecar.istio.io/inject": "false",
 	}
 
-	// If no user-provided GPU resource is found, proceed with auto-assignment
 	// Get tensorParallelism from the profile
 	tensorParallelism, err := utils.GetTensorParallelismByProfileTags(nimProfile.Config)
 	if err != nil {
@@ -483,9 +544,32 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 		return nil, err
 	}
 
-	gpuQuantity, err := apiResource.ParseQuantity(tensorParallelism)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse tensorParallelism: %w", err)
+	// Ensure Resources, Requests, and Limits are initialized
+	if nimBuild.Spec.Resources == nil {
+		nimBuild.Spec.Resources = &corev1.ResourceRequirements{}
+	}
+	if nimBuild.Spec.Resources.Requests == nil {
+		nimBuild.Spec.Resources.Requests = corev1.ResourceList{}
+	}
+	if nimBuild.Spec.Resources.Limits == nil {
+		nimBuild.Spec.Resources.Limits = corev1.ResourceList{}
+	}
+	if tensorParallelism == "" {
+		if _, present := nimBuild.Spec.Resources.Requests["nvidia.com/gpu"]; !present {
+			return nil, fmt.Errorf("tensorParallelism is not set in the profile tags or resources")
+		}
+	} else {
+		if _, present := nimBuild.Spec.Resources.Requests["nvidia.com/gpu"]; !present {
+			gpuQuantity, err := apiResource.ParseQuantity(tensorParallelism)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse tensorParallelism: %w", err)
+			}
+			nimBuild.Spec.Resources.Requests["nvidia.com/gpu"] = gpuQuantity
+			nimBuild.Spec.Resources.Limits["nvidia.com/gpu"] = gpuQuantity
+
+		} else {
+			return nil, fmt.Errorf("tensorParallelism is set in the profile tags, but nvidia.com/gpu is already set in resources")
+		}
 	}
 
 	if platformType == k8sutil.OpenShift {
@@ -518,10 +602,9 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 					},
 				},
 			},
-			ImagePullSecrets:   []corev1.LocalObjectReference{},
-			ServiceAccountName: NIMCacheServiceAccount,
-			Tolerations:        nimCache.GetTolerations(),
-			NodeSelector:       nimCache.GetNodeSelectors(),
+			ImagePullSecrets: []corev1.LocalObjectReference{},
+			Tolerations:      nimBuild.GetTolerations(),
+			NodeSelector:     nimBuild.GetNodeSelectors(),
 		},
 	}
 
@@ -573,18 +656,7 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 					SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 				},
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]apiResource.Quantity{
-					"cpu":            nimCache.Spec.Resources.CPU,
-					"memory":         nimCache.Spec.Resources.Memory,
-					"nvidia.com/gpu": gpuQuantity,
-				},
-				Requests: map[corev1.ResourceName]apiResource.Quantity{
-					"cpu":            nimCache.Spec.Resources.CPU,
-					"memory":         nimCache.Spec.Resources.Memory,
-					"nvidia.com/gpu": gpuQuantity,
-				},
-			},
+			Resources:                *nimBuild.Spec.Resources,
 			TerminationMessagePath:   "/dev/termination-log",
 			TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 			Ports: []corev1.ContainerPort{{
@@ -734,7 +806,7 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 	}
 	logger.V(2).Info("local manifest file", "nimbuild", nimBuild.Name, "manifest", manifest)
 
-	// Create a ConfigMap with the model manifest file for re-use
+	// Update a ConfigMap with the model manifest file for re-use
 	err = r.updateManifestConfigMap(ctx, nimCache, &manifest)
 	if err != nil {
 		logger.Error(err, "Failed to create model manifest config map")
@@ -831,10 +903,8 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 					},
 				},
 			},
-			ImagePullSecrets:   []corev1.LocalObjectReference{},
-			ServiceAccountName: NIMCacheServiceAccount,
-			Tolerations:        nimCache.GetTolerations(),
-			NodeSelector:       nimCache.GetNodeSelectors(),
+			Tolerations:  nimBuild.GetTolerations(),
+			NodeSelector: nimBuild.GetNodeSelectors(),
 		},
 	}
 
@@ -859,16 +929,6 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 				RunAsGroup:   nimCache.GetGroupID(),
 				RunAsUser:    nimCache.GetUserID(),
 			},
-			Resources: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]apiResource.Quantity{
-					"cpu":    nimCache.Spec.Resources.CPU,
-					"memory": nimCache.Spec.Resources.Memory,
-				},
-				Requests: map[corev1.ResourceName]apiResource.Quantity{
-					"cpu":    nimCache.Spec.Resources.CPU,
-					"memory": nimCache.Spec.Resources.Memory,
-				},
-			},
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      "nim-cache-volume",
@@ -883,10 +943,8 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 			Name: nimCache.Spec.Source.NGC.PullSecret,
 		},
 	}
-
 	// Merge env with the user provided values
 	pod.Spec.Containers[0].Env = utils.MergeEnvVars(pod.Spec.Containers[0].Env, nimCache.Spec.Env)
-
 	return pod
 }
 

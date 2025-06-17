@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,22 +28,18 @@ import (
 type NIMBuildSpec struct {
 	// Required: Reference to the model weights from NIMCache
 	NIMCacheRef string `json:"nimCacheRef"`
-	// Required: Profile name for this engine build
-	ProfileName string `json:"profileName,omitempty"`
-	// Required: Number of GPUs to build the engine with
-	Parallelism int `json:"parallelism,omitempty"`
-	// Optional: Any user-defined tags for tracking builds
+	// Profile name for this engine build
+	Profile string `json:"profile,omitempty"`
+	// Any user-defined tags for tracking builds
 	Tags map[string]string `json:"tags,omitempty"`
-	// Optional: Additional build params
+	// Additional build params
 	BuildParams []string `json:"additionalBuildParams,omitempty"`
-}
-
-// Parallelism defines the compute parallelism strategy for building the engine.
-type Parallelism struct {
-	// Number of tensor parallelism shards (splits model across GPUs at tensor level)
-	TP int `json:"tp"`
-	// Optional: Number of pipeline parallelism stages (model split across layers)
-	PP int `json:"pp,omitempty"`
+	// Resources is the resource requirements for the NIMBuild pod.
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Tolerations for running the job to cache the NIM model
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	// NodeSelector is the node selector labels to schedule the caching job.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 }
 
 // NIMBuildStatus defines the observed state of NIMBuild.
@@ -96,6 +93,10 @@ const (
 	// NimBuildConditionModelManifestPodCompleted indicates that the model manifest pod is in completed state.
 	NimBuildConditionModelManifestPodCompleted = "NIM_BUILD_MODEL_MANIFEST_POD_COMPLETED"
 
+	NimBuildConditionNIMCacheNotFound = "NIM_BUILD_NIM_CACHE_NOT_FOUND"
+
+	NimBuildConditionNimCacheFailed = "NIM_BUILD_NIM_CACHE_FAILED"
+
 	// NimBuildStatusNotReady indicates that build is not ready.
 	NimBuildStatusNotReady = "NotReady"
 
@@ -113,4 +114,14 @@ const (
 
 func init() {
 	SchemeBuilder.Register(&NIMBuild{}, &NIMBuildList{})
+}
+
+// GetTolerations returns tolerations configured for the NIMBuild Pod.
+func (n *NIMBuild) GetTolerations() []corev1.Toleration {
+	return n.Spec.Tolerations
+}
+
+// GetNodeSelectors returns nodeselectors configured for the NIMBuild Pod.
+func (n *NIMBuild) GetNodeSelectors() map[string]string {
+	return n.Spec.NodeSelector
 }
