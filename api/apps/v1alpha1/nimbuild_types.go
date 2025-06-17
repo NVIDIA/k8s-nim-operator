@@ -93,6 +93,8 @@ const (
 	NimBuildConditionEngineBuildPodCompleted = "NIM_BUILD_ENGINE_BUILD_POD_COMPLETED"
 	// NimBuildConditionEngineBuildPodPending indicates that the engine build pod is in pending state.
 	NimBuildConditionEngineBuildPodPending = "NIM_BUILD_ENGINE_BUILD_POD_PENDING"
+	// NimBuildConditionModelManifestPodCompleted indicates that the model manifest pod is in completed state.
+	NimBuildConditionModelManifestPodCompleted = "NIM_BUILD_MODEL_MANIFEST_POD_COMPLETED"
 
 	// NimBuildStatusNotReady indicates that build is not ready.
 	NimBuildStatusNotReady = "NotReady"

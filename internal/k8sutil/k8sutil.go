@@ -17,14 +17,18 @@ limitations under the License.
 package k8sutil
 
 import (
+	"bytes"
 	"context"
 	goerrors "errors"
 	"fmt"
+	"io"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -291,4 +295,33 @@ func GetRawYAMLFromConfigMap(ctx context.Context, k8sClient client.Client, names
 	}
 
 	return raw, nil
+}
+
+func GetPodLogs(ctx context.Context, pod *corev1.Pod, containerName string) (string, error) {
+	podLogOpts := corev1.PodLogOptions{Container: containerName}
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return "", err
+	}
+	// create a clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return "", err
+	}
+	req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOpts)
+	podLogs, err := req.Stream(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func(podLogs io.ReadCloser) {
+		_ = podLogs.Close()
+	}(podLogs)
+
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
