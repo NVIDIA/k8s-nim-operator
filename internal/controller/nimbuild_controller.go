@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -192,6 +193,11 @@ func (r *NIMBuildReconciler) GetClient() client.Client {
 
 func (r *NIMBuildReconciler) GetUpdater() conditions.Updater {
 	return r.updater
+}
+
+// GetDiscoveryClient returns the discovery client instance.
+func (r *NIMBuildReconciler) GetDiscoveryClient() discovery.DiscoveryInterface {
+	return nil
 }
 
 func (r *NIMBuildReconciler) GetRenderer() render.Renderer {

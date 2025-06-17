@@ -53,9 +53,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"k8s.io/apimachinery/pkg/version"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
-	"k8s.io/apimachinery/pkg/version"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
