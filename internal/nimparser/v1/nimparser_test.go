@@ -19,12 +19,12 @@ package v1
 import (
 	"path/filepath"
 
+	"k8s.io/utils/ptr"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 var _ = Describe("NIMParser", func() {
@@ -163,7 +163,7 @@ var _ = Describe("NIMParser", func() {
 			}
 			// Match using Lora
 			modelSpec := appsv1alpha1.ModelSpec{
-				Lora: utils.BoolPtr(true),
+				Lora: ptr.To(true),
 			}
 			matchedProfiles, err := nimManifest.MatchProfiles(modelSpec, nil)
 			Expect(err).NotTo(HaveOccurred())

@@ -38,19 +38,24 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
+	"k8s.io/apimachinery/pkg/version"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -127,6 +132,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		testServerHandler http.HandlerFunc
 		testServer        *httptest.Server
 		originalTransport = http.DefaultTransport
+		discoveryClient   *discoveryfake.FakeDiscovery
 	)
 	BeforeEach(func() {
 		scheme = runtime.NewScheme()
@@ -148,12 +154,27 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			panic(err)
 		}
 
+		// Create mock discovery client
+		discoveryClient = &discoveryfake.FakeDiscovery{Fake: &testing.Fake{}}
+		discoveryClient.Resources = []*metav1.APIResourceList{
+			{
+				GroupVersion: resourcev1beta2.SchemeGroupVersion.String(),
+				APIResources: []metav1.APIResource{
+					{Name: "resourceclaims"},
+				},
+			},
+		}
+		discoveryClient.FakedServerVersion = &version.Info{
+			GitVersion: "v1.33.0",
+		}
+
 		reconciler = &NIMServiceReconciler{
-			Client:   client,
-			scheme:   scheme,
-			updater:  conditions.NewUpdater(client),
-			renderer: render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/standalone"), "manifests")),
-			recorder: record.NewFakeRecorder(1000),
+			Client:          client,
+			scheme:          scheme,
+			updater:         conditions.NewUpdater(client),
+			renderer:        render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/standalone"), "manifests")),
+			recorder:        record.NewFakeRecorder(1000),
+			discoveryClient: discoveryClient,
 		}
 		pvcName := "test-pvc"
 		minReplicas := int32(1)
@@ -561,7 +582,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(deployment.Spec.Template.Spec.Tolerations).To(Equal(nimService.Spec.Tolerations))
 		})
 
-		Describe("spec reconciliation with DRAResources", func() {
+		Context("spec reconciliation with DRAResources", func() {
 			It("should request resource claims", func() {
 				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
 					{
@@ -643,6 +664,95 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Expect(podSpec.Containers[0].Resources.Claims[0].Request).To(Equal("test-request-1"))
 				Expect(podSpec.Containers[0].Resources.Claims[1].Name).To(Equal(podSpec.ResourceClaims[0].Name))
 				Expect(podSpec.Containers[0].Resources.Claims[1].Request).To(Equal("test-request-2"))
+			})
+
+			It("should mark NIMService as failed when cluster version is less than v1.33.0", func() {
+				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
+					Fake: &testing.Fake{},
+					FakedServerVersion: &version.Info{
+						GitVersion: "v1.30.5",
+					},
+				}
+
+				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
+					{
+						ResourceClaimName: ptr.To("test-resource-claim"),
+					},
+				}
+
+				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+				err := client.Create(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				obj := &appsv1alpha1.NIMService{}
+				err = client.Get(context.TODO(), nimServiceKey, obj)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
+				failedCondition := getCondition(obj, conditions.Failed)
+				Expect(failedCondition).NotTo(BeNil())
+				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
+				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.33.0' or higher"))
+			})
+
+			It("should mark NIMService as failed when resource claim CRD is not enabled", func() {
+				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
+					Fake: &testing.Fake{},
+					FakedServerVersion: &version.Info{
+						GitVersion: "v1.33.0",
+					},
+				}
+				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
+					{
+						ResourceClaimName: ptr.To("test-resource-claim"),
+					},
+				}
+				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+				err := client.Create(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				obj := &appsv1alpha1.NIMService{}
+				err = client.Get(context.TODO(), nimServiceKey, obj)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
+				failedCondition := getCondition(obj, conditions.Failed)
+				Expect(failedCondition).NotTo(BeNil())
+				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
+				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please ensure resource.k8s.io/v1beta2 API group is enabled"))
+			})
+
+			It("should mark NIMService as failed when resource claim name is duplicated", func() {
+				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
+					{
+						ResourceClaimName: ptr.To("test-resource-claim"),
+					},
+					{
+						ResourceClaimName: ptr.To("test-resource-claim"),
+					},
+				}
+				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+				err := client.Create(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				obj := &appsv1alpha1.NIMService{}
+				err = client.Get(context.TODO(), nimServiceKey, obj)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
+				failedCondition := getCondition(obj, conditions.Failed)
+				Expect(failedCondition).NotTo(BeNil())
+				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
+				Expect(failedCondition.Message).To(Equal("spec.draResources[1].resourceClaimName: duplicate resource claim name: 'test-resource-claim'"))
 			})
 		})
 

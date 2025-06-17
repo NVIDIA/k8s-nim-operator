@@ -27,8 +27,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,6 +48,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 // NIMServiceFinalizer is the finalizer annotation.
@@ -57,6 +60,7 @@ type NIMServiceReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
+	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
 	Platform         platform.Platform
@@ -68,14 +72,15 @@ type NIMServiceReconciler struct {
 var _ shared.Reconciler = &NIMServiceReconciler{}
 
 // NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform.
-func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
+func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
-		Client:   client,
-		scheme:   scheme,
-		updater:  updater,
-		renderer: renderer,
-		log:      log,
-		Platform: platform,
+		Client:          client,
+		scheme:          scheme,
+		updater:         updater,
+		discoveryClient: discoveryClient,
+		renderer:        renderer,
+		log:             log,
+		Platform:        platform,
 	}
 }
 
@@ -193,6 +198,11 @@ func (r *NIMServiceReconciler) GetUpdater() conditions.Updater {
 	return r.updater
 }
 
+// GetDiscoveryClient returns the discovery client instance.
+func (r *NIMServiceReconciler) GetDiscoveryClient() discovery.DiscoveryInterface {
+	return r.discoveryClient
+}
+
 // GetRenderer returns the renderer instance.
 func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 	return r.renderer
@@ -235,7 +245,7 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	nimServiceBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMService{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -268,8 +278,21 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&appsv1alpha1.NIMCache{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNIMCacheToNIMService),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+		)
+
+	crdExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
+	if err != nil {
+		return err
+	}
+	if crdExists {
+		nimServiceBuilder = nimServiceBuilder.Watches(
+			&resourcev1beta2.ResourceClaim{},
+			handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		)
+	}
+
+	return nimServiceBuilder.Complete(r)
 }
 
 func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
@@ -292,6 +315,50 @@ func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj 
 				Name:      item.Name,
 				Namespace: item.Namespace,
 			},
+		}
+	}
+	return requests
+}
+
+func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
+	resourceClaim, ok := obj.(*resourcev1beta2.ResourceClaim)
+	if !ok {
+		return []ctrl.Request{}
+	}
+
+	// Get all NIMServices directly requesting resourceClaims.
+	var nimServices appsv1alpha1.NIMServiceList
+	if err := r.List(ctx, &nimServices, client.InNamespace(resourceClaim.GetNamespace())); err != nil {
+		return []ctrl.Request{}
+	}
+
+	// Enqueue reconciliation for each matching NIMService
+	requests := make([]ctrl.Request, 0)
+	for _, item := range nimServices.Items {
+		nameCache := make(map[string]int)
+		for _, draResource := range item.Spec.DRAResources {
+			if draResource.ResourceClaimName != nil && *draResource.ResourceClaimName == resourceClaim.GetName() {
+				requests = append(requests, ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      item.Name,
+						Namespace: item.Namespace,
+					},
+				})
+				break
+			}
+			if draResource.ResourceClaimTemplateName != nil {
+				draResourceName := shared.GenerateUniquePodClaimName(nameCache, item.Name, &draResource)
+				podClaimName, ok := resourceClaim.GetAnnotations()[utils.DRAPodClaimNameAnnotationKey]
+				if ok && podClaimName == draResourceName {
+					requests = append(requests, ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      item.Name,
+							Namespace: item.Namespace,
+						},
+					})
+					break
+				}
+			}
 		}
 	}
 	return requests

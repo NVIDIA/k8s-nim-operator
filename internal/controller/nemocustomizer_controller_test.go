@@ -140,7 +140,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 				ModelDownloadJobs: &appsv1alpha1.ModelDownloadJobsConfig{
 					Image:           "nvcr.io/nvidia/nemo-microservices/customizer-api:25.04",
 					ImagePullPolicy: "IfNotPresent",
-					NGCSecret:       appsv1alpha1.NGCSecret{Name: "ngc-api-secret"},
+					NGCSecret:       &appsv1alpha1.NGCSecret{Name: "ngc-api-secret"},
 					SecurityContext: &corev1.PodSecurityContext{
 						FSGroup:      ptr.To[int64](1000),
 						RunAsNonRoot: ptr.To[bool](true),

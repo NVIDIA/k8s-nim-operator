@@ -17,11 +17,16 @@ limitations under the License.
 package shared
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
@@ -78,14 +83,14 @@ func GenerateNamedDRAResources(nimService *appsv1alpha1.NIMService) []NamedDRARe
 			Requests:                  resource.Requests,
 		}
 		claims[idx] = NamedDRAResource{
-			Name:        generateUniquePodClaimName(nameCache, nimService.Name, &draResource),
+			Name:        GenerateUniquePodClaimName(nameCache, nimService.Name, &draResource),
 			DRAResource: draResource,
 		}
 	}
 	return claims
 }
 
-func generateUniquePodClaimName(nameCache map[string]int, nimServiceName string, resource *appsv1alpha1.DRAResource) string {
+func GenerateUniquePodClaimName(nameCache map[string]int, nimServiceName string, resource *appsv1alpha1.DRAResource) string {
 	var fieldIdx int
 	claimName := resource.ResourceClaimName
 	if resource.ResourceClaimTemplateName != nil {
@@ -115,4 +120,80 @@ func GetPodResourceClaims(draResources []NamedDRAResource) []corev1.PodResourceC
 		}
 	}
 	return claims
+}
+
+func GenerateDRAResourceStatus(ctx context.Context, client client.Client, namespace string, draResources []NamedDRAResource) ([]appsv1alpha1.DRAResourceStatus, error) {
+	statuses := make([]appsv1alpha1.DRAResourceStatus, len(draResources))
+	for idx, resource := range draResources {
+		status := appsv1alpha1.DRAResourceStatus{
+			Name: resource.Name,
+		}
+		status.ResourceClaims = make([]appsv1alpha1.DRAResourceClaimStatus, 0)
+		// Process resource claim template.
+		if resource.ResourceClaimTemplateName != nil {
+			status.ResourceClaimTemplateName = resource.ResourceClaimTemplateName
+		}
+
+		claimStatuses, err := generateDRAResourceClaimStatus(ctx, client, namespace, &resource)
+		if err != nil {
+			return nil, err
+		}
+		status.ResourceClaims = claimStatuses
+		statuses[idx] = status
+	}
+	return statuses, nil
+}
+
+func generateDRAResourceClaimStatus(ctx context.Context, client client.Client, namespace string, resource *NamedDRAResource) ([]appsv1alpha1.DRAResourceClaimStatus, error) {
+	claimStatuses := make([]appsv1alpha1.DRAResourceClaimStatus, 0)
+	// For resource claims, verify the resource claim exists before adding it to the status.
+	if resource.ResourceClaimName != nil {
+		claim, err := k8sutil.GetResourceClaim(ctx, client, *resource.ResourceClaimName, namespace)
+		if err != nil {
+			return nil, err
+		}
+		claimStatus := appsv1alpha1.DRAResourceClaimStatus{
+			Name:  claim.GetName(),
+			State: getDRAResourceClaimState(claim),
+		}
+		claimStatuses = append(claimStatuses, claimStatus)
+		return claimStatuses, nil
+	}
+
+	// For resource claim templates, we need to fetch all resource claims that match the pod claim name.
+	if resource.ResourceClaimTemplateName != nil {
+		resourceClaims, err := k8sutil.ListResourceClaimsByPodClaimName(ctx, client, namespace, resource.Name)
+		if err != nil {
+			return nil, err
+		}
+		for _, claim := range resourceClaims {
+			// Ignore claims that are being deleted.
+			if claim.GetDeletionTimestamp() != nil {
+				continue
+			}
+			claimStatuses = append(claimStatuses, appsv1alpha1.DRAResourceClaimStatus{
+				Name:  claim.GetName(),
+				State: getDRAResourceClaimState(&claim),
+			})
+		}
+	}
+	return claimStatuses, nil
+}
+
+func getDRAResourceClaimState(claim *resourcev1beta2.ResourceClaim) string {
+	var states []string
+	if claim.GetDeletionTimestamp() != nil {
+		states = append(states, "deleted")
+	}
+	if claim.Status.Allocation == nil {
+		if claim.GetDeletionTimestamp() == nil {
+			states = append(states, "pending")
+		}
+	} else {
+		states = append(states, "allocated")
+		if len(claim.Status.ReservedFor) > 0 {
+			states = append(states, "reserved")
+		}
+	}
+	return strings.Join(states, ",")
 }

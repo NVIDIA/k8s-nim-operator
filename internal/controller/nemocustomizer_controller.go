@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -207,6 +208,11 @@ func (r *NemoCustomizerReconciler) GetConfig() *rest.Config {
 // GetUpdater returns the conditions updater instance.
 func (r *NemoCustomizerReconciler) GetUpdater() conditions.Updater {
 	return r.updater
+}
+
+// GetDiscoveryClient returns the discovery client instance.
+func (r *NemoCustomizerReconciler) GetDiscoveryClient() discovery.DiscoveryInterface {
+	return nil
 }
 
 // GetRenderer returns the renderer instance.
@@ -561,26 +567,30 @@ func (r *NemoCustomizerReconciler) addModelDownloadJobsConfig(ctx context.Contex
 		pullSecrets = append(pullSecrets, map[string]string{"name": secret})
 	}
 
-	cfg["model_download_jobs"] = map[string]interface{}{
+	modelDownloadJobsCfg := map[string]interface{}{
 		"image":                   n.Spec.ModelDownloadJobs.Image,
 		"imagePullPolicy":         n.Spec.Image.PullPolicy,
 		"imagePullSecrets":        pullSecrets,
-		"ngcAPISecret":            n.Spec.ModelDownloadJobs.NGCSecret.Name,
-		"ngcAPISecretKey":         n.Spec.ModelDownloadJobs.NGCSecret.Key,
-		"ngcSecretName":           n.Spec.ModelDownloadJobs.NGCSecret.Name,
-		"ngcSecretKey":            n.Spec.ModelDownloadJobs.NGCSecret.Key,
 		"securityContext":         n.Spec.ModelDownloadJobs.SecurityContext,
 		"ttlSecondsAfterFinished": n.Spec.ModelDownloadJobs.TTLSecondsAfterFinished,
 		"pollIntervalSeconds":     n.Spec.ModelDownloadJobs.PollIntervalSeconds,
 	}
 
-	// add HF secret only if present
-	if n.Spec.ModelDownloadJobs.HFSecret.Name != "" {
-		if modelDownloadJobs, ok := cfg["model_download_jobs"].(map[string]interface{}); ok {
-			modelDownloadJobs["hfSecretName"] = n.Spec.ModelDownloadJobs.HFSecret.Name
-			modelDownloadJobs["hfSecretKey"] = n.Spec.ModelDownloadJobs.HFSecret.Key
-		}
+	// add NGC secret if present
+	if n.Spec.ModelDownloadJobs.NGCSecret != nil {
+		modelDownloadJobsCfg["ngcAPISecret"] = n.Spec.ModelDownloadJobs.NGCSecret.Name
+		modelDownloadJobsCfg["ngcAPISecretKey"] = n.Spec.ModelDownloadJobs.NGCSecret.Key
+		modelDownloadJobsCfg["ngcSecretName"] = n.Spec.ModelDownloadJobs.NGCSecret.Name
+		modelDownloadJobsCfg["ngcSecretKey"] = n.Spec.ModelDownloadJobs.NGCSecret.Key
 	}
+
+	// add HF secret if present
+	if n.Spec.ModelDownloadJobs.HFSecret != nil {
+		modelDownloadJobsCfg["hfSecretName"] = n.Spec.ModelDownloadJobs.HFSecret.Name
+		modelDownloadJobsCfg["hfSecretKey"] = n.Spec.ModelDownloadJobs.HFSecret.Key
+	}
+
+	cfg["model_download_jobs"] = modelDownloadJobsCfg
 
 	return nil
 }

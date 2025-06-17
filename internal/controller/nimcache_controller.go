@@ -34,6 +34,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -226,6 +229,11 @@ func (r *NIMCacheReconciler) GetClient() client.Client {
 // GetUpdater returns the conditions updater instance.
 func (r *NIMCacheReconciler) GetUpdater() conditions.Updater {
 	return r.updater
+}
+
+// GetDiscoveryClient returns the discovery client instance.
+func (r *NIMCacheReconciler) GetDiscoveryClient() discovery.DiscoveryInterface {
+	return nil
 }
 
 // GetRenderer returns the renderer instance.

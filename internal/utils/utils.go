@@ -35,15 +35,25 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// TODO: Move constants to a separate file and move the UpdateObject functions to k8sutil package.
 const (
 	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by the operator.
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 
 	// NvidiaAnnotationParentSpecHashKey indicates annotation name for applied hash by the operator.
 	NvidiaAnnotationParentSpecHashKey = "nvidia.com/parent-spec-hash"
+
+	// DRAPodClaimNameAnnotationKey indicates annotation name for the identifier of a resource claim template in a pod spec.
+	DRAPodClaimNameAnnotationKey = "resource.kubernetes.io/pod-claim-name"
+)
+
+const (
+	// MinSupportedClusterVersionForDRA is the minimum supported cluster version for integration with DRA resources.
+	MinSupportedClusterVersionForDRA = "v1.33.0"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
@@ -74,11 +84,6 @@ func GetFilesWithSuffix(baseDir string, suffixes ...string) ([]string, error) {
 		return nil, fmt.Errorf("error traversing directory tree: %w", err)
 	}
 	return files, nil
-}
-
-// BoolPtr returns a pointer to the bool value passed in.
-func BoolPtr(v bool) *bool {
-	return &v
 }
 
 func GetStringHash(s string) string {
@@ -443,4 +448,16 @@ func GetTensorParallelismByProfileTags(tags map[string]string) (string, error) {
 	}
 
 	return tensorParallelism, nil
+}
+
+func IsVersionGreaterThanOrEqual(version string, minVersion string) bool {
+	cv, err := utilversion.Parse(version)
+	if err != nil {
+		return false
+	}
+	mv, err := utilversion.Parse(minVersion)
+	if err != nil {
+		return false
+	}
+	return cv.AtLeast(mv)
 }
