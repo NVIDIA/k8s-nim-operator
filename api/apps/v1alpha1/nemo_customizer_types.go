@@ -909,9 +909,11 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 		},
 	}
 
-	if n.Spec.Scheduler.Type == SchedulerTypeVolcano {
+	// Add scheduler specific rules
+	switch n.Spec.Scheduler.Type {
+	case SchedulerTypeVolcano:
 		params.Rules = append(params.Rules, volcanoRules...)
-	} else if n.Spec.Scheduler.Type == SchedulerTypeRunAI {
+	case SchedulerTypeRunAI:
 		params.Rules = append(params.Rules, runAIRules...)
 	}
 
