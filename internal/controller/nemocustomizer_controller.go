@@ -89,6 +89,8 @@ func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, u
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nemocustomizers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nemocustomizers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nemocustomizers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=run.ai,resources=trainingworkloads;runaijobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=nvidia.com,resources=nemotrainingjobs;nemotrainingjobs/status;nemoentityhandlers,verbs=create;get;list;watch;update;delete;patch
 // +kubebuilder:rbac:groups=batch.volcano.sh,resources=jobs;jobs/status,verbs=get;list;watch
 // +kubebuilder:rbac:groups=nodeinfo.volcano.sh,resources=numatopologies,verbs=get;list;watch
@@ -638,10 +640,10 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 	trainingCfg["env"] = n.Spec.Training.Env
 	trainingCfg["training_networking"] = n.Spec.Training.NetworkConfig
 	trainingCfg["workspace_dir"] = n.Spec.Training.WorkspacePVC.MountPath
-	trainingCfg["use_run_ai_executor"] = "false"
+	trainingCfg["use_run_ai_executor"] = false
 
 	if n.Spec.Scheduler.Type == appsv1alpha1.SchedulerTypeRunAI {
-		trainingCfg["use_run_ai_executor"] = "true"
+		trainingCfg["use_run_ai_executor"] = true
 	}
 	if n.Spec.Training.TTLSecondsAfterFinished != nil {
 		trainingCfg["ttl_seconds_after_finished"] = *n.Spec.Training.TTLSecondsAfterFinished
