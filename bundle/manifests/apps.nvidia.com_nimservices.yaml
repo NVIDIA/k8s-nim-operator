@@ -2363,9 +2363,6 @@ spec:
                   description: DRAResourceStatus defines the status of the DRAResource.
                   properties:
                     name:
-                      description: |-
-                        Name is the generated name of the DRAResource referenced in the NIMService
-                        pod template as `spec.resourceClaims[].name`.
                       type: string
                     resourceClaimTemplateName:
                       description: |-
@@ -2373,10 +2370,7 @@ spec:
                         used to generate the ResourceClaim for an instance of NIMService.
                       type: string
                     resourceClaims:
-                      description: |-
-                        ResourceClaims is the status of used resource claims.
-
-                        This list is empty if ResourceClaimTemplateName is not set.
+                      description: ResourceClaims is the status of resource claims.
                       items:
                         description: DRAResourceClaimStatus defines the status of
                           the DRAResourceClaim.
@@ -2384,8 +2378,18 @@ spec:
                           name:
                             description: Name is the name of the ResourceClaim.
                             type: string
+                          state:
+                            description: |-
+                              State is the state of the ResourceClaim.
+                              * pending: the resource claim is pending allocation.
+                              * deleted: the resource claim has a deletion timestamp set but is not yet finalized.
+                              * allocated: the resource claim is allocated to a pod.
+                              * reserved: the resource claim is consumed by a pod.
+                              This field will have one or more of the above values depending on the status of the resource claim.
+                            type: string
                         required:
                         - name
+                        - state
                         type: object
                       type: array
                   required:
