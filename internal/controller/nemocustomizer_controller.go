@@ -579,7 +579,7 @@ func (r *NemoCustomizerReconciler) addModelDownloadJobsConfig(ctx context.Contex
 	}
 
 	// add HF secret if present
-	if n.Spec.ModelDownloadJobs.HFSecret != nil && n.Spec.ModelDownloadJobs.HFSecret.Name != "" {
+	if n.Spec.ModelDownloadJobs.HFSecret != nil {
 		modelDownloadJobsCfg["hfSecretName"] = n.Spec.ModelDownloadJobs.HFSecret.Name
 		modelDownloadJobsCfg["hfSecretKey"] = n.Spec.ModelDownloadJobs.HFSecret.Key
 	}
