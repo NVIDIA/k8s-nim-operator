@@ -10,6 +10,7 @@ import (
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -395,7 +396,8 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(statuses).To(Equal([]appsv1alpha1.DRAResourceClaimStatus{
 				{
-					Name: "test-claim",
+					Name:  "test-claim",
+					State: "pending",
 				},
 			}))
 		})
@@ -434,10 +436,12 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(statuses).To(Equal([]appsv1alpha1.DRAResourceClaimStatus{
 				{
-					Name: "template-generated-claim-1",
+					Name:  "template-generated-claim-1",
+					State: "pending",
 				},
 				{
-					Name: "template-generated-claim-2",
+					Name:  "template-generated-claim-2",
+					State: "pending",
 				},
 			}))
 		})
@@ -480,7 +484,8 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(statuses).To(Equal([]appsv1alpha1.DRAResourceClaimStatus{
 				{
-					Name: "template-generated-claim-1",
+					Name:  "template-generated-claim-1",
+					State: "pending",
 				},
 			}))
 		})
@@ -525,4 +530,81 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
+
+	DescribeTable("getDRAResourceClaimState",
+		func(claim *resourcev1beta2.ResourceClaim, expectedState string) {
+			state := getDRAResourceClaimState(claim)
+			Expect(state).To(Equal(expectedState))
+		},
+		Entry("pending claim",
+			&resourcev1beta2.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-claim",
+					Namespace:         "test-ns",
+					CreationTimestamp: metav1.Time{},
+				},
+				Status: resourcev1beta2.ResourceClaimStatus{},
+			},
+			"pending",
+		),
+		Entry("allocated and reserved claim",
+			&resourcev1beta2.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-claim",
+					Namespace:         "test-ns",
+					CreationTimestamp: metav1.Time{},
+				},
+				Status: resourcev1beta2.ResourceClaimStatus{
+					Allocation: &resourcev1beta2.AllocationResult{},
+					ReservedFor: []resourcev1beta2.ResourceClaimConsumerReference{
+						{
+							Name:     "pod-test",
+							Resource: "pods",
+							UID:      types.UID("pod-test"),
+						},
+					},
+				},
+			},
+			"allocated,reserved",
+		),
+		Entry("deleted claim",
+			&resourcev1beta2.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-claim",
+					Namespace:         "test-ns",
+					CreationTimestamp: metav1.Time{},
+					DeletionTimestamp: &metav1.Time{},
+					Finalizers: []string{
+						resourcev1beta2.Finalizer,
+					},
+				},
+				Status: resourcev1beta2.ResourceClaimStatus{},
+			},
+			"deleted",
+		),
+		Entry("deleted, allocated and reserved claim",
+			&resourcev1beta2.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-claim",
+					Namespace:         "test-ns",
+					CreationTimestamp: metav1.Time{},
+					DeletionTimestamp: &metav1.Time{},
+					Finalizers: []string{
+						resourcev1beta2.Finalizer,
+					},
+				},
+				Status: resourcev1beta2.ResourceClaimStatus{
+					Allocation: &resourcev1beta2.AllocationResult{},
+					ReservedFor: []resourcev1beta2.ResourceClaimConsumerReference{
+						{
+							Name:     "pod-test",
+							Resource: "pods",
+							UID:      types.UID("pod-test"),
+						},
+					},
+				},
+			},
+			"deleted,allocated,reserved",
+		),
+	)
 })

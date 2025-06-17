@@ -295,15 +295,11 @@ type DRAResource struct {
 
 // DRAResourceStatus defines the status of the DRAResource.
 type DRAResourceStatus struct {
-	// Name is the generated name of the DRAResource referenced in the NIMService
-	// pod template as `spec.resourceClaims[].name`.
 	Name string `json:"name"`
 	// ResourceClaimTemplateName is the name of the ResourceClaimTemplate that was
 	// used to generate the ResourceClaim for an instance of NIMService.
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
-	// ResourceClaims is the status of used resource claims.
-	//
-	// This list is empty if ResourceClaimTemplateName is not set.
+	// ResourceClaims is the status of resource claims.
 	ResourceClaims []DRAResourceClaimStatus `json:"resourceClaims,omitempty"`
 }
 
@@ -311,4 +307,13 @@ type DRAResourceStatus struct {
 type DRAResourceClaimStatus struct {
 	// Name is the name of the ResourceClaim.
 	Name string `json:"name"`
+	// State is the state of the ResourceClaim.
+	// * pending: the resource claim is pending allocation.
+	// * deleted: the resource claim has a deletion timestamp set but is not yet finalized.
+	// * allocated: the resource claim is allocated to a pod.
+	// * reserved: the resource claim is consumed by a pod.
+	// This field will have one or more of the above values depending on the status of the resource claim.
+	//
+	// +kubebuilder:validation:default=pending
+	State string `json:"state"`
 }

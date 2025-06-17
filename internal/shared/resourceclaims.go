@@ -19,8 +19,10 @@ package shared
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -150,9 +152,11 @@ func generateDRAResourceClaimStatus(ctx context.Context, client client.Client, n
 		if err != nil {
 			return nil, err
 		}
-		claimStatuses = append(claimStatuses, appsv1alpha1.DRAResourceClaimStatus{
-			Name: claim.GetName(),
-		})
+		claimStatus := appsv1alpha1.DRAResourceClaimStatus{
+			Name:  claim.GetName(),
+			State: getDRAResourceClaimState(claim),
+		}
+		claimStatuses = append(claimStatuses, claimStatus)
 		return claimStatuses, nil
 	}
 
@@ -168,9 +172,28 @@ func generateDRAResourceClaimStatus(ctx context.Context, client client.Client, n
 				continue
 			}
 			claimStatuses = append(claimStatuses, appsv1alpha1.DRAResourceClaimStatus{
-				Name: claim.GetName(),
+				Name:  claim.GetName(),
+				State: getDRAResourceClaimState(&claim),
 			})
 		}
 	}
 	return claimStatuses, nil
+}
+
+func getDRAResourceClaimState(claim *resourcev1beta2.ResourceClaim) string {
+	var states []string
+	if claim.GetDeletionTimestamp() != nil {
+		states = append(states, "deleted")
+	}
+	if claim.Status.Allocation == nil {
+		if claim.GetDeletionTimestamp() == nil {
+			states = append(states, "pending")
+		}
+	} else {
+		states = append(states, "allocated")
+		if len(claim.Status.ReservedFor) > 0 {
+			states = append(states, "reserved")
+		}
+	}
+	return strings.Join(states, ",")
 }
