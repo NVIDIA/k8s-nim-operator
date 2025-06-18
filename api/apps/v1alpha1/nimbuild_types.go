@@ -27,13 +27,11 @@ import (
 // NIMBuildSpec to build optimized trtllm engines with given model config and weights.
 type NIMBuildSpec struct {
 	// Required: Reference to the model weights from NIMCache
-	NIMCacheRef string `json:"nimCacheRef"`
-	// Profile name for this engine build
+	NIMCacheName string `json:"nimCacheName"`
+	// Profile is the name of the profile to be used for building the engine.
 	Profile string `json:"profile,omitempty"`
-	// Any user-defined tags for tracking builds
-	Tags map[string]string `json:"tags,omitempty"`
-	// Additional build params
-	BuildParams []string `json:"additionalBuildParams,omitempty"`
+	// EngineName is the name given to the engine being built.
+	EngineName string `json:"engineName,omitempty"`
 	// Resources is the resource requirements for the NIMBuild pod.
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// Tolerations for running the job to cache the NIM model
@@ -44,9 +42,10 @@ type NIMBuildSpec struct {
 
 // NIMBuildStatus defines the observed state of NIMBuild.
 type NIMBuildStatus struct {
-	State      string             `json:"state,omitempty"`
-	Profiles   []NIMProfile       `json:"profiles,omitempty"`
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+	State         string             `json:"state,omitempty"`
+	TargetProfile NIMProfile         `json:"targetProfile,omitempty"`
+	BuiltProfile  NIMProfile         `json:"builtProfile,omitempty"`
+	Conditions    []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +genclient
@@ -124,4 +123,17 @@ func (n *NIMBuild) GetTolerations() []corev1.Toleration {
 // GetNodeSelectors returns nodeselectors configured for the NIMBuild Pod.
 func (n *NIMBuild) GetNodeSelectors() map[string]string {
 	return n.Spec.NodeSelector
+}
+
+// GetEngineName returns the name of the engine to be built.
+func (n *NIMBuild) GetEngineName() string {
+	if n.Spec.EngineName != "" {
+		return n.Spec.EngineName
+	}
+	return n.Name
+}
+
+// GetProfile returns the profile name for this engine build.
+func (n *NIMBuild) GetProfile() string {
+	return n.Spec.Profile
 }

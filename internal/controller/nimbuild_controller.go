@@ -228,13 +228,13 @@ func (r *NIMBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&appsv1alpha1.NIMBuild{},
-		"spec.nimCacheRef",
+		"spec.nimCacheName",
 		func(rawObj client.Object) []string {
 			nimBuild, ok := rawObj.(*appsv1alpha1.NIMBuild)
 			if !ok {
 				return []string{}
 			}
-			return []string{nimBuild.Spec.NIMCacheRef}
+			return []string{nimBuild.Spec.NIMCacheName}
 		},
 	)
 	if err != nil {
@@ -337,7 +337,7 @@ func (r *NIMBuildReconciler) cleanupNIMBuild(ctx context.Context, nimBuild *apps
 
 func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild) (reconcile.Result, error) {
 	logger := r.GetLogger()
-	nimCacheNamespacedName := types.NamespacedName{Name: nimBuild.Spec.NIMCacheRef, Namespace: nimBuild.GetNamespace()}
+	nimCacheNamespacedName := types.NamespacedName{Name: nimBuild.Spec.NIMCacheName, Namespace: nimBuild.GetNamespace()}
 
 	nimCache := &appsv1alpha1.NIMCache{}
 	if err := r.Get(ctx, nimCacheNamespacedName, nimCache); err != nil {
@@ -400,6 +400,7 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 				logger.Info("Selected buildable profile found", "Profile", buildableProfiles[0].Name)
 				conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionSingleBuildableProfilesFound, metav1.ConditionTrue, "BuildableProfileFound", "Single buildable profile cached in NIM Cache")
 				buildableProfile = buildableProfiles[0]
+				nimBuild.Status.TargetProfile = buildableProfile
 			default:
 				logger.Info("No buildable profiles found, skipping engine build")
 				conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNoBuildableProfilesFound, metav1.ConditionTrue, "NoBuildableProfilesFound", "No buildable profiles found in NIM Cache")
@@ -423,6 +424,7 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 			logger.Info("Selected buildable profile found", "Profile", foundProfile.Name)
 			conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionSingleBuildableProfilesFound, metav1.ConditionTrue, "BuildableProfileFound", "Single buildable profile found")
 			buildableProfile = *foundProfile
+			nimBuild.Status.TargetProfile = buildableProfile
 		}
 	}
 
@@ -635,7 +637,7 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 				},
 				{
 					Name:  "NIM_CUSTOM_MODEL_NAME",
-					Value: nimCache.Name + "-" + nimProfile.Name,
+					Value: nimBuild.GetEngineName(),
 				},
 				{
 					Name: "NGC_API_KEY",
@@ -822,21 +824,23 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 		return err
 	}
 
-	// To Do: Explore changing the profile list to a map for faster lookups
-	for _, profileName := range manifest.GetProfilesList() {
-		for _, selectedProfile := range nimCache.Status.Profiles {
-			if selectedProfile.Name == profileName {
-				break
-			}
+	// To Do: Explore changing the profile list on NIMCache to a map for faster lookups
+	// Update the NIMCache status with the details of the built profile
+	builtProfileName := getBuiltProfileName(manifest, nimBuild)
+	if builtProfileName != "" {
+		presentOnNIMCache := isBuiltProfilePresentOnNIMCacheStatus(nimCache, builtProfileName)
+		// If built profile is not present on NIMCache status, add it
+		if !presentOnNIMCache {
+			tagsMap := manifest.GetProfileTags(builtProfileName)
+			tagsMap["target_profile"] = nimBuild.Status.TargetProfile.Name
+			logger.Info("Adding profile to NIMCache status", "profileName", builtProfileName)
+			nimCache.Status.Profiles = append(nimCache.Status.Profiles, appsv1alpha1.NIMProfile{
+				Name:    builtProfileName,
+				Model:   manifest.GetProfileModel(builtProfileName),
+				Config:  manifest.GetProfileTags(builtProfileName),
+				Release: manifest.GetProfileRelease(builtProfileName),
+			})
 		}
-		logger.Info("Adding profile to NIMCache status", "profileName", profileName)
-		// If the profile is not found, add it to the status
-		nimCache.Status.Profiles = append(nimCache.Status.Profiles, appsv1alpha1.NIMProfile{
-			Name:    profileName,
-			Model:   manifest.GetProfileModel(profileName),
-			Config:  manifest.GetProfileTags(profileName),
-			Release: manifest.GetProfileRelease(profileName),
-		})
 	}
 
 	// Update the NIMCache status with the new profiles
@@ -856,6 +860,26 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 	nimBuild.Status.State = appsv1alpha1.NimBuildStatusReady
 
 	return nil
+}
+
+func isBuiltProfilePresentOnNIMCacheStatus(nimCache *appsv1alpha1.NIMCache, builtProfileName string) bool {
+	for _, selectedProfile := range nimCache.Status.Profiles {
+		if selectedProfile.Name == builtProfileName {
+			return true
+		}
+	}
+	return false
+}
+
+// getBuiltProfileName retrieves the auto generated profile name assigned for the built engine.
+func getBuiltProfileName(manifest nimparser.NIMManifestInterface, nimBuild *appsv1alpha1.NIMBuild) string {
+	for _, profileName := range manifest.GetProfilesList() {
+		tagsMap := manifest.GetProfileTags(profileName)
+		if tagsMap["model_name"] == nimBuild.GetEngineName() {
+			return profileName
+		}
+	}
+	return ""
 }
 
 func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *appsv1alpha1.NIMBuild, platformType k8sutil.OrchestratorType) *corev1.Pod {

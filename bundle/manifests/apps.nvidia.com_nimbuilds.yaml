@@ -48,12 +48,10 @@ spec:
             description: NIMBuildSpec to build optimized trtllm engines with given
               model config and weights.
             properties:
-              additionalBuildParams:
-                description: Additional build params
-                items:
-                  type: string
-                type: array
-              nimCacheRef:
+              engineName:
+                description: EngineName is the name given to the engine being built.
+                type: string
+              nimCacheName:
                 description: 'Required: Reference to the model weights from NIMCache'
                 type: string
               nodeSelector:
@@ -63,7 +61,8 @@ spec:
                   the caching job.
                 type: object
               profile:
-                description: Profile name for this engine build
+                description: Profile is the name of the profile to be used for building
+                  the engine.
                 type: string
               resources:
                 description: Resources is the resource requirements for the NIMBuild
@@ -125,11 +124,6 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
-              tags:
-                additionalProperties:
-                  type: string
-                description: Any user-defined tags for tracking builds
-                type: object
               tolerations:
                 description: Tolerations for running the job to cache the NIM model
                 items:
@@ -170,11 +164,25 @@ spec:
                   type: object
                 type: array
             required:
-            - nimCacheRef
+            - nimCacheName
             type: object
           status:
             description: NIMBuildStatus defines the observed state of NIMBuild.
             properties:
+              builtProfile:
+                description: NIMProfile defines the profiles that were cached.
+                properties:
+                  config:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  model:
+                    type: string
+                  name:
+                    type: string
+                  release:
+                    type: string
+                type: object
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current
@@ -231,24 +239,22 @@ spec:
                   - type
                   type: object
                 type: array
-              profiles:
-                items:
-                  description: NIMProfile defines the profiles that were cached.
-                  properties:
-                    config:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    model:
-                      type: string
-                    name:
-                      type: string
-                    release:
-                      type: string
-                  type: object
-                type: array
               state:
                 type: string
+              targetProfile:
+                description: NIMProfile defines the profiles that were cached.
+                properties:
+                  config:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  model:
+                    type: string
+                  name:
+                    type: string
+                  release:
+                    type: string
+                type: object
             type: object
         type: object
     served: true
