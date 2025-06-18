@@ -166,7 +166,7 @@ func (r *NIMBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err != nil {
 		logger.Error(err, "error reconciling NIMBuild", "name", nimBuild.Name)
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionReconcileFailed, metav1.ConditionTrue, "ReconcileFailed", err.Error())
-		nimBuild.Status.State = appsv1alpha1.NimBuildStatusNotReady
+		nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
 
 		err := r.updateNIMBuildStatus(ctx, nimBuild)
 		if err != nil {
