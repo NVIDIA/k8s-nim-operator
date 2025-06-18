@@ -17,11 +17,9 @@ limitations under the License.
 package controller
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"reflect"
 	"slices"
 	"strings"
@@ -37,8 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -636,7 +632,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 	}
 
 	// Extract manifest file
-	output, err := r.getPodLogs(ctx, existingPod)
+	output, err := k8sutil.GetPodLogs(ctx, existingPod, NIMCacheContainerName)
 	if err != nil {
 		logger.Error(err, "failed to get pod logs for parsing model manifest file", "pod", pod.Name)
 		return false, err
@@ -1017,35 +1013,6 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 	}
 
 	return pod
-}
-
-func (r *NIMCacheReconciler) getPodLogs(ctx context.Context, pod *corev1.Pod) (string, error) {
-	podLogOpts := corev1.PodLogOptions{Container: NIMCacheContainerName}
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return "", err
-	}
-	// create a clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return "", err
-	}
-	req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOpts)
-	podLogs, err := req.Stream(ctx)
-	if err != nil {
-		return "", err
-	}
-	defer func(podLogs io.ReadCloser) {
-		_ = podLogs.Close()
-	}(podLogs)
-
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, podLogs)
-	if err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
 }
 
 func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType) (*batchv1.Job, error) {
