@@ -166,6 +166,9 @@ spec:
             required:
             - nimCacheName
             type: object
+            x-kubernetes-validations:
+            - message: spec is immutable
+              rule: self == oldSelf
           status:
             description: NIMBuildStatus defines the observed state of NIMBuild.
             properties:

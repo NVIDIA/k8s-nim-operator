@@ -59,6 +59,7 @@ type NIMBuild struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="spec is immutable"
 	Spec   NIMBuildSpec   `json:"spec,omitempty"`
 	Status NIMBuildStatus `json:"status,omitempty"`
 }

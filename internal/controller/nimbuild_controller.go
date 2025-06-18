@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -248,22 +247,14 @@ func (r *NIMBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithEventFilter(predicate.Funcs{
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				// Type assert to NIMBuild
-				if oldNIMBuild, ok := e.ObjectOld.(*appsv1alpha1.NIMBuild); ok {
+				if _, ok := e.ObjectOld.(*appsv1alpha1.NIMBuild); ok {
 					newNIMBuild, ok := e.ObjectNew.(*appsv1alpha1.NIMBuild)
 					if ok {
 						// Handle case where object is marked for deletion
 						if !newNIMBuild.ObjectMeta.DeletionTimestamp.IsZero() {
 							return true
 						}
-
-						// Allow only status updates
-						// Reject updates that change anything other than status
-						// Spec is immutable
-						if !reflect.DeepEqual(oldNIMBuild.Spec, newNIMBuild.Spec) {
-							return false
-						}
-						// Allow if only status changed
-						return !reflect.DeepEqual(oldNIMBuild.Status, newNIMBuild.Status)
+						return false
 					}
 				}
 				// For other types we watch, reconcile them
