@@ -233,7 +233,7 @@ func (r *NIMBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			if !ok {
 				return []string{}
 			}
-			return []string{nimBuild.Spec.NIMCacheRef.Name}
+			return []string{nimBuild.Spec.NIMCache.Name}
 		},
 	)
 	if err != nil {
@@ -328,7 +328,7 @@ func (r *NIMBuildReconciler) cleanupNIMBuild(ctx context.Context, nimBuild *apps
 
 func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild) (reconcile.Result, error) {
 	logger := r.GetLogger()
-	nimCacheNamespacedName := types.NamespacedName{Name: nimBuild.Spec.NIMCacheRef.Name, Namespace: nimBuild.GetNamespace()}
+	nimCacheNamespacedName := types.NamespacedName{Name: nimBuild.Spec.NIMCache.Name, Namespace: nimBuild.GetNamespace()}
 
 	nimCache := &appsv1alpha1.NIMCache{}
 	if err := r.Get(ctx, nimCacheNamespacedName, nimCache); err != nil {
@@ -378,7 +378,7 @@ func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *ap
 func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
 	buildableProfile := appsv1alpha1.NIMProfile{}
-	if nimBuild.Spec.NIMCacheRef.Profile == "" {
+	if nimBuild.Spec.NIMCache.Profile == "" {
 		buildableProfiles := getBuildableProfiles(nimCache)
 		if len(buildableProfiles) > 0 {
 			switch {
@@ -405,9 +405,9 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 			nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
 		}
 	} else {
-		foundProfile := getBuildableProfileByName(nimCache, nimBuild.Spec.NIMCacheRef.Profile)
+		foundProfile := getBuildableProfileByName(nimCache, nimBuild.Spec.NIMCache.Profile)
 		if foundProfile == nil {
-			logger.Info("No buildable profiles found", "ProfileName", nimBuild.Spec.NIMCacheRef.Profile)
+			logger.Info("No buildable profiles found", "ProfileName", nimBuild.Spec.NIMCache.Profile)
 			conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNoBuildableProfilesFound, metav1.ConditionTrue, "NoBuildableProfilesFound", "No buildable profiles found, please select a valid profile from the NIM cache")
 			nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
 			return nil
@@ -576,6 +576,11 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 		annotations["openshift.io/scc"] = "nonroot"
 	}
 
+	var imagePullSecrets []corev1.LocalObjectReference
+	for _, name := range nimBuild.Spec.Image.PullSecrets {
+		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: name})
+	}
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        nimBuild.Name + "-engine-build-pod",
@@ -602,7 +607,7 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 					},
 				},
 			},
-			ImagePullSecrets: []corev1.LocalObjectReference{},
+			ImagePullSecrets: imagePullSecrets,
 			Tolerations:      nimBuild.GetTolerations(),
 			NodeSelector:     nimBuild.GetNodeSelectors(),
 		},
@@ -618,7 +623,7 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 	pod.Spec.Containers = []corev1.Container{
 		{
 			Name:  NIMBuildContainerName,
-			Image: nimBuild.Spec.ModelBuilder,
+			Image: nimBuild.GetImage(),
 			Env: []corev1.EnvVar{
 				{
 					Name:  "NIM_CACHE_PATH",
@@ -711,11 +716,6 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 				RunAsGroup:   nimCache.GetGroupID(),
 				RunAsUser:    nimCache.GetUserID(),
 			},
-		},
-	}
-	pod.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-		{
-			Name: nimBuild.Spec.PullSecret,
 		},
 	}
 
@@ -898,6 +898,11 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 	}
 	pvcName := shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)
 
+	var imagePullSecrets []corev1.LocalObjectReference
+	for _, name := range nimBuild.Spec.Image.PullSecrets {
+		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: name})
+	}
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        nimBuild.Name + "-local-manifest-pod",
@@ -906,6 +911,7 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
+			ImagePullSecrets: imagePullSecrets,
 			RuntimeClassName: nimCache.GetRuntimeClassName(),
 			SecurityContext: &corev1.PodSecurityContext{
 				RunAsUser:    nimCache.GetUserID(),
@@ -939,7 +945,7 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 	pod.Spec.Containers = []corev1.Container{
 		{
 			Name:    NIMBuildManifestContainerName,
-			Image:   nimBuild.Spec.ModelBuilder,
+			Image:   nimBuild.GetImage(),
 			Command: getNIMBuildSidecarCommand(),
 			SecurityContext: &corev1.SecurityContext{
 				AllowPrivilegeEscalation: ptr.To[bool](false),
@@ -959,11 +965,7 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 			},
 		},
 	}
-	pod.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-		{
-			Name: nimBuild.Spec.PullSecret,
-		},
-	}
+
 	return pod
 }
 

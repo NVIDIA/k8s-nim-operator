@@ -48,8 +48,6 @@ spec:
             description: NIMBuildSpec to build optimized trtllm engines with given
               model config and weights.
             properties:
-              ModelBuilder:
-                type: string
               annotations:
                 additionalProperties:
                   type: string
@@ -174,12 +172,29 @@ spec:
                   - name
                   type: object
                 type: array
+              image:
+                description: Image defines image attributes.
+                properties:
+                  pullPolicy:
+                    type: string
+                  pullSecrets:
+                    items:
+                      type: string
+                    type: array
+                  repository:
+                    type: string
+                  tag:
+                    type: string
+                required:
+                - repository
+                - tag
+                type: object
               labels:
                 additionalProperties:
                   type: string
                 type: object
               nimCacheRef:
-                description: NIMCacheRef is Reference to the model weights from NIMCache
+                description: NIMCache is Reference to the model weights from NIMCache
                 properties:
                   name:
                     type: string
@@ -194,9 +209,6 @@ spec:
                 description: NodeSelector is the node selector labels to schedule
                   the caching job.
                 type: object
-              pullSecret:
-                description: PullSecret to pull the model builder image
-                type: string
               resources:
                 description: Resources is the resource requirements for the NIMBuild
                   pod.
@@ -266,7 +278,7 @@ spec:
                   type: object
                 type: array
             required:
-            - ModelBuilder
+            - image
             - nimCacheRef
             type: object
             x-kubernetes-validations:
