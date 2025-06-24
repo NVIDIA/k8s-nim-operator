@@ -233,7 +233,7 @@ func (r *NIMBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			if !ok {
 				return []string{}
 			}
-			return []string{nimBuild.Spec.NIMCacheName}
+			return []string{nimBuild.Spec.NIMCacheRef.Name}
 		},
 	)
 	if err != nil {
@@ -328,7 +328,7 @@ func (r *NIMBuildReconciler) cleanupNIMBuild(ctx context.Context, nimBuild *apps
 
 func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild) (reconcile.Result, error) {
 	logger := r.GetLogger()
-	nimCacheNamespacedName := types.NamespacedName{Name: nimBuild.Spec.NIMCacheName, Namespace: nimBuild.GetNamespace()}
+	nimCacheNamespacedName := types.NamespacedName{Name: nimBuild.Spec.NIMCacheRef.Name, Namespace: nimBuild.GetNamespace()}
 
 	nimCache := &appsv1alpha1.NIMCache{}
 	if err := r.Get(ctx, nimCacheNamespacedName, nimCache); err != nil {
@@ -378,7 +378,7 @@ func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *ap
 func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
 	buildableProfile := appsv1alpha1.NIMProfile{}
-	if nimBuild.Spec.Profile == "" {
+	if nimBuild.Spec.NIMCacheRef.Profile == "" {
 		buildableProfiles := getBuildableProfiles(nimCache)
 		if len(buildableProfiles) > 0 {
 			switch {
@@ -405,9 +405,9 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 			nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
 		}
 	} else {
-		foundProfile := getBuildableProfileByName(nimCache, nimBuild.Spec.Profile)
+		foundProfile := getBuildableProfileByName(nimCache, nimBuild.Spec.NIMCacheRef.Profile)
 		if foundProfile == nil {
-			logger.Info("No buildable profiles found", "ProfileName", nimBuild.Spec.Profile)
+			logger.Info("No buildable profiles found", "ProfileName", nimBuild.Spec.NIMCacheRef.Profile)
 			conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNoBuildableProfilesFound, metav1.ConditionTrue, "NoBuildableProfilesFound", "No buildable profiles found, please select a valid profile from the NIM cache")
 			nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
 			return nil
@@ -526,8 +526,15 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 		"app.kubernetes.io/managed-by": "k8s-nim-operator",
 	}
 
+	if nimBuild.GetLabels() != nil {
+		labels = utils.MergeMaps(labels, nimBuild.GetLabels())
+	}
+
 	annotations := map[string]string{
 		"sidecar.istio.io/inject": "false",
+	}
+	if nimBuild.GetAnnotations() != nil {
+		annotations = utils.MergeMaps(annotations, nimBuild.GetAnnotations())
 	}
 
 	// Get tensorParallelism from the profile
@@ -539,7 +546,7 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 
 	// Ensure Resources, Requests, and Limits are initialized
 	if nimBuild.Spec.Resources == nil {
-		nimBuild.Spec.Resources = &corev1.ResourceRequirements{}
+		nimBuild.Spec.Resources = &appsv1alpha1.ResourceRequirements{}
 	}
 	if nimBuild.Spec.Resources.Requests == nil {
 		nimBuild.Spec.Resources.Requests = corev1.ResourceList{}
@@ -610,9 +617,8 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 
 	pod.Spec.Containers = []corev1.Container{
 		{
-			Name:    NIMBuildContainerName,
-			Image:   nimCache.Spec.Source.NGC.ModelPuller,
-			EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
+			Name:  NIMBuildContainerName,
+			Image: nimBuild.Spec.ModelBuilder,
 			Env: []corev1.EnvVar{
 				{
 					Name:  "NIM_CACHE_PATH",
@@ -628,7 +634,7 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 				},
 				{
 					Name:  "NIM_CUSTOM_MODEL_NAME",
-					Value: nimBuild.GetEngineName(),
+					Value: nimBuild.GetModelName(),
 				},
 				{
 					Name: "NGC_API_KEY",
@@ -649,7 +655,7 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 					SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 				},
 			},
-			Resources:                *nimBuild.Spec.Resources,
+			Resources:                corev1.ResourceRequirements{Limits: nimBuild.Spec.Resources.Limits, Requests: nimBuild.Spec.Resources.Requests},
 			TerminationMessagePath:   "/dev/termination-log",
 			TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 			Ports: []corev1.ContainerPort{{
@@ -709,12 +715,12 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 	}
 	pod.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 		{
-			Name: nimCache.Spec.Source.NGC.PullSecret,
+			Name: nimBuild.Spec.PullSecret,
 		},
 	}
 
 	// Merge env with the user provided values
-	pod.Spec.Containers[0].Env = utils.MergeEnvVars(pod.Spec.Containers[0].Env, nimCache.Spec.Env)
+	pod.Spec.Containers[0].Env = utils.MergeEnvVars(pod.Spec.Containers[0].Env, nimBuild.Spec.Env)
 
 	return pod, nil
 }
@@ -866,7 +872,7 @@ func isBuiltProfilePresentOnNIMCacheStatus(nimCache *appsv1alpha1.NIMCache, buil
 func getBuiltProfileName(manifest nimparser.NIMManifestInterface, nimBuild *appsv1alpha1.NIMBuild) string {
 	for _, profileName := range manifest.GetProfilesList() {
 		tagsMap := manifest.GetProfileTags(profileName)
-		if tagsMap["model_name"] == nimBuild.GetEngineName() {
+		if tagsMap["model_name"] == nimBuild.GetModelName() {
 			return profileName
 		}
 	}
@@ -933,7 +939,7 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 	pod.Spec.Containers = []corev1.Container{
 		{
 			Name:    NIMBuildManifestContainerName,
-			Image:   nimCache.Spec.Source.NGC.ModelPuller,
+			Image:   nimBuild.Spec.ModelBuilder,
 			Command: getNIMBuildSidecarCommand(),
 			SecurityContext: &corev1.SecurityContext{
 				AllowPrivilegeEscalation: ptr.To[bool](false),
@@ -955,11 +961,9 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 	}
 	pod.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 		{
-			Name: nimCache.Spec.Source.NGC.PullSecret,
+			Name: nimBuild.Spec.PullSecret,
 		},
 	}
-	// Merge env with the user provided values
-	pod.Spec.Containers[0].Env = utils.MergeEnvVars(pod.Spec.Containers[0].Env, nimCache.Spec.Env)
 	return pod
 }
 

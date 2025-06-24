@@ -26,18 +26,23 @@ import (
 
 // NIMBuildSpec to build optimized trtllm engines with given model config and weights.
 type NIMBuildSpec struct {
-	// Required: Reference to the model weights from NIMCache
-	NIMCacheName string `json:"nimCacheName"`
-	// Profile is the name of the profile to be used for building the engine.
-	Profile string `json:"profile,omitempty"`
-	// EngineName is the name given to the engine being built.
-	EngineName string `json:"engineName,omitempty"`
+	// NIMCacheRef is Reference to the model weights from NIMCache
+	NIMCacheRef NIMCacheReference `json:"nimCacheRef"`
+	// ModelName is the name given to the locally built engine.
+	ModelName string `json:"engineName,omitempty"`
 	// Resources is the resource requirements for the NIMBuild pod.
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *ResourceRequirements `json:"resources,omitempty"`
 	// Tolerations for running the job to cache the NIM model
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// NodeSelector is the node selector labels to schedule the caching job.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	Env          []corev1.EnvVar   `json:"env,omitempty"`
+	Labels       map[string]string `json:"labels,omitempty"`
+	Annotations  map[string]string `json:"annotations,omitempty"`
+	ModelBuilder string            `json:"ModelBuilder"`
+	// PullSecret to pull the model builder image
+	PullSecret string `json:"pullSecret,omitempty"`
 }
 
 // NIMBuildStatus defines the observed state of NIMBuild.
@@ -46,6 +51,24 @@ type NIMBuildStatus struct {
 	TargetProfile NIMProfile         `json:"targetProfile,omitempty"`
 	BuiltProfile  NIMProfile         `json:"builtProfile,omitempty"`
 	Conditions    []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+type ResourceRequirements struct {
+	// Limits describes the maximum amount of compute resources allowed.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Limits corev1.ResourceList `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=ResourceList,castkey=ResourceName"`
+	// Requests describes the minimum amount of compute resources required.
+	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value. Requests cannot exceed Limits.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Requests corev1.ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+}
+
+type NIMCacheReference struct {
+	Name    string `json:"name"`
+	Profile string `json:"profile,omitempty"`
 }
 
 // +genclient
@@ -126,15 +149,15 @@ func (n *NIMBuild) GetNodeSelectors() map[string]string {
 	return n.Spec.NodeSelector
 }
 
-// GetEngineName returns the name of the engine to be built.
-func (n *NIMBuild) GetEngineName() string {
-	if n.Spec.EngineName != "" {
-		return n.Spec.EngineName
+// GetModelName returns the model name for the engine being built.
+func (n *NIMBuild) GetModelName() string {
+	if n.Spec.ModelName != "" {
+		return n.Spec.ModelName
 	}
 	return n.Name
 }
 
 // GetProfile returns the profile name for this engine build.
 func (n *NIMBuild) GetProfile() string {
-	return n.Spec.Profile
+	return n.Spec.NIMCacheRef.Profile
 }
