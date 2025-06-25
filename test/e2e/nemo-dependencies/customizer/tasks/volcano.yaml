@@ -30,6 +30,23 @@
       --namespace {{ namespace }} \
       --version {{ volcano.chart_version }}
 
+- name: Patch ClusterRole for volcano to update/patch replicaset finalizers in OpenShift
+  shell: |
+    kubectl patch clusterrole volcano-controllers --type='json' -p='[
+      {
+        "op": "add",
+        "path": "/rules/-",
+        "value": {
+          "apiGroups": ["apps"],
+          "resources": ["replicasets/finalizers"],
+          "verbs": ["update", "patch"]
+        }
+      }
+    ]'
+  register: patch_result
+  changed_when: "'configured' in patch_result.stdout or 'patched' in patch_result.stdout"
+  when: is_openshift
+
 - name: Wait for Volcano deployments to be available
   command: kubectl rollout status deployment/{{ item }} -n {{ namespace }} --timeout=300s
   loop:
