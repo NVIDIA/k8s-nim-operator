@@ -52,9 +52,6 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
-              engineName:
-                description: ModelName is the name given to the locally built engine.
-                type: string
               env:
                 items:
                   description: EnvVar represents an environment variable present in
@@ -193,7 +190,10 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
-              nimCacheRef:
+              modelName:
+                description: ModelName is the name given to the locally built engine.
+                type: string
+              nimCache:
                 description: NIMCache is Reference to the model weights from NIMCache
                 properties:
                   name:
@@ -279,7 +279,7 @@ spec:
                 type: array
             required:
             - image
-            - nimCacheRef
+            - nimCache
             type: object
             x-kubernetes-validations:
             - message: spec is immutable
@@ -287,20 +287,6 @@ spec:
           status:
             description: NIMBuildStatus defines the observed state of NIMBuild.
             properties:
-              builtProfile:
-                description: NIMProfile defines the profiles that were cached.
-                properties:
-                  config:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  model:
-                    type: string
-                  name:
-                    type: string
-                  release:
-                    type: string
-                type: object
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current
@@ -357,9 +343,7 @@ spec:
                   - type
                   type: object
                 type: array
-              state:
-                type: string
-              targetProfile:
+              inputProfile:
                 description: NIMProfile defines the profiles that were cached.
                 properties:
                   config:
@@ -373,6 +357,22 @@ spec:
                   release:
                     type: string
                 type: object
+              outputProfile:
+                description: NIMProfile defines the profiles that were cached.
+                properties:
+                  config:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  model:
+                    type: string
+                  name:
+                    type: string
+                  release:
+                    type: string
+                type: object
+              state:
+                type: string
             type: object
         type: object
     served: true
