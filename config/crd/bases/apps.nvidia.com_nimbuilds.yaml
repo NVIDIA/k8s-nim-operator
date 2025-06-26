@@ -193,7 +193,7 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
-              nimCacheRef:
+              nimCache:
                 description: NIMCache is Reference to the model weights from NIMCache
                 properties:
                   name:
@@ -279,7 +279,7 @@ spec:
                 type: array
             required:
             - image
-            - nimCacheRef
+            - nimCache
             type: object
             x-kubernetes-validations:
             - message: spec is immutable
