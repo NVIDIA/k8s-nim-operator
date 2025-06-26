@@ -391,7 +391,7 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 				logger.Info("Selected buildable profile found", "Profile", buildableProfiles[0].Name)
 				conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionSingleBuildableProfilesFound, metav1.ConditionTrue, "BuildableProfileFound", "Single buildable profile cached in NIM Cache")
 				buildableProfile = buildableProfiles[0]
-				nimBuild.Status.TargetProfile = buildableProfile
+				nimBuild.Status.InputProfile = buildableProfile
 			default:
 				logger.Info("No buildable profiles found, skipping engine build")
 				conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNoBuildableProfilesFound, metav1.ConditionTrue, "NoBuildableProfilesFound", "No buildable profiles found in NIM Cache")
@@ -415,7 +415,7 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 			logger.Info("Selected buildable profile found", "Profile", foundProfile.Name)
 			conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionSingleBuildableProfilesFound, metav1.ConditionTrue, "BuildableProfileFound", "Single buildable profile found")
 			buildableProfile = *foundProfile
-			nimBuild.Status.TargetProfile = buildableProfile
+			nimBuild.Status.InputProfile = buildableProfile
 		}
 	}
 
@@ -829,7 +829,7 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 		// If built profile is not present on NIMCache status, add it
 		if !presentOnNIMCache {
 			tagsMap := manifest.GetProfileTags(builtProfileName)
-			tagsMap["target_profile"] = nimBuild.Status.TargetProfile.Name
+			tagsMap["input_profile"] = nimBuild.Status.InputProfile.Name
 			logger.Info("Adding profile to NIMCache status", "profileName", builtProfileName)
 			nimCache.Status.Profiles = append(nimCache.Status.Profiles, appsv1alpha1.NIMProfile{
 				Name:    builtProfileName,

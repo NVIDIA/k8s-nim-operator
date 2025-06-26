@@ -31,7 +31,7 @@ type NIMBuildSpec struct {
 	// NIMCache is Reference to the model weights from NIMCache
 	NIMCache NIMCacheReference `json:"nimCache"`
 	// ModelName is the name given to the locally built engine.
-	ModelName string `json:"engineName,omitempty"`
+	ModelName string `json:"modelName,omitempty"`
 	// Resources is the resource requirements for the NIMBuild pod.
 	Resources *ResourceRequirements `json:"resources,omitempty"`
 	// Tolerations for running the job to cache the NIM model
@@ -48,8 +48,8 @@ type NIMBuildSpec struct {
 // NIMBuildStatus defines the observed state of NIMBuild.
 type NIMBuildStatus struct {
 	State         string             `json:"state,omitempty"`
-	TargetProfile NIMProfile         `json:"targetProfile,omitempty"`
-	BuiltProfile  NIMProfile         `json:"builtProfile,omitempty"`
+	InputProfile  NIMProfile         `json:"inputProfile,omitempty"`
+	OutputProfile NIMProfile         `json:"outputProfile,omitempty"`
 	Conditions    []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
