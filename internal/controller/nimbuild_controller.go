@@ -227,7 +227,7 @@ func (r *NIMBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&appsv1alpha1.NIMBuild{},
-		"spec.nimCacheName",
+		"spec.nimCache.name",
 		func(rawObj client.Object) []string {
 			nimBuild, ok := rawObj.(*appsv1alpha1.NIMBuild)
 			if !ok {
@@ -300,7 +300,7 @@ func (r *NIMBuildReconciler) cleanupNIMBuild(ctx context.Context, nimBuild *apps
 	// All owned objects are garbage collected
 
 	// Fetch the pod
-	podName := types.NamespacedName{Name: nimBuild.Name + "-engine-build-pod", Namespace: nimBuild.Namespace}
+	podName := types.NamespacedName{Name: nimBuild.GetEngineBuildPodName(), Namespace: nimBuild.Namespace}
 	pod := &corev1.Pod{}
 	if err := r.Get(ctx, podName, pod); err != nil {
 		if errors.IsNotFound(err) {
@@ -420,7 +420,7 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 	}
 
 	pod := &corev1.Pod{}
-	podName := types.NamespacedName{Name: nimBuild.Name + "-engine-build-pod", Namespace: nimBuild.GetNamespace()}
+	podName := types.NamespacedName{Name: nimBuild.GetEngineBuildPodName(), Namespace: nimBuild.GetNamespace()}
 	err := r.Get(ctx, podName, pod)
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return err
@@ -583,7 +583,7 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        nimBuild.Name + "-engine-build-pod",
+			Name:        nimBuild.GetEngineBuildPodName(),
 			Namespace:   nimBuild.Namespace,
 			Labels:      labels,
 			Annotations: annotations,
@@ -905,7 +905,7 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        nimBuild.Name + "-local-manifest-pod",
+			Name:        nimBuild.GetLocalManifestReaderPodName(),
 			Namespace:   nimBuild.Namespace,
 			Labels:      labels,
 			Annotations: annotations,

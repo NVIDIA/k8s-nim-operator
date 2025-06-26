@@ -29,7 +29,7 @@ import (
 // NIMBuildSpec to build optimized trtllm engines with given model config and weights.
 type NIMBuildSpec struct {
 	// NIMCache is Reference to the model weights from NIMCache
-	NIMCache NIMCacheReference `json:"nimCacheRef"`
+	NIMCache NIMCacheReference `json:"nimCache"`
 	// ModelName is the name given to the locally built engine.
 	ModelName string `json:"engineName,omitempty"`
 	// Resources is the resource requirements for the NIMBuild pod.
@@ -157,4 +157,14 @@ func (n *NIMBuild) GetImage() string {
 // GetImagePullSecrets returns the image pull secrets for the NIM engine build.
 func (n *NIMBuild) GetImagePullSecrets() []string {
 	return n.Spec.Image.PullSecrets
+}
+
+// GetEngineBuildPodName returns the name of the pod that will be created to build the NIM engine.
+func (n *NIMBuild) GetEngineBuildPodName() string {
+	return fmt.Sprintf("%s-engine-build-pod", n.Name)
+}
+
+// GetLocalManifestReaderPodName returns the name of the pod that will be created to read the local manifest.
+func (n *NIMBuild) GetLocalManifestReaderPodName() string {
+	return fmt.Sprintf("%s-local-manifest-pod", n.Name)
 }
