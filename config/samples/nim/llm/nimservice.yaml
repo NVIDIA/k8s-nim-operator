@@ -22,8 +22,3 @@ spec:
     service:
       type: ClusterIP
       port: 8000
-  multiNode:
-    workers: 2
-    gpusPerWorker: 1
-    # mpi:
-    #   clusterStartTimeout: 300
