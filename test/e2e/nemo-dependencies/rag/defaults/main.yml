@@ -1,0 +1,20 @@
+---
+# defaults file for rag
+namespace: "rag"
+
+# Milvus Helm chart details
+milvus:
+  enabled: true
+  helm_repo_name: "rag-milvus"
+  helm_repo_url: "https://zilliztech.github.io/milvus-helm/"
+  chart_name: "milvus/milvus"
+  chart_version: "4.1.11"
+
+# Minio Helm chart details
+minio:
+  enabled: true
+  helm_release_name: rag-minio
+  helm_oci_registry: oci://registry-1.docker.io/bitnamicharts/minio
+  username: minioadmin
+  password: minioadmin
+

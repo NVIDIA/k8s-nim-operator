@@ -1,0 +1,9 @@
+---
+# tasks file for evaluator
+- include_tasks: local-path-provisioner.yaml
+  when: localPathProvisioner.enabled
+- include_tasks: namespace.yaml
+- include_tasks: milvus.yaml
+  when: milvus.enabled
+- include_tasks: minio.yaml
+  when: minio.enabled

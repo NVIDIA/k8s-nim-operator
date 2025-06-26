@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-server
+  labels:
+    app: rag-server
+spec:
+  replicas: {{ .Values.ragServer.replicaCount }}
+  selector:
+    matchLabels:
+      app: rag-server
+  template:
+    metadata:
+      labels:
+        app: rag-server
+    spec:
+      {{- if .Values.ragServer.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ .Values.ragServer.imagePullSecret.name }}
+      {{- end }}
+      containers:
+        - name: rag-server
+          image: "{{ .Values.ragServer.image.repository }}:{{ .Values.ragServer.image.tag }}"
+          imagePullPolicy: {{ .Values.ragServer.image.pullPolicy }}
+          command:
+          - "uvicorn"
+          - "src.server:app"
+          - "--port"
+          - "8081"
+          - "--host"
+          - "0.0.0.0"
+          - "--workers"
+          - "{{ .Values.ragServer.server.workers }}"
+          ports:
+            - containerPort: 8081
+          {{ if .Values.ragServer.envVars }}
+          env:
+            {{- if .Values.ragServer.envVars }}
+            {{- range $k, $v := .Values.ragServer.envVars }}
+            - name: "{{ $k }}"
+              value: "{{ $v }}"
+            {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.ragServer.resources }}
+          resources:
+{{ toYaml .Values.ragServer.resources | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: prompt-volume
+              mountPath: /prompt.yaml
+              subPath: prompt.yaml
+      volumes:
+        - name: prompt-volume
+          configMap:
+            name: prompt-config
+            defaultMode: 0555

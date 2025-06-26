@@ -1,0 +1,99 @@
+---
+- name: Template values file
+  ansible.builtin.template:
+    src: minio-values.yaml.j2
+    dest: minio-values.yaml
+
+- name: Install minio Helm chart
+  shell: >
+    helm upgrade --install {{ minio.helm_release_name }}
+    {{ minio.helm_oci_registry }}
+    --namespace {{ namespace }}
+    --values minio-values.yaml
+  register: helm_install_result
+  changed_when: "'STATUS: deployed' in helm_install_result.stdout"
+
+- name: Verify MinIO installation
+  command: kubectl get pods -n {{ namespace }}
+  register: pods
+
+- name: Check if mc (MinIO Client) is installed
+  command: which mc
+  register: mc_installed
+  ignore_errors: true
+
+- name: Ensure ~/bin directory exists
+  file:
+    path: "{{ ansible_env.HOME }}/bin"
+    state: directory
+    mode: '0755'
+
+- name: Install mc (MinIO Client) for Linux x86_64
+  shell: |
+    curl -O https://dl.min.io/client/mc/release/linux-amd64/mc &&
+    chmod +x mc &&
+    mv mc {{ ansible_env.HOME }}/bin/mc
+  when: mc_installed.rc != 0 and ansible_system == 'Linux' and ansible_architecture == 'x86_64'
+
+- name: Install mc (MinIO Client) for Linux aarch64
+  shell: |
+    curl -O https://dl.min.io/client/mc/release/linux-arm64/mc &&
+    chmod +x mc &&
+    mv mc {{ ansible_env.HOME }}/bin/mc
+  when: mc_installed.rc != 0 and ansible_system == 'Linux' and ansible_architecture == 'aarch64'
+
+- name: Install mc (MinIO Client) for macOS
+  shell: |
+    curl -O https://dl.min.io/client/mc/release/darwin-amd64/mc &&
+    chmod +x mc &&
+    mv mc {{ ansible_env.HOME }}/bin/mc
+  when: mc_installed.rc != 0 and ansible_system == 'Darwin'
+
+- name: Ensure ~/bin is in PATH
+  lineinfile:
+    path: "{{ ansible_env.HOME }}/.bashrc"
+    line: 'export PATH="$HOME/bin:$PATH"'
+    state: present
+  when: ansible_system != 'Darwin'
+
+- name: Ensure ~/bin is in PATH (macOS)
+  lineinfile:
+    path: "{{ ansible_env.HOME }}/.zshrc"
+    line: 'export PATH="$HOME/bin:$PATH"'
+    state: present
+  when: ansible_system == 'Darwin'
+
+- name: Wait for MinIO pods to be ready
+  shell: |
+    kubectl get pods -n {{ namespace }} \
+      | grep {{ minio.helm_release_name }} \
+      | grep -v console \
+      | awk '{print $1}' \
+      | xargs kubectl get pod -n {{ namespace }} -o json
+  register: minio_pods
+  retries: 30
+  delay: 10
+  until: minio_pods.stdout | from_json | json_query("items[*].status.phase") | unique == ['Running']
+  failed_when: minio_pods.rc != 0
+
+- name: Get the IP of the running MinIO pod
+  set_fact:
+    minio_pod_ip: "{{ (minio_pods.stdout | from_json).status.podIP }}"
+
+- name: Run validation to connect to MinIO
+  ignore_errors: true
+  shell: |
+    echo "Running MinIO validation script"
+    mc alias set myminio http://{{ minio_pod_ip }}:9000 {{ minio.username }} {{ minio.password }} --insecure
+    mc mb myminio/testbucket --insecure
+  register: minio_validation_output
+
+- name: MinIO Connection status (Success)
+  debug:
+    msg: "Successfully connected and created test bucket on MinIO."
+  when: minio_validation_output.rc == 0
+
+- name: MinIO Connection status (Failed)
+  debug:
+    msg: "Failed to connect and create test bucket on MinIO."
+  when: minio_validation_output.rc != 0
