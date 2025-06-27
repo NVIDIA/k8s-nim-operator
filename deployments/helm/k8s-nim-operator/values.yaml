@@ -44,6 +44,15 @@ operator:
     capabilities:
       drop:
         - ALL
+  admissionController:
+    # -- Deploy with admission controller.
+    enabled: false
+    # -- Use cert-manager for generating self-signed certificate.
+    useCertManager: true
+    # certificate:
+    #   caCrt: |-
+    #   tlsCrt: |-
+    #   tlsKey: |-
 
 metricsService:
   ports:
