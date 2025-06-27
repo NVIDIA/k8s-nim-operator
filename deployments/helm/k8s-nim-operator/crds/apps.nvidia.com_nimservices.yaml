@@ -2363,38 +2363,74 @@ spec:
                   description: DRAResourceStatus defines the status of the DRAResource.
                   properties:
                     name:
+                      description: Name is the pod claim name referenced in the pod
+                        spec as `spec.resourceClaims[].name` for this DRA resource.
                       type: string
-                    resourceClaimTemplateName:
+                    resourceClaimStatus:
                       description: |-
-                        ResourceClaimTemplateName is the name of the ResourceClaimTemplate that was
-                        used to generate the ResourceClaim for an instance of NIMService.
-                      type: string
-                    resourceClaims:
-                      description: ResourceClaims is the status of resource claims.
-                      items:
-                        description: DRAResourceClaimStatus defines the status of
-                          the DRAResourceClaim.
-                        properties:
-                          name:
-                            description: Name is the name of the ResourceClaim.
-                            type: string
-                          state:
-                            description: |-
-                              State is the state of the ResourceClaim.
-                              * pending: the resource claim is pending allocation.
-                              * deleted: the resource claim has a deletion timestamp set but is not yet finalized.
-                              * allocated: the resource claim is allocated to a pod.
-                              * reserved: the resource claim is consumed by a pod.
-                              This field will have one or more of the above values depending on the status of the resource claim.
-                            type: string
-                        required:
-                        - name
-                        - state
-                        type: object
-                      type: array
+                        ResourceClaimStatus is the status of the resource claim in this DRA resource.
+
+                        Exactly one of resourceClaimStatus and resourceClaimTemplateStatus will be set.
+                      properties:
+                        name:
+                          description: Name is the name of the ResourceClaim.
+                          type: string
+                        state:
+                          description: |-
+                            State is the state of the ResourceClaim.
+                            * pending: the resource claim is pending allocation.
+                            * deleted: the resource claim has a deletion timestamp set but is not yet finalized.
+                            * allocated: the resource claim is allocated to a pod.
+                            * reserved: the resource claim is consumed by a pod.
+                            This field will have one or more of the above values depending on the status of the resource claim.
+                          type: string
+                      required:
+                      - name
+                      - state
+                      type: object
+                    resourceClaimTemplateStatus:
+                      description: |-
+                        ResourceClaimTemplateStatus is the status of the resource claim template in this DRA resource.
+
+                        Exactly one of resourceClaimStatus and resourceClaimTemplateStatus will be set.
+                      properties:
+                        name:
+                          description: Name is the name of the resource claim template.
+                          type: string
+                        resourceClaimStatuses:
+                          description: ResourceClaimStatuses is the statuses of the
+                            generated resource claims from this resource claim template.
+                          items:
+                            description: DRAResourceClaimStatusInfo defines the status
+                              of a ResourceClaim referenced in the DRAResource.
+                            properties:
+                              name:
+                                description: Name is the name of the ResourceClaim.
+                                type: string
+                              state:
+                                description: |-
+                                  State is the state of the ResourceClaim.
+                                  * pending: the resource claim is pending allocation.
+                                  * deleted: the resource claim has a deletion timestamp set but is not yet finalized.
+                                  * allocated: the resource claim is allocated to a pod.
+                                  * reserved: the resource claim is consumed by a pod.
+                                  This field will have one or more of the above values depending on the status of the resource claim.
+                                type: string
+                            required:
+                            - name
+                            - state
+                            type: object
+                          type: array
+                      required:
+                      - name
+                      type: object
                   required:
                   - name
                   type: object
+                  x-kubernetes-validations:
+                  - message: exactly one of resourceClaimStatus and resourceClaimTemplateStatus
+                      must be set.
+                    rule: has(self.resourceClaimStatus) != has(self.resourceClaimTemplateStatus)
                 type: array
                 x-kubernetes-list-map-keys:
                 - name

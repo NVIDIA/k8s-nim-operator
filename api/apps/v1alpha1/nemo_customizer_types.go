@@ -867,6 +867,11 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 			Verbs:     []string{"create", "get", "list", "watch", "delete"},
 		},
 		{
+			APIGroups: []string{""},
+			Resources: []string{"events"},
+			Verbs:     []string{"create", "get", "list", "watch"},
+		},
+		{
 			APIGroups: []string{"nvidia.com"},
 			Resources: []string{"nemotrainingjobs", "nemotrainingjobs/status", "nemoentityhandlers"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "delete", "patch"},
@@ -896,8 +901,20 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 		},
 	}
 
-	if n.Spec.Scheduler.Type == SchedulerTypeVolcano {
+	runAIRules := []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{"run.ai"},
+			Resources: []string{"trainingworkloads", "runaijobs"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "delete", "patch"},
+		},
+	}
+
+	// Add scheduler specific rules
+	switch n.Spec.Scheduler.Type {
+	case SchedulerTypeVolcano:
 		params.Rules = append(params.Rules, volcanoRules...)
+	case SchedulerTypeRunAI:
+		params.Rules = append(params.Rules, runAIRules...)
 	}
 
 	return params

@@ -32,6 +32,8 @@ rules:
   resources:
   - events
   verbs:
+  - get
+  - list
   - create
   - update
   - patch
@@ -375,6 +377,15 @@ rules:
   - update
   - watch
 - apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaims
+  - resourceclaimtemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - route.openshift.io
   resources:
   - routes
@@ -512,7 +523,18 @@ rules:
   - get
   - list
   - watch
-
+- apiGroups:
+  - run.ai
+  resources:
+  - trainingworkloads
+  - runaijobs
+  verbs:
+  - get
+  - list
+  - watch
+  - delete
+  - patch
+  - update
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
