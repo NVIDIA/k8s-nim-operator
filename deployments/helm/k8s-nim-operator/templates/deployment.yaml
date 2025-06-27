@@ -33,6 +33,16 @@ spec:
         - /manager
         image: {{ include "k8s-nim-operator.fullimage" . }}
         imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+        {{- if .Values.operator.admissionController.enabled }}
+        ports:
+          - containerPort: 9443
+            name: webhook-server
+            protocol: TCP
+        volumeMounts:
+          - mountPath: /tmp/k8s-webhook-server/serving-certs
+            name: cert
+            readOnly: true
+        {{- end }}
         env:
           - name: WATCH_NAMESPACE
             value: ""
@@ -40,6 +50,8 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          - name: ENABLE_WEBHOOKS
+            value: "{{ .Values.operator.admissionController.enabled }}"
         livenessProbe:
           httpGet:
             path: /healthz
@@ -62,6 +74,13 @@ spec:
       securityContext: {{- toYaml .Values.operator.podSecurityContext | nindent 8 }}
       serviceAccountName: k8s-nim-operator
       terminationGracePeriodSeconds: 10
+      {{- if .Values.operator.admissionController.enabled }}
+      volumes:
+        - name: cert
+          secret:
+            secretName: {{ include "k8s-nim-operator.fullname" . }}-webhook-server-cert
+            defaultMode: 420
+      {{- end }}
     {{- with .Values.operator.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

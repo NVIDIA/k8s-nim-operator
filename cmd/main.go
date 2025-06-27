@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"strconv"
 
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	monitoring "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -47,6 +48,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/kserve"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/standalone"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	webhookappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/internal/webhook/apps/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -256,6 +258,29 @@ func main() {
 		os.Exit(1)
 	}
 
+	// nolint:goconst
+	// Parse ENABLE_WEBHOOKS environment variable once as a boolean.
+	var enableWebhooks bool
+	if val, ok := os.LookupEnv("ENABLE_WEBHOOKS"); ok {
+		var err error
+		enableWebhooks, err = strconv.ParseBool(val)
+		if err != nil {
+			setupLog.Error(err, "invalid value for ENABLE_WEBHOOKS, expected boolean")
+			os.Exit(1)
+		}
+	}
+
+	if enableWebhooks {
+		if err := webhookappsv1alpha1.SetupNIMCacheWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "NIMCache")
+			os.Exit(1)
+		}
+
+		if err := webhookappsv1alpha1.SetupNIMServiceWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "NIMService")
+			os.Exit(1)
+		}
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
