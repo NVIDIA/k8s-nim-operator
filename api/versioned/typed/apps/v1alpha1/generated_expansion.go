@@ -17,6 +17,8 @@ limitations under the License.
 
 package v1alpha1
 
+type NIMBuildExpansion interface{}
+
 type NIMCacheExpansion interface{}
 
 type NIMPipelineExpansion interface{}
