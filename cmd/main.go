@@ -47,6 +47,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/kserve"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/standalone"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	webhookappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/internal/webhook/apps/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -256,6 +257,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookappsv1alpha1.SetupNIMCacheWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "NIMCache")
+			os.Exit(1)
+		}
+
+		if err := webhookappsv1alpha1.SetupNIMServiceWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "NIMService")
+			os.Exit(1)
+		}
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
