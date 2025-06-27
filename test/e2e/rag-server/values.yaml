@@ -148,8 +148,13 @@ frontend:
       value: "http://rag-server:8081/v1"
 
 # Ingestor Server
+  # NOTE: nv-ingest assumes ngc-api secret exists in the namespace
 ingestor-server:
   enabled: true
+  milvusDeployed: false
+  redisDeployed: false
+  otelDeployed: false
+  zipkinDeployed: false
   imagePullSecret:
     name: "ngc-secret"
     create: false
