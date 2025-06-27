@@ -1,0 +1,250 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMPipeline
+metadata:
+  name: rag-blueprint
+spec:
+  services:
+    - name: {{ .Values.llm.service.name }}
+      enabled: {{ .Values.llm.enabled }}
+      spec:
+        image:
+          repository: {{ .Values.llm.image.repository }}
+          tag: {{ .Values.llm.image.tag | quote }}
+          pullPolicy: {{ .Values.llm.image.pullPolicy }}
+          pullSecrets:
+            - {{ .Values.imagePullSecret.name }}
+        authSecret: {{ .Values.ngcApiSecret.name }}
+        storage:
+          pvc:
+            create: {{ .Values.llm.pvc.create }}
+            storageClass: {{ .Values.llm.pvc.storageClass }}
+            size: {{ .Values.llm.pvc.size }}
+            {{ with .Values.llm.pvc.annotations }}
+            annotations:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            volumeAccessMode: {{ .Values.llm.pvc.accessMode }}
+        replicas: {{ .Values.llm.replicas | default 1 }}
+        resources:
+          {{- toYaml .Values.llm.resources | nindent 10 }}
+        expose:
+          service:
+            type: {{ .Values.llm.service.type | default "ClusterIP" }}
+            port: {{ .Values.llm.service.port | default 8000 }}
+        {{- if .Values.llm.autoScale.enabled }}
+        scale:
+          enabled: {{ .Values.llm.autoScale.enabled }}
+          hpa: 
+            {{- toYaml .Values.llm.autoScale.hpa | nindent 12 }}
+        {{- end }}
+    - name: {{ .Values.embedding.service.name }}
+      enabled: {{ default false .Values.embedding.enabled }}
+      spec:
+        image:
+          repository: {{ .Values.embedding.image.repository }}
+          tag: {{ .Values.embedding.image.tag | quote }}
+          pullPolicy: {{ .Values.embedding.image.pullPolicy }}
+          pullSecrets:
+          - {{ .Values.imagePullSecret.name }}
+        authSecret: {{ .Values.ngcApiSecret.name }}
+        storage:
+          pvc:
+            create: {{ default false .Values.embedding.pvc.create }}
+            storageClass: {{ .Values.embedding.pvc.storageClass }}
+            size: {{ .Values.embedding.pvc.size | quote }}
+            {{- with .Values.embedding.pvc.annotations }}
+            annotations:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            volumeAccessMode: {{ .Values.embedding.pvc.accessMode }}
+        replicas: {{ .Values.embedding.replicas | default 1 }}
+        resources:
+          {{- toYaml .Values.embedding.resources | nindent 10 }}
+        expose:
+          service:
+            type: {{ .Values.embedding.service.type | default "ClusterIP" }}
+            port: {{ .Values.embedding.service.port | default 8000 }}
+            grpcPort: {{ .Values.embedding.service.grpcPort | default 8001 }}
+            metricsPort: {{ .Values.embedding.service.metricsPort | default 8002 }}
+        {{- if .Values.embedding.autoScale.enabled }}
+        scale:
+          enabled: {{ .Values.embedding.autoScale.enabled }}
+          hpa: 
+            {{- toYaml .Values.embedding.autoScale.hpa | nindent 12 }}
+        {{- end }}
+    - name: {{ .Values.reranking.service.name }}
+      enabled: {{ default false .Values.reranking.enabled }}
+      spec:
+        image:
+          repository: {{ .Values.reranking.image.repository }}
+          tag: {{ .Values.reranking.image.tag | quote }}
+          pullPolicy: {{ .Values.reranking.image.pullPolicy }}
+          pullSecrets:
+          - {{ .Values.imagePullSecret.name }}
+        authSecret: {{ .Values.ngcApiSecret.name }}
+        storage:
+          pvc:
+            create: {{ default false .Values.reranking.pvc.create }}
+            storageClass: {{ .Values.reranking.pvc.storageClass }}
+            size: {{ .Values.reranking.pvc.size }}
+            {{- with .Values.reranking.pvc.annotations }}
+            annotations:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            volumeAccessMode: {{ .Values.reranking.pvc.accessMode }}
+        replicas: {{ .Values.reranking.replicas | default 1 }}
+        resources:
+          {{ toYaml .Values.reranking.resources | nindent 10 }}
+        expose:
+          service:
+            type: {{ .Values.reranking.service.type | default "ClusterIP" }}
+            port: {{ .Values.reranking.service.port | default 8000 }}
+            grpcPort: {{ .Values.reranking.service.grpcPort | default 8001 }}
+            metricsPort: {{ .Values.reranking.service.metricsPort | default 8002 }}
+        {{- if .Values.reranking.autoScale.enabled }}
+        scale:
+          enabled: {{ .Values.reranking.autoScale.enabled }}
+          hpa: 
+            {{- toYaml .Values.reranking.autoScale.hpa | nindent 12 }}
+        {{- end }}
+    - name: {{ .Values.paddleOcr.service.name }}
+      enabled: {{ .Values.paddleOcr.enabled }}
+      spec:
+        image:
+          repository: {{ .Values.paddleOcr.image.repository }}
+          tag: {{ .Values.paddleOcr.image.tag | quote }}
+          pullPolicy: {{ .Values.paddleOcr.image.pullPolicy }}
+          pullSecrets:
+            - {{ .Values.imagePullSecret.name }}
+        authSecret: {{ .Values.ngcApiSecret.name }}
+        storage:
+          pvc:
+            create: {{ .Values.paddleOcr.pvc.create }}
+            storageClass: {{ .Values.paddleOcr.pvc.storageClass }}
+            size: {{ .Values.paddleOcr.pvc.size }}
+            {{ with .Values.paddleOcr.pvc.annotations }}
+            annotations:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            volumeAccessMode: {{ .Values.llm.pvc.accessMode }}
+        replicas: {{ .Values.paddleOcr.replicas | default 1 }}
+        resources:
+          {{- toYaml .Values.paddleOcr.resources | nindent 10 }}
+        expose:
+          service:
+            type: {{ .Values.paddleOcr.service.type | default "ClusterIP" }}
+            port: {{ .Values.paddleOcr.service.port | default 8000 }}
+            grpcPort: {{ .Values.paddleOcr.service.grpcPort | default 8001 }}
+            metricsPort: {{ .Values.paddleOcr.service.metricsPort | default 8002 }}
+        {{- if .Values.paddleOcr.autoScale.enabled }}
+        scale:
+          enabled: {{ .Values.paddleOcr.autoScale.enabled }}
+          hpa: 
+            {{- toYaml .Values.paddleOcr.autoScale.hpa | nindent 12 }}
+        {{- end }}
+    - name: {{ .Values.graphicElements.service.name }}
+      enabled: {{ .Values.graphicElements.enabled }}
+      spec:
+        image:
+          repository: {{ .Values.graphicElements.image.repository }}
+          tag: {{ .Values.graphicElements.image.tag | quote }}
+          pullPolicy: {{ .Values.graphicElements.image.pullPolicy }}
+          pullSecrets:
+            - {{ .Values.imagePullSecret.name }}
+        authSecret: {{ .Values.ngcApiSecret.name }}
+        storage:
+          pvc:
+            create: {{ .Values.graphicElements.pvc.create }}
+            storageClass: {{ .Values.graphicElements.pvc.storageClass }}
+            size: {{ .Values.graphicElements.pvc.size }}
+            {{ with .Values.graphicElements.pvc.annotations }}
+            annotations:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            volumeAccessMode: {{ .Values.graphicElements.pvc.accessMode }}
+        replicas: {{ .Values.graphicElements.replicas | default 1 }}
+        resources:
+          {{- toYaml .Values.graphicElements.resources | nindent 10 }}
+        expose:
+          service:
+            type: {{ .Values.graphicElements.service.type | default "ClusterIP" }}
+            port: {{ .Values.graphicElements.service.port | default 8000 }}
+            grpcPort: {{ .Values.graphicElements.service.grpcPort | default 8001 }}
+            metricsPort: {{ .Values.graphicElements.service.metricsPort | default 8002 }}
+        {{- if .Values.graphicElements.autoScale.enabled }}
+        scale:
+          enabled: {{ .Values.graphicElements.autoScale.enabled }}
+          hpa: 
+            {{- toYaml .Values.graphicElements.autoScale.hpa | nindent 12 }}
+        {{- end }}
+    - name: {{ .Values.pageElements.service.name }}
+      enabled: {{ .Values.pageElements.enabled }}
+      spec:
+        image:
+          repository: {{ .Values.pageElements.image.repository }}
+          tag: {{ .Values.pageElements.image.tag | quote }}
+          pullPolicy: {{ .Values.pageElements.image.pullPolicy }}
+          pullSecrets:
+            - {{ .Values.imagePullSecret.name }}
+        authSecret: {{ .Values.ngcApiSecret.name }}
+        storage:
+          pvc:
+            create: {{ .Values.pageElements.pvc.create }}
+            storageClass: {{ .Values.pageElements.pvc.storageClass }}
+            size: {{ .Values.pageElements.pvc.size }}
+            {{ with .Values.pageElements.pvc.annotations }}
+            annotations:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            volumeAccessMode: {{ .Values.pageElements.pvc.accessMode }}
+        replicas: {{ .Values.pageElements.replicas | default 1 }}
+        resources:
+          {{- toYaml .Values.pageElements.resources | nindent 10 }}
+        expose:
+          service:
+            type: {{ .Values.pageElements.service.type | default "ClusterIP" }}
+            port: {{ .Values.pageElements.service.port | default 8000 }}
+            grpcPort: {{ .Values.pageElements.service.grpcPort | default 8001 }}
+            metricsPort: {{ .Values.pageElements.service.metricsPort | default 8002 }}
+        {{- if .Values.pageElements.autoScale.enabled }}
+        scale:
+          enabled: {{ .Values.pageElements.autoScale.enabled }}
+          hpa: 
+            {{- toYaml .Values.pageElements.autoScale.hpa | nindent 12 }}
+        {{- end }}
+    - name: {{ .Values.tableStructure.service.name }}
+      enabled: {{ .Values.tableStructure.enabled }}
+      spec:
+        image:
+          repository: {{ .Values.tableStructure.image.repository }}
+          tag: {{ .Values.tableStructure.image.tag | quote }}
+          pullPolicy: {{ .Values.tableStructure.image.pullPolicy }}
+          pullSecrets:
+            - {{ .Values.imagePullSecret.name }}
+        authSecret: {{ .Values.ngcApiSecret.name }}
+        storage:
+          pvc:
+            create: {{ .Values.tableStructure.pvc.create }}
+            storageClass: {{ .Values.tableStructure.pvc.storageClass }}
+            size: {{ .Values.tableStructure.pvc.size }}
+            {{ with .Values.tableStructure.pvc.annotations }}
+            annotations:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            volumeAccessMode: {{ .Values.tableStructure.pvc.accessMode }}
+        replicas: {{ .Values.tableStructure.replicas | default 1 }}
+        resources:
+          {{- toYaml .Values.tableStructure.resources | nindent 10 }}
+        expose:
+          service:
+            type: {{ .Values.tableStructure.service.type | default "ClusterIP" }}
+            port: {{ .Values.tableStructure.service.port | default 8000 }}
+            grpcPort: {{ .Values.tableStructure.service.grpcPort | default 8001 }}
+            metricsPort: {{ .Values.tableStructure.service.metricsPort | default 8002 }}
+        {{- if .Values.tableStructure.autoScale.enabled }}
+        scale:
+          enabled: {{ .Values.tableStructure.autoScale.enabled }}
+          hpa: 
+            {{- toYaml .Values.tableStructure.autoScale.hpa | nindent 12 }}
+        {{- end }}
+

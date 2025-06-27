@@ -1,0 +1,19 @@
+apiVersion: v2
+appVersion: v2.1.0
+dependencies:
+- condition: k8s-nim-operator.enabled
+  name: k8s-nim-operator
+  repository: https://helm.ngc.nvidia.com/nvidia
+  version: v2.0.0
+- condition: frontend.enabled
+  name: frontend
+  repository: ""
+  version: v2.1.0
+- condition: ingestor-server.enabled
+  name: ingestor-server
+  repository: ""
+  version: v2.1.0
+description: An end to end Helm chart for the NVIDIA RAG Blueprint
+name: nvidia-rag-blueprint
+type: application
+version: v2.1.0
