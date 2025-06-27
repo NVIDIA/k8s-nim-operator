@@ -164,9 +164,9 @@ func (r *NIMBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionReconcileFailed, metav1.ConditionTrue, "ReconcileFailed", err.Error())
 		nimBuild.Status.State = appsv1alpha1.NimBuildStatusPending
 
-		err := r.updateNIMBuildStatus(ctx, nimBuild)
+		err := r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusPending)
 		if err != nil {
-			logger.Error(err, "Failed to update NIMBuild status", "NIMBuild", nimBuild.Name)
+			logger.Error(err, "Failed to update NIMBuild state", "NIMBuild", nimBuild.Name)
 			return ctrl.Result{}, err
 		}
 		return result, err
@@ -330,8 +330,7 @@ func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *ap
 	if err := r.Get(ctx, nimCacheNamespacedName, nimCache); err != nil {
 		logger.Error(err, "unable to fetch NIMCache for NIMBuild", "NIMCache", nimCacheNamespacedName)
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNIMCacheNotFound, metav1.ConditionTrue, "NIMCache not found", "Not able to get NIMCache for NIMBuild")
-		nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 	}
 
 	switch nimCache.Status.State {
@@ -339,12 +338,10 @@ func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *ap
 		logger.V(4).Info("NIMCache is ready", "nimcache", nimCache.Name, "nimservice", nimBuild.Name)
 	case appsv1alpha1.NimCacheStatusFailed:
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNimCacheFailed, metav1.ConditionTrue, "NIMCache failed", "NIMCache is failed. NIMBuild can not progress")
-		nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 	default:
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionWaitForNimCache, metav1.ConditionTrue, "NIMCache not ready", "Waiting for NIMCache to be ready before building engines")
-		nimBuild.Status.State = appsv1alpha1.NimBuildStatusPending
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 	}
 
 	if !meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted) {
@@ -363,12 +360,17 @@ func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *ap
 		}
 	}
 
+	return ctrl.Result{}, nil
+}
+func (r *NIMBuildReconciler) updateNIMBuildState(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild, state string) error {
+	logger := r.GetLogger()
+	nimBuild.Status.State = state
 	err := r.updateNIMBuildStatus(ctx, nimBuild)
 	if err != nil {
 		logger.Error(err, "Failed to update NIMBuild status", "NIMBuild", nimBuild.Name)
-		return ctrl.Result{}, err
+		return err
 	}
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache) error {
@@ -381,8 +383,7 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 			case len(buildableProfiles) > 1:
 				logger.Info("Multiple buildable profiles found", "Profiles", buildableProfiles)
 				conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionMultipleBuildableProfilesFound, metav1.ConditionTrue, "MultipleBuildableProfilesFound", "Multiple buildable profiles found in NIM Cache, please select one profile to build")
-				nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
-				return nil
+				return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 			case len(buildableProfiles) == 1:
 				logger.Info("Selected buildable profile found", "Profile", buildableProfiles[0].Name)
 				conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionSingleBuildableProfilesFound, metav1.ConditionTrue, "BuildableProfileFound", "Single buildable profile cached in NIM Cache")
@@ -391,22 +392,20 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 			default:
 				logger.Info("No buildable profiles found, skipping engine build")
 				conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNoBuildableProfilesFound, metav1.ConditionTrue, "NoBuildableProfilesFound", "No buildable profiles found in NIM Cache")
-				nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
-				return nil
+				return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 			}
 
 		} else {
 			logger.Info("No buildable profiles found, skipping engine build")
 			conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNoBuildableProfilesFound, metav1.ConditionTrue, "NoBuildableProfilesFound", "No buildable profiles found for NIM Cache")
-			nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
+			return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 		}
 	} else {
 		foundProfile := getBuildableProfileByName(nimCache, nimBuild.Spec.NIMCache.Profile)
 		if foundProfile == nil {
 			logger.Info("No buildable profiles found", "ProfileName", nimBuild.Spec.NIMCache.Profile)
 			conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNoBuildableProfilesFound, metav1.ConditionTrue, "NoBuildableProfilesFound", "No buildable profiles found, please select a valid profile from the NIM cache")
-			nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
-			return nil
+			return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 		} else {
 			logger.Info("Selected buildable profile found", "Profile", foundProfile.Name)
 			conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionSingleBuildableProfilesFound, metav1.ConditionTrue, "BuildableProfileFound", "Single buildable profile found")
@@ -485,12 +484,12 @@ func (r *NIMBuildReconciler) reconcileEngineBuildPodStatus(ctx context.Context, 
 	case pod.Status.Phase == corev1.PodFailed && !meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted):
 		logger.Info("Failed to cache NIM, build pod failed", "pod", pod)
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCreated, metav1.ConditionFalse, "PodFailed", "The pod to build engine has failed")
-		nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
+		return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 
 	case !isPodReady(pod) && !meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted):
 		logger.Info("Caching NIM is in progress, build engine pod running", "job", podName)
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodPending, metav1.ConditionTrue, "PodRunning", "The Pod to build engine is in progress")
-		nimBuild.Status.State = appsv1alpha1.NimBuildStatusInProgress
+		return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusInProgress)
 
 	}
 
@@ -850,9 +849,7 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 	}
 	// Update the NIMBuild status
 	conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionModelManifestPodCompleted, metav1.ConditionTrue, "PodCompleted", "The Pod to read local model manifest is completed")
-	nimBuild.Status.State = appsv1alpha1.NimBuildStatusReady
-
-	return nil
+	return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusReady)
 }
 
 func isBuiltProfilePresentOnNIMCacheStatus(nimCache *appsv1alpha1.NIMCache, builtProfileName string) bool {
