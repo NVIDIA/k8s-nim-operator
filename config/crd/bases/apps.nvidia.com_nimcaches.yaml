@@ -389,6 +389,10 @@ spec:
                               for the model computations
                             type: string
                         type: object
+                      modelEndpoint:
+                        description: ModelEndpoint is the endpoint for the model to
+                          be cached for Universal NIM
+                        type: string
                       modelPuller:
                         description: ModelPuller is the container image that can pull
                           the model
@@ -405,6 +409,9 @@ spec:
                     - authSecret
                     - modelPuller
                     type: object
+                    x-kubernetes-validations:
+                    - message: Only one of 'model' or 'modelEndpoint' can be specified
+                      rule: '!(has(self.model) && has(self.modelEndpoint))'
                 type: object
                 x-kubernetes-validations:
                 - message: Exactly one of ngc, dataStore, or hf must be defined

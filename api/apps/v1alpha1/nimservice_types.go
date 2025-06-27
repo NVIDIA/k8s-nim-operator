@@ -189,7 +189,7 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "NIM_CACHE_PATH",
-			Value: "/model-store",
+			Value: utils.DefaultModelStorePath,
 		},
 		{
 			Name: "NGC_API_KEY",

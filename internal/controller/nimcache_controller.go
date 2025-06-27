@@ -494,6 +494,7 @@ func (r *NIMCacheReconciler) reconcileServiceAccount(ctx context.Context, nimCac
 		}
 
 		// Create the ServiceAccount
+
 		err = r.Create(ctx, newSA)
 		if err != nil {
 			logger.Error(err, "Failed to create ServiceAccount", "Name", saName)
@@ -550,8 +551,8 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 // Model auto-selection is enabled and
 // Explicit model profiles are not provided by the user.
 func isModelSelectionRequired(nimCache *appsv1alpha1.NIMCache) bool {
-	if nimCache.Spec.Source.NGC != nil &&
-		len(nimCache.Spec.Source.NGC.Model.Profiles) == 0 {
+	if nimCache.IsOptimizedNIM() &&
+		len(nimCache.GetModelSpec().Profiles) == 0 {
 		return true
 	}
 	return false
@@ -567,8 +568,8 @@ func isModelSelectionDone(nimCache *appsv1alpha1.NIMCache) bool {
 }
 
 func getSelectedProfiles(nimCache *appsv1alpha1.NIMCache) ([]string, error) {
-	if nimCache.Spec.Source.NGC != nil {
-		if len(nimCache.Spec.Source.NGC.Model.Profiles) > 0 {
+	if nimCache.IsOptimizedNIM() {
+		if len(nimCache.GetModelSpec().Profiles) > 0 {
 			return nimCache.Spec.Source.NGC.Model.Profiles, nil
 		}
 
@@ -589,7 +590,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 	logger := r.GetLogger()
 
 	// Model manifest is available only for NGC model pullers
-	if nimCache.Spec.Source.NGC == nil {
+	if !nimCache.IsOptimizedNIM() {
 		return false, nil
 	}
 
@@ -677,7 +678,7 @@ func (r *NIMCacheReconciler) reconcileModelSelection(ctx context.Context, nimCac
 	if isModelSelectionRequired(nimCache) && !isModelSelectionDone(nimCache) {
 		var discoveredGPUs []string
 		// If no specific GPUs are provided, then auto-detect GPUs in the cluster for profile selection
-		if len(nimCache.Spec.Source.NGC.Model.GPUs) == 0 {
+		if len(nimCache.GetModelSpec().GPUs) == 0 {
 			gpusByNode, err := r.GetNodeGPUProducts(ctx)
 			if err != nil {
 				logger.Error(err, "Failed to get gpus in the cluster")
@@ -693,7 +694,7 @@ func (r *NIMCacheReconciler) reconcileModelSelection(ctx context.Context, nimCac
 		}
 
 		// Match profiles with user input
-		profiles, err := nimManifest.MatchProfiles(nimCache.Spec.Source.NGC.Model, discoveredGPUs)
+		profiles, err := nimManifest.MatchProfiles(nimCache.GetModelSpec(), discoveredGPUs)
 		if err != nil {
 			logger.Error(err, "Failed to match profiles for given model parameters")
 			return err
@@ -1084,7 +1085,8 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 	}
 
-	if nimCache.Spec.Source.DataStore != nil || nimCache.Spec.Source.HF != nil {
+	switch {
+	case nimCache.Spec.Source.DataStore != nil || nimCache.Spec.Source.HF != nil:
 		var hfDataSource HFInterface
 		if nimCache.Spec.Source.DataStore != nil {
 			hfDataSource = nimCache.Spec.Source.DataStore
@@ -1116,6 +1118,10 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 					{
 						Name:  "HF_ENDPOINT",
 						Value: hfDataSource.GetEndpoint(),
+					},
+					{
+						Name:  "HF_HUB_OFFLINE",
+						Value: "0",
 					},
 				},
 				VolumeMounts: []corev1.VolumeMount{
@@ -1152,7 +1158,8 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Name: hfDataSource.GetPullSecret(),
 			},
 		}
-	} else if nimCache.Spec.Source.NGC != nil {
+
+	case nimCache.Spec.Source.NGC != nil && nimCache.Spec.Source.NGC.ModelEndpoint == nil:
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
 				Name:    NIMCacheContainerName,
@@ -1220,8 +1227,57 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
 			}
 		}
-	}
 
+	case nimCache.Spec.Source.NGC != nil && nimCache.Spec.Source.NGC.ModelEndpoint != nil:
+		job.Spec.Template.Spec.Containers = []corev1.Container{
+			{
+				Name:    NIMCacheContainerName,
+				Image:   nimCache.Spec.Source.NGC.ModelPuller,
+				Command: []string{"create-model-store"},
+				Args:    []string{"--model-repo", *nimCache.Spec.Source.NGC.ModelEndpoint, "--model-store", "/model-store"},
+				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
+				Env: []corev1.EnvVar{
+					{
+						Name:  "NIM_CACHE_PATH",
+						Value: utils.DefaultModelStorePath,
+					},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "nim-cache-volume",
+						MountPath: utils.DefaultModelStorePath,
+						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
+					},
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: map[corev1.ResourceName]apiResource.Quantity{
+						"cpu":    nimCache.Spec.Resources.CPU,
+						"memory": nimCache.Spec.Resources.Memory,
+					},
+					Requests: map[corev1.ResourceName]apiResource.Quantity{
+						"cpu":    nimCache.Spec.Resources.CPU,
+						"memory": nimCache.Spec.Resources.Memory,
+					},
+				},
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+				SecurityContext: &corev1.SecurityContext{
+					AllowPrivilegeEscalation: ptr.To[bool](false),
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+					RunAsNonRoot: ptr.To[bool](true),
+					RunAsGroup:   nimCache.GetGroupID(),
+					RunAsUser:    nimCache.GetUserID(),
+				},
+			},
+		}
+		job.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
+			{
+				Name: nimCache.Spec.Source.NGC.PullSecret,
+			},
+		}
+	}
 	// Merge env with the user provided values
 	job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.Spec.Env)
 
