@@ -118,15 +118,11 @@ func (r *NIMBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	logger.Info("Reconciling", "NIMBuild", nimBuild.Name)
-	previousStatusState := nimBuild.Status.State
 
 	defer func() {
 		if err != nil {
 			r.GetEventRecorder().Eventf(nimBuild, corev1.EventTypeWarning, "ReconcileFailed",
 				"NIMBuild %s reconcile failed, msg: %s", nimBuild.Name, err.Error())
-		} else if previousStatusState != nimBuild.Status.State {
-			r.GetEventRecorder().Eventf(nimBuild, corev1.EventTypeNormal, nimBuild.Status.State,
-				"NIMBuild %s reconcile success, new state: %s", nimBuild.Name, nimBuild.Status.State)
 		}
 	}()
 	// Check if the instance is marked for deletion
@@ -151,8 +147,8 @@ func (r *NIMBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			if err := r.Update(ctx, nimBuild); err != nil {
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil
 		}
+		return ctrl.Result{}, nil
 	}
 
 	// Fetch container orchestrator type
@@ -166,7 +162,7 @@ func (r *NIMBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err != nil {
 		logger.Error(err, "error reconciling NIMBuild", "name", nimBuild.Name)
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionReconcileFailed, metav1.ConditionTrue, "ReconcileFailed", err.Error())
-		nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
+		nimBuild.Status.State = appsv1alpha1.NimBuildStatusPending
 
 		err := r.updateNIMBuildStatus(ctx, nimBuild)
 		if err != nil {
@@ -335,7 +331,7 @@ func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *ap
 		logger.Error(err, "unable to fetch NIMCache for NIMBuild", "NIMCache", nimCacheNamespacedName)
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionNIMCacheNotFound, metav1.ConditionTrue, "NIMCache not found", "Not able to get NIMCache for NIMBuild")
 		nimBuild.Status.State = appsv1alpha1.NimBuildStatusFailed
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	switch nimCache.Status.State {
