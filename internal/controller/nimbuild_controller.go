@@ -375,7 +375,7 @@ func (r *NIMBuildReconciler) updateNIMBuildState(ctx context.Context, nimBuild *
 
 func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
-	buildableProfile := appsv1alpha1.NIMProfile{}
+	var buildableProfile appsv1alpha1.NIMProfile
 	if nimBuild.Spec.NIMCache.Profile == "" {
 		buildableProfiles := getBuildableProfiles(nimCache)
 		if len(buildableProfiles) > 0 {
