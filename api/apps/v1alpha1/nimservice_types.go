@@ -17,6 +17,11 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"maps"
 	"os"
@@ -53,9 +58,26 @@ const (
 	NIMServiceStatusReady = "Ready"
 	// NIMServiceStatusFailed indicates that NIM deployment has failed.
 	NIMServiceStatusFailed = "Failed"
+
+	DefaultMPIStartScript = `#!/bin/bash
+NIM_JSONL_LOGGING="${NIM_JSONL_LOGGING:-0}"
+if [ "${NIM_JSONL_LOGGING}" -eq "1" ] && /opt/nim/llm/.venv/bin/python3 -c "import nim_llm_sdk.logging.pack_all_logs_into_json" 2> /dev/null; then
+  /opt/nim/llm/.venv/bin/python3 -m nim_llm_sdk.entrypoints.openai.api_server |& /opt/nim/llm/.venv/bin/python3 -m nim_llm_sdk.logging.pack_all_logs_into_json
+else
+  /opt/nim/llm/.venv/bin/python3 -m nim_llm_sdk.entrypoints.openai.api_server
+fi`
+
+	DefaultMPITimeout = 300
+)
+
+type NIMBackendType string
+
+const (
+	NIMBackendTypeLWS NIMBackendType = "lws"
 )
 
 // NIMServiceSpec defines the desired state of NIMService.
+// +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
@@ -70,12 +92,12 @@ type NIMServiceSpec struct {
 	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
 	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
 	PodAffinity  *corev1.PodAffinity `json:"podAffinity,omitempty"`
-	// Resources is the resource requirements for the NIMService deployment.
+	// Resources is the resource requirements for the NIMService deployment or leader worker set.
 	//
 	// Note: Only traditional resources like cpu/memory and custom device plugin resources are supported here.
 	// Any DRA claim references are ignored. Use DRAResources instead for those.
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
-	// DRAResources is the list of DRA resource claims to be used for the NIMService deployment.
+	// DRAResources is the list of DRA resource claims to be used for the NIMService deployment or leader worker set.
 	DRAResources   []DRAResource `json:"draResources,omitempty"`
 	Expose         Expose        `json:"expose,omitempty"`
 	LivenessProbe  Probe         `json:"livenessProbe,omitempty"`
@@ -86,11 +108,38 @@ type NIMServiceSpec struct {
 	Metrics        Metrics       `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas         int        `json:"replicas,omitempty"`
-	UserID           *int64     `json:"userID,omitempty"`
-	GroupID          *int64     `json:"groupID,omitempty"`
-	RuntimeClassName string     `json:"runtimeClassName,omitempty"`
-	Proxy            *ProxySpec `json:"proxy,omitempty"`
+	Replicas         int                        `json:"replicas,omitempty"`
+	UserID           *int64                     `json:"userID,omitempty"`
+	GroupID          *int64                     `json:"groupID,omitempty"`
+	RuntimeClassName string                     `json:"runtimeClassName,omitempty"`
+	Proxy            *ProxySpec                 `json:"proxy,omitempty"`
+	MultiNode        *NimServiceMultiNodeConfig `json:"multiNode,omitempty"`
+}
+
+// NimServiceMultiNodeConfig defines the configuration for multi-node NIMService.
+type NimServiceMultiNodeConfig struct {
+	// +kubebuilder:validation:Enum=lws
+	// +kubebuilder:default:=lws
+	// BackendType specifies the backend type for the multi-node NIMService. Currently only LWS is supported.
+	BackendType NIMBackendType `json:"backendType,omitempty"`
+
+	// +kubebuilder:default:=1
+	// Size specifies the number of pods to create for the multi-node NIMService.
+	// +kubebuilder:validation:Minimum=1
+	Size int `json:"size,omitempty"`
+
+	// +kubebuilder:default:=1
+	// GPUSPerPod specifies the number of GPUs for each instance. In most cases, this should match `resources.limits.nvidia.com/gpu`.
+	GPUSPerPod int `json:"gpusPerPod,omitempty"`
+
+	// MPI config for NIMService using LeaderWorkerSet
+	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
+}
+
+type MultiNodeMPIConfig struct {
+	// +kubebuilder:default:=300
+	// MPIStartTimeout specifies the timeout in seconds for starting the cluster.
+	MPIStartTimeout int `json:"mpiStartTimeout"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume.
@@ -155,6 +204,11 @@ type NIMServiceStorage struct {
 	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
+// GetLWSName returns the name to be used for the LeaderWorkerSet based on the custom spec.
+func (n *NIMService) GetLWSName() string {
+	return fmt.Sprintf("%s-lws", n.GetName())
+}
+
 // GetPVCName returns the name to be used for the PVC based on the custom spec
 // Prefers pvc.Name if explicitly set by the user in the NIMService instance.
 func (n *NIMService) GetPVCName(pvc PersistentVolumeClaim) string {
@@ -167,8 +221,12 @@ func (n *NIMService) GetPVCName(pvc PersistentVolumeClaim) string {
 
 // GetStandardSelectorLabels returns the standard selector labels for the NIMService deployment.
 func (n *NIMService) GetStandardSelectorLabels() map[string]string {
+	appName := n.GetName()
+	if n.Spec.MultiNode != nil {
+		appName = n.GetLWSName()
+	}
 	return map[string]string{
-		"app": n.Name,
+		"app": appName,
 	}
 }
 
@@ -240,6 +298,106 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 	}
 
 	return envVars
+}
+
+func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
+	env := n.GetEnv()
+
+	mpiTimeout := DefaultMPITimeout
+	if n.Spec.MultiNode.MPI != nil && n.Spec.MultiNode.MPI.MPIStartTimeout != 0 {
+		mpiTimeout = n.Spec.MultiNode.MPI.MPIStartTimeout
+	}
+
+	env = append(env,
+		corev1.EnvVar{
+			Name:  "NIM_LEADER_ROLE",
+			Value: "1",
+		},
+		corev1.EnvVar{
+			Name:  "NIM_MPI_ALLOW_RUN_AS_ROOT",
+			Value: "0",
+		},
+		corev1.EnvVar{
+			Name:  "OMPI_MCA_orte_keep_fqdn_hostnames",
+			Value: "true",
+		},
+		corev1.EnvVar{
+			Name:  "OMPI_MCA_plm_rsh_args",
+			Value: "-o ConnectionAttempts=20",
+		},
+		corev1.EnvVar{
+			Name:  "NIM_NUM_COMPUTE_NODES",
+			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
+		},
+		corev1.EnvVar{
+			Name:  "GPUS_PER_NODE",
+			Value: fmt.Sprintf("%d", n.Spec.MultiNode.GPUSPerPod),
+		},
+		corev1.EnvVar{
+			Name:  "CLUSTER_START_TIMEOUT",
+			Value: fmt.Sprintf("%d", mpiTimeout),
+		},
+		corev1.EnvVar{
+			Name: "CLUSTER_SIZE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.annotations['leaderworkerset.sigs.k8s.io/size']",
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: "GROUP_INDEX",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.labels['leaderworkerset.sigs.k8s.io/group-index']",
+				},
+			},
+		},
+	)
+	return env
+}
+
+func (n *NIMService) GetLWSWorkerEnv() []corev1.EnvVar {
+	env := n.GetEnv()
+	env = append(env,
+		corev1.EnvVar{
+			Name:  "NIM_LEADER_ROLE",
+			Value: "0",
+		},
+		corev1.EnvVar{
+			Name:  "NIM_MPI_ALLOW_RUN_AS_ROOT",
+			Value: "0",
+		},
+		corev1.EnvVar{
+			Name:  "NIM_NUM_COMPUTE_NODES",
+			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
+		},
+		corev1.EnvVar{
+			Name: "LEADER_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.annotations['leaderworkerset.sigs.k8s.io/leader-name']",
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: "NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace",
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: "LWS_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.labels['leaderworkerset.sigs.k8s.io/name']",
+				},
+			},
+		},
+	)
+	return env
 }
 
 // GetProxySpec returns the proxy spec for the NIMService deployment.
@@ -315,7 +473,11 @@ func (n *NIMService) GetServiceLabels() map[string]string {
 // GetSelectorLabels returns standard selector labels to apply to the NIMService instance.
 func (n *NIMService) GetSelectorLabels() map[string]string {
 	// TODO: add custom ones
-	return n.GetStandardSelectorLabels()
+	selector := n.GetStandardSelectorLabels()
+	if n.Spec.MultiNode != nil {
+		selector["nim-llm-role"] = "leader"
+	}
+	return selector
 }
 
 // GetNodeSelector returns node selector labels for the NIMService instance.
@@ -506,7 +668,90 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 	if n.GetProxySpec() != nil {
 		volumes = append(volumes, k8sutil.GetVolumesForUpdatingCaCert(n.Spec.Proxy.CertConfigMap)...)
 	}
+	return volumes
+}
 
+func (n *NIMService) GetLeaderVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume {
+	volumes := n.GetVolumes(modelPVC)
+
+	volumes = append(volumes,
+		corev1.Volume{
+			Name: "mpi-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					DefaultMode: ptr.To[int32](365),
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: fmt.Sprintf("%s-mpi-config", n.GetName()),
+					},
+				},
+			},
+		},
+		corev1.Volume{
+			Name: "ssh-dotfiles",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		corev1.Volume{
+			Name: "ssh-pk",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  fmt.Sprintf("%s-ssh-pk", n.GetName()),
+					DefaultMode: ptr.To[int32](256),
+				},
+			},
+		},
+		corev1.Volume{
+			Name: "start-mpi-script",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					DefaultMode: ptr.To[int32](365),
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: fmt.Sprintf("%s-mpi-start-script", n.GetName()),
+					},
+				},
+			},
+		},
+	)
+	return volumes
+}
+
+func (n *NIMService) GetWorkerVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume {
+	volumes := n.GetVolumes(modelPVC)
+	volumes = append(volumes,
+		corev1.Volume{
+			Name: "ssh-confs",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		corev1.Volume{
+			Name: "ssh-dotfiles",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		corev1.Volume{
+			Name: "ssh-pk",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  fmt.Sprintf("%s-ssh-pk", n.GetName()),
+					DefaultMode: ptr.To[int32](256),
+				},
+			},
+		},
+		corev1.Volume{
+			Name: "start-mpi-script",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					DefaultMode: ptr.To[int32](365),
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: fmt.Sprintf("%s-mpi-start-script", n.GetName()),
+					},
+				},
+			},
+		},
+	)
 	return volumes
 }
 
@@ -527,6 +772,55 @@ func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.Vo
 	if n.GetProxySpec() != nil {
 		volumeMounts = append(volumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
 	}
+	return volumeMounts
+}
+
+func (n *NIMService) GetWorkerVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.VolumeMount {
+	volumeMounts := n.GetVolumeMounts(modelPVC)
+
+	volumeMounts = append(volumeMounts,
+		corev1.VolumeMount{
+			Name:      "ssh-confs",
+			MountPath: "/ssh-confs",
+		},
+		corev1.VolumeMount{
+			Name:      "ssh-dotfiles",
+			MountPath: "/opt/nim/llm/.ssh",
+		},
+		corev1.VolumeMount{
+			Name:      "ssh-pk",
+			MountPath: "/opt/nim/llm/pk",
+		},
+		corev1.VolumeMount{
+			Name:      "start-mpi-script",
+			MountPath: "/opt/nim/start-mpi-cluster.sh",
+			SubPath:   "start-mpi-cluster.sh",
+		},
+	)
+	return volumeMounts
+}
+
+func (n *NIMService) GetLeaderVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.VolumeMount {
+	volumeMounts := n.GetVolumeMounts(modelPVC)
+	volumeMounts = append(volumeMounts,
+		corev1.VolumeMount{
+			Name:      "mpi-config",
+			MountPath: "/etc/mpi",
+		},
+		corev1.VolumeMount{
+			Name:      "ssh-dotfiles",
+			MountPath: "/opt/nim/llm/.ssh",
+		},
+		corev1.VolumeMount{
+			Name:      "ssh-pk",
+			MountPath: "/opt/nim/llm/pk",
+		},
+		corev1.VolumeMount{
+			Name:      "start-mpi-script",
+			MountPath: "/opt/nim/start-mpi-cluster.sh",
+			SubPath:   "start-mpi-cluster.sh",
+		},
+	)
 	return volumeMounts
 }
 
@@ -566,6 +860,13 @@ func (n *NIMService) GetReplicas() int {
 		return 0
 	}
 	return n.Spec.Replicas
+}
+
+func (n *NIMService) GetLWSSize() int {
+	if n.Spec.MultiNode == nil {
+		return 0
+	}
+	return n.Spec.MultiNode.Size
 }
 
 // GetDeploymentKind returns the kind of deployment for NIMService.
@@ -739,6 +1040,62 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	return params
 }
 
+func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
+	params := &rendertypes.LeaderWorkerSetParams{}
+
+	// Set metadata
+	params.Name = n.GetLWSName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetLabels()
+	params.Annotations = n.GetNIMServiceAnnotations()
+	params.PodAnnotations = n.GetNIMServiceAnnotations()
+	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
+
+	// Set template spec
+	params.Replicas = n.GetReplicas()
+	params.Size = n.GetLWSSize()
+	params.ContainerName = n.GetContainerName()
+	params.Args = n.GetArgs()
+	params.Command = n.GetCommand()
+	params.LeaderEnvs = n.GetLWSLeaderEnv()
+	params.WorkerEnvs = n.GetLWSWorkerEnv()
+	params.UserID = n.GetUserID()
+	params.GroupID = n.GetGroupID()
+	params.Image = n.GetImage()
+	params.ImagePullSecrets = n.GetImagePullSecrets()
+	params.ImagePullPolicy = n.GetImagePullPolicy()
+	params.Resources = n.GetResources()
+	params.NodeSelector = n.GetNodeSelector()
+	params.Tolerations = n.GetTolerations()
+	params.Affinity = n.GetPodAffinity()
+	params.Ports = []corev1.ContainerPort{
+		{
+			Name:          DefaultNamedPortAPI,
+			ContainerPort: n.GetServicePort(),
+			Protocol:      corev1.ProtocolTCP,
+		},
+	}
+
+	// Set container probes
+	if IsProbeEnabled(n.Spec.LivenessProbe) {
+		params.LivenessProbe = n.GetLivenessProbe()
+	}
+
+	if IsProbeEnabled(n.Spec.ReadinessProbe) {
+		params.ReadinessProbe = n.GetReadinessProbe()
+	}
+
+	if IsProbeEnabled(n.Spec.StartupProbe) {
+		params.StartupProbe = n.GetStartupProbe()
+	}
+
+	params.ServiceAccountName = n.GetServiceAccountName()
+	params.SchedulerName = n.GetSchedulerName()
+	params.RuntimeClassName = n.GetRuntimeClassName()
+	params.InitContainers = n.GetInitContainers()
+	return params
+}
+
 // GetSchedulerName returns the scheduler name for the NIMService deployment.
 func (n *NIMService) GetSchedulerName() string {
 	return n.Spec.SchedulerName
@@ -788,6 +1145,79 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	// Set runtime class
 	params.RuntimeClassName = n.GetRuntimeClassName()
 	return params
+}
+
+func (n *NIMService) generateMPIConfigData() map[string]string {
+	// Construct ConfigMap data
+	data := make(map[string]string)
+	for i := 0; i < n.Spec.Replicas; i++ {
+		hostfile := fmt.Sprintf("localhost slots=%d\n", n.Spec.MultiNode.GPUSPerPod)
+		for j := 1; j < n.Spec.MultiNode.Size; j++ {
+			workerHostname := fmt.Sprintf("%s-%d-%d.%s.%s.svc slots=%d",
+				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.Spec.MultiNode.GPUSPerPod)
+			hostfile += workerHostname + "\n"
+		}
+		dataKey := fmt.Sprintf("hostfile-%d", i)
+		data[dataKey] = hostfile
+	}
+	return data
+}
+
+func (n *NIMService) GetMPIConfigParams() *rendertypes.ConfigMapParams {
+	if n.Spec.MultiNode == nil {
+		return nil
+	}
+	return &rendertypes.ConfigMapParams{
+		Name:          fmt.Sprintf("%s-mpi-config", n.GetName()),
+		Namespace:     n.GetNamespace(),
+		ConfigMapData: n.generateMPIConfigData(),
+		Labels:        n.GetLabels(),
+		Annotations:   n.GetAnnotations(),
+	}
+}
+
+func (n *NIMService) GetDefaultMPIScriptConfigParams() *rendertypes.ConfigMapParams {
+	if n.Spec.MultiNode == nil {
+		return nil
+	}
+
+	return &rendertypes.ConfigMapParams{
+		Name:      fmt.Sprintf("%s-mpi-start-script", n.GetName()),
+		Namespace: n.GetNamespace(),
+		ConfigMapData: map[string]string{
+			"start-mpi-cluster.sh": DefaultMPIStartScript,
+		},
+		Labels:      n.GetLabels(),
+		Annotations: n.GetAnnotations(),
+	}
+}
+
+func (n *NIMService) GetMPISSHSecretParams() (*rendertypes.SecretParams, error) {
+	if n.Spec.MultiNode == nil {
+		return nil, nil
+	}
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate MPI SSH private key: %v", err)
+	}
+
+	privateKeyPEM := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		},
+	)
+
+	return &rendertypes.SecretParams{
+		Name:        fmt.Sprintf("%s-ssh-pk", n.GetName()),
+		Namespace:   n.GetNamespace(),
+		Labels:      n.GetLabels(),
+		Annotations: n.GetAnnotations(),
+		SecretMapData: map[string]string{
+			"private.key": base64.StdEncoding.EncodeToString(privateKeyPEM),
+		},
+	}, nil
 }
 
 // GetServiceParams returns params to render Service from templates.

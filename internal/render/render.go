@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
+	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 	yamlConverter "sigs.k8s.io/yaml"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/render/types"
@@ -63,6 +64,7 @@ type Renderer interface {
 	RenderObjects(data *TemplateData) ([]*unstructured.Unstructured, error)
 	DaemonSet(params *types.DaemonsetParams) (*appsv1.DaemonSet, error)
 	Deployment(params *types.DeploymentParams) (*appsv1.Deployment, error)
+	LeaderWorkerSet(params *types.LeaderWorkerSetParams) (*lws.LeaderWorkerSet, error)
 	StatefulSet(params *types.StatefulSetParams) (*appsv1.StatefulSet, error)
 	Service(params *types.ServiceParams) (*corev1.Service, error)
 	ServiceAccount(params *types.ServiceAccountParams) (*corev1.ServiceAccount, error)
@@ -216,6 +218,23 @@ func (r *textTemplateRenderer) Deployment(params *types.DeploymentParams) (*apps
 		return nil, fmt.Errorf("error converting unstructured object to Deployment: %w", err)
 	}
 	return deployment, nil
+}
+
+func (r *textTemplateRenderer) LeaderWorkerSet(params *types.LeaderWorkerSetParams) (*lws.LeaderWorkerSet, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "lws.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+
+	leaderworkerset := &lws.LeaderWorkerSet{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, leaderworkerset)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to LeaderWorkerSet: %w", err)
+	}
+	return leaderworkerset, nil
 }
 
 // StatefulSet renders spec for a StatefulSet with the given templating data.
