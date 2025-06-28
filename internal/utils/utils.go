@@ -49,6 +49,9 @@ const (
 
 	// DRAPodClaimNameAnnotationKey indicates annotation name for the identifier of a resource claim template in a pod spec.
 	DRAPodClaimNameAnnotationKey = "resource.kubernetes.io/pod-claim-name"
+
+	// DefaultModelStorePath is the default path for model store.
+	DefaultModelStorePath = "/model-store"
 )
 
 const (
