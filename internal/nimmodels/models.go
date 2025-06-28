@@ -59,8 +59,12 @@ type MetadataV1 struct {
 	ModelInfo []MetadataV1ModelInfo `json:"modelInfo"`
 }
 
-func getURL(endpoint string, uri string) string {
-	return fmt.Sprintf("http://%s%s", endpoint, uri)
+func getURL(endpoint string, uri string, scheme string) string {
+	if scheme != "" {
+		return fmt.Sprintf("%s://%s%s", scheme, endpoint, uri)
+	} else {
+		return fmt.Sprintf("%s%s", endpoint, uri)
+	}
 }
 
 func processAPIResponse(resp *http.Response) error {
@@ -99,10 +103,10 @@ func doGetRequest(ctx context.Context, url string) ([]byte, error) {
 	return body, nil
 }
 
-func ListModelsV1(ctx context.Context, nimServiceEndpoint string) (*ModelsV1List, error) {
+func ListModelsV1(ctx context.Context, nimServiceEndpoint string, scheme string) (*ModelsV1List, error) {
 	logger := log.FromContext(ctx)
 
-	modelsURL := getURL(nimServiceEndpoint, ModelsV1URI)
+	modelsURL := getURL(nimServiceEndpoint, ModelsV1URI, scheme)
 	modelsBytes, err := doGetRequest(ctx, modelsURL)
 	if err != nil {
 		return nil, err
@@ -118,10 +122,10 @@ func ListModelsV1(ctx context.Context, nimServiceEndpoint string) (*ModelsV1List
 	return &info, nil
 }
 
-func GetMetadataV1(ctx context.Context, nimServiceEndpoint string) (*MetadataV1, error) {
+func GetMetadataV1(ctx context.Context, nimServiceEndpoint string, scheme string) (*MetadataV1, error) {
 	logger := log.FromContext(ctx)
 
-	metadataURL := getURL(nimServiceEndpoint, MetadataV1URI)
+	metadataURL := getURL(nimServiceEndpoint, MetadataV1URI, scheme)
 	metadataBytes, err := doGetRequest(ctx, metadataURL)
 	if err != nil {
 		return nil, err
