@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -103,6 +104,8 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
+// +kubebuilder:rbac:groups=leaderworkerset.x-k8s.io,resources=leaderworkersets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -281,16 +284,24 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		)
 
-	crdExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
+	resourceClaimCRDExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
 	if err != nil {
 		return err
 	}
-	if crdExists {
+	if resourceClaimCRDExists {
 		nimServiceBuilder = nimServiceBuilder.Watches(
 			&resourcev1beta2.ResourceClaim{},
 			handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		)
+	}
+
+	lwsCRDExists, err := k8sutil.CRDExists(r.discoveryClient, lwsv1.SchemeGroupVersion.WithResource("leaderworkersets"))
+	if err != nil {
+		return err
+	}
+	if lwsCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Owns(&lwsv1.LeaderWorkerSet{})
 	}
 
 	return nimServiceBuilder.Complete(r)
