@@ -26,7 +26,20 @@ spec:
             volumeAccessMode: {{ .Values.llm.pvc.accessMode }}
         replicas: {{ .Values.llm.replicas | default 1 }}
         resources:
-          {{- toYaml .Values.llm.resources | nindent 10 }}
+          {{- $requestsResources := include "mergeResources" (dict "existingResources" .Values.llm.resources.requests "gpuConfig" .Values.llm.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $requestsResources }}
+          requests:
+            {{- toYaml $requestsResources | nindent 12 }}
+          {{- end }}
+          {{- $limitsResources := include "mergeResources" (dict "existingResources" .Values.llm.resources.limits "gpuConfig" .Values.llm.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $limitsResources }}
+          limits:
+            {{- toYaml $limitsResources | nindent 12 }}
+          {{- end }}
+        {{- if .Values.dra.enabled }}
+        draResources:
+          {{- include "generateGPUDRAResources" .Values.llm.gpu | nindent 8 }}
+        {{- end }}
         expose:
           service:
             type: {{ .Values.llm.service.type | default "ClusterIP" }}
@@ -59,7 +72,20 @@ spec:
             volumeAccessMode: {{ .Values.embedding.pvc.accessMode }}
         replicas: {{ .Values.embedding.replicas | default 1 }}
         resources:
-          {{- toYaml .Values.embedding.resources | nindent 10 }}
+          {{- $requestsResources := include "mergeResources" (dict "existingResources" .Values.embedding.resources.requests "gpuConfig" .Values.embedding.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $requestsResources }}
+          requests:
+            {{- toYaml $requestsResources | nindent 12 }}
+          {{- end }}
+          {{- $limitsResources := include "mergeResources" (dict "existingResources" .Values.embedding.resources.limits "gpuConfig" .Values.embedding.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $limitsResources }}
+          limits:
+            {{- toYaml $limitsResources | nindent 12 }}
+          {{- end }}
+        {{- if .Values.dra.enabled }}
+        draResources:
+          {{- include "generateGPUDRAResources" .Values.embedding.gpu | nindent 8 }}
+        {{- end }}
         expose:
           service:
             type: {{ .Values.embedding.service.type | default "ClusterIP" }}
@@ -94,7 +120,20 @@ spec:
             volumeAccessMode: {{ .Values.reranking.pvc.accessMode }}
         replicas: {{ .Values.reranking.replicas | default 1 }}
         resources:
-          {{ toYaml .Values.reranking.resources | nindent 10 }}
+          {{- $requestsResources := include "mergeResources" (dict "existingResources" .Values.reranking.resources.requests "gpuConfig" .Values.reranking.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $requestsResources }}
+          requests:
+            {{- toYaml $requestsResources | nindent 12 }}
+          {{- end }}
+          {{- $limitsResources := include "mergeResources" (dict "existingResources" .Values.reranking.resources.limits "gpuConfig" .Values.reranking.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $limitsResources }}
+          limits:
+            {{- toYaml $limitsResources | nindent 12 }}
+          {{- end }}
+        {{- if .Values.dra.enabled }}
+        draResources:
+          {{- include "generateGPUDRAResources" .Values.reranking.gpu | nindent 8 }}
+        {{- end }}
         expose:
           service:
             type: {{ .Values.reranking.service.type | default "ClusterIP" }}
@@ -129,7 +168,20 @@ spec:
             volumeAccessMode: {{ .Values.llm.pvc.accessMode }}
         replicas: {{ .Values.paddleOcr.replicas | default 1 }}
         resources:
-          {{- toYaml .Values.paddleOcr.resources | nindent 10 }}
+          {{- $requestsResources := include "mergeResources" (dict "existingResources" .Values.paddleOcr.resources.requests "gpuConfig" .Values.paddleOcr.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $requestsResources }}
+          requests:
+            {{- toYaml $requestsResources | nindent 12 }}
+          {{- end }}
+          {{- $limitsResources := include "mergeResources" (dict "existingResources" .Values.paddleOcr.resources.limits "gpuConfig" .Values.paddleOcr.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $limitsResources }}
+          limits:
+            {{- toYaml $limitsResources | nindent 12 }}
+          {{- end }}
+        {{- if .Values.dra.enabled }}
+        draResources:
+          {{- include "generateGPUDRAResources" .Values.paddleOcr.gpu | nindent 8 }}
+        {{- end }}
         expose:
           service:
             type: {{ .Values.paddleOcr.service.type | default "ClusterIP" }}
@@ -164,7 +216,20 @@ spec:
             volumeAccessMode: {{ .Values.graphicElements.pvc.accessMode }}
         replicas: {{ .Values.graphicElements.replicas | default 1 }}
         resources:
-          {{- toYaml .Values.graphicElements.resources | nindent 10 }}
+          {{- $requestsResources := include "mergeResources" (dict "existingResources" .Values.graphicElements.resources.requests "gpuConfig" .Values.graphicElements.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $requestsResources }}
+          requests:
+            {{- toYaml $requestsResources | nindent 12 }}
+          {{- end }}
+          {{- $limitsResources := include "mergeResources" (dict "existingResources" .Values.graphicElements.resources.limits "gpuConfig" .Values.graphicElements.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $limitsResources }}
+          limits:
+            {{- toYaml $limitsResources | nindent 12 }}
+          {{- end }}
+        {{- if .Values.dra.enabled }}
+        draResources:
+          {{- include "generateGPUDRAResources" .Values.graphicElements.gpu | nindent 8 }}
+        {{- end }}
         expose:
           service:
             type: {{ .Values.graphicElements.service.type | default "ClusterIP" }}
@@ -199,7 +264,20 @@ spec:
             volumeAccessMode: {{ .Values.pageElements.pvc.accessMode }}
         replicas: {{ .Values.pageElements.replicas | default 1 }}
         resources:
-          {{- toYaml .Values.pageElements.resources | nindent 10 }}
+          {{- $requestsResources := include "mergeResources" (dict "existingResources" .Values.pageElements.resources.requests "gpuConfig" .Values.pageElements.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $requestsResources }}
+          requests:
+            {{- toYaml $requestsResources | nindent 12 }}
+          {{- end }}
+          {{- $limitsResources := include "mergeResources" (dict "existingResources" .Values.pageElements.resources.limits "gpuConfig" .Values.pageElements.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $limitsResources }}
+          limits:
+            {{- toYaml $limitsResources | nindent 12 }}
+          {{- end }}
+        {{- if .Values.dra.enabled }}
+        draResources:
+          {{- include "generateGPUDRAResources" .Values.pageElements.gpu | nindent 8 }}
+        {{- end }}
         expose:
           service:
             type: {{ .Values.pageElements.service.type | default "ClusterIP" }}
@@ -234,7 +312,20 @@ spec:
             volumeAccessMode: {{ .Values.tableStructure.pvc.accessMode }}
         replicas: {{ .Values.tableStructure.replicas | default 1 }}
         resources:
-          {{- toYaml .Values.tableStructure.resources | nindent 10 }}
+          {{- $requestsResources := include "mergeResources" (dict "existingResources" .Values.tableStructure.resources.requests "gpuConfig" .Values.tableStructure.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $requestsResources }}
+          requests:
+            {{- toYaml $requestsResources | nindent 12 }}
+          {{- end }}
+          {{- $limitsResources := include "mergeResources" (dict "existingResources" .Values.tableStructure.resources.limits "gpuConfig" .Values.tableStructure.gpu "draEnabled" .Values.dra.enabled) | fromYaml }}
+          {{- if $limitsResources }}
+          limits:
+            {{- toYaml $limitsResources | nindent 12 }}
+          {{- end }}
+        {{- if .Values.dra.enabled }}
+        draResources:
+          {{- include "generateGPUDRAResources" .Values.tableStructure.gpu | nindent 8 }}
+        {{- end }}
         expose:
           service:
             type: {{ .Values.tableStructure.service.type | default "ClusterIP" }}
