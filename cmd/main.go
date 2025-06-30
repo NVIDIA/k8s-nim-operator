@@ -185,6 +185,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = controller.NewNIMBuildReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		ctrl.Log.WithName("controllers").WithName("NIMBuild"),
+		platformImpl,
+	).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NIMBuild")
+		os.Exit(1)
+	}
+
 	if err = controller.NewNemoGuardrailReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),

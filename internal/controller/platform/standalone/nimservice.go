@@ -252,8 +252,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	// Select PVC for model store
 	nimCacheName := nimService.GetNIMCacheName()
+	nimCache := appsv1alpha1.NIMCache{}
 	if nimCacheName != "" { // nolint:gocritic
-		nimCache := appsv1alpha1.NIMCache{}
 		if err := r.Get(ctx, types.NamespacedName{Name: nimCacheName, Namespace: nimService.GetNamespace()}, &nimCache); err != nil {
 			// Fail the NIMService if the NIMCache is not found
 			if k8serrors.IsNotFound(err) {
@@ -338,22 +338,32 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 		deploymentParams.Env = append(deploymentParams.Env, profileEnv)
 
-		// Retrieve and set profile details from NIMCache
-		var profile *appsv1alpha1.NIMProfile
-		profile, err = r.getNIMCacheProfile(ctx, nimService, modelProfile)
-		if err != nil {
-			logger.Error(err, "Failed to get cached NIM profile")
-			return ctrl.Result{}, err
-		}
-
-		// Auto assign GPU resources in case of the optimized profile
-		if profile != nil {
-			if err = r.assignGPUResources(ctx, nimService, profile, deploymentParams); err != nil {
+		// Only assign GPU resources if the NIMCache is for optimized NIM
+		if nimCache.IsOptimizedNIM() {
+			// Retrieve and set profile details from NIMCache
+			var profile *appsv1alpha1.NIMProfile
+			profile, err = r.getNIMCacheProfile(ctx, nimService, modelProfile)
+			if err != nil {
+				logger.Error(err, "Failed to get cached NIM profile")
 				return ctrl.Result{}, err
+			}
+
+			// Auto assign GPU resources in case of the optimized profile
+			if profile != nil {
+				if err = r.assignGPUResources(ctx, nimService, profile, deploymentParams); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 		}
 
 		// TODO: assign GPU resources and node selector that is required for the selected profile
+	}
+
+	if nimCache.IsUniversalNIM() {
+		deploymentParams.Env = append(deploymentParams.Env, corev1.EnvVar{
+			Name:  "NIM_MODEL_NAME",
+			Value: utils.DefaultModelStorePath,
+		})
 	}
 
 	// Setup pod resource claims
@@ -777,24 +787,6 @@ func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimServic
 	return nil, nil
 }
 
-// getTensorParallelismByProfile returns the value of tensor parallelism parameter in the given NIM profile.
-func (r *NIMServiceReconciler) getTensorParallelismByProfile(ctx context.Context, profile *appsv1alpha1.NIMProfile) (string, error) {
-	// List of possible keys for tensor parallelism
-	possibleKeys := []string{"tensorParallelism", "tp"}
-
-	tensorParallelism := ""
-
-	// Iterate through possible keys and return the first valid value
-	for _, key := range possibleKeys {
-		if value, exists := profile.Config[key]; exists {
-			tensorParallelism = value
-			break
-		}
-	}
-
-	return tensorParallelism, nil
-}
-
 // assignGPUResources automatically assigns GPU resources to the NIMService based on the provided profile,
 // but retains any user-specified GPU resources if they are explicitly provided.
 //
@@ -828,7 +820,7 @@ func (r *NIMServiceReconciler) assignGPUResources(ctx context.Context, nimServic
 
 	// If no user-provided GPU resource is found, proceed with auto-assignment
 	// Get tensorParallelism from the profile
-	tensorParallelism, err := r.getTensorParallelismByProfile(ctx, profile)
+	tensorParallelism, err := utils.GetTensorParallelismByProfileTags(profile.Config)
 	if err != nil {
 		logger.Error(err, "Failed to retrieve tensorParallelism")
 		return err

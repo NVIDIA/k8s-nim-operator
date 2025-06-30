@@ -487,7 +487,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles}}},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: &appsv1alpha1.ModelSpec{Profiles: profiles}}},
 				},
 			}
 
@@ -513,7 +513,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{GPUs: []appsv1alpha1.GPUSpec{{IDs: []string{"26b5"}}}}}},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: &appsv1alpha1.ModelSpec{GPUs: []appsv1alpha1.GPUSpec{{IDs: []string{"26b5"}}}}}},
 					Env: []corev1.EnvVar{
 						{
 							Name:  "NGC_HOME",
@@ -567,7 +567,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles}}},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: &appsv1alpha1.ModelSpec{Profiles: profiles}}},
 					Proxy: &appsv1alpha1.ProxySpec{
 						HttpProxy:     "http://proxy:1000",
 						HttpsProxy:    "https://proxy:1000",

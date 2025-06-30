@@ -29,4 +29,6 @@ resources:
 - nimcache_viewer_role.yaml
 - nimservice_editor_role.yaml
 - nimservice_viewer_role.yaml
-
+- nimbuild_admin_role.yaml
+- nimbuild_editor_role.yaml
+- nimbuild_viewer_role.yaml

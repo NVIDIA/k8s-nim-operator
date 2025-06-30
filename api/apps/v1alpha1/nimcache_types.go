@@ -108,6 +108,7 @@ type HuggingFaceHubSource struct {
 }
 
 // NGCSource references a model stored on NVIDIA NGC.
+// +kubebuilder:validation:XValidation:rule="!(has(self.model) && has(self.modelEndpoint))",message="Only one of 'model' or 'modelEndpoint' can be specified"
 type NGCSource struct {
 	// The name of an existing pull secret containing the NGC_API_KEY
 	AuthSecret string `json:"authSecret"`
@@ -117,7 +118,9 @@ type NGCSource struct {
 	// PullSecret to pull the model puller image
 	PullSecret string `json:"pullSecret,omitempty"`
 	// Model spec for caching
-	Model ModelSpec `json:"model,omitempty"`
+	Model *ModelSpec `json:"model,omitempty"`
+	// ModelEndpoint is the endpoint for the model to be cached for Universal NIM
+	ModelEndpoint *string `json:"modelEndpoint,omitempty"`
 }
 
 // ModelSpec is the spec required to cache selected models.
@@ -307,6 +310,36 @@ func (n *NIMCache) GetRuntimeClassName() *string {
 		return nil
 	}
 	return &n.Spec.RuntimeClassName
+}
+
+// IsUniversalNIM returns true if the NIMCache is for a universal NIM.
+func (n *NIMCache) IsUniversalNIM() bool {
+	// Universal NIM is when the modelEndpoint is set in the NGCSource.
+	if n.Spec.Source.NGC != nil && n.Spec.Source.NGC.ModelEndpoint != nil {
+		return true
+	}
+	// Universal NIM also support HuggingFaceEndpoints
+	if n.Spec.Source.HF != nil {
+		return true
+	}
+	return false
+}
+
+// IsOptimizedNIM returns true if the NIMCache is for an optimized NIM.
+func (n *NIMCache) IsOptimizedNIM() bool {
+	// Universal NIM is when the modelEndpoint is set in the NGCSource.
+	if n.Spec.Source.NGC != nil && n.Spec.Source.NGC.ModelEndpoint == nil {
+		return true
+	}
+	return false
+}
+
+// GetModelSpec returns the model spec for the NIMCache.
+func (n *NIMCache) GetModelSpec() ModelSpec {
+	if n.Spec.Source.NGC != nil && n.Spec.Source.NGC.Model != nil {
+		return *n.Spec.Source.NGC.Model
+	}
+	return ModelSpec{}
 }
 
 // GetProxySpec returns the proxy spec for the NIMService deployment.

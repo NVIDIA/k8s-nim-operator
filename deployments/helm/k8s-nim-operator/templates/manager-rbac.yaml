@@ -235,6 +235,32 @@ rules:
   - patch
   - update
 - apiGroups:
+    - apps.nvidia.com
+  resources:
+    - nimbuilds
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - apps.nvidia.com
+  resources:
+    - nimbuilds/finalizers
+  verbs:
+    - update
+- apiGroups:
+    - apps.nvidia.com
+  resources:
+    - nimbuilds/status
+  verbs:
+    - get
+    - patch
+    - update
+- apiGroups:
   - apps.nvidia.com
   resources:
   - nimpipelines

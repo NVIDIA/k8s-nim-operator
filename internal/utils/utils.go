@@ -49,6 +49,9 @@ const (
 
 	// DRAPodClaimNameAnnotationKey indicates annotation name for the identifier of a resource claim template in a pod spec.
 	DRAPodClaimNameAnnotationKey = "resource.kubernetes.io/pod-claim-name"
+
+	// DefaultModelStorePath is the default path for model store.
+	DefaultModelStorePath = "/model-store"
 )
 
 const (
@@ -430,6 +433,24 @@ func updateRoleBinding(obj, desired *rbacv1.RoleBinding) *rbacv1.RoleBinding {
 	obj.Subjects = desired.Subjects
 	obj.RoleRef = desired.RoleRef
 	return obj
+}
+
+// GetTensorParallelismByProfileTags retrieves the tensor parallelism value from the provided tags.
+func GetTensorParallelismByProfileTags(tags map[string]string) (string, error) {
+	// List of possible keys for tensor parallelism
+	possibleKeys := []string{"tensorParallelism", "tp"}
+
+	tensorParallelism := ""
+
+	// Iterate through possible keys and return the first valid value
+	for _, key := range possibleKeys {
+		if value, exists := tags[key]; exists {
+			tensorParallelism = value
+			break
+		}
+	}
+
+	return tensorParallelism, nil
 }
 
 func IsVersionGreaterThanOrEqual(version string, minVersion string) bool {
