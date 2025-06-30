@@ -439,7 +439,7 @@ func (r *NIMBuildReconciler) reconcileEngineBuild(ctx context.Context, nimBuild 
 
 		logger.Info("Created pod for NIM Cache engine build", "pod", podName)
 		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCreated, metav1.ConditionTrue, "EngineBuildPodCreated", "The pod to build engine has been created")
-		return nil
+		return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusInProgress)
 	}
 
 	// Reconcile the job status
@@ -483,7 +483,7 @@ func (r *NIMBuildReconciler) reconcileEngineBuildPodStatus(ctx context.Context, 
 
 	case pod.Status.Phase == corev1.PodFailed && !meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted):
 		logger.Info("Failed to cache NIM, build pod failed", "pod", pod)
-		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCreated, metav1.ConditionFalse, "PodFailed", "The pod to build engine has failed")
+		conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted, metav1.ConditionFalse, "PodFailed", "The pod to build engine has failed")
 		return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 
 	case !isPodReady(pod) && !meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted):
@@ -939,7 +939,7 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 		{
 			Name:    NIMBuildManifestContainerName,
 			Image:   nimBuild.GetImage(),
-			Command: getNIMBuildSidecarCommand(),
+			Command: getNIMBuildLocalManifestPodCommand(),
 			SecurityContext: &corev1.SecurityContext{
 				AllowPrivilegeEscalation: ptr.To[bool](false),
 				Capabilities: &corev1.Capabilities{
@@ -962,7 +962,8 @@ func constructLocalManifestPodSpec(nimCache *appsv1alpha1.NIMCache, nimBuild *ap
 	return pod
 }
 
-func getNIMBuildSidecarCommand() []string {
+// getNIMBuildLocalManifestPodCommand is the command to run in the local manifest pod.
+func getNIMBuildLocalManifestPodCommand() []string {
 	return []string{
 		"sh",
 		"-c",
@@ -973,6 +974,7 @@ func getNIMBuildSidecarCommand() []string {
 	}
 }
 
+// createPod creates a pod in the cluster.
 func (r *NIMBuildReconciler) createPod(ctx context.Context, pod *corev1.Pod) error {
 	// Create pod
 	err := r.Create(ctx, pod)
@@ -982,6 +984,7 @@ func (r *NIMBuildReconciler) createPod(ctx context.Context, pod *corev1.Pod) err
 	return nil
 }
 
+// updateManifestConfigMap updates the manifest ConfigMap in the cluster with the local manifest data.
 func (r *NIMBuildReconciler) updateManifestConfigMap(ctx context.Context, nimCache *appsv1alpha1.NIMCache, manifestData *nimparser.NIMManifestInterface) error {
 	// Convert manifestData to YAML
 	manifestBytes, err := yaml.Marshal(manifestData)
