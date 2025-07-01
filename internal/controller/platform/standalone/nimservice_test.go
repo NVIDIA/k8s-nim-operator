@@ -1292,6 +1292,277 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			})
 		})
+
+		It("should add NIM_MODEL_NAME environment variable when NIMCache is Universal NIM", func() {
+			// Create a NIMCache with ModelEndpoint to make it Universal NIM
+			modelEndpoint := "https://api.ngc.nvidia.com/v2/models/nvidia/nim-llama2-7b/versions/1.0.0"
+			universalNimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-universal-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller:   "test-container",
+							PullSecret:    "my-secret",
+							ModelEndpoint: &modelEndpoint,
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create:       ptr.To[bool](true),
+							StorageClass: "standard",
+							Size:         "1Gi",
+							SubPath:      "subPath",
+						},
+					},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusReady,
+					PVC:   "test-universal-nimcache-pvc",
+					Profiles: []appsv1alpha1.NIMProfile{{
+						Name:   "test-profile",
+						Config: map[string]string{"tp": "4"}},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), universalNimCache)).To(Succeed())
+
+			// Create PVC for the universal NIMCache
+			universalPVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-universal-nimcache-pvc",
+					Namespace: "default",
+				},
+			}
+			Expect(client.Create(context.TODO(), universalPVC)).To(Succeed())
+
+			// Create a new NIMService instance for this test
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-universal-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Labels:      map[string]string{"app": "test-app"},
+					Annotations: map[string]string{"annotation-key": "annotation-value"},
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nim-llm",
+						Tag:         "v0.1.0",
+						PullPolicy:  "IfNotPresent",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					Storage: appsv1alpha1.NIMServiceStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Name:         "test-pvc",
+							StorageClass: "standard",
+							Size:         "1Gi",
+							Create:       ptr.To[bool](true),
+						},
+						NIMCache: appsv1alpha1.NIMCacheVolSpec{
+							Name: "test-universal-nimcache",
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "custom-env",
+							Value: "custom-value",
+						},
+					},
+					Resources: &corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("64Mi"),
+						},
+					},
+					NodeSelector: map[string]string{"disktype": "ssd"},
+					Tolerations: []corev1.Toleration{{
+						Key:      "key1",
+						Operator: corev1.TolerationOpEqual,
+						Value:    "value1",
+						Effect:   corev1.TaintEffectNoSchedule,
+					}},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
+					},
+					RuntimeClassName: "nvidia",
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Deployment should be created
+			deployment := &appsv1.Deployment{}
+			err = client.Get(context.TODO(), namespacedName, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deployment.Name).To(Equal(testNimService.GetName()))
+			Expect(deployment.Namespace).To(Equal(testNimService.GetNamespace()))
+
+			// Verify that NIM_MODEL_NAME environment variable is added
+			container := deployment.Spec.Template.Spec.Containers[0]
+			var nimModelNameEnv *corev1.EnvVar
+			for _, env := range container.Env {
+				if env.Name == "NIM_MODEL_NAME" {
+					nimModelNameEnv = &env
+					break
+				}
+			}
+			Expect(nimModelNameEnv).NotTo(BeNil(), "NIM_MODEL_NAME environment variable should be present")
+			Expect(nimModelNameEnv.Value).To(Equal("/model-store"), "NIM_MODEL_NAME should be set to /model-store")
+
+			// Verify that other environment variables are still present
+			var customEnv *corev1.EnvVar
+			for _, env := range container.Env {
+				if env.Name == "custom-env" {
+					customEnv = &env
+					break
+				}
+			}
+			Expect(customEnv).NotTo(BeNil(), "Custom environment variables should still be present")
+			Expect(customEnv.Value).To(Equal("custom-value"))
+		})
+
+		It("should not add NIM_MODEL_NAME environment variable when NIMCache is not Universal NIM", func() {
+			// Create a regular NIMCache (not Universal NIM)
+			regularNimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-regular-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller: "test-container",
+							PullSecret:  "my-secret",
+							// No ModelEndpoint, so it's not Universal NIM
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create:       ptr.To[bool](true),
+							StorageClass: "standard",
+							Size:         "1Gi",
+							SubPath:      "subPath",
+						},
+					},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusReady,
+					PVC:   "test-regular-nimcache-pvc",
+					Profiles: []appsv1alpha1.NIMProfile{{
+						Name:   "test-profile",
+						Config: map[string]string{"tp": "4"}},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), regularNimCache)).To(Succeed())
+
+			// Create PVC for the regular NIMCache
+			regularPVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-regular-nimcache-pvc",
+					Namespace: "default",
+				},
+			}
+			Expect(client.Create(context.TODO(), regularPVC)).To(Succeed())
+
+			// Create a new NIMService instance for this test
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-regular-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Labels:      map[string]string{"app": "test-app"},
+					Annotations: map[string]string{"annotation-key": "annotation-value"},
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nim-llm",
+						Tag:         "v0.1.0",
+						PullPolicy:  "IfNotPresent",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					Storage: appsv1alpha1.NIMServiceStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Name:         "test-pvc",
+							StorageClass: "standard",
+							Size:         "1Gi",
+							Create:       ptr.To[bool](true),
+						},
+						NIMCache: appsv1alpha1.NIMCacheVolSpec{
+							Name: "test-regular-nimcache",
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "custom-env",
+							Value: "custom-value",
+						},
+					},
+					Resources: &corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("64Mi"),
+						},
+					},
+					NodeSelector: map[string]string{"disktype": "ssd"},
+					Tolerations: []corev1.Toleration{{
+						Key:      "key1",
+						Operator: corev1.TolerationOpEqual,
+						Value:    "value1",
+						Effect:   corev1.TaintEffectNoSchedule,
+					}},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
+					},
+					RuntimeClassName: "nvidia",
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Deployment should be created
+			deployment := &appsv1.Deployment{}
+			err = client.Get(context.TODO(), namespacedName, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deployment.Name).To(Equal(testNimService.GetName()))
+			Expect(deployment.Namespace).To(Equal(testNimService.GetNamespace()))
+
+			// Verify that NIM_MODEL_NAME environment variable is NOT added
+			container := deployment.Spec.Template.Spec.Containers[0]
+			for _, env := range container.Env {
+				Expect(env.Name).NotTo(Equal("NIM_MODEL_NAME"), "NIM_MODEL_NAME environment variable should not be present for non-Universal NIM")
+			}
+
+			// Verify that other environment variables are still present
+			var customEnv *corev1.EnvVar
+			for _, env := range container.Env {
+				if env.Name == "custom-env" {
+					customEnv = &env
+					break
+				}
+			}
+			Expect(customEnv).NotTo(BeNil(), "Custom environment variables should still be present")
+			Expect(customEnv.Value).To(Equal("custom-value"))
+		})
 	})
 
 	Describe("getNIMModelEndpoints", func() {
