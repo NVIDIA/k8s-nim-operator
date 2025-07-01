@@ -1249,6 +1249,18 @@ spec:
               - get
               - list
               - watch
+            - apiGroups:
+              - leaderworkerset.x-k8s.io
+              resources:
+              - leaderworkersets
+              verbs:
+              - create
+              - get
+              - list
+              - watch
+              - delete
+              - patch
+              - update
       deployments:
         - name: k8s-nim-operator
           spec:
