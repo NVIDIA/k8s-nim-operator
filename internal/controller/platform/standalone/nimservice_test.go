@@ -1410,15 +1410,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			// Verify that NIM_MODEL_NAME environment variable is added
 			container := deployment.Spec.Template.Spec.Containers[0]
-			var nimModelNameEnv *corev1.EnvVar
-			for _, env := range container.Env {
-				if env.Name == "NIM_MODEL_NAME" {
-					nimModelNameEnv = &env
-					break
-				}
-			}
-			Expect(nimModelNameEnv).NotTo(BeNil(), "NIM_MODEL_NAME environment variable should be present")
-			Expect(nimModelNameEnv.Value).To(Equal("/model-store"), "NIM_MODEL_NAME should be set to /model-store")
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: "/model-store",
+			}), "NIM_MODEL_NAME environment variable should be present and set to /model-store")
 
 			// Verify that other environment variables are still present
 			var customEnv *corev1.EnvVar
@@ -1548,9 +1543,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			// Verify that NIM_MODEL_NAME environment variable is NOT added
 			container := deployment.Spec.Template.Spec.Containers[0]
-			for _, env := range container.Env {
-				Expect(env.Name).NotTo(Equal("NIM_MODEL_NAME"), "NIM_MODEL_NAME environment variable should not be present for non-Universal NIM")
-			}
+			Expect(container.Env).NotTo(ContainElement(corev1.EnvVar{Name: "NIM_MODEL_NAME"}), "NIM_MODEL_NAME environment variable should not be present for non-Universal NIM")
 
 			// Verify that other environment variables are still present
 			var customEnv *corev1.EnvVar
