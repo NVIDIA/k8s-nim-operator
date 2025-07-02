@@ -175,9 +175,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	var result *ctrl.Result
-	result, err = r.checkInferenceServiceStatus(ctx,
-		&types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()},
-		nimService, deploymentMode)
+	result, err = r.checkInferenceServiceStatus(ctx, nimService, deploymentMode)
 
 	if err != nil {
 		r.log.Error(err, "Unable to update status")
@@ -602,12 +600,12 @@ func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *
 	return resources, nil
 }
 
-func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, namespacedName *types.NamespacedName,
-	nimService *appsv1alpha1.NIMService, deploymentMode kserveconstants.DeploymentModeType) (*ctrl.Result, error) {
+func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, nimService *appsv1alpha1.NIMService,
+	deploymentMode kserveconstants.DeploymentModeType) (*ctrl.Result, error) {
 	logger := r.log
 
 	// Check if InferenceService is ready
-	msg, ready, err := r.isInferenceServiceReady(ctx, namespacedName)
+	msg, ready, err := r.isInferenceServiceReady(ctx, nimService)
 	if err != nil {
 		return &ctrl.Result{}, err
 	}
@@ -632,7 +630,7 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
 	} else {
 		// Update NIMServiceStatus with model config.
-		updateErr := r.updateModelStatus(ctx, nimService, namespacedName, deploymentMode)
+		updateErr := r.updateModelStatus(ctx, nimService, deploymentMode)
 		if updateErr != nil {
 			logger.Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
 			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
@@ -653,33 +651,36 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 }
 
 // isInferenceServiceReady checks if the InferenceService is ready.
-func (r *NIMServiceReconciler) isInferenceServiceReady(ctx context.Context, namespacedName *types.NamespacedName) (string, bool, error) {
+func (r *NIMServiceReconciler) isInferenceServiceReady(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, bool, error) {
 	logger := r.log
 
 	isvc := &kservev1beta1.InferenceService{}
-	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, isvc)
+	err := r.Get(ctx, client.ObjectKey{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)
 	if err != nil {
 		logger.Error(err, "failed to fetch inferenceservice")
 		if k8serrors.IsNotFound(err) {
-			return "", false, nil
+			return fmt.Sprintf("Waiting for InferenceService creation"), false, nil
 		}
 		return "", false, err
 	}
 
-	var cond knativeapis.Condition
+	var cond *knativeapis.Condition
 	for i := range isvc.Status.Conditions {
 		c := isvc.Status.Conditions[i]
 		if c.Type == kservev1beta1.PredictorReady {
-			cond = c
+			cond = &c
 			break
 		}
 	}
-	return cond.GetMessage(), cond.IsTrue(), nil
+	if cond != nil {
+		return cond.GetMessage(), cond.IsTrue(), nil
+	}
+	return fmt.Sprintf("Waiting for Predictor readiness reporting"), false, nil
 }
 
 func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *appsv1alpha1.NIMService,
-	namespacedName *types.NamespacedName, deploymentMode kserveconstants.DeploymentModeType) error {
-	clusterEndpoint, externalEndpoint, err := r.getNIMModelEndpoints(ctx, nimService, namespacedName, deploymentMode)
+	deploymentMode kserveconstants.DeploymentModeType) error {
+	clusterEndpoint, externalEndpoint, err := r.getNIMModelEndpoints(ctx, nimService, deploymentMode)
 	if err != nil {
 		return err
 	}
@@ -698,11 +699,11 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 }
 
 func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimService *appsv1alpha1.NIMService,
-	namespacedName *types.NamespacedName, deploymentMode kserveconstants.DeploymentModeType) (string, string, error) {
+	deploymentMode kserveconstants.DeploymentModeType) (string, string, error) {
 	logger := r.log
 
 	isvc := &kservev1beta1.InferenceService{}
-	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, isvc)
+	err := r.Get(ctx, client.ObjectKey{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)
 	if err != nil {
 		logger.Error(err, "unable to fetch k8s service", "nimservice", nimService.GetName())
 		return "", "", err
