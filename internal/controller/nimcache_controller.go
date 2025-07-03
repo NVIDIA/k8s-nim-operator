@@ -1283,18 +1283,6 @@ func (r *NIMCacheReconciler) createManifestConfigMap(ctx context.Context, nimCac
 		return fmt.Errorf("failed to marshal manifest data: %w", err)
 	}
 
-	// Pretty-print the YAML content
-	var prettyYAML interface{}
-	err = yaml.Unmarshal(manifestBytes, &prettyYAML)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal manifest data for pretty-printing: %w", err)
-	}
-
-	prettyManifestBytes, err := yaml.Marshal(prettyYAML)
-	if err != nil {
-		return fmt.Errorf("failed to re-marshal manifest data for pretty-printing: %w", err)
-	}
-
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getManifestConfigName(nimCache),
@@ -1322,7 +1310,7 @@ func (r *NIMCacheReconciler) createManifestConfigMap(ctx context.Context, nimCac
 
 	// Update the data
 	configMap.Data = map[string]string{
-		"model_manifest.yaml": string(prettyManifestBytes),
+		"model_manifest.yaml": string(manifestBytes),
 	}
 
 	// Create the ConfigMap

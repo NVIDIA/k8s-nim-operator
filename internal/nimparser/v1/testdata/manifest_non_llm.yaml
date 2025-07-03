@@ -1,0 +1,11 @@
+2ad8fe56fc5c2cd108b4d177286fbd6c6ea5dcd3de3995cb9aeb83f80ddd5c9e:
+  tags:
+    backend: onnx
+    key: onnx
+    precision: fp16
+72972bc1f4dc3f79aff74aa6a9a26d24d27d6f9c74c455dc904b2a2a20f156d2:
+  tags:
+    backend: tensorrt
+    key: NVIDIA-A10G_10.0.1_12
+    precision: fp16
+    product_name_regex: ^NVIDIA-A10(?!0).*
