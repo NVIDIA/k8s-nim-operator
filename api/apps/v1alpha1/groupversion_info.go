@@ -33,4 +33,9 @@ var (
 
 	// AddToScheme adds the types in this group-version to the given scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
+
+	// Resource returns a GroupResource object for the given resource string using the scheme group version.
+	Resource = func(resource string) schema.GroupResource {
+		return SchemeGroupVersion.WithResource(resource).GroupResource()
+	}
 )
