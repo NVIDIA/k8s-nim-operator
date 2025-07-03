@@ -535,6 +535,18 @@ rules:
   - delete
   - patch
   - update
+- apiGroups:
+  - leaderworkerset.x-k8s.io
+  resources:
+  - leaderworkersets
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+  - patch
+  - update
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
