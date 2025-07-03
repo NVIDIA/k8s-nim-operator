@@ -1,0 +1,280 @@
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  annotations:
+  {{- if .Annotations }}
+    {{- .Annotations | yaml | nindent 4 }}
+  {{- end }}
+  labels:
+  {{- if .Labels }}
+    {{- .Labels | yaml | nindent 4 }}
+  {{- end }}
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+spec:
+  leaderWorkerTemplate:
+    leaderTemplate:
+      metadata:
+        annotations:
+        {{- if .PodAnnotations }}
+          {{- .PodAnnotations | yaml | nindent 10 }}
+        {{- end }}
+        labels:
+          app: {{ .Name }}
+          nim-llm-role: "leader"
+        {{- if .Labels }}
+          {{- .Labels | yaml | nindent 10 }}
+        {{- end }}
+      spec:
+        {{- if .ImagePullSecrets }}
+        imagePullSecrets:
+          {{- range .ImagePullSecrets }}
+          - name: {{ . }}
+          {{- end }}
+        {{- end }}
+        securityContext:
+          {{- if eq .OrchestratorType "TKGS" }}
+          seccompProfile:
+            type: RuntimeDefault
+          {{- end }}
+          {{- if .UserID }}
+          runAsUser: {{ .UserID }}
+          {{- end }}
+          {{- if .GroupID }}
+          runAsGroup: {{ .GroupID }}
+          fsGroup: {{ .GroupID }}
+          {{- end }}
+        {{- if .SchedulerName }}
+        schedulerName: {{ .SchedulerName }}
+        {{- end }}
+        initContainers:
+        {{- range .InitContainers }}
+        - name: {{ .Name }}
+          image: {{ .Image }}
+          {{- if .ImagePullPolicy }}
+          imagePullPolicy: {{ .ImagePullPolicy }}
+          {{- end }}
+          {{- if .Command }}
+          command: 
+            {{ .Command | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .Args}}
+          args: 
+            {{ .Args| yaml | nindent 12 }}
+          {{- end }}
+          {{- if .WorkingDir }}
+          workingDir: {{ .WorkingDir }}
+          {{- end }}
+          {{- if .Env }}
+          env:
+            {{ .Env | yaml | nindent 12 }}
+          {{- end }}
+          {{- with .Resources }}
+          resources:
+            {{ . | yaml | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        containers:
+        - name: nim-leader
+          {{- if .LeaderEnvs}}
+          env:
+            {{- .LeaderEnvs | yaml | nindent 12 }}
+          {{- end }}
+          image: {{ .Image }}
+          {{- if .LivenessProbe }}
+          livenessProbe:
+            {{ .LivenessProbe | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .Ports }}
+          ports:
+            {{- .Ports | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .ReadinessProbe }}
+          readinessProbe:
+            {{ .ReadinessProbe | yaml | nindent 12 }}
+          {{- end }}
+          {{- with .Resources }}
+          resources:
+            {{ . | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .StartupProbe }}
+          startupProbe:
+            {{ .StartupProbe | yaml | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- range .LeaderVolumeMounts }}
+            - name: {{ .Name }}
+              mountPath: {{ .MountPath }}
+              subPath: {{ .SubPath }}
+              readOnly: {{ .ReadOnly }}
+            {{- end }}
+        {{- if .Tolerations }}
+        tolerations:
+          {{- range .Tolerations }}
+          - key: {{ .Key | quote }}
+            operator: {{ .Operator | quote }}
+            value: {{ .Value | quote }}
+            effect: {{ .Effect | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if .NodeSelector }}
+        nodeSelector:
+          {{- range $key, $value := .NodeSelector }}
+          {{ $key }}: {{ $value }}
+          {{- end }}
+        {{- end }}
+        {{- if .PodResourceClaims }}
+        resourceClaims:
+          {{- .PodResourceClaims | yaml | nindent 12 }}
+        {{- end }}
+        volumes:
+        {{- range .LeaderVolumes }}
+        - name: {{ .Name }}
+          {{- if .ConfigMap }}
+          configMap:
+            name: {{ .ConfigMap.Name }}
+            {{- if .ConfigMap.Items }}
+            items:
+              {{- range .ConfigMap.Items }}
+              - key: {{ .Key }}
+                path: {{ .Path }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- if .Secret }}
+          secret:
+            secretName: {{ .Secret.SecretName }}
+            defaultMode: {{ .Secret.DefaultMode }}
+          {{- end }}
+          {{- if .EmptyDir }}
+          emptyDir:
+            medium: {{ .EmptyDir.Medium }}
+            {{- if .EmptyDir.SizeLimit }}
+            sizeLimit: {{ .EmptyDir.SizeLimit }}
+            {{- end }}
+          {{- end }}
+          {{- if .PersistentVolumeClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .PersistentVolumeClaim.ClaimName }}
+            readOnly: {{ .PersistentVolumeClaim.ReadOnly }}
+          {{- end }}
+          {{- if .HostPath }}
+          hostPath:
+            path: {{ .HostPath.Path }}
+            type: {{ .HostPath.Type }}
+          {{- end }}
+        {{- end }}
+    size: {{ .Size }}
+    restartPolicy: RecreateGroupOnPodRestart
+    workerTemplate:
+      metadata:
+        annotations:
+        {{- if .PodAnnotations }}
+          {{- .PodAnnotations | yaml | nindent 10 }}
+        {{- end }}
+      spec:
+        {{- if .ImagePullSecrets }}
+        imagePullSecrets:
+          {{- range .ImagePullSecrets }}
+          - name: {{ . }}
+          {{- end }}
+        {{- end }}
+        securityContext:
+          {{- if eq .OrchestratorType "TKGS" }}
+          seccompProfile:
+            type: RuntimeDefault
+          {{- end }}
+          {{- if .UserID }}
+          runAsUser: {{ .UserID }}
+          {{- end }}
+          {{- if .GroupID }}
+          runAsGroup: {{ .GroupID }}
+          fsGroup: {{ .GroupID }}
+          {{- end }}
+        containers:
+        - name: nim-worker
+          {{- if .WorkerEnvs }}
+          env:
+            {{ .WorkerEnvs | yaml | nindent 12 }}
+          {{- end }}
+          image: {{ .Image }}
+          ports:
+          {{- if .Ports }}
+            {{- .Ports | yaml | nindent 12 }}
+          {{- end }}
+          {{- with .Resources }}
+          resources:
+            {{ . | yaml | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+          {{- range .WorkerVolumeMounts }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            subPath: {{ .SubPath }}
+            readOnly: {{ .ReadOnly }}
+          {{- end }}
+        {{- if .Tolerations }}
+        tolerations:
+          {{- range .Tolerations }}
+          - key: {{ .Key | quote }}
+            operator: {{ .Operator | quote }}
+            value: {{ .Value | quote }}
+            effect: {{ .Effect | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if .NodeSelector }}
+        nodeSelector:
+          {{- range $key, $value := .NodeSelector }}
+          {{ $key }}: {{ $value }}
+          {{- end }}
+        {{- end }}
+        {{- if .PodResourceClaims }}
+        resourceClaims:
+          {{- .PodResourceClaims | yaml | nindent 12 }}
+        {{- end }}
+        volumes:
+        {{- range .WorkerVolumes }}
+        - name: {{ .Name }}
+          {{- if .ConfigMap }}
+          configMap:
+            name: {{ .ConfigMap.Name }}
+            {{- if .ConfigMap.Items }}
+            items:
+              {{- range .ConfigMap.Items }}
+              - key: {{ .Key }}
+                path: {{ .Path }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- if .Secret }}
+          secret:
+            secretName: {{ .Secret.SecretName }}
+            defaultMode: {{ .Secret.DefaultMode }}
+          {{- end }}
+          {{- if .EmptyDir }}
+          emptyDir:
+            medium: {{ .EmptyDir.Medium }}
+            {{- if .EmptyDir.SizeLimit }}
+            sizeLimit: {{ .EmptyDir.SizeLimit }}
+            {{- end }}
+          {{- end }}
+          {{- if .PersistentVolumeClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .PersistentVolumeClaim.ClaimName }}
+            readOnly: {{ .PersistentVolumeClaim.ReadOnly }}
+          {{- end }}
+          {{- if .HostPath }}
+          hostPath:
+            path: {{ .HostPath.Path }}
+            type: {{ .HostPath.Type }}
+          {{- end }}
+        {{- end }}
+  networkConfig:
+    subdomainPolicy: Shared
+  replicas: {{ .Replicas }}
+  rolloutStrategy:
+    rollingUpdateConfiguration:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  startupPolicy: LeaderCreated

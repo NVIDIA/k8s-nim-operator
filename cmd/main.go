@@ -21,11 +21,15 @@ import (
 	"flag"
 	"os"
 
+	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	monitoring "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	discovery "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -54,6 +59,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(monitoring.AddToScheme(scheme))
+	utilruntime.Must(lws.AddToScheme(scheme))
+	utilruntime.Must(kservev1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -147,6 +154,12 @@ func main() {
 
 	updater := conditions.NewUpdater(mgr.GetClient())
 
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(ctrl.GetConfigOrDie())
+	if err != nil {
+		setupLog.Error(err, "unable to create discovery client")
+		os.Exit(1)
+	}
+
 	if err = controller.NewNIMCacheReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
@@ -161,6 +174,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NIMService"),
 		platformImpl,
@@ -174,6 +188,16 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMPipeline")
+		os.Exit(1)
+	}
+
+	if err = controller.NewNIMBuildReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		ctrl.Log.WithName("controllers").WithName("NIMBuild"),
+		platformImpl,
+	).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NIMBuild")
 		os.Exit(1)
 	}
 

@@ -2,9 +2,11 @@
 resources:
 - nim/llm/nimservice.yaml
 - nim/llm/nimcache-llm.yaml
+- nim/llm/nimbuild.yaml
 - nemo/latest/apps_v1alpha1_nemocustomizer.yaml
 - nemo/latest/apps_v1alpha1_nemoguardrails.yaml
 - nemo/latest/apps_v1alpha1_nemoevaluator.yaml
 - nemo/latest/apps_v1alpha1_nemodatastore.yaml
 - nemo/latest/apps_v1alpha1_nemoentitystore.yaml
+- apps_v1aplha1_nimbuild.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

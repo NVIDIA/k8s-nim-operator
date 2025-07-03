@@ -80,4 +80,12 @@ resources:
   kind: NemoCustomizer
   path: github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: nvidia.com
+  group: apps
+  kind: NIMBuild
+  path: github.com/NVIDIA/k8s-nim-operator/api/v1aplha1
+  version: v1aplha1
 version: "3"

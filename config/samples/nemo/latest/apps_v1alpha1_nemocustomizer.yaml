@@ -33,7 +33,7 @@ spec:
   # Global image pull settings used in various subcomponents
   image:
     repository: nvcr.io/nvidia/nemo-microservices/customizer-api
-    tag: "25.04"
+    tag: "25.06"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
@@ -48,10 +48,10 @@ spec:
     endpoint: http://mlflow-tracking.nemo.svc.cluster.local:80
   # Configuration for the data store CLI tools
   nemoDatastoreTools:
-    image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04
+    image: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.06
   # Configuration for model download jobs
   modelDownloadJobs:
-    image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.04"
+    image: "nvcr.io/nvidia/nemo-microservices/customizer-api:25.06"
     ngcAPISecret:
       # Secret that stores NGC API key
       name: ngc-api-secret
@@ -91,7 +91,7 @@ spec:
       mountPath: /pvc/workspace          
     image:
       repository: nvcr.io/nvidia/nemo-microservices/customizer
-      tag: "25.04"
+      tag: "25.06"
     env:
       - name: LOG_LEVEL
         value: INFO                    

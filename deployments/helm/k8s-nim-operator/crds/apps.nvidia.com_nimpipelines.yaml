@@ -101,6 +101,60 @@ spec:
                           items:
                             type: string
                           type: array
+                        draResources:
+                          description: DRAResources is the list of DRA resource claims
+                            to be used for the NIMService deployment or leader worker
+                            set.
+                          items:
+                            description: |-
+                              DRAResource references exactly one ResourceClaim, either directly
+                              or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim.
+
+                              When creating the NIMService pods, it adds a name (`DNS_LABEL` format) to it
+                              that uniquely identifies the DRA resource.
+                            properties:
+                              requests:
+                                description: |-
+                                  Requests is the list of requests in the referenced ResourceClaim/ResourceClaimTemplate
+                                  to be made available to the model container of the NIMService pods.
+
+                                  If empty, everything from the claim is made available, otherwise
+                                  only the result of this subset of requests.
+                                items:
+                                  minLength: 1
+                                  type: string
+                                type: array
+                              resourceClaimName:
+                                description: |-
+                                  ResourceClaimName is the name of a ResourceClaim object in the same
+                                  namespace as the NIMService.
+
+                                  Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+                                  be set.
+                                maxLength: 253
+                                minLength: 1
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
+                                type: string
+                              resourceClaimTemplateName:
+                                description: |-
+                                  ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+                                  object in the same namespace as the pods for this NIMService.
+
+                                  The template will be used to create a new ResourceClaim, which will
+                                  be bound to the pods created for this NIMService.
+
+                                  Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+                                  be set.
+                                maxLength: 253
+                                minLength: 1
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
+                                type: string
+                            type: object
+                            x-kubernetes-validations:
+                            - message: exactly one of spec.resourceClaimName and spec.resourceClaimTemplateName
+                                must be set.
+                              rule: has(self.resourceClaimName) != has(self.resourceClaimTemplateName)
+                          type: array
                         env:
                           items:
                             description: EnvVar represents an environment variable
@@ -591,7 +645,8 @@ spec:
                                 alive or ready to receive traffic.
                               properties:
                                 exec:
-                                  description: Exec specifies the action to take.
+                                  description: Exec specifies a command to execute
+                                    in the container.
                                   properties:
                                     command:
                                       description: |-
@@ -612,8 +667,7 @@ spec:
                                   format: int32
                                   type: integer
                                 grpc:
-                                  description: GRPC specifies an action involving
-                                    a GRPC port.
+                                  description: GRPC specifies a GRPC HealthCheckRequest.
                                   properties:
                                     port:
                                       description: Port number of the gRPC service.
@@ -632,7 +686,7 @@ spec:
                                   - port
                                   type: object
                                 httpGet:
-                                  description: HTTPGet specifies the http request
+                                  description: HTTPGet specifies an HTTP GET request
                                     to perform.
                                   properties:
                                     host:
@@ -700,7 +754,7 @@ spec:
                                   format: int32
                                   type: integer
                                 tcpSocket:
-                                  description: TCPSocket specifies an action involving
+                                  description: TCPSocket specifies a connection to
                                     a TCP port.
                                   properties:
                                     host:
@@ -775,6 +829,42 @@ spec:
                                   pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                                   type: string
                               type: object
+                          type: object
+                        multiNode:
+                          description: NimServiceMultiNodeConfig defines the configuration
+                            for multi-node NIMService.
+                          properties:
+                            backendType:
+                              default: lws
+                              description: BackendType specifies the backend type
+                                for the multi-node NIMService. Currently only LWS
+                                is supported.
+                              enum:
+                              - lws
+                              type: string
+                            gpusPerPod:
+                              default: 1
+                              description: GPUSPerPod specifies the number of GPUs
+                                for each instance. In most cases, this should match
+                                `resources.limits.nvidia.com/gpu`.
+                              type: integer
+                            mpi:
+                              description: MPI config for NIMService using LeaderWorkerSet
+                              properties:
+                                mpiStartTimeout:
+                                  default: 300
+                                  description: MPIStartTimeout specifies the timeout
+                                    in seconds for starting the cluster.
+                                  type: integer
+                              required:
+                              - mpiStartTimeout
+                              type: object
+                            size:
+                              default: 1
+                              description: Size specifies the number of pods to create
+                                for the multi-node NIMService.
+                              minimum: 1
+                              type: integer
                           type: object
                         nodeSelector:
                           additionalProperties:
@@ -863,7 +953,6 @@ spec:
                                           pod labels will be ignored. The default value is empty.
                                           The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                           Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                          This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                         items:
                                           type: string
                                         type: array
@@ -878,7 +967,6 @@ spec:
                                           pod labels will be ignored. The default value is empty.
                                           The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                           Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                          This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                         items:
                                           type: string
                                         type: array
@@ -1045,7 +1133,6 @@ spec:
                                       pod labels will be ignored. The default value is empty.
                                       The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                       Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                      This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                     items:
                                       type: string
                                     type: array
@@ -1060,7 +1147,6 @@ spec:
                                       pod labels will be ignored. The default value is empty.
                                       The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                       Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                      This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                     items:
                                       type: string
                                     type: array
@@ -1166,7 +1252,8 @@ spec:
                                 alive or ready to receive traffic.
                               properties:
                                 exec:
-                                  description: Exec specifies the action to take.
+                                  description: Exec specifies a command to execute
+                                    in the container.
                                   properties:
                                     command:
                                       description: |-
@@ -1187,8 +1274,7 @@ spec:
                                   format: int32
                                   type: integer
                                 grpc:
-                                  description: GRPC specifies an action involving
-                                    a GRPC port.
+                                  description: GRPC specifies a GRPC HealthCheckRequest.
                                   properties:
                                     port:
                                       description: Port number of the gRPC service.
@@ -1207,7 +1293,7 @@ spec:
                                   - port
                                   type: object
                                 httpGet:
-                                  description: HTTPGet specifies the http request
+                                  description: HTTPGet specifies an HTTP GET request
                                     to perform.
                                   properties:
                                     host:
@@ -1275,7 +1361,7 @@ spec:
                                   format: int32
                                   type: integer
                                 tcpSocket:
-                                  description: TCPSocket specifies an action involving
+                                  description: TCPSocket specifies a connection to
                                     a TCP port.
                                   properties:
                                     host:
@@ -1322,8 +1408,11 @@ spec:
                           minimum: 1
                           type: integer
                         resources:
-                          description: ResourceRequirements describes the compute
-                            resource requirements.
+                          description: |-
+                            Resources is the resource requirements for the NIMService deployment or leader worker set.
+
+                            Note: Only traditional resources like cpu/memory and custom device plugin resources are supported here.
+                            Any DRA claim references are ignored. Use DRAResources instead for those.
                           properties:
                             claims:
                               description: |-
@@ -1413,7 +1502,9 @@ spec:
                                         policies:
                                           description: |-
                                             policies is a list of potential scaling polices which can be used during scaling.
-                                            At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+                                            If not set, use the default values:
+                                            - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window.
+                                            - For scale down: allow all pods to be removed in a 15s window.
                                           items:
                                             description: HPAScalingPolicy is a single
                                               policy which must hold true for a specified
@@ -1457,6 +1548,24 @@ spec:
                                             - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
                                           format: int32
                                           type: integer
+                                        tolerance:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          description: |-
+                                            tolerance is the tolerance on the ratio between the current and desired
+                                            metric value under which no updates are made to the desired number of
+                                            replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not
+                                            set, the default cluster-wide tolerance is applied (by default 10%).
+
+                                            For example, if autoscaling is configured with a memory consumption target of 100Mi,
+                                            and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
+                                            triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
+
+                                            This is an alpha field and requires enabling the HPAConfigurableTolerance
+                                            feature gate.
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
                                       type: object
                                     scaleUp:
                                       description: |-
@@ -1469,7 +1578,9 @@ spec:
                                         policies:
                                           description: |-
                                             policies is a list of potential scaling polices which can be used during scaling.
-                                            At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+                                            If not set, use the default values:
+                                            - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window.
+                                            - For scale down: allow all pods to be removed in a 15s window.
                                           items:
                                             description: HPAScalingPolicy is a single
                                               policy which must hold true for a specified
@@ -1513,6 +1624,24 @@ spec:
                                             - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
                                           format: int32
                                           type: integer
+                                        tolerance:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          description: |-
+                                            tolerance is the tolerance on the ratio between the current and desired
+                                            metric value under which no updates are made to the desired number of
+                                            replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not
+                                            set, the default cluster-wide tolerance is applied (by default 10%).
+
+                                            For example, if autoscaling is configured with a memory consumption target of 100Mi,
+                                            and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
+                                            triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
+
+                                            This is an alpha field and requires enabling the HPAConfigurableTolerance
+                                            feature gate.
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
                                       type: object
                                   type: object
                                 maxReplicas:
@@ -1531,7 +1660,6 @@ spec:
                                           each pod of the current scale target (e.g. CPU or memory). Such metrics are
                                           built in to Kubernetes, and have special scaling options on top of those
                                           available to normal per-pod metrics using the "pods" source.
-                                          This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
                                         properties:
                                           container:
                                             description: container is the name of
@@ -1994,8 +2122,6 @@ spec:
                                         description: |-
                                           type is the type of metric source.  It should be one of "ContainerResource", "External",
                                           "Object", "Pods" or "Resource", each mapping to a matching field in the object.
-                                          Note: "ContainerResource" type is available on when the feature-gate
-                                          HPAContainerMetrics is enabled
                                         type: string
                                     required:
                                     - type
@@ -2022,7 +2148,8 @@ spec:
                                 alive or ready to receive traffic.
                               properties:
                                 exec:
-                                  description: Exec specifies the action to take.
+                                  description: Exec specifies a command to execute
+                                    in the container.
                                   properties:
                                     command:
                                       description: |-
@@ -2043,8 +2170,7 @@ spec:
                                   format: int32
                                   type: integer
                                 grpc:
-                                  description: GRPC specifies an action involving
-                                    a GRPC port.
+                                  description: GRPC specifies a GRPC HealthCheckRequest.
                                   properties:
                                     port:
                                       description: Port number of the gRPC service.
@@ -2063,7 +2189,7 @@ spec:
                                   - port
                                   type: object
                                 httpGet:
-                                  description: HTTPGet specifies the http request
+                                  description: HTTPGet specifies an HTTP GET request
                                     to perform.
                                   properties:
                                     host:
@@ -2131,7 +2257,7 @@ spec:
                                   format: int32
                                   type: integer
                                 tcpSocket:
-                                  description: TCPSocket specifies an action involving
+                                  description: TCPSocket specifies a connection to
                                     a TCP port.
                                   properties:
                                     host:
@@ -2292,6 +2418,11 @@ spec:
                       - authSecret
                       - image
                       type: object
+                      x-kubernetes-validations:
+                      - message: autoScaling must be nil or disabled when multiNode
+                          is set
+                        rule: '!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled)
+                          && self.scale.enabled)'
                   type: object
                 type: array
             type: object

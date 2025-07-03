@@ -7,7 +7,7 @@ metadata:
 spec:
   image:
     repository: nvcr.io/nvidia/nemo-microservices/entity-store
-    tag: "25.04"
+    tag: "25.06"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret

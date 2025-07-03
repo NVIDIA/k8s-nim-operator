@@ -487,7 +487,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles}}},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: &appsv1alpha1.ModelSpec{Profiles: profiles}}},
 				},
 			}
 
@@ -513,7 +513,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{GPUs: []appsv1alpha1.GPUSpec{{IDs: []string{"26b5"}}}}}},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: &appsv1alpha1.ModelSpec{GPUs: []appsv1alpha1.GPUSpec{{IDs: []string{"26b5"}}}}}},
 					Env: []corev1.EnvVar{
 						{
 							Name:  "NGC_HOME",
@@ -567,7 +567,7 @@ var _ = Describe("NIMCache Controller", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMCacheSpec{
-					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: appsv1alpha1.ModelSpec{Profiles: profiles}}},
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret", Model: &appsv1alpha1.ModelSpec{Profiles: profiles}}},
 					Proxy: &appsv1alpha1.ProxySpec{
 						HttpProxy:     "http://proxy:1000",
 						HttpsProxy:    "https://proxy:1000",
@@ -731,6 +731,82 @@ var _ = Describe("NIMCache Controller", func() {
 			_, err := reconciler.extractNIMManifest(ctx, emptyConfig.Name, emptyConfig.Namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("model_manifest.yaml not found in ConfigMap"))
+		})
+
+		It("should construct a job with NGC ModelEndpoint for create-model-store", func() {
+			modelEndpoint := "https://api.ngc.nvidia.com/v2/models/nvidia/nim-llama2-7b/versions/1.0.0"
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller:   "nvcr.io/nim:test",
+							PullSecret:    "my-secret",
+							ModelEndpoint: &modelEndpoint,
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							SubPath: "test-subpath",
+						},
+					},
+					Resources: appsv1alpha1.Resources{
+						CPU:    resource.MustParse("500m"),
+						Memory: resource.MustParse("1Gi"),
+					},
+				},
+			}
+
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(job.Name).To(Equal(getJobName(nimCache)))
+			Expect(job.Spec.Template.Spec.Containers).To(HaveLen(1))
+
+			container := job.Spec.Template.Spec.Containers[0]
+			Expect(container.Name).To(Equal(NIMCacheContainerName))
+			Expect(container.Image).To(Equal("nvcr.io/nim:test"))
+			Expect(container.Command).To(Equal([]string{"create-model-store"}))
+			Expect(container.Args).To(Equal([]string{"--model-repo", modelEndpoint, "--model-store", "/model-store"}))
+
+			// Check environment variables
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "NIM_CACHE_PATH",
+				Value: "/model-store",
+			}))
+
+			// Check volume mounts
+			Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+				Name:      "nim-cache-volume",
+				MountPath: "/model-store",
+				SubPath:   "test-subpath",
+			}))
+
+			// Check resources
+			Expect(container.Resources.Limits.Cpu().String()).To(Equal("500m"))
+			Expect(container.Resources.Limits.Memory().String()).To(Equal("1Gi"))
+			Expect(container.Resources.Requests.Cpu().String()).To(Equal("500m"))
+			Expect(container.Resources.Requests.Memory().String()).To(Equal("1Gi"))
+
+			// Check security context
+			Expect(container.SecurityContext).NotTo(BeNil())
+			Expect(*container.SecurityContext.AllowPrivilegeEscalation).To(BeFalse())
+			Expect(container.SecurityContext.Capabilities.Drop).To(ContainElement(corev1.Capability("ALL")))
+			Expect(*container.SecurityContext.RunAsNonRoot).To(BeTrue())
+			Expect(container.SecurityContext.RunAsGroup).To(Equal(nimCache.GetGroupID()))
+			Expect(container.SecurityContext.RunAsUser).To(Equal(nimCache.GetUserID()))
+
+			// Check termination message settings
+			Expect(container.TerminationMessagePath).To(Equal("/dev/termination-log"))
+			Expect(container.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageFallbackToLogsOnError))
+
+			// Check image pull secrets
+			Expect(job.Spec.Template.Spec.ImagePullSecrets).To(ContainElement(corev1.LocalObjectReference{
+				Name: "my-secret",
+			}))
 		})
 	})
 

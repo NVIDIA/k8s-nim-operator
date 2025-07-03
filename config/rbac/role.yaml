@@ -30,8 +30,11 @@ rules:
   - events
   verbs:
   - create
+  - get
+  - list
   - patch
   - update
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -46,6 +49,13 @@ rules:
   - pods/log
   verbs:
   - get
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - get
+  - list
 - apiGroups:
   - apps
   resources:
@@ -67,6 +77,7 @@ rules:
   - nemoentitystores
   - nemoevaluators
   - nemoguardrails
+  - nimbuilds
   - nimcaches
   - nimpipelines
   - nimservices
@@ -86,6 +97,7 @@ rules:
   - nemoentitystores/finalizers
   - nemoevaluators/finalizers
   - nemoguardrails/finalizers
+  - nimbuilds/finalizers
   - nimcaches/finalizers
   - nimpipelines/finalizers
   - nimservices/finalizers
@@ -99,6 +111,7 @@ rules:
   - nemoentitystores/status
   - nemoevaluators/status
   - nemoguardrails/status
+  - nimbuilds/status
   - nimcaches/status
   - nimpipelines/status
   - nimservices/status
@@ -148,6 +161,18 @@ rules:
   verbs:
   - get
   - list
+  - watch
+- apiGroups:
+  - leaderworkerset.x-k8s.io
+  resources:
+  - leaderworkersets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - monitoring.coreos.com
@@ -210,9 +235,31 @@ rules:
   - update
   - watch
 - apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaims
+  - resourceclaimtemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - route.openshift.io
   resources:
   - routes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - run.ai
+  resources:
+  - runaijobs
+  - trainingworkloads
   verbs:
   - create
   - delete
@@ -261,6 +308,18 @@ rules:
   - securitycontextconstraints
   verbs:
   - use
+- apiGroups:
+  - serving.kserve.io
+  resources:
+  - inferenceservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - storage.k8s.io
   resources:

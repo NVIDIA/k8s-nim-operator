@@ -22,13 +22,16 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -46,6 +50,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 // NIMServiceFinalizer is the finalizer annotation.
@@ -57,6 +62,7 @@ type NIMServiceReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
+	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
 	Platform         platform.Platform
@@ -68,14 +74,15 @@ type NIMServiceReconciler struct {
 var _ shared.Reconciler = &NIMServiceReconciler{}
 
 // NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform.
-func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
+func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
-		Client:   client,
-		scheme:   scheme,
-		updater:  updater,
-		renderer: renderer,
-		log:      log,
-		Platform: platform,
+		Client:          client,
+		scheme:          scheme,
+		updater:         updater,
+		discoveryClient: discoveryClient,
+		renderer:        renderer,
+		log:             log,
+		Platform:        platform,
 	}
 }
 
@@ -87,6 +94,7 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=use,resourceNames=nonroot
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=resource.k8s.io,resources=resourceclaims;resourceclaimtemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=serviceaccounts;pods;pods/eviction;services;services/finalizers;endpoints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims;configmaps;secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
@@ -97,6 +105,9 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
+// +kubebuilder:rbac:groups=leaderworkerset.x-k8s.io,resources=leaderworkersets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list
+// +kubebuilder:rbac:groups=serving.kserve.io,resources=inferenceservices,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -193,6 +204,11 @@ func (r *NIMServiceReconciler) GetUpdater() conditions.Updater {
 	return r.updater
 }
 
+// GetDiscoveryClient returns the discovery client instance.
+func (r *NIMServiceReconciler) GetDiscoveryClient() discovery.DiscoveryInterface {
+	return r.discoveryClient
+}
+
 // GetRenderer returns the renderer instance.
 func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 	return r.renderer
@@ -235,7 +251,7 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	nimServiceBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMService{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -268,8 +284,37 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&appsv1alpha1.NIMCache{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNIMCacheToNIMService),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+		)
+
+	resourceClaimCRDExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
+	if err != nil {
+		return err
+	}
+	if resourceClaimCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Watches(
+			&resourcev1beta2.ResourceClaim{},
+			handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		)
+	}
+
+	lwsCRDExists, err := k8sutil.CRDExists(r.discoveryClient, lwsv1.SchemeGroupVersion.WithResource("leaderworkersets"))
+	if err != nil {
+		return err
+	}
+	if lwsCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Owns(&lwsv1.LeaderWorkerSet{})
+	}
+
+	isvcCRDExists, err := k8sutil.CRDExists(r.discoveryClient, kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"))
+	if err != nil {
+		return err
+	}
+	if isvcCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Owns(&kservev1beta1.InferenceService{})
+	}
+
+	return nimServiceBuilder.Complete(r)
 }
 
 func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
@@ -292,6 +337,50 @@ func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj 
 				Name:      item.Name,
 				Namespace: item.Namespace,
 			},
+		}
+	}
+	return requests
+}
+
+func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
+	resourceClaim, ok := obj.(*resourcev1beta2.ResourceClaim)
+	if !ok {
+		return []ctrl.Request{}
+	}
+
+	// Get all NIMServices directly requesting resourceClaims.
+	var nimServices appsv1alpha1.NIMServiceList
+	if err := r.List(ctx, &nimServices, client.InNamespace(resourceClaim.GetNamespace())); err != nil {
+		return []ctrl.Request{}
+	}
+
+	// Enqueue reconciliation for each matching NIMService
+	requests := make([]ctrl.Request, 0)
+	for _, item := range nimServices.Items {
+		nameCache := make(map[string]int)
+		for _, draResource := range item.Spec.DRAResources {
+			if draResource.ResourceClaimName != nil && *draResource.ResourceClaimName == resourceClaim.GetName() {
+				requests = append(requests, ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      item.Name,
+						Namespace: item.Namespace,
+					},
+				})
+				break
+			}
+			if draResource.ResourceClaimTemplateName != nil {
+				draResourceName := shared.GenerateUniquePodClaimName(nameCache, item.Name, &draResource)
+				podClaimName, ok := resourceClaim.GetAnnotations()[utils.DRAPodClaimNameAnnotationKey]
+				if ok && podClaimName == draResourceName {
+					requests = append(requests, ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      item.Name,
+							Namespace: item.Namespace,
+						},
+					})
+					break
+				}
+			}
 		}
 	}
 	return requests

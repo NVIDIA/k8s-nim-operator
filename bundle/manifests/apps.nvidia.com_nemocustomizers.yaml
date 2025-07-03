@@ -419,6 +419,22 @@ spec:
               modelDownloadJobs:
                 description: Model download job configuration
                 properties:
+                  hfSecret:
+                    description: HFSecret is the secret containing the HF_TOKEN key
+                    properties:
+                      key:
+                        default: HF_TOKEN
+                        description: Key in the key containing the actual token value
+                        type: string
+                      name:
+                        description: Name of the Kubernetes secret containing HF_TOKEN
+                          key
+                        minLength: 1
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
                   image:
                     description: Docker image used for model download jobs
                     minLength: 1
@@ -531,6 +547,32 @@ spec:
                           Note that this field cannot be set when spec.os.name is windows.
                         format: int64
                         type: integer
+                      seLinuxChangePolicy:
+                        description: |-
+                          seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.
+                          It has no effect on nodes that do not support SELinux or to volumes does not support SELinux.
+                          Valid values are "MountOption" and "Recursive".
+
+                          "Recursive" means relabeling of all files on all Pod volumes by the container runtime.
+                          This may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.
+
+                          "MountOption" mounts all eligible Pod volumes with `-o context` mount option.
+                          This requires all Pods that share the same volume to use the same SELinux label.
+                          It is not possible to share the same volume among privileged and unprivileged Pods.
+                          Eligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes
+                          whose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their
+                          CSIDriver instance. Other volumes are always re-labelled recursively.
+                          "MountOption" value is allowed only when SELinuxMount feature gate is enabled.
+
+                          If not specified and SELinuxMount feature gate is enabled, "MountOption" is used.
+                          If not specified and SELinuxMount feature gate is disabled, "MountOption" is used for ReadWriteOncePod volumes
+                          and "Recursive" for all other volumes.
+
+                          This field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.
+
+                          All Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.
+                          Note that this field cannot be set when spec.os.name is windows.
+                        type: string
                       seLinuxOptions:
                         description: |-
                           The SELinux context to be applied to all containers.
@@ -664,7 +706,6 @@ spec:
                     type: integer
                 required:
                 - image
-                - ngcAPISecret
                 - pollIntervalSeconds
                 - ttlSecondsAfterFinished
                 type: object
@@ -824,7 +865,6 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                 Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array
@@ -839,7 +879,6 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                 Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array
@@ -1004,7 +1043,6 @@ spec:
                             pod labels will be ignored. The default value is empty.
                             The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                             Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                            This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                           items:
                             type: string
                           type: array
@@ -1019,7 +1057,6 @@ spec:
                             pod labels will be ignored. The default value is empty.
                             The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                             Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                            This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                           items:
                             type: string
                           type: array
@@ -1193,7 +1230,9 @@ spec:
                               policies:
                                 description: |-
                                   policies is a list of potential scaling polices which can be used during scaling.
-                                  At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+                                  If not set, use the default values:
+                                  - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window.
+                                  - For scale down: allow all pods to be removed in a 15s window.
                                 items:
                                   description: HPAScalingPolicy is a single policy
                                     which must hold true for a specified past interval.
@@ -1236,6 +1275,24 @@ spec:
                                   - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
                                 format: int32
                                 type: integer
+                              tolerance:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: |-
+                                  tolerance is the tolerance on the ratio between the current and desired
+                                  metric value under which no updates are made to the desired number of
+                                  replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not
+                                  set, the default cluster-wide tolerance is applied (by default 10%).
+
+                                  For example, if autoscaling is configured with a memory consumption target of 100Mi,
+                                  and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
+                                  triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
+
+                                  This is an alpha field and requires enabling the HPAConfigurableTolerance
+                                  feature gate.
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
                             type: object
                           scaleUp:
                             description: |-
@@ -1248,7 +1305,9 @@ spec:
                               policies:
                                 description: |-
                                   policies is a list of potential scaling polices which can be used during scaling.
-                                  At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+                                  If not set, use the default values:
+                                  - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window.
+                                  - For scale down: allow all pods to be removed in a 15s window.
                                 items:
                                   description: HPAScalingPolicy is a single policy
                                     which must hold true for a specified past interval.
@@ -1291,6 +1350,24 @@ spec:
                                   - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
                                 format: int32
                                 type: integer
+                              tolerance:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: |-
+                                  tolerance is the tolerance on the ratio between the current and desired
+                                  metric value under which no updates are made to the desired number of
+                                  replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not
+                                  set, the default cluster-wide tolerance is applied (by default 10%).
+
+                                  For example, if autoscaling is configured with a memory consumption target of 100Mi,
+                                  and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
+                                  triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
+
+                                  This is an alpha field and requires enabling the HPAConfigurableTolerance
+                                  feature gate.
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
                             type: object
                         type: object
                       maxReplicas:
@@ -1309,7 +1386,6 @@ spec:
                                 each pod of the current scale target (e.g. CPU or memory). Such metrics are
                                 built in to Kubernetes, and have special scaling options on top of those
                                 available to normal per-pod metrics using the "pods" source.
-                                This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
                               properties:
                                 container:
                                   description: container is the name of the container
@@ -1756,8 +1832,6 @@ spec:
                               description: |-
                                 type is the type of metric source.  It should be one of "ContainerResource", "External",
                                 "Object", "Pods" or "Resource", each mapping to a matching field in the object.
-                                Note: "ContainerResource" type is available on when the feature-gate
-                                HPAContainerMetrics is enabled
                               type: string
                           required:
                           - type
@@ -2220,7 +2294,6 @@ spec:
                                     pod labels will be ignored. The default value is empty.
                                     The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                     Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                    This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                   items:
                                     type: string
                                   type: array
@@ -2235,7 +2308,6 @@ spec:
                                     pod labels will be ignored. The default value is empty.
                                     The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                     Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                    This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                   items:
                                     type: string
                                   type: array
@@ -2401,7 +2473,6 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                 Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array
@@ -2416,7 +2487,6 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                 Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array

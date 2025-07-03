@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strings"
 
+	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -35,15 +36,30 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
+
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// TODO: Move constants to a separate file and move the UpdateObject functions to k8sutil package.
 const (
 	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by the operator.
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 
 	// NvidiaAnnotationParentSpecHashKey indicates annotation name for applied hash by the operator.
 	NvidiaAnnotationParentSpecHashKey = "nvidia.com/parent-spec-hash"
+
+	// DRAPodClaimNameAnnotationKey indicates annotation name for the identifier of a resource claim template in a pod spec.
+	DRAPodClaimNameAnnotationKey = "resource.kubernetes.io/pod-claim-name"
+
+	// DefaultModelStorePath is the default path for model store.
+	DefaultModelStorePath = "/model-store"
+)
+
+const (
+	// MinSupportedClusterVersionForDRA is the minimum supported cluster version for integration with DRA resources.
+	MinSupportedClusterVersionForDRA = "v1.33.0"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
@@ -76,17 +92,20 @@ func GetFilesWithSuffix(baseDir string, suffixes ...string) ([]string, error) {
 	return files, nil
 }
 
-// BoolPtr returns a pointer to the bool value passed in.
-func BoolPtr(v bool) *bool {
-	return &v
-}
-
 func GetStringHash(s string) string {
 	hasher := fnv.New32a()
 	if _, err := hasher.Write([]byte(s)); err != nil {
 		panic(err)
 	}
 	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
+}
+
+func GetTruncatedStringHash(s string, length int) string {
+	hash := GetStringHash(s)
+	if len(hash) <= length {
+		return hash
+	}
+	return hash[:length]
 }
 
 // MergeMaps merges two maps and ensures no duplicate key-value pairs.
@@ -326,9 +345,20 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 		return updateRole(castedObj, desired.(*rbacv1.Role)) //nolint:forcetypeassert
 	case *rbacv1.RoleBinding:
 		return updateRoleBinding(castedObj, desired.(*rbacv1.RoleBinding)) //nolint:forcetypeassert
+	case *lwsv1.LeaderWorkerSet:
+		return updateLeaderWorkerSet(castedObj, desired.(*lwsv1.LeaderWorkerSet)) //nolint:forcetypeassert
+	case *kservev1beta1.InferenceService:
+		return updateInferenceService(castedObj, desired.(*kservev1beta1.InferenceService)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
+}
+
+func updateLeaderWorkerSet(obj, desired *lwsv1.LeaderWorkerSet) *lwsv1.LeaderWorkerSet {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
 }
 
 func updateDeployment(obj, desired *appsv1.Deployment) *appsv1.Deployment {
@@ -417,4 +447,41 @@ func updateRoleBinding(obj, desired *rbacv1.RoleBinding) *rbacv1.RoleBinding {
 	obj.Subjects = desired.Subjects
 	obj.RoleRef = desired.RoleRef
 	return obj
+}
+
+func updateInferenceService(obj, desired *kservev1beta1.InferenceService) *kservev1beta1.InferenceService {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+// GetTensorParallelismByProfileTags retrieves the tensor parallelism value from the provided tags.
+func GetTensorParallelismByProfileTags(tags map[string]string) (string, error) {
+	// List of possible keys for tensor parallelism
+	possibleKeys := []string{"tensorParallelism", "tp"}
+
+	tensorParallelism := ""
+
+	// Iterate through possible keys and return the first valid value
+	for _, key := range possibleKeys {
+		if value, exists := tags[key]; exists {
+			tensorParallelism = value
+			break
+		}
+	}
+
+	return tensorParallelism, nil
+}
+
+func IsVersionGreaterThanOrEqual(version string, minVersion string) bool {
+	cv, err := utilversion.Parse(version)
+	if err != nil {
+		return false
+	}
+	mv, err := utilversion.Parse(minVersion)
+	if err != nil {
+		return false
+	}
+	return cv.AtLeast(mv)
 }

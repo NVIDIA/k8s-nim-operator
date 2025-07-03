@@ -128,6 +128,20 @@ type IngressV1 struct {
 	Spec        *IngressSpec      `json:"spec,omitempty"`
 }
 
+// ResourceRequirements defines the resources required for a container.
+type ResourceRequirements struct {
+	// Limits describes the maximum amount of compute resources allowed.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Limits corev1.ResourceList `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=ResourceList,castkey=ResourceName"`
+	// Requests describes the minimum amount of compute resources required.
+	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value. Requests cannot exceed Limits.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Requests corev1.ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+}
+
 func (i *IngressV1) GenerateNetworkingV1IngressSpec(name string) networkingv1.IngressSpec {
 	if i.Spec == nil {
 		return networkingv1.IngressSpec{}
@@ -218,6 +232,17 @@ type NGCSecret struct {
 	Key string `json:"key"`
 }
 
+// HFSecret represents the secret and key details for HuggingFace.
+type HFSecret struct {
+	// Name of the Kubernetes secret containing HF_TOKEN key
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Key in the key containing the actual token value
+	// +kubebuilder:default:="HF_TOKEN"
+	Key string `json:"key"`
+}
+
 // PersistentVolumeClaim defines the attributes of PVC.
 // +kubebuilder:validation:XValidation:rule="!has(self.create) || !self.create || (has(self.size) && self.size != \"\")", message="size is required for pvc creation"
 // +kubebuilder:validation:XValidation:rule="!has(self.create) || !self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != \"\")", message="volumeAccessMode is required for pvc creation"
@@ -238,4 +263,84 @@ type PersistentVolumeClaim struct {
 	SubPath string `json:"subPath,omitempty"`
 	// Annotations for the PVC
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// DRAResource references exactly one ResourceClaim, either directly
+// or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim.
+//
+// When creating the NIMService pods, it adds a name (`DNS_LABEL` format) to it
+// that uniquely identifies the DRA resource.
+// +kubebuilder:validation:XValidation:rule="has(self.resourceClaimName) != has(self.resourceClaimTemplateName)",message="exactly one of spec.resourceClaimName and spec.resourceClaimTemplateName must be set."
+type DRAResource struct {
+	// ResourceClaimName is the name of a ResourceClaim object in the same
+	// namespace as the NIMService.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
+	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
+
+	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+	// object in the same namespace as the pods for this NIMService.
+	//
+	// The template will be used to create a new ResourceClaim, which will
+	// be bound to the pods created for this NIMService.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
+
+	// Requests is the list of requests in the referenced ResourceClaim/ResourceClaimTemplate
+	// to be made available to the model container of the NIMService pods.
+	//
+	// If empty, everything from the claim is made available, otherwise
+	// only the result of this subset of requests.
+	//
+	// +kubebuilder:validation:items:MinLength=1
+	Requests []string `json:"requests,omitempty"`
+}
+
+// DRAResourceStatus defines the status of the DRAResource.
+// +kubebuilder:validation:XValidation:rule="has(self.resourceClaimStatus) != has(self.resourceClaimTemplateStatus)",message="exactly one of resourceClaimStatus and resourceClaimTemplateStatus must be set."
+type DRAResourceStatus struct {
+	// Name is the pod claim name referenced in the pod spec as `spec.resourceClaims[].name` for this DRA resource.
+	Name string `json:"name"`
+	// ResourceClaimStatus is the status of the resource claim in this DRA resource.
+	//
+	// Exactly one of resourceClaimStatus and resourceClaimTemplateStatus will be set.
+	ResourceClaimStatus *DRAResourceClaimStatusInfo `json:"resourceClaimStatus,omitempty"`
+	// ResourceClaimTemplateStatus is the status of the resource claim template in this DRA resource.
+	//
+	// Exactly one of resourceClaimStatus and resourceClaimTemplateStatus will be set.
+	ResourceClaimTemplateStatus *DRAResourceClaimTemplateStatusInfo `json:"resourceClaimTemplateStatus,omitempty"`
+}
+
+// DRAResourceClaimStatusInfo defines the status of a ResourceClaim referenced in the DRAResource.
+type DRAResourceClaimStatusInfo struct {
+	// Name is the name of the ResourceClaim.
+	Name string `json:"name"`
+	// State is the state of the ResourceClaim.
+	// * pending: the resource claim is pending allocation.
+	// * deleted: the resource claim has a deletion timestamp set but is not yet finalized.
+	// * allocated: the resource claim is allocated to a pod.
+	// * reserved: the resource claim is consumed by a pod.
+	// This field will have one or more of the above values depending on the status of the resource claim.
+	//
+	// +kubebuilder:validation:default=pending
+	State string `json:"state"`
+}
+
+// DRAResourceClaimTemplateStatusInfo defines the status of a ResourceClaimTemplate referenced in the DRAResource.
+type DRAResourceClaimTemplateStatusInfo struct {
+	// Name is the name of the resource claim template.
+	Name string `json:"name"`
+	// ResourceClaimStatuses is the statuses of the generated resource claims from this resource claim template.
+	ResourceClaimStatuses []DRAResourceClaimStatusInfo `json:"resourceClaimStatuses,omitempty"`
 }

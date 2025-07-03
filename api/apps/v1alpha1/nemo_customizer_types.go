@@ -192,7 +192,10 @@ type ModelDownloadJobsConfig struct {
 	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
 
 	// NGCSecret is the secret containing the NGC API key
-	NGCSecret NGCSecret `json:"ngcAPISecret"`
+	NGCSecret *NGCSecret `json:"ngcAPISecret,omitempty"`
+
+	// HFSecret is the secret containing the HF_TOKEN key
+	HFSecret *HFSecret `json:"hfSecret,omitempty"`
 
 	// Optional security context for the job pods
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
@@ -864,6 +867,11 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 			Verbs:     []string{"create", "get", "list", "watch", "delete"},
 		},
 		{
+			APIGroups: []string{""},
+			Resources: []string{"events"},
+			Verbs:     []string{"create", "get", "list", "watch"},
+		},
+		{
 			APIGroups: []string{"nvidia.com"},
 			Resources: []string{"nemotrainingjobs", "nemotrainingjobs/status", "nemoentityhandlers"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "delete", "patch"},
@@ -893,8 +901,20 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 		},
 	}
 
-	if n.Spec.Scheduler.Type == SchedulerTypeVolcano {
+	runAIRules := []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{"run.ai"},
+			Resources: []string{"trainingworkloads", "runaijobs"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "delete", "patch"},
+		},
+	}
+
+	// Add scheduler specific rules
+	switch n.Spec.Scheduler.Type {
+	case SchedulerTypeVolcano:
 		params.Rules = append(params.Rules, volcanoRules...)
+	case SchedulerTypeRunAI:
+		params.Rules = append(params.Rules, runAIRules...)
 	}
 
 	return params
