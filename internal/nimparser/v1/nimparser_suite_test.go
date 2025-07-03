@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nimparser_test
+package v1_test
 
 import (
 	"testing"
@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestRender(t *testing.T) {
+func TestNIMParser(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Model Manifest Parser Test Suite")
 }

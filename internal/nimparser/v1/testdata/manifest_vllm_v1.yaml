@@ -8,3 +8,11 @@
     precision: fp16
     tp: '8'
   container_url: nvcr.io/nim/meta/llama3-70b-instruct:1.0.0
+  workspace: !workspace
+    components:
+      - dst: ''
+        src:
+          files:
+            - !name 'README.md'
+            - !name 'checksums.blake3'
+            - !name 'config.json'
