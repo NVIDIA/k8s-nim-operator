@@ -32,7 +32,7 @@ var _ = Describe("NIMParser", func() {
 	Context("ParseModelManifest", func() {
 		It("should parse a model profile for trtllm engine files correctly", func() {
 
-			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+			filePath := filepath.Join("testdata", "manifest_trtllm_v1.yaml")
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
@@ -49,7 +49,7 @@ var _ = Describe("NIMParser", func() {
 		})
 		It("should parse a model profile for vllm engine files correctly", func() {
 
-			filePath := filepath.Join("testdata", "manifest_vllm.yaml")
+			filePath := filepath.Join("testdata", "manifest_vllm_v1.yaml")
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
@@ -83,7 +83,7 @@ var _ = Describe("NIMParser", func() {
 			Expect(profile.ContainerURL).To(Equal("nvcr.io/nim/meta/llama3-70b-instruct:1.0.0"))
 		})
 		It("should match model profiles with valid parameters", func() {
-			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+			filePath := filepath.Join("testdata", "manifest_trtllm_v1.yaml")
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
@@ -112,7 +112,7 @@ var _ = Describe("NIMParser", func() {
 			Expect(matchedProfiles).To(HaveLen(1))
 		})
 		It("should not match model profiles with invalid parameters", func() {
-			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+			filePath := filepath.Join("testdata", "manifest_trtllm_v1.yaml")
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
@@ -133,7 +133,7 @@ var _ = Describe("NIMParser", func() {
 			Expect(matchedProfiles).To(BeEmpty())
 		})
 		It("should match model profiles using automatically discovered GPUs", func() {
-			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+			filePath := filepath.Join("testdata", "manifest_trtllm_v1.yaml")
 			nimparser := NIMParser{}
 			config, err := nimparser.ParseModelManifest(filePath)
 			Expect(err).NotTo(HaveOccurred())
