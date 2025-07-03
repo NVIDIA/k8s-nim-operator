@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
