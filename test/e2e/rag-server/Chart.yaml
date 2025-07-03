@@ -1,7 +1,7 @@
 apiVersion: v2
 appVersion: v2.1.0
 dependencies:
-- condition: k8s-nim-operator.enabled
+- condition: k8s-nim-operator.install
   name: k8s-nim-operator
   repository: https://helm.ngc.nvidia.com/nvidia
   version: v2.0.0

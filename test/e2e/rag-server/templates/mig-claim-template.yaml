@@ -6,25 +6,26 @@ kind: ResourceClaimTemplate
 metadata:
   name: mig-claim-template-{{ . }}
 spec:
-  devices:
-    config:
-    - requests:
-      - mig
-      opaque:
-        driver: gpu.nvidia.com
-        parameters:
-          apiVersion: resource.nvidia.com/v1beta1
-          kind: MigDeviceConfig
-          sharing:
-            strategy: TimeSlicing
-    requests:
-    - exactly:
-        allocationMode: ExactCount
-        count: 1
-        deviceClassName: mig.nvidia.com
-        selectors:
-        - cel:
-            expression: "device.attributes['gpu.nvidia.com'].profile == '{{ . }}'"
-      name: mig
+  spec:
+    devices:
+      config:
+      - requests:
+        - mig
+        opaque:
+          driver: gpu.nvidia.com
+          parameters:
+            apiVersion: resource.nvidia.com/v1beta1
+            kind: MigDeviceConfig
+            sharing:
+              strategy: TimeSlicing
+      requests:
+      - exactly:
+          allocationMode: ExactCount
+          count: 1
+          deviceClassName: mig.nvidia.com
+          selectors:
+          - cel:
+              expression: "device.attributes['gpu.nvidia.com'].profile == '{{ . }}'"
+        name: mig
 {{- end }}
 {{- end }}

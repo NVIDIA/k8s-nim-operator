@@ -17,51 +17,28 @@
   command: kubectl get pods -n {{ namespace }}
   register: pods
 
-- name: Check if mc (MinIO Client) is installed
-  command: which mc
-  register: mc_installed
-  ignore_errors: true
+- name: Check if mc binary exists in workspace
+  stat:
+    path: "./mc"
+  register: mc_binary
 
-- name: Ensure ~/bin directory exists
-  file:
-    path: "{{ ansible_env.HOME }}/bin"
-    state: directory
-    mode: '0755'
-
-- name: Install mc (MinIO Client) for Linux x86_64
+- name: Download mc for Linux x86_64
   shell: |
     curl -O https://dl.min.io/client/mc/release/linux-amd64/mc &&
-    chmod +x mc &&
-    mv mc {{ ansible_env.HOME }}/bin/mc
-  when: mc_installed.rc != 0 and ansible_system == 'Linux' and ansible_architecture == 'x86_64'
+    chmod +x mc
+  when: not mc_binary.stat.exists and ansible_system == 'Linux' and ansible_architecture == 'x86_64'
 
-- name: Install mc (MinIO Client) for Linux aarch64
+- name: Download mc for Linux aarch64
   shell: |
     curl -O https://dl.min.io/client/mc/release/linux-arm64/mc &&
-    chmod +x mc &&
-    mv mc {{ ansible_env.HOME }}/bin/mc
-  when: mc_installed.rc != 0 and ansible_system == 'Linux' and ansible_architecture == 'aarch64'
+    chmod +x mc
+  when: not mc_binary.stat.exists and ansible_system == 'Linux' and ansible_architecture == 'aarch64'
 
-- name: Install mc (MinIO Client) for macOS
+- name: Download mc for macOS
   shell: |
     curl -O https://dl.min.io/client/mc/release/darwin-amd64/mc &&
-    chmod +x mc &&
-    mv mc {{ ansible_env.HOME }}/bin/mc
-  when: mc_installed.rc != 0 and ansible_system == 'Darwin'
-
-- name: Ensure ~/bin is in PATH
-  lineinfile:
-    path: "{{ ansible_env.HOME }}/.bashrc"
-    line: 'export PATH="$HOME/bin:$PATH"'
-    state: present
-  when: ansible_system != 'Darwin'
-
-- name: Ensure ~/bin is in PATH (macOS)
-  lineinfile:
-    path: "{{ ansible_env.HOME }}/.zshrc"
-    line: 'export PATH="$HOME/bin:$PATH"'
-    state: present
-  when: ansible_system == 'Darwin'
+    chmod +x mc
+  when: not mc_binary.stat.exists and ansible_system == 'Darwin'
 
 - name: Wait for MinIO pods to be ready
   shell: |
@@ -84,8 +61,8 @@
   ignore_errors: true
   shell: |
     echo "Running MinIO validation script"
-    mc alias set myminio http://{{ minio_pod_ip }}:9000 {{ minio.username }} {{ minio.password }} --insecure
-    mc mb myminio/testbucket --insecure
+    ./mc alias set myminio http://{{ minio_pod_ip }}:9000 {{ minio.username }} {{ minio.password }} --insecure
+    ./mc mb myminio/testbucket --insecure
   register: minio_validation_output
 
 - name: MinIO Connection status (Success)

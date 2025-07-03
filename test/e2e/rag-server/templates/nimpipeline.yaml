@@ -50,6 +50,10 @@ spec:
           hpa: 
             {{- toYaml .Values.llm.autoScale.hpa | nindent 12 }}
         {{- end }}
+        env:
+          {{- with .Values.llm.env }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
     - name: {{ .Values.embedding.service.name }}
       enabled: {{ default false .Values.embedding.enabled }}
       spec:
@@ -98,6 +102,10 @@ spec:
           hpa: 
             {{- toYaml .Values.embedding.autoScale.hpa | nindent 12 }}
         {{- end }}
+        env:
+          {{- with .Values.embedding.env }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
     - name: {{ .Values.reranking.service.name }}
       enabled: {{ default false .Values.reranking.enabled }}
       spec:
@@ -146,6 +154,10 @@ spec:
           hpa: 
             {{- toYaml .Values.reranking.autoScale.hpa | nindent 12 }}
         {{- end }}
+        env:
+          {{- with .Values.reranking.env }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
     - name: {{ .Values.paddleOcr.service.name }}
       enabled: {{ .Values.paddleOcr.enabled }}
       spec:
@@ -194,6 +206,10 @@ spec:
           hpa: 
             {{- toYaml .Values.paddleOcr.autoScale.hpa | nindent 12 }}
         {{- end }}
+        env:
+          {{- with .Values.paddleOcr.env }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
     - name: {{ .Values.graphicElements.service.name }}
       enabled: {{ .Values.graphicElements.enabled }}
       spec:
@@ -242,6 +258,10 @@ spec:
           hpa: 
             {{- toYaml .Values.graphicElements.autoScale.hpa | nindent 12 }}
         {{- end }}
+        env:
+          {{- with .Values.graphicElements.env }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
     - name: {{ .Values.pageElements.service.name }}
       enabled: {{ .Values.pageElements.enabled }}
       spec:
@@ -290,6 +310,10 @@ spec:
           hpa: 
             {{- toYaml .Values.pageElements.autoScale.hpa | nindent 12 }}
         {{- end }}
+        env:
+          {{- with .Values.pageElements.env }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
     - name: {{ .Values.tableStructure.service.name }}
       enabled: {{ .Values.tableStructure.enabled }}
       spec:
@@ -338,4 +362,7 @@ spec:
           hpa: 
             {{- toYaml .Values.tableStructure.autoScale.hpa | nindent 12 }}
         {{- end }}
-
+        env:
+          {{- with .Values.tableStructure.env }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}

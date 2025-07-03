@@ -85,8 +85,6 @@ nv-ingest:
     repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
     tag: "25.4.1"
   resources:
-    limits:
-      nvidia.com/gpu: 0
   envVars:
     INGEST_LOG_LEVEL: DEFAULT
     INGEST_EDGE_BUFFER_SIZE: 64
