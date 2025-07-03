@@ -52,6 +52,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	"k8s.io/apimachinery/pkg/version"
 
@@ -61,7 +62,6 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
-	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 )
 
 func sortEnvVars(envVars []corev1.EnvVar) {
@@ -143,6 +143,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(networkingv1.AddToScheme(scheme)).To(Succeed())
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
+		Expect(lwsv1.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -1014,6 +1015,67 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 	})
 
+	Describe("LWS deployment for multi-node inferencing NIMService", func() {
+		AfterEach(func() {
+			lws := &lwsv1.LeaderWorkerSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-lws",
+					Namespace: "default",
+				},
+			}
+			err := client.Delete(context.TODO(), lws)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should report ready when LWS is available", func() {
+			lws := &lwsv1.LeaderWorkerSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-lws",
+					Namespace: "default",
+				},
+				Status: lwsv1.LeaderWorkerSetStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(lwsv1.LeaderWorkerSetAvailable),
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			}
+			err := client.Create(context.TODO(), lws)
+			Expect(err).NotTo(HaveOccurred())
+			msg, ready, err := reconciler.isLeaderWorkerSetReady(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(Equal(true))
+			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is ready", lws.Name)))
+		})
+		It("should report not ready when LWS is not available", func() {
+			lws := &lwsv1.LeaderWorkerSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-lws",
+					Namespace: "default",
+				},
+				Status: lwsv1.LeaderWorkerSetStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(lwsv1.LeaderWorkerSetProgressing),
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   string(lwsv1.LeaderWorkerSetAvailable),
+							Status: metav1.ConditionFalse,
+						},
+					},
+				},
+			}
+			err := client.Create(context.TODO(), lws)
+			Expect(err).NotTo(HaveOccurred())
+			msg, ready, err := reconciler.isLeaderWorkerSetReady(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(Equal(false))
+			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is not ready", lws.Name)))
+		})
+	})
 	Describe("update model status on NIMService", func() {
 		BeforeEach(func() {
 			ingress := &networkingv1.Ingress{
@@ -1230,6 +1292,270 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			})
 		})
+
+		It("should add NIM_MODEL_NAME environment variable when NIMCache is Universal NIM", func() {
+			// Create a NIMCache with ModelEndpoint to make it Universal NIM
+			modelEndpoint := "https://api.ngc.nvidia.com/v2/models/nvidia/nim-llama2-7b/versions/1.0.0"
+			universalNimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-universal-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller:   "test-container",
+							PullSecret:    "my-secret",
+							ModelEndpoint: &modelEndpoint,
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create:       ptr.To[bool](true),
+							StorageClass: "standard",
+							Size:         "1Gi",
+							SubPath:      "subPath",
+						},
+					},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusReady,
+					PVC:   "test-universal-nimcache-pvc",
+					Profiles: []appsv1alpha1.NIMProfile{{
+						Name:   "test-profile",
+						Config: map[string]string{"tp": "4"}},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), universalNimCache)).To(Succeed())
+
+			// Create PVC for the universal NIMCache
+			universalPVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-universal-nimcache-pvc",
+					Namespace: "default",
+				},
+			}
+			Expect(client.Create(context.TODO(), universalPVC)).To(Succeed())
+
+			// Create a new NIMService instance for this test
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-universal-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Labels:      map[string]string{"app": "test-app"},
+					Annotations: map[string]string{"annotation-key": "annotation-value"},
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nim-llm",
+						Tag:         "v0.1.0",
+						PullPolicy:  "IfNotPresent",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					Storage: appsv1alpha1.NIMServiceStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Name:         "test-pvc",
+							StorageClass: "standard",
+							Size:         "1Gi",
+							Create:       ptr.To[bool](true),
+						},
+						NIMCache: appsv1alpha1.NIMCacheVolSpec{
+							Name: "test-universal-nimcache",
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "custom-env",
+							Value: "custom-value",
+						},
+					},
+					Resources: &corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("64Mi"),
+						},
+					},
+					NodeSelector: map[string]string{"disktype": "ssd"},
+					Tolerations: []corev1.Toleration{{
+						Key:      "key1",
+						Operator: corev1.TolerationOpEqual,
+						Value:    "value1",
+						Effect:   corev1.TaintEffectNoSchedule,
+					}},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
+					},
+					RuntimeClassName: "nvidia",
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Deployment should be created
+			deployment := &appsv1.Deployment{}
+			err = client.Get(context.TODO(), namespacedName, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deployment.Name).To(Equal(testNimService.GetName()))
+			Expect(deployment.Namespace).To(Equal(testNimService.GetNamespace()))
+
+			// Verify that NIM_MODEL_NAME environment variable is added
+			container := deployment.Spec.Template.Spec.Containers[0]
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: "/model-store",
+			}), "NIM_MODEL_NAME environment variable should be present and set to /model-store")
+
+			// Verify that other environment variables are still present
+			var customEnv *corev1.EnvVar
+			for _, env := range container.Env {
+				if env.Name == "custom-env" {
+					customEnv = &env
+					break
+				}
+			}
+			Expect(customEnv).NotTo(BeNil(), "Custom environment variables should still be present")
+			Expect(customEnv.Value).To(Equal("custom-value"))
+		})
+
+		It("should not add NIM_MODEL_NAME environment variable when NIMCache is not Universal NIM", func() {
+			// Create a regular NIMCache (not Universal NIM)
+			regularNimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-regular-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller: "test-container",
+							PullSecret:  "my-secret",
+							// No ModelEndpoint, so it's not Universal NIM
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create:       ptr.To[bool](true),
+							StorageClass: "standard",
+							Size:         "1Gi",
+							SubPath:      "subPath",
+						},
+					},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusReady,
+					PVC:   "test-regular-nimcache-pvc",
+					Profiles: []appsv1alpha1.NIMProfile{{
+						Name:   "test-profile",
+						Config: map[string]string{"tp": "4"}},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), regularNimCache)).To(Succeed())
+
+			// Create PVC for the regular NIMCache
+			regularPVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-regular-nimcache-pvc",
+					Namespace: "default",
+				},
+			}
+			Expect(client.Create(context.TODO(), regularPVC)).To(Succeed())
+
+			// Create a new NIMService instance for this test
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-regular-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Labels:      map[string]string{"app": "test-app"},
+					Annotations: map[string]string{"annotation-key": "annotation-value"},
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nim-llm",
+						Tag:         "v0.1.0",
+						PullPolicy:  "IfNotPresent",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					Storage: appsv1alpha1.NIMServiceStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Name:         "test-pvc",
+							StorageClass: "standard",
+							Size:         "1Gi",
+							Create:       ptr.To[bool](true),
+						},
+						NIMCache: appsv1alpha1.NIMCacheVolSpec{
+							Name: "test-regular-nimcache",
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "custom-env",
+							Value: "custom-value",
+						},
+					},
+					Resources: &corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("64Mi"),
+						},
+					},
+					NodeSelector: map[string]string{"disktype": "ssd"},
+					Tolerations: []corev1.Toleration{{
+						Key:      "key1",
+						Operator: corev1.TolerationOpEqual,
+						Value:    "value1",
+						Effect:   corev1.TaintEffectNoSchedule,
+					}},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
+					},
+					RuntimeClassName: "nvidia",
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Deployment should be created
+			deployment := &appsv1.Deployment{}
+			err = client.Get(context.TODO(), namespacedName, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deployment.Name).To(Equal(testNimService.GetName()))
+			Expect(deployment.Namespace).To(Equal(testNimService.GetNamespace()))
+
+			// Verify that NIM_MODEL_NAME environment variable is NOT added
+			container := deployment.Spec.Template.Spec.Containers[0]
+			Expect(container.Env).NotTo(ContainElement(corev1.EnvVar{Name: "NIM_MODEL_NAME"}), "NIM_MODEL_NAME environment variable should not be present for non-Universal NIM")
+
+			// Verify that other environment variables are still present
+			var customEnv *corev1.EnvVar
+			for _, env := range container.Env {
+				if env.Name == "custom-env" {
+					customEnv = &env
+					break
+				}
+			}
+			Expect(customEnv).NotTo(BeNil(), "Custom environment variables should still be present")
+			Expect(customEnv.Value).To(Equal("custom-value"))
+		})
 	})
 
 	Describe("getNIMModelEndpoints", func() {
@@ -1403,30 +1729,30 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 	})
 
-	Describe("assignGPUResources", func() {
-		It("should retain user-provided GPU resources and not override them", func() {
+	Describe("addGPUResources", func() {
+		It("should not provide GPU resources if user has already provided them", func() {
 			profile := &appsv1alpha1.NIMProfile{
 				Name:   "test-profile",
 				Config: map[string]string{"tp": "4"},
 			}
 
 			// Initialize deployment params with user-provided GPU resources
-			deploymentParams := &rendertypes.DeploymentParams{
-				Resources: &corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
-					},
+			nimService.Spec.Resources = &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
 				},
 			}
 
-			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
 
 			// Ensure the user-provided GPU resources (8) are retained and not overridden
-			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
-			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("8")))
 		})
 
 		It("should assign GPU resources when tensor parallelism is provided", func() {
@@ -1434,12 +1760,29 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Name:   "test-profile",
 				Config: map[string]string{"tp": "4"},
 			}
-			// Initialize deployment params with no user-provided GPU resources
-			deploymentParams := &rendertypes.DeploymentParams{}
 
-			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
-			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
-			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
+
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("4")))
+		})
+
+		It("should respect non GPU resources after adding GPU resources", func() {
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{},
+			}
+
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
+
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("250m")))
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("64Mi")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("500m")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("128Mi")))
 		})
 
 		It("should assign 1 GPU resource if tensor parallelism is not provided", func() {
@@ -1447,12 +1790,30 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Name:   "test-profile",
 				Config: map[string]string{},
 			}
-			// Initialize deployment params with no user-provided GPU resources
-			deploymentParams := &rendertypes.DeploymentParams{}
 
-			Expect(reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)).To(Succeed())
-			Expect(deploymentParams.Resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
-			Expect(deploymentParams.Resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
+
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
+		})
+
+		It("should assign GPU resource equal to multiNode.GPUSPerPod in multi-node deployment", func() {
+			nimService.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{
+				GPUSPerPod: 2,
+			}
+			profile := &appsv1alpha1.NIMProfile{
+				Name:   "test-profile",
+				Config: map[string]string{"tp": "4"},
+			}
+
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resources).ToNot(BeNil())
+
+			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("2")))
+			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("2")))
 		})
 
 		It("should return an error if tensor parallelism cannot be parsed", func() {
@@ -1460,10 +1821,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Name:   "test-profile",
 				Config: map[string]string{"tp": "invalid"},
 			}
-			// Initialize deployment params with no user-provided GPU resources
-			deploymentParams := &rendertypes.DeploymentParams{}
 
-			err := reconciler.assignGPUResources(context.TODO(), nimService, profile, deploymentParams)
+			_, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).To(HaveOccurred())
 		})
 	})
