@@ -59,6 +59,8 @@ const (
 	ReasonDeploymentFailed = "DeploymentFailed"
 	// ReasonStatefulSetFailed indicates that the creation of statefulset has failed.
 	ReasonStatefulSetFailed = "StatefulsetFailed"
+	// ReasonLeaderWorkerSetFailed indicates that the creation of leader-worker set has failed.
+	ReasonLeaderWorkerSetFailed = "LeaderWorkerSetFailed"
 	// ReasonSecretFailed indicates that the creation of secret has failed.
 	ReasonSecretFailed = "SecretFailed"
 	// ReasonNIMCacheFailed indicates that the NIMCache is in failed state.
@@ -69,6 +71,8 @@ const (
 	ReasonNIMCacheNotReady = "NIMCacheNotReady"
 	// ReasonDRAResourcesUnsupported indicates that the DRA resources are not supported on this cluster version.
 	ReasonDRAResourcesUnsupported = "DRAResourcesUnsupported"
+	// ReasonInferenceServiceFailed indicates that the creation of inferenceservice has failed.
+	ReasonInferenceServiceFailed = "InferenceServiceFailed"
 )
 
 // Updater is the condition updater.

@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -323,25 +324,23 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	deploymentParams := nimService.GetDeploymentParams()
-	deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
+	var profileEnv *corev1.EnvVar
+	var profile *appsv1alpha1.NIMProfile
+	var gpuResources *corev1.ResourceRequirements
+	var initContainers []corev1.Container
+	var renderFunc func() (client.Object, error)
+	var conType, failedCon string
+	var renderObj client.Object
 
-	// Setup volume mounts with model store
-	deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
-	deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
-
-	// Setup env for explicit override profile is specified
 	if modelProfile != "" {
-		profileEnv := corev1.EnvVar{
+		profileEnv = &corev1.EnvVar{
 			Name:  "NIM_MODEL_PROFILE",
 			Value: modelProfile,
 		}
-		deploymentParams.Env = append(deploymentParams.Env, profileEnv)
 
 		// Only assign GPU resources if the NIMCache is for optimized NIM
 		if nimCache.IsOptimizedNIM() {
 			// Retrieve and set profile details from NIMCache
-			var profile *appsv1alpha1.NIMProfile
 			profile, err = r.getNIMCacheProfile(ctx, nimService, modelProfile)
 			if err != nil {
 				logger.Error(err, "Failed to get cached NIM profile")
@@ -350,7 +349,9 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 			// Auto assign GPU resources in case of the optimized profile
 			if profile != nil {
-				if err = r.assignGPUResources(ctx, nimService, profile, deploymentParams); err != nil {
+				gpuResources, err = r.addGPUResources(ctx, nimService, profile)
+				if err != nil {
+					logger.Error(err, "Failed to get GPU resources")
 					return ctrl.Result{}, err
 				}
 			}
@@ -359,38 +360,105 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		// TODO: assign GPU resources and node selector that is required for the selected profile
 	}
 
-	if nimCache.IsUniversalNIM() {
-		deploymentParams.Env = append(deploymentParams.Env, corev1.EnvVar{
-			Name:  "NIM_MODEL_NAME",
-			Value: utils.DefaultModelStorePath,
-		})
+	initContainers = nimService.GetInitContainers()
+	namedDraResources := shared.GenerateNamedDRAResources(nimService)
+
+	if nimService.Spec.MultiNode != nil && nimService.Spec.MultiNode.BackendType == appsv1alpha1.NIMBackendTypeLWS {
+		lwsParams := nimService.GetLWSParams()
+		lwsParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
+		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
+		lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(*modelPVC)
+		lwsParams.WorkerVolumes = nimService.GetWorkerVolumes(*modelPVC)
+		if nimCache.IsUniversalNIM() {
+			lwsParams.WorkerEnvs = append(lwsParams.WorkerEnvs, corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: utils.DefaultModelStorePath,
+			})
+			lwsParams.LeaderEnvs = append(lwsParams.LeaderEnvs, corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: utils.DefaultModelStorePath,
+			})
+		}
+		lwsParams.LeaderVolumeMounts = nimService.GetLeaderVolumeMounts(*modelPVC)
+		lwsParams.WorkerVolumeMounts = nimService.GetWorkerVolumeMounts(*modelPVC)
+		if profileEnv != nil {
+			lwsParams.WorkerEnvs = append(lwsParams.WorkerEnvs, *profileEnv)
+			lwsParams.LeaderEnvs = append(lwsParams.LeaderEnvs, *profileEnv)
+		}
+		if gpuResources != nil {
+			lwsParams.Resources = gpuResources
+		}
+		renderFunc = func() (client.Object, error) {
+			result, err := renderer.LeaderWorkerSet(lwsParams)
+			if err != nil {
+				return nil, err
+			}
+			if len(initContainers) > 0 {
+				result.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.InitContainers = initContainers
+				result.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.InitContainers = initContainers
+			}
+			shared.UpdateContainerResourceClaims(result.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers, namedDraResources)
+			shared.UpdateContainerResourceClaims(result.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers, namedDraResources)
+			return result, nil
+		}
+		conType = "LeaderWorkerSet"
+		failedCon = conditions.ReasonLeaderWorkerSetFailed
+		renderObj = &lws.LeaderWorkerSet{}
+
+		// Create configmap for MPI
+		err = r.createMultiNodeVolumeObjects(ctx, nimService)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to create multi-node volumes: %v", err)
+		}
+	} else {
+		deploymentParams := nimService.GetDeploymentParams()
+		deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
+		deploymentParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
+		if nimCache.IsUniversalNIM() {
+			deploymentParams.Env = append(deploymentParams.Env, corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: utils.DefaultModelStorePath,
+			})
+		}
+		// Setup volume mounts with model store
+		deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
+		deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
+		if profileEnv != nil {
+			deploymentParams.Env = append(deploymentParams.Env, *profileEnv)
+		}
+		// Auto assign GPU resources in case of the optimized profile
+		if gpuResources != nil {
+			deploymentParams.Resources = gpuResources
+		}
+		renderFunc = func() (client.Object, error) {
+			result, err := renderer.Deployment(deploymentParams)
+			if err != nil {
+				return nil, err
+			}
+			if len(initContainers) > 0 {
+				result.Spec.Template.Spec.InitContainers = initContainers
+			}
+			// Update Container resources with DRA resource claims.
+			shared.UpdateContainerResourceClaims(result.Spec.Template.Spec.Containers, namedDraResources)
+			return result, nil
+		}
+		conType = "Deployment"
+		failedCon = conditions.ReasonDeploymentFailed
+		renderObj = &appsv1.Deployment{}
 	}
 
-	// Setup pod resource claims
-	namedDraResources := shared.GenerateNamedDRAResources(nimService)
-	deploymentParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
-
-	// Sync deployment
-	err = r.renderAndSyncResource(ctx, nimService, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
-		result, err := renderer.Deployment(deploymentParams)
-		if err != nil {
-			return nil, err
-		}
-		initContainers := nimService.GetInitContainers()
-		if len(initContainers) > 0 {
-			result.Spec.Template.Spec.InitContainers = initContainers
-		}
-		// Update Container resources with DRA resource claims.
-		shared.UpdateContainerResourceClaims(result.Spec.Template.Spec.Containers, namedDraResources)
-		return result, err
-
-	}, "deployment", conditions.ReasonDeploymentFailed)
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, renderObj, renderFunc, conType, failedCon)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// check if deployment is ready
-	msg, ready, err := r.isDeploymentReady(ctx, &namespacedName)
+	var ready bool
+	if nimService.Spec.MultiNode != nil {
+		msg, ready, err = r.isLeaderWorkerSetReady(ctx, nimService)
+	} else {
+		msg, ready, err = r.isDeploymentReady(ctx, &namespacedName)
+	}
+
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -433,6 +501,76 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	return ctrl.Result{}, nil
 }
 
+func (r *NIMServiceReconciler) createMultiNodeVolumeObjects(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
+	if err := r.createMultiNodeConfigMap(ctx, nimService, nimService.GetMPIConfigParams()); err != nil {
+		return fmt.Errorf("failed to create MPI configmap for %s: %v", nimService.Name, err)
+	}
+
+	if err := r.createMultiNodeConfigMap(ctx, nimService, nimService.GetDefaultMPIScriptConfigParams()); err != nil {
+		return fmt.Errorf("failed to create MPI script configmap for %s: %v", nimService.Name, err)
+	}
+
+	if err := r.createMultiNodeSSHPK(ctx, nimService); err != nil {
+		return fmt.Errorf("failed to create MPI SSH secret for %s: %v", nimService.Name, err)
+	}
+	return nil
+}
+
+func (r *NIMServiceReconciler) createMultiNodeSSHPK(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
+	secretParams, err := nimService.GetMPISSHSecretParams()
+	if err != nil {
+		return err
+	}
+
+	namespacedName := types.NamespacedName{
+		Name:      secretParams.Name,
+		Namespace: secretParams.Namespace,
+	}
+	secret := &corev1.Secret{}
+	err = r.Get(ctx, namespacedName, secret)
+	if err == nil {
+		// secret already exists, do nothing
+		return nil
+	}
+	if client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	err = r.renderAndSyncResource(ctx, nimService, &r.renderer, &corev1.Secret{}, func() (client.Object, error) {
+		return r.renderer.Secret(secretParams)
+	}, "secret", conditions.ReasonSecretFailed)
+	if err != nil {
+		return fmt.Errorf("failed to create MPI SSH secret %s: %v", secretParams.Name, err)
+	}
+
+	return nil
+}
+
+func (r *NIMServiceReconciler) createMultiNodeConfigMap(ctx context.Context, nimService *appsv1alpha1.NIMService, cmParams *rendertypes.ConfigMapParams) error {
+	renderer := r.GetRenderer()
+
+	namespacedName := types.NamespacedName{
+		Name:      cmParams.Name,
+		Namespace: cmParams.Namespace,
+	}
+	cm := &corev1.ConfigMap{}
+	err := r.Get(ctx, namespacedName, cm)
+	if err == nil {
+		return nil
+	}
+	if client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ConfigMap{}, func() (client.Object, error) {
+		return renderer.ConfigMap(cmParams)
+	}, "configmap", conditions.ReasonConfigMapFailed)
+	if err != nil {
+		return fmt.Errorf("failed to create configmap %s: %v", cmParams.Name, err)
+	}
+	return nil
+}
+
 func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
 	clusterEndpoint, externalEndpoint, err := r.getNIMModelEndpoints(ctx, nimService)
 	if err != nil {
@@ -467,15 +605,16 @@ func (r *NIMServiceReconciler) updateResourceClaimStatus(ctx context.Context, ni
 func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEndpoint string) (string, error) {
 	logger := log.FromContext(ctx)
 
+	httpScheme := "http"
 	// List nimservice /v1/models endpoint.
-	modelsList, err := nimmodels.ListModelsV1(ctx, nimServiceEndpoint)
+	modelsList, err := nimmodels.ListModelsV1(ctx, nimServiceEndpoint, httpScheme)
 	if err != nil {
 		logger.Error(err, "Failed to list models", "endpoint", nimServiceEndpoint)
-		// Check if it's an HTTP error with a status code
+		// Check if err is an HTTP error with a status code
 		if nimmodels.IsNotFound(err) {
 			// The endpoint does not exist
 			logger.V(2).Error(err, "URI does not exist", "uri", nimmodels.ModelsV1URI, "endpoint", nimServiceEndpoint)
-			metadata, err := nimmodels.GetMetadataV1(ctx, nimServiceEndpoint)
+			metadata, err := nimmodels.GetMetadataV1(ctx, nimServiceEndpoint, httpScheme)
 			if err != nil {
 				logger.Error(err, "Failed to get metadata", "endpoint", nimServiceEndpoint)
 				if nimmodels.IsNotFound(err) {
@@ -590,21 +729,9 @@ func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimServ
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
-
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !k8serrors.IsNotFound(err) {
-		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
-		return err
-	}
-	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
-		return nil
-	}
-
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, namespacedName)
+		logger.Error(err, "failed to render", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "nimservice", nimService.Name)
@@ -629,6 +756,18 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		return nil
 	}
 
+	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
+
+	err = r.Get(ctx, namespacedName, obj)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
+		return err
+	}
+	// Don't do anything if CR is unchanged.
+	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
+		return nil
+	}
+
 	if err = controllerutil.SetControllerReference(nimService, resource, r.GetScheme()); err != nil {
 		logger.Error(err, "failed to set owner", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
@@ -648,6 +787,24 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		return err
 	}
 	return nil
+}
+
+func (r *NIMServiceReconciler) isLeaderWorkerSetReady(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, bool, error) {
+	leaderWorkerSet := &lws.LeaderWorkerSet{}
+	err := r.Get(ctx, client.ObjectKey{Name: nimService.GetLWSName(), Namespace: nimService.GetNamespace()}, leaderWorkerSet)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+
+	for _, cond := range leaderWorkerSet.Status.Conditions {
+		if cond.Type == string(lws.LeaderWorkerSetAvailable) && cond.Status == metav1.ConditionTrue {
+			return fmt.Sprintf("leaderworkerset %q is ready", leaderWorkerSet.Name), true, nil
+		}
+	}
+	return fmt.Sprintf("leaderworkerset %q is not ready", leaderWorkerSet.Name), false, nil
 }
 
 // CheckDeploymentReadiness checks if the Deployment is ready.
@@ -790,67 +947,74 @@ func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimServic
 // assignGPUResources automatically assigns GPU resources to the NIMService based on the provided profile,
 // but retains any user-specified GPU resources if they are explicitly provided.
 //
-// This function retrieves the tensor parallelism (TP) value from the provided profile config to determine
+// In case of monolithic NIMs, this function retrieves the tensor parallelism (TP) value from the provided profile config to determine
 // the number of GPUs to be allocated. If the TP value is defined and no GPU resources have been
 // explicitly provided by the user, the function allocates GPUs according to the TP value.
 // If the TP value is not present, the function defaults to allocating 1 GPU.
-func (r *NIMServiceReconciler) assignGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile, deploymentParams *rendertypes.DeploymentParams) error {
+//
+// In case of multi-node NIMs, this function assigns the number of GPUs equal to .spec.multiNode.gpuPerWorker.
+func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile) (*corev1.ResourceRequirements, error) {
 	logger := log.FromContext(ctx)
 
 	// TODO: Refine this to detect GPU claims and only assign GPU resources if no GPU claims are present.
 	if len(nimService.Spec.DRAResources) > 0 {
 		logger.Info("DRAResources found, skipping GPU resource assignment", "DRAResources", nimService.Spec.DRAResources)
-		return nil
+		return nil, nil
 	}
 
 	// TODO: Make the resource name configurable
 	const gpuResourceName = corev1.ResourceName("nvidia.com/gpu")
 
 	// Check if the user has already provided a GPU resource quantity in the requests or limits
-	if deploymentParams.Resources != nil {
-		if _, gpuRequested := deploymentParams.Resources.Requests[gpuResourceName]; gpuRequested {
+	if nimService.Spec.Resources != nil {
+		if _, gpuRequested := nimService.Spec.Resources.Requests[gpuResourceName]; gpuRequested {
 			logger.V(2).Info("User has provided GPU resource requests, skipping auto-assignment", "gpuResource", gpuResourceName)
-			return nil
+			return nimService.Spec.Resources, nil
 		}
-		if _, gpuLimit := deploymentParams.Resources.Limits[gpuResourceName]; gpuLimit {
+		if _, gpuLimit := nimService.Spec.Resources.Limits[gpuResourceName]; gpuLimit {
 			logger.V(2).Info("User has provided GPU resource limits, skipping auto-assignment", "gpuResource", gpuResourceName)
-			return nil
+			return nimService.Spec.Resources, nil
 		}
 	}
 
-	// If no user-provided GPU resource is found, proceed with auto-assignment
-	// Get tensorParallelism from the profile
-	tensorParallelism, err := utils.GetTensorParallelismByProfileTags(profile.Config)
-	if err != nil {
-		logger.Error(err, "Failed to retrieve tensorParallelism")
-		return err
+	gpuQuantity := apiResource.MustParse("1")
+	var err error
+	// if deployed as multi-node, use the GPU per worker value to assign GPU resources to each worker
+	// TODO auto determine base on tp*pp/(.spec.multiNode.size)
+	if nimService.Spec.MultiNode != nil {
+		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", nimService.Spec.MultiNode.GPUSPerPod))
+		if err != nil {
+			logger.Error(err, "Failed to parse GPU per worker value")
+			return nil, err
+		}
+	} else {
+		// If no user-provided GPU resource is found, proceed with auto-assignment
+		// Get tensorParallelism from the profile
+		tensorParallelism, err := utils.GetTensorParallelismByProfileTags(profile.Config)
+		if err != nil {
+			logger.Error(err, "Failed to retrieve tensorParallelism")
+			return nil, err
+		}
+		if tensorParallelism != "" {
+			gpuQuantity, err = apiResource.ParseQuantity(tensorParallelism)
+			if err != nil {
+				logger.Error(err, "Failed to parse tensorParallelism")
+				return nil, err
+			}
+		}
 	}
 
-	// Initialize the Resources field if not already initialized
-	if deploymentParams.Resources == nil {
-		deploymentParams.Resources = &corev1.ResourceRequirements{
+	var resources *corev1.ResourceRequirements
+	if nimService.Spec.Resources != nil {
+		resources = nimService.Spec.Resources
+	} else {
+		resources = &corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{},
 			Limits:   corev1.ResourceList{},
 		}
 	}
 
-	// Assign GPU resources based on tensorParallelism, or default to 1 GPU if tensorParallelism is not available
-	gpuQuantity := apiResource.MustParse("1") // Default to 1 GPU
-
-	if tensorParallelism != "" {
-		gpuQuantity, err = apiResource.ParseQuantity(tensorParallelism)
-		if err != nil {
-			return fmt.Errorf("failed to parse tensorParallelism: %w", err)
-		}
-
-		logger.V(2).Info("Auto-assigning GPU resources based on tensorParallelism", "tensorParallelism", tensorParallelism, "gpuQuantity", gpuQuantity.String())
-	} else {
-		logger.V(2).Info("tensorParallelism not found, assigning 1 GPU by default", "Profile", profile.Name)
-	}
-
-	// Assign the GPU quantity for both requests and limits
-	deploymentParams.Resources.Requests[gpuResourceName] = gpuQuantity
-	deploymentParams.Resources.Limits[gpuResourceName] = gpuQuantity
-
-	return nil
+	resources.Requests[gpuResourceName] = gpuQuantity
+	resources.Limits[gpuResourceName] = gpuQuantity
+	return resources, nil
 }

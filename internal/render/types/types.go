@@ -88,6 +88,47 @@ type DeploymentParams struct {
 	PodResourceClaims  []corev1.PodResourceClaim
 }
 
+// LeaderWorkerSetParams holds the parameters for rendering a LeaderWorkerSet template.
+type LeaderWorkerSetParams struct {
+	Name               string
+	Namespace          string
+	Labels             map[string]string
+	Annotations        map[string]string
+	PodAnnotations     map[string]string
+	SelectorLabels     map[string]string
+	Replicas           int
+	Size               int
+	ContainerName      string
+	Args               []string
+	Command            []string
+	Image              string
+	ImagePullSecrets   []string
+	ImagePullPolicy    string
+	SchedulerName      string
+	WorkerVolumes      []corev1.Volume
+	LeaderVolumes      []corev1.Volume
+	WorkerVolumeMounts []corev1.VolumeMount
+	LeaderVolumeMounts []corev1.VolumeMount
+	WorkerEnvs         []corev1.EnvVar
+	LeaderEnvs         []corev1.EnvVar
+	Resources          *corev1.ResourceRequirements
+	NodeSelector       map[string]string
+	Tolerations        []corev1.Toleration
+	Affinity           *corev1.PodAffinity
+	LivenessProbe      *corev1.Probe
+	ReadinessProbe     *corev1.Probe
+	StartupProbe       *corev1.Probe
+	ServiceAccountName string
+	NIMCachePVC        string
+	UserID             *int64
+	GroupID            *int64
+	RuntimeClassName   string
+	OrchestratorType   string
+	Ports              []corev1.ContainerPort
+	InitContainers     []corev1.Container
+	PodResourceClaims  []corev1.PodResourceClaim
+}
+
 // StatefulSetParams holds the parameters for rendering a StatefulSet template.
 type StatefulSetParams struct {
 	Name               string
@@ -227,4 +268,46 @@ type SecretParams struct {
 	Annotations map[string]string
 	// Key-value pairs representing filenames and their content
 	SecretMapData map[string]string
+}
+
+// InferenceServiceParams holds the parameters for rendering a InferenceService template.
+type InferenceServiceParams struct {
+	Name               string
+	Namespace          string
+	Labels             map[string]string
+	Annotations        map[string]string
+	PodAnnotations     map[string]string
+	SelectorLabels     map[string]string
+	MinReplicas        *int32
+	MaxReplicas        *int32
+	ScaleMetricType    string
+	ScaleMetric        string
+	ScaleTarget        *int32
+	ContainerName      string
+	Args               []string
+	Command            []string
+	Image              string
+	ImagePullSecrets   []string
+	ImagePullPolicy    string
+	SchedulerName      string
+	Volumes            []corev1.Volume
+	VolumeMounts       []corev1.VolumeMount
+	Env                []corev1.EnvVar
+	Resources          *corev1.ResourceRequirements
+	NodeSelector       map[string]string
+	Tolerations        []corev1.Toleration
+	Affinity           *corev1.PodAffinity
+	LivenessProbe      *corev1.Probe
+	ReadinessProbe     *corev1.Probe
+	StartupProbe       *corev1.Probe
+	ServiceAccountName string
+	NIMCachePVC        string
+	UserID             *int64
+	GroupID            *int64
+	RuntimeClassName   string
+	OrchestratorType   string
+	Ports              []corev1.ContainerPort
+	InitContainers     []corev1.Container
+	PodResourceClaims  []corev1.PodResourceClaim
+	DeploymentMode     string
 }
