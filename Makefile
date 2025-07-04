@@ -37,6 +37,8 @@ endif
 CONTAINER_TOOL ?= docker
 
 CLIENT_GEN = $(shell pwd)/bin/client-gen
+LISTER_GEN = $(shell pwd)/bin/lister-gen
+INFORMER_GEN = $(shell pwd)/bin/informer-gen
 
 # DEFAULT_CHANNEL defines the default channel used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
@@ -91,6 +93,18 @@ generate-clientset: install-tools
 		--output-pkg $(MODULE)/api \
 		--input-base $(CURDIR)/api \
 		--input "apps/v1alpha1"
+
+	$(LISTER_GEN) $(MODULE)/api/apps/v1alpha1 \
+		--go-header-file $(CURDIR)/hack/boilerplate.go.txt \
+		--output-pkg $(MODULE)/api/listers \
+		--output-dir $(CURDIR)/api/listers
+
+	$(INFORMER_GEN) $(MODULE)/api/apps/v1alpha1 \
+		--go-header-file $(CURDIR)/hack/boilerplate.go.txt \
+		--versioned-clientset-package $(MODULE)/api/versioned \
+		--listers-package $(MODULE)/api/listers \
+		--output-pkg $(MODULE)/api/informers \
+		--output-dir $(CURDIR)/api/informers
 
 validate-generated-assets: manifests generate generate-clientset sync-crds
 	@echo "- Verifying that the generated code and manifests are in-sync..."
