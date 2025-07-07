@@ -512,7 +512,7 @@ func (r *NIMBuildReconciler) updateNIMBuildStatus(ctx context.Context, nimBuild 
 	return nil
 }
 
-func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType, nimProfile appsv1alpha1.NIMProfile) (*corev1.Pod, error) {
+func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType, inputNimProfile appsv1alpha1.NIMProfile) (*corev1.Pod, error) {
 	logger := r.GetLogger()
 	pvcName := shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)
 	labels := map[string]string{
@@ -533,7 +533,7 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 	}
 
 	// Get tensorParallelism from the profile
-	tensorParallelism, err := utils.GetTensorParallelismByProfileTags(nimProfile.Config)
+	tensorParallelism, err := utils.GetTensorParallelismByProfileTags(inputNimProfile.Config)
 	if err != nil {
 		logger.Error(err, "Failed to retrieve tensorParallelism")
 		return nil, err
@@ -635,6 +635,10 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 				{
 					Name:  "NIM_CUSTOM_MODEL_NAME",
 					Value: nimBuild.GetModelName(),
+				},
+				{
+					Name:  "NIM_MODEL_PROFILE",
+					Value: inputNimProfile.Name,
 				},
 				{
 					Name: "NGC_API_KEY",
