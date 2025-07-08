@@ -434,7 +434,7 @@ spec:
                     description: |-
                       HostPath is the host path volume for caching NIM
 
-                      DEPRECATED: use PVC instead.
+                      Deprecated: use PVC instead.
                     type: string
                   pvc:
                     description: PersistentVolumeClaim is the pvc volume used for
