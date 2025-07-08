@@ -13,7 +13,7 @@ type HFInterface interface {
 	GetRevision() string
 }
 
-func DownloadToCacheCommand(src HFInterface, outputPath string) []string {
+func HFDownloadToCacheCommand(src HFInterface, outputPath string) []string {
 	var command []string
 	if src.GetModelName() != nil { // nolint:gocritic
 		hfRepo := fmt.Sprintf("%s/%s", src.GetNamespace(), *src.GetModelName())

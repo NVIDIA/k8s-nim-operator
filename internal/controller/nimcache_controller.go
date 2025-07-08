@@ -1085,7 +1085,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			hfDataSource = nimCache.Spec.Source.HF
 		}
 
-		command := nimsource.DownloadToCacheCommand(hfDataSource, "/output")
+		command := nimsource.HFDownloadToCacheCommand(hfDataSource, utils.DefaultModelStorePath)
 
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
@@ -1105,7 +1105,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				VolumeMounts: []corev1.VolumeMount{
 					{
 						Name:      "nim-cache-volume",
-						MountPath: "/output",
+						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
 				},
@@ -1147,13 +1147,13 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Env: []corev1.EnvVar{
 					{
 						Name:  "NIM_CACHE_PATH",
-						Value: "/model-store",
+						Value: utils.DefaultModelStorePath,
 					},
 				},
 				VolumeMounts: []corev1.VolumeMount{
 					{
 						Name:      "nim-cache-volume",
-						MountPath: "/model-store",
+						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
 				},
@@ -1212,7 +1212,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.NGC.ModelPuller,
 				Command: []string{"create-model-store"},
-				Args:    []string{"--model-repo", *nimCache.Spec.Source.NGC.ModelEndpoint, "--model-store", "/model-store"},
+				Args:    []string{"--model-repo", *nimCache.Spec.Source.NGC.ModelEndpoint, "--model-store", utils.DefaultModelStorePath},
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
 				Env: []corev1.EnvVar{
 					{
