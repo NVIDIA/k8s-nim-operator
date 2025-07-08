@@ -431,7 +431,10 @@ spec:
                 description: Storage is the target storage for caching NIM model
                 properties:
                   hostPath:
-                    description: HostPath is the host path volume for caching NIM
+                    description: |-
+                      HostPath is the host path volume for caching NIM
+
+                      DEPRECATED: use PVC instead.
                     type: string
                   pvc:
                     description: PersistentVolumeClaim is the pvc volume used for

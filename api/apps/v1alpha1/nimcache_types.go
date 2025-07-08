@@ -159,6 +159,8 @@ type NIMCacheStorage struct {
 	// PersistentVolumeClaim is the pvc volume used for caching NIM
 	PVC PersistentVolumeClaim `json:"pvc,omitempty"`
 	// HostPath is the host path volume for caching NIM
+	//
+	// DEPRECATED: use PVC instead.
 	HostPath *string `json:"hostPath,omitempty"`
 }
 

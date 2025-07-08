@@ -1085,12 +1085,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			hfDataSource = nimCache.Spec.Source.HF
 		}
 
-		outputPath := "/output"
-		if nimCache.Spec.Storage.HostPath != nil {
-			outputPath = fmt.Sprintf("%v/%v", outputPath, *nimCache.Spec.Storage.HostPath)
-		}
-
-		command := nimsource.DownloadToCacheCommand(hfDataSource, outputPath)
+		command := nimsource.DownloadToCacheCommand(hfDataSource, "/output")
 
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
