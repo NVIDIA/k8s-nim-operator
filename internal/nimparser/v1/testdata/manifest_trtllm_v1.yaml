@@ -11,3 +11,11 @@
     profile: throughput
     tp: '8'
   container_url: nvcr.io/nim/meta/llama3-70b-instruct:1.0.0
+  workspace: !workspace
+    components:
+    - dst: trtllm_engine
+      src:
+        files:
+          - !name 'LICENSE.txt'
+          - !name 'checksums.blake3'
+          - !name 'config.json'
