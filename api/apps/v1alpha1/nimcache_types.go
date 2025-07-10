@@ -72,19 +72,22 @@ type NIMSource struct {
 
 // +kubebuilder:validation:XValidation:rule="(has(self.modelName) ? 1 : 0) + (has(self.datasetName) ? 1 : 0) == 1",message="Exactly one of modelName or datasetName must be defined"
 type DSHFCommonFields struct {
-	// modelName is the name of the model
+	// ModelName is the name of the model
 	ModelName *string `json:"modelName,omitempty"`
-	// datasetName is the name of the dataset
+	// DatasetName is the name of the dataset
 	DatasetName *string `json:"datasetName,omitempty"`
-	// authSecret is the name of the secret containing the "HF_TOKEN" token
+	// AuthSecret is the name of the secret containing the "HF_TOKEN" token
 	// +kubebuilder:validation:MinLength=1
 	AuthSecret string `json:"authSecret"`
-	// modelPuller is the containerized huggingface-cli image to pull the data
+	// ModelPuller is the containerized huggingface-cli image to pull the data
 	// +kubebuilder:validation:MinLength=1
 	ModelPuller string `json:"modelPuller"`
-	// pullSecret is the name of the image pull secret for the modelPuller image
+	// PullSecret is the name of the image pull secret for the modelPuller image
 	// +kubebuilder:validation:MinLength=1
 	PullSecret string `json:"pullSecret"`
+	// Revision is the revision of the object to be cached. This is either a commit hash, branch name or tag.
+	// +kubebuilder:validation:MinLength=1
+	Revision *string `json:"revision,omitempty"`
 }
 
 type NemoDataStoreSource struct {
@@ -156,6 +159,8 @@ type NIMCacheStorage struct {
 	// PersistentVolumeClaim is the pvc volume used for caching NIM
 	PVC PersistentVolumeClaim `json:"pvc,omitempty"`
 	// HostPath is the host path volume for caching NIM
+	//
+	// Deprecated: use PVC instead.
 	HostPath *string `json:"hostPath,omitempty"`
 }
 
@@ -421,6 +426,13 @@ func (d *DSHFCommonFields) GetModelPuller() string {
 
 func (d *DSHFCommonFields) GetPullSecret() string {
 	return d.PullSecret
+}
+
+func (d *DSHFCommonFields) GetRevision() string {
+	if d.Revision == nil {
+		return ""
+	}
+	return *d.Revision
 }
 
 func (d *HuggingFaceHubSource) GetEndpoint() string {

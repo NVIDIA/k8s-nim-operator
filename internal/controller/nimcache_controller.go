@@ -52,6 +52,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
 	nimparserutils "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/utils"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nimsource"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -79,16 +80,6 @@ const (
 	// NIMCacheContainerName returns the name of the container used for NIM Cache operations.
 	NIMCacheContainerName = "nim-cache-ctr"
 )
-
-type HFInterface interface {
-	GetModelName() *string
-	GetDatasetName() *string
-	GetAuthSecret() string
-	GetModelPuller() string
-	GetPullSecret() string
-	GetEndpoint() string
-	GetNamespace() string
-}
 
 // NIMCacheReconciler reconciles a NIMCache object.
 type NIMCacheReconciler struct {
@@ -1087,28 +1078,15 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 
 	switch {
 	case nimCache.Spec.Source.DataStore != nil || nimCache.Spec.Source.HF != nil:
-		var hfDataSource HFInterface
+		var hfDataSource nimsource.HFInterface
 		if nimCache.Spec.Source.DataStore != nil {
 			hfDataSource = nimCache.Spec.Source.DataStore
 		} else if nimCache.Spec.Source.HF != nil {
 			hfDataSource = nimCache.Spec.Source.HF
 		}
 
-		outputPath := "/output"
-		if nimCache.Spec.Storage.HostPath != nil {
-			outputPath = fmt.Sprintf("%v/%v", outputPath, *nimCache.Spec.Storage.HostPath)
-		}
+		command := nimsource.HFDownloadToCacheCommand(hfDataSource, utils.DefaultModelStorePath)
 
-		var command []string
-		if hfDataSource.GetModelName() != nil { // nolint:gocritic
-			hfRepo := fmt.Sprintf("%s/%s", hfDataSource.GetNamespace(), *hfDataSource.GetModelName())
-			command = []string{"huggingface-cli", "download", "--local-dir", outputPath, "--repo-type", "model", hfRepo}
-		} else if hfDataSource.GetDatasetName() != nil {
-			hfRepo := fmt.Sprintf("%s/%s", hfDataSource.GetNamespace(), *hfDataSource.GetDatasetName())
-			command = []string{"huggingface-cli", "download", "--local-dir", outputPath, "--repo-type", "dataset", hfRepo}
-		} else {
-			return nil, errors.NewBadRequest("either modelName or datasetName must be provided")
-		}
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
 				Name:    NIMCacheContainerName,
@@ -1127,7 +1105,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				VolumeMounts: []corev1.VolumeMount{
 					{
 						Name:      "nim-cache-volume",
-						MountPath: "/output",
+						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
 				},
@@ -1169,13 +1147,13 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Env: []corev1.EnvVar{
 					{
 						Name:  "NIM_CACHE_PATH",
-						Value: "/model-store",
+						Value: utils.DefaultModelStorePath,
 					},
 				},
 				VolumeMounts: []corev1.VolumeMount{
 					{
 						Name:      "nim-cache-volume",
-						MountPath: "/model-store",
+						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
 				},
@@ -1234,7 +1212,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.NGC.ModelPuller,
 				Command: []string{"create-model-store"},
-				Args:    []string{"--model-repo", *nimCache.Spec.Source.NGC.ModelEndpoint, "--model-store", "/model-store"},
+				Args:    []string{"--model-repo", *nimCache.Spec.Source.NGC.ModelEndpoint, "--model-store", utils.DefaultModelStorePath},
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
 				Env: []corev1.EnvVar{
 					{

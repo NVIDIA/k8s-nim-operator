@@ -243,12 +243,12 @@ spec:
                       DataStore service
                     properties:
                       authSecret:
-                        description: authSecret is the name of the secret containing
+                        description: AuthSecret is the name of the secret containing
                           the "HF_TOKEN" token
                         minLength: 1
                         type: string
                       datasetName:
-                        description: datasetName is the name of the dataset
+                        description: DatasetName is the name of the dataset
                         type: string
                       endpoint:
                         description: Endpoint is the HuggingFace endpoint from NeMo
@@ -256,10 +256,10 @@ spec:
                         pattern: ^https?://.*/v1/hf/?$
                         type: string
                       modelName:
-                        description: modelName is the name of the model
+                        description: ModelName is the name of the model
                         type: string
                       modelPuller:
-                        description: modelPuller is the containerized huggingface-cli
+                        description: ModelPuller is the containerized huggingface-cli
                           image to pull the data
                         minLength: 1
                         type: string
@@ -268,8 +268,13 @@ spec:
                         description: Namespace is the namespace within NeMo DataStore
                         type: string
                       pullSecret:
-                        description: pullSecret is the name of the image pull secret
+                        description: PullSecret is the name of the image pull secret
                           for the modelPuller image
+                        minLength: 1
+                        type: string
+                      revision:
+                        description: Revision is the revision of the object to be
+                          cached. This is either a commit hash, branch name or tag.
                         minLength: 1
                         type: string
                     required:
@@ -288,22 +293,22 @@ spec:
                       Hub
                     properties:
                       authSecret:
-                        description: authSecret is the name of the secret containing
+                        description: AuthSecret is the name of the secret containing
                           the "HF_TOKEN" token
                         minLength: 1
                         type: string
                       datasetName:
-                        description: datasetName is the name of the dataset
+                        description: DatasetName is the name of the dataset
                         type: string
                       endpoint:
                         description: Endpoint is the HuggingFace endpoint
                         pattern: ^https?://.*$
                         type: string
                       modelName:
-                        description: modelName is the name of the model
+                        description: ModelName is the name of the model
                         type: string
                       modelPuller:
-                        description: modelPuller is the containerized huggingface-cli
+                        description: ModelPuller is the containerized huggingface-cli
                           image to pull the data
                         minLength: 1
                         type: string
@@ -313,8 +318,13 @@ spec:
                         minLength: 1
                         type: string
                       pullSecret:
-                        description: pullSecret is the name of the image pull secret
+                        description: PullSecret is the name of the image pull secret
                           for the modelPuller image
+                        minLength: 1
+                        type: string
+                      revision:
+                        description: Revision is the revision of the object to be
+                          cached. This is either a commit hash, branch name or tag.
                         minLength: 1
                         type: string
                     required:
@@ -421,7 +431,10 @@ spec:
                 description: Storage is the target storage for caching NIM model
                 properties:
                   hostPath:
-                    description: HostPath is the host path volume for caching NIM
+                    description: |-
+                      HostPath is the host path volume for caching NIM
+
+                      Deprecated: use PVC instead.
                     type: string
                   pvc:
                     description: PersistentVolumeClaim is the pvc volume used for
