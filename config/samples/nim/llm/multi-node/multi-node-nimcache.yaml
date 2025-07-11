@@ -14,4 +14,4 @@ spec:
       create: true
       storageClass: "nfs-storage"
       size: "100Gi"
-      volumeAccessMode: ReadWriteOnce
+      volumeAccessMode: ReadWriteMany
