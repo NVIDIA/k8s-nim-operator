@@ -324,7 +324,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	var profileEnv *corev1.EnvVar
+	var profileEnv *[]corev1.EnvVar
 	var profile *appsv1alpha1.NIMProfile
 	var gpuResources *corev1.ResourceRequirements
 	var initContainers []corev1.Container
@@ -333,10 +333,10 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	var renderObj client.Object
 
 	if modelProfile != "" {
-		profileEnv = &corev1.EnvVar{
+		profileEnv = &[]corev1.EnvVar{{
 			Name:  "NIM_MODEL_PROFILE",
 			Value: modelProfile,
-		}
+		}}
 
 		// Only assign GPU resources if the NIMCache is for optimized NIM
 		if nimCache.IsOptimizedNIM() {
@@ -370,20 +370,20 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(*modelPVC)
 		lwsParams.WorkerVolumes = nimService.GetWorkerVolumes(*modelPVC)
 		if nimCache.IsUniversalNIM() {
-			lwsParams.WorkerEnvs = append(lwsParams.WorkerEnvs, corev1.EnvVar{
+			lwsParams.WorkerEnvs = utils.MergeEnvVars([]corev1.EnvVar{{
 				Name:  "NIM_MODEL_NAME",
 				Value: utils.DefaultModelStorePath,
-			})
-			lwsParams.LeaderEnvs = append(lwsParams.LeaderEnvs, corev1.EnvVar{
+			}}, lwsParams.WorkerEnvs)
+			lwsParams.LeaderEnvs = utils.MergeEnvVars([]corev1.EnvVar{{
 				Name:  "NIM_MODEL_NAME",
 				Value: utils.DefaultModelStorePath,
-			})
+			}}, lwsParams.LeaderEnvs)
 		}
 		lwsParams.LeaderVolumeMounts = nimService.GetLeaderVolumeMounts(*modelPVC)
 		lwsParams.WorkerVolumeMounts = nimService.GetWorkerVolumeMounts(*modelPVC)
 		if profileEnv != nil {
-			lwsParams.WorkerEnvs = append(lwsParams.WorkerEnvs, *profileEnv)
-			lwsParams.LeaderEnvs = append(lwsParams.LeaderEnvs, *profileEnv)
+			lwsParams.WorkerEnvs = utils.MergeEnvVars(*profileEnv, lwsParams.WorkerEnvs)
+			lwsParams.LeaderEnvs = utils.MergeEnvVars(*profileEnv, lwsParams.LeaderEnvs)
 		}
 		if gpuResources != nil {
 			lwsParams.Resources = gpuResources
@@ -415,16 +415,16 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
 		deploymentParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
 		if nimCache.IsUniversalNIM() {
-			deploymentParams.Env = append(deploymentParams.Env, corev1.EnvVar{
+			deploymentParams.Env = utils.MergeEnvVars([]corev1.EnvVar{{
 				Name:  "NIM_MODEL_NAME",
 				Value: utils.DefaultModelStorePath,
-			})
+			}}, deploymentParams.Env)
 		}
 		// Setup volume mounts with model store
 		deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
 		deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
 		if profileEnv != nil {
-			deploymentParams.Env = append(deploymentParams.Env, *profileEnv)
+			deploymentParams.Env = utils.MergeEnvVars(*profileEnv, deploymentParams.Env)
 		}
 		// Auto assign GPU resources in case of the optimized profile
 		if gpuResources != nil {
