@@ -610,6 +610,18 @@ spec:
             kind: ConfigMap
         specDescriptors: []
         statusDescriptors: []
+      - name: nimbuilds.apps.nvidia.com
+        displayName: NIMBuild
+        kind: NIMBuild
+        version: v1alpha1
+        description: NIM Build
+        resources:
+          - version: v1
+            kind: Pod
+          - version: v1
+            kind: ConfigMap
+        specDescriptors: [ ]
+        statusDescriptors: [ ]
       - name: nemoguardrails.apps.nvidia.com
         displayName: NemoGuardrail
         kind: NemoGuardrail
@@ -903,6 +915,32 @@ spec:
                 - apps.nvidia.com
               resources:
                 - nimservices/status
+              verbs:
+                - get
+                - patch
+                - update
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nimbuilds
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nimbuilds/finalizers
+              verbs:
+                - update
+            - apiGroups:
+                - apps.nvidia.com
+              resources:
+                - nimbuilds/status
               verbs:
                 - get
                 - patch
