@@ -309,36 +309,36 @@ func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
 		mpiTimeout = n.Spec.MultiNode.MPI.MPIStartTimeout
 	}
 
-	env = append(env,
-		corev1.EnvVar{
+	env = utils.MergeEnvVars([]corev1.EnvVar{
+		{
 			Name:  "NIM_LEADER_ROLE",
 			Value: "1",
 		},
-		corev1.EnvVar{
+		{
 			Name:  "NIM_MPI_ALLOW_RUN_AS_ROOT",
 			Value: "0",
 		},
-		corev1.EnvVar{
+		{
 			Name:  "OMPI_MCA_orte_keep_fqdn_hostnames",
 			Value: "true",
 		},
-		corev1.EnvVar{
+		{
 			Name:  "OMPI_MCA_plm_rsh_args",
 			Value: "-o ConnectionAttempts=20",
 		},
-		corev1.EnvVar{
+		{
 			Name:  "NIM_NUM_COMPUTE_NODES",
 			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
 		},
-		corev1.EnvVar{
+		{
 			Name:  "GPUS_PER_NODE",
 			Value: fmt.Sprintf("%d", n.Spec.MultiNode.GPUSPerPod),
 		},
-		corev1.EnvVar{
+		{
 			Name:  "CLUSTER_START_TIMEOUT",
 			Value: fmt.Sprintf("%d", mpiTimeout),
 		},
-		corev1.EnvVar{
+		{
 			Name: "CLUSTER_SIZE",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -346,7 +346,7 @@ func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
 				},
 			},
 		},
-		corev1.EnvVar{
+		{
 			Name: "GROUP_INDEX",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -354,26 +354,26 @@ func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
 				},
 			},
 		},
-	)
+	}, env)
 	return env
 }
 
 func (n *NIMService) GetLWSWorkerEnv() []corev1.EnvVar {
 	env := n.GetEnv()
-	env = append(env,
-		corev1.EnvVar{
+	env = utils.MergeEnvVars([]corev1.EnvVar{
+		{
 			Name:  "NIM_LEADER_ROLE",
 			Value: "0",
 		},
-		corev1.EnvVar{
+		{
 			Name:  "NIM_MPI_ALLOW_RUN_AS_ROOT",
 			Value: "0",
 		},
-		corev1.EnvVar{
+		{
 			Name:  "NIM_NUM_COMPUTE_NODES",
 			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
 		},
-		corev1.EnvVar{
+		{
 			Name: "LEADER_NAME",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -381,7 +381,7 @@ func (n *NIMService) GetLWSWorkerEnv() []corev1.EnvVar {
 				},
 			},
 		},
-		corev1.EnvVar{
+		{
 			Name: "NAMESPACE",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -389,7 +389,7 @@ func (n *NIMService) GetLWSWorkerEnv() []corev1.EnvVar {
 				},
 			},
 		},
-		corev1.EnvVar{
+		{
 			Name: "LWS_NAME",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -397,7 +397,7 @@ func (n *NIMService) GetLWSWorkerEnv() []corev1.EnvVar {
 				},
 			},
 		},
-	)
+	}, env)
 	return env
 }
 

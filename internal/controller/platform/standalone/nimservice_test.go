@@ -1556,6 +1556,345 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(customEnv).NotTo(BeNil(), "Custom environment variables should still be present")
 			Expect(customEnv.Value).To(Equal("custom-value"))
 		})
+
+		It("should not add NIM_MODEL_NAME environment variable for multi-node non-Universal NIM deployment", func() {
+			// Create a non-Universal NIM NIMCache
+			regularNimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-multinode-regular-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller: "test-container",
+							PullSecret:  "my-secret",
+							// No ModelEndpoint, so it's not Universal NIM
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create:       ptr.To[bool](true),
+							StorageClass: "standard",
+							Size:         "1Gi",
+							SubPath:      "subPath",
+						},
+					},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusReady,
+					PVC:   "test-multinode-regular-nimcache-pvc",
+					Profiles: []appsv1alpha1.NIMProfile{{
+						Name:   "test-profile",
+						Config: map[string]string{"tp": "4"}},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), regularNimCache)).To(Succeed())
+
+			// Create PVC for the regular NIMCache
+			regularPVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-multinode-regular-nimcache-pvc",
+					Namespace: "default",
+				},
+			}
+			Expect(client.Create(context.TODO(), regularPVC)).To(Succeed())
+
+			// Create a multi-node NIMService instance
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-multinode-regular-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nim-llm",
+						Tag:         "v0.1.0",
+						PullPolicy:  "IfNotPresent",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					Storage: appsv1alpha1.NIMServiceStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Name:         "test-pvc",
+							StorageClass: "standard",
+							Size:         "1Gi",
+							Create:       ptr.To[bool](true),
+						},
+						NIMCache: appsv1alpha1.NIMCacheVolSpec{
+							Name: "test-multinode-regular-nimcache",
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123)},
+					},
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						BackendType: appsv1alpha1.NIMBackendTypeLWS,
+						Size:        2,
+						GPUSPerPod:  2,
+					},
+				},
+			}
+
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// LeaderWorkerSet should be created instead of Deployment
+			lws := &lwsv1.LeaderWorkerSet{}
+			lwsNamespacedName := types.NamespacedName{Name: testNimService.GetLWSName(), Namespace: testNimService.Namespace}
+			err = client.Get(context.TODO(), lwsNamespacedName, lws)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify that NIM_MODEL_NAME environment variable is NOT added to leader and worker containers
+			leaderContainer := lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0]
+			Expect(leaderContainer.Env).NotTo(ContainElement(corev1.EnvVar{Name: "NIM_MODEL_NAME"}), "NIM_MODEL_NAME environment variable should not be present in leader container for multi-node non-Universal NIM")
+
+			workerContainer := lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers[0]
+			Expect(workerContainer.Env).NotTo(ContainElement(corev1.EnvVar{Name: "NIM_MODEL_NAME"}), "NIM_MODEL_NAME environment variable should not be present in worker container for multi-node non-Universal NIM")
+		})
+
+		It("should respect user-provided NIM_MODEL_NAME environment variable over default for Universal NIM", func() {
+			// Create a Universal NIM NIMCache
+			modelEndpoint := "https://api.ngc.nvidia.com/v2/models/nvidia/nim-llama2-7b/versions/1q.0.0"
+			universalNimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-custom-universal-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller:   "test-container",
+							PullSecret:    "my-secret",
+							ModelEndpoint: &modelEndpoint,
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create:       ptr.To[bool](true),
+							StorageClass: "standard",
+							Size:         "1Gi",
+							SubPath:      "subPath",
+						},
+					},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusReady,
+					PVC:   "test-custom-universal-nimcache-pvc",
+					Profiles: []appsv1alpha1.NIMProfile{{
+						Name:   "test-profile",
+						Config: map[string]string{"tp": "4"}},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), universalNimCache)).To(Succeed())
+
+			// Create PVC for the Universal NIMCache
+			universalPVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-custom-universal-nimcache-pvc",
+					Namespace: "default",
+				},
+			}
+			Expect(client.Create(context.TODO(), universalPVC)).To(Succeed())
+
+			// Create a new NIMService instance with custom NIM_MODEL_NAME
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-custom-universal-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Env: []corev1.EnvVar{
+						{
+							Name:  "NIM_MODEL_NAME",
+							Value: "/custom-model-path",
+						},
+						{
+							Name:  "CUSTOM_ENV",
+							Value: "custom-value",
+						},
+					},
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nim-llm",
+						Tag:         "v0.1.0",
+						PullPolicy:  "IfNotPresent",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					Storage: appsv1alpha1.NIMServiceStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Name:         "test-pvc",
+							StorageClass: "standard",
+							Size:         "1Gi",
+							Create:       ptr.To[bool](true),
+						},
+						NIMCache: appsv1alpha1.NIMCacheVolSpec{
+							Name: "test-custom-universal-nimcache",
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123)},
+					},
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Deployment should be created
+			deployment := &appsv1.Deployment{}
+			err = client.Get(context.TODO(), namespacedName, deployment)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify that user-provided NIM_MODEL_NAME takes precedence over default
+			container := deployment.Spec.Template.Spec.Containers[0]
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: "/custom-model-path",
+			}), "User-provided NIM_MODEL_NAME environment variable should take precedence over default")
+
+			// Verify that other user-provided environment variables are still present
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "CUSTOM_ENV",
+				Value: "custom-value",
+			}), "Other user-provided environment variables should be present")
+
+			// Verify that the default value is NOT present
+			Expect(container.Env).NotTo(ContainElement(corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: "/model-store",
+			}), "Default NIM_MODEL_NAME value should not be present when user provides custom value")
+		})
+
+		It("should respect user-provided NIM_MODEL_NAME environment variable in multi-node Universal NIM deployment", func() {
+			// Create a Universal NIM NIMCache
+			modelEndpoint := "https://api.ngc.nvidia.com/v2/models/nvidia/nim-llama2-7b/versions/1.0.0"
+			universalNimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-custom-multinode-universal-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller:   "test-container",
+							PullSecret:    "my-secret",
+							ModelEndpoint: &modelEndpoint,
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create:       ptr.To[bool](true),
+							StorageClass: "standard",
+							Size:         "1Gi",
+							SubPath:      "subPath",
+						},
+					},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusReady,
+					PVC:   "test-custom-multinode-universal-nimcache-pvc",
+					Profiles: []appsv1alpha1.NIMProfile{{
+						Name:   "test-profile",
+						Config: map[string]string{"tp": "4"}},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), universalNimCache)).To(Succeed())
+
+			// Create PVC for the Universal NIMCache
+			universalPVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-custom-multinode-universal-nimcache-pvc",
+					Namespace: "default",
+				},
+			}
+			Expect(client.Create(context.TODO(), universalPVC)).To(Succeed())
+
+			// Create a multi-node NIMService instance with custom NIM_MODEL_NAME
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-custom-multinode-universal-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Env: []corev1.EnvVar{
+						{
+							Name:  "NIM_MODEL_NAME",
+							Value: "/custom-multinode-model-path",
+						},
+					},
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nim-llm",
+						Tag:         "v0.1.0",
+						PullPolicy:  "IfNotPresent",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					Storage: appsv1alpha1.NIMServiceStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Name:         "test-pvc",
+							StorageClass: "standard",
+							Size:         "1Gi",
+							Create:       ptr.To[bool](true),
+						},
+						NIMCache: appsv1alpha1.NIMCacheVolSpec{
+							Name: "test-custom-multinode-universal-nimcache",
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123)},
+					},
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						BackendType: appsv1alpha1.NIMBackendTypeLWS,
+						Size:        2,
+						GPUSPerPod:  2,
+					},
+				},
+			}
+
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// LeaderWorkerSet should be created instead of Deployment
+			lws := &lwsv1.LeaderWorkerSet{}
+			lwsNamespacedName := types.NamespacedName{Name: testNimService.GetLWSName(), Namespace: testNimService.Namespace}
+			err = client.Get(context.TODO(), lwsNamespacedName, lws)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify that user-provided NIM_MODEL_NAME takes precedence in both leader and worker containers
+			leaderContainer := lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0]
+			Expect(leaderContainer.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: "/custom-multinode-model-path",
+			}), "User-provided NIM_MODEL_NAME environment variable should take precedence in leader container")
+
+			workerContainer := lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers[0]
+			Expect(workerContainer.Env).To(ContainElement(corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: "/custom-multinode-model-path",
+			}), "User-provided NIM_MODEL_NAME environment variable should take precedence in worker container")
+
+			// Verify that the default value is NOT present in either container
+			Expect(leaderContainer.Env).NotTo(ContainElement(corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: "/model-store",
+			}), "Default NIM_MODEL_NAME value should not be present in leader container when user provides custom value")
+
+			Expect(workerContainer.Env).NotTo(ContainElement(corev1.EnvVar{
+				Name:  "NIM_MODEL_NAME",
+				Value: "/model-store",
+			}), "Default NIM_MODEL_NAME value should not be present in worker container when user provides custom value")
+		})
 	})
 
 	Describe("getNIMModelEndpoints", func() {
