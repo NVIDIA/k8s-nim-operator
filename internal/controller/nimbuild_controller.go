@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -498,18 +499,21 @@ func (r *NIMBuildReconciler) reconcileEngineBuildPodStatus(ctx context.Context, 
 
 func (r *NIMBuildReconciler) updateNIMBuildStatus(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild) error {
 	logger := r.GetLogger()
-	obj := &appsv1alpha1.NIMBuild{}
-	errGet := r.Get(ctx, types.NamespacedName{Name: nimBuild.Name, Namespace: nimBuild.GetNamespace()}, obj)
-	if errGet != nil {
-		logger.Error(errGet, "error getting NIMBuild", "name", nimBuild.Name)
-		return errGet
-	}
-	obj.Status = nimBuild.Status
-	if err := r.Status().Update(ctx, obj); err != nil {
-		logger.Error(err, "Failed to update status", "NIMBuild", nimBuild.Name)
-		return err
-	}
-	return nil
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		obj := &appsv1alpha1.NIMBuild{}
+		errGet := r.Get(ctx, types.NamespacedName{Name: nimBuild.Name, Namespace: nimBuild.GetNamespace()}, obj)
+		if errGet != nil {
+			logger.Error(errGet, "error getting NIMBuild", "name", nimBuild.Name)
+			return errGet
+		}
+		obj.Status = nimBuild.Status
+		if err := r.Status().Update(ctx, obj); err != nil {
+			logger.Error(err, "Failed to update status", "NIMBuild", nimBuild.Name)
+			return err
+		}
+		return nil
+	})
 }
 
 func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType, inputNimProfile appsv1alpha1.NIMProfile) (*corev1.Pod, error) {
