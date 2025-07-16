@@ -2352,13 +2352,6 @@ spec:
                                     mode of the PVC
                                   type: string
                               type: object
-                              x-kubernetes-validations:
-                              - message: size is required for pvc creation
-                                rule: '!has(self.create) || !self.create || (has(self.size)
-                                  && self.size != "")'
-                              - message: volumeAccessMode is required for pvc creation
-                                rule: '!has(self.create) || !self.create || (has(self.volumeAccessMode)
-                                  && self.volumeAccessMode != "")'
                             readOnly:
                               description: ReadOnly mode indicates if the volume should
                                 be mounted as read-only
