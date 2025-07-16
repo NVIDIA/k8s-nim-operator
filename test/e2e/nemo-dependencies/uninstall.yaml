@@ -57,3 +57,15 @@
       vars:
         namespace: "{{ installation_namespace }}"
       when: uninstall.jupyter == true
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  tasks:
+    - name: Uninstall RAG Dependencies
+      include_role:
+        name: rag
+        tasks_from: uninstall.yaml  
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: uninstall.rag == true
