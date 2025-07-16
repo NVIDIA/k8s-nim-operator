@@ -472,13 +472,6 @@ spec:
                           the PVC
                         type: string
                     type: object
-                    x-kubernetes-validations:
-                    - message: size is required for pvc creation
-                      rule: '!has(self.create) || !self.create || (has(self.size)
-                        && self.size != "")'
-                    - message: volumeAccessMode is required for pvc creation
-                      rule: '!has(self.create) || !self.create || (has(self.volumeAccessMode)
-                        && self.volumeAccessMode != "")'
                 type: object
               tolerations:
                 description: Tolerations for running the job to cache the NIM model
