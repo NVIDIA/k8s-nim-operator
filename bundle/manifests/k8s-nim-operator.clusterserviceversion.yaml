@@ -150,17 +150,17 @@ metadata:
           "apiVersion": "apps.nvidia.com/v1alpha1",
           "kind": "NIMBuild",
           "metadata": {
-            "name": "nim-build-sample",
+            "name": "meta-llama3-8b-instruct",
             "namespace": "nim-service"
           },
           "spec": {
             "nimCache": {
-              "name": "meta-llama3-2-3b-instruct",
-              "profile": "ac34857f8dcbd174ad524974248f2faf271bd2a0355643b2cf1490d0fe7787c2"
+              "name": "meta-llama3-8b-instruct",
+              "profile": "7cc8597690a35aba19a3636f35e7f1c7e7dbc005fe88ce9394cad4a4adeed414"
             },
             "image": {
-              "repository": "nvcr.io/nim/meta/llama-3.2-3b-instruct",
-              "tag": "1.8.5",
+              "repository": "nvcr.io/nim/meta/llama-3.1-8b-instruct",
+              "tag": "1.3.3",
               "pullSecrets": [
                "ngc-secret"
               ]
