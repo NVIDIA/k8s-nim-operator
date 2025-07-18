@@ -1,0 +1,113 @@
+---
+{{- if .Values.operator.admissionController.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-nim-operator.fullname" . }}-webhook-service
+  namespace: {{ .Release.Namespace }}
+  labels:
+    control-plane: controller-manager
+    {{- include "k8s-nim-operator.selectorLabels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 9443
+  selector:
+    control-plane: controller-manager
+    app.kubernetes.io/name: {{ include "k8s-nim-operator.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+---
+{{- if and .Values.operator.admissionController.enabled .Values.operator.admissionController.useCertManager }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "k8s-nim-operator.fullname" . }}-serving-cert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: k8s-nim-operator
+    app.kubernetes.io/managed-by: helm
+spec:
+  dnsNames:
+    - {{ include "k8s-nim-operator.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc
+    - {{ include "k8s-nim-operator.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: {{ include "k8s-nim-operator.fullname" . }}-selfsigned-issuer
+  secretName: {{ include "k8s-nim-operator.fullname" . }}-webhook-server-cert
+{{- end }}
+---
+{{- if and .Values.operator.admissionController.enabled .Values.operator.admissionController.useCertManager }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "k8s-nim-operator.fullname" . }}-selfsigned-issuer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: k8s-nim-operator
+    app.kubernetes.io/managed-by: helm
+spec:
+  selfSigned: {}
+{{- end}}
+---
+{{- if .Values.operator.admissionController.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "k8s-nim-operator.fullname" . }}-validating-webhook-configuration
+  {{- if .Values.operator.admissionController.useCertManager }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "k8s-nim-operator.fullname" . }}-serving-cert
+  {{- end }}
+  labels:
+    app.kubernetes.io/name: k8s-nim-operator
+    app.kubernetes.io/managed-by: helm
+webhooks:
+  - name: vnimcache-v1alpha1.kb.io
+    admissionReviewVersions: ["v1"]
+    clientConfig:
+      service:
+        name: {{ include "k8s-nim-operator.fullname" . }}-webhook-service
+        namespace: {{ .Release.Namespace }}
+        path: /validate-apps-nvidia-com-v1alpha1-nimcache
+      {{- if not .Values.operator.admissionController.useCertManager }}
+      caBundle: {{ .Values.operator.admissionController.certificate.caCrt | b64enc | quote }}
+      {{- end }}
+    failurePolicy: Fail
+    rules:
+      - apiGroups: ["apps.nvidia.com"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["nimcaches"]
+    sideEffects: None
+  - name: vnimservice-v1alpha1.kb.io
+    admissionReviewVersions: ["v1"]
+    clientConfig:
+      service:
+        name: {{ include "k8s-nim-operator.fullname" . }}-webhook-service
+        namespace: {{ .Release.Namespace }}
+        path: /validate-apps-nvidia-com-v1alpha1-nimservice
+      {{- if not .Values.operator.admissionController.useCertManager }}
+      caBundle: {{ .Values.operator.admissionController.certificate.caCrt | b64enc | quote }}
+      {{- end }}
+    failurePolicy: Fail
+    rules:
+      - apiGroups: ["apps.nvidia.com"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["nimservices"]
+    sideEffects: None
+{{- end }} 
+---
+{{- if and .Values.operator.admissionController.enabled (not .Values.operator.admissionController.useCertManager) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webhook-server-cert
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  tls.crt: {{ .Values.operator.admissionController.certificate.tlsCrt | b64enc | quote }}
+  tls.key: {{ .Values.operator.admissionController.certificate.tlsKey | b64enc | quote }}
+{{- end }}
