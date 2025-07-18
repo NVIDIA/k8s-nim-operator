@@ -4,7 +4,13 @@ kind: NIMService
 metadata:
   name: deepseek-r1
 spec:
+  annotations:
+    k8s.v1.cni.cncf.io/networks: example-ipoibnetwork   # configured by NVIDIA Network Operator
   env:
+  - name: NCCL_DEBUG
+    value: "WARN"
+  - name: "NCCL_NET"
+    value: "Socket"
   - name: NIM_USE_SGLANG
     value: "1"
   - name: NIM_MULTI_NODE
@@ -28,7 +34,7 @@ spec:
   - name: GLOO_SOCKET_IFNAME
     value: eth0
   - name: NCCL_SOCKET_IFNAME
-    value: eth0
+    value: net1
   - name: NIM_TRUST_CUSTOM_CODE
     value: "1"
   - name: NIM_NODE_RANK
@@ -69,8 +75,10 @@ spec:
   resources:
     limits:
       nvidia.com/gpu: 8
+      rdma/rdma_shared_device_a: 1    # configured through NICClusterPolicy using NVIDIA Network Operator
     requests:
       nvidia.com/gpu: 8
+      rdma/rdma_shared_device_a: 1
   expose:
     service:
       type: ClusterIP
