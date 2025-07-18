@@ -828,18 +828,21 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 	// Update the NIMCache status with the details of the built profile
 	builtProfileName := getBuiltProfileName(manifest, nimBuild)
 	if builtProfileName != "" {
+		builtProfile := appsv1alpha1.NIMProfile{
+			Name:    builtProfileName,
+			Model:   manifest.GetProfileModel(builtProfileName),
+			Config:  manifest.GetProfileTags(builtProfileName),
+			Release: manifest.GetProfileRelease(builtProfileName),
+		}
+		nimBuild.Status.OutputProfile = builtProfile
+
 		presentOnNIMCache := isBuiltProfilePresentOnNIMCacheStatus(nimCache, builtProfileName)
 		// If built profile is not present on NIMCache status, add it
 		if !presentOnNIMCache {
 			tagsMap := manifest.GetProfileTags(builtProfileName)
 			tagsMap["input_profile"] = nimBuild.Status.InputProfile.Name
 			logger.Info("Adding profile to NIMCache status", "profileName", builtProfileName)
-			nimCache.Status.Profiles = append(nimCache.Status.Profiles, appsv1alpha1.NIMProfile{
-				Name:    builtProfileName,
-				Model:   manifest.GetProfileModel(builtProfileName),
-				Config:  manifest.GetProfileTags(builtProfileName),
-				Release: manifest.GetProfileRelease(builtProfileName),
-			})
+			nimCache.Status.Profiles = append(nimCache.Status.Profiles, builtProfile)
 		}
 	}
 
