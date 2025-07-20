@@ -28,6 +28,7 @@ const (
 // +genclient
 // +k8s:openapi-gen=true
 // +kubebuilder:resource:categories="prometheus-operator",shortName="smon"
+// +kubebuilder:subresource:status
 
 // The `ServiceMonitor` custom resource definition (CRD) defines how `Prometheus` and `PrometheusAgent` can scrape metrics from a group of services.
 // Among other things, it allows to specify:
@@ -43,6 +44,14 @@ type ServiceMonitor struct {
 	// Specification of desired Service selection for target discovery by
 	// Prometheus.
 	Spec ServiceMonitorSpec `json:"spec"`
+	// This Status subresource is under active development and is updated only when the
+	// "StatusForConfigurationResources" feature gate is enabled.
+	//
+	// Most recent observed status of the ServiceMonitor. Read-only.
+	// More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Status ConfigResourceStatus `json:"status,omitempty"`
 }
 
 // DeepCopyObject implements the runtime.Object interface.
@@ -83,6 +92,17 @@ type ServiceMonitorSpec struct {
 
 	// Label selector to select the Kubernetes `Endpoints` objects to scrape metrics from.
 	Selector metav1.LabelSelector `json:"selector"`
+
+	// Mechanism used to select the endpoints to scrape.
+	// By default, the selection process relies on relabel configurations to filter the discovered targets.
+	// Alternatively, you can opt in for role selectors, which may offer better efficiency in large clusters.
+	// Which strategy is best for your use case needs to be carefully evaluated.
+	//
+	// It requires Prometheus >= v2.17.0.
+	//
+	// +optional
+	SelectorMechanism *SelectorMechanism `json:"selectorMechanism,omitempty"`
+
 	// `namespaceSelector` defines in which namespace(s) Prometheus should discover the services.
 	// By default, the services are discovered in the same namespace as the `ServiceMonitor` object but it is possible to select pods across different/all namespaces.
 	NamespaceSelector NamespaceSelector `json:"namespaceSelector,omitempty"`
@@ -103,6 +123,12 @@ type ServiceMonitorSpec struct {
 	// +listType=set
 	// +optional
 	ScrapeProtocols []ScrapeProtocol `json:"scrapeProtocols,omitempty"`
+
+	// The protocol to use if a scrape returns blank, unparseable, or otherwise invalid Content-Type.
+	//
+	// It requires Prometheus >= v3.0.0.
+	// +optional
+	FallbackScrapeProtocol *ScrapeProtocol `json:"fallbackScrapeProtocol,omitempty"`
 
 	// `targetLimit` defines a limit on the number of scraped targets that will
 	// be accepted.
@@ -128,6 +154,9 @@ type ServiceMonitorSpec struct {
 	//
 	// +optional
 	LabelValueLengthLimit *uint64 `json:"labelValueLengthLimit,omitempty"`
+
+	NativeHistogramConfig `json:",inline"`
+
 	// Per-scrape limit on the number of targets dropped by relabeling
 	// that will be kept in memory. 0 means no limit.
 	//
@@ -166,7 +195,7 @@ type ServiceMonitorList struct {
 	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of ServiceMonitors
-	Items []*ServiceMonitor `json:"items"`
+	Items []ServiceMonitor `json:"items"`
 }
 
 // DeepCopyObject implements the runtime.Object interface.
