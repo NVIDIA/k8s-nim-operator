@@ -7,14 +7,6 @@ spec:
   env:
   - name: NIM_USE_SGLANG
     value: "1"
-  - name: NIM_MULTI_NODE
-    value: "1"
-  - name: NIM_TENSOR_PARALLEL_SIZE
-    value: '8'
-  - name: NIM_PIPELINE_PARALLEL_SIZE
-    value: '2'
-  - name: NGC_HOME
-    value: /model-store/ngc/hub
   - name: HF_HOME
     value: /model-store/huggingface/hub
   - name: NUMBA_CACHE_DIR
@@ -31,10 +23,6 @@ spec:
     value: eth0
   - name: NIM_TRUST_CUSTOM_CODE
     value: "1"
-  - name: NIM_NODE_RANK
-    valueFrom:
-      fieldRef:
-        fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
   readinessProbe:
     probe:
       failureThreshold: 3

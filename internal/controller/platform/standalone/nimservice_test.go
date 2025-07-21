@@ -25,6 +25,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -1012,6 +1013,225 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(Equal(true))
 			Expect(msg).To(Equal(fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name)))
+		})
+	})
+
+	Describe("LWS environment variable creation for multi-node inferencing NIMService", func() {
+		It("should create environment variables for the LWS", func() {
+			nimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
+					},
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Size:       2,
+						GPUSPerPod: 8,
+					},
+				},
+			}
+
+			leaderEnv := utils.SortKeys(nimService.GetLWSLeaderEnv())
+			workerEnv := utils.SortKeys(nimService.GetLWSWorkerEnv())
+
+			Expect(reflect.DeepEqual(leaderEnv, []corev1.EnvVar{
+				{
+					Name:  "NIM_CACHE_PATH",
+					Value: "/model-store",
+				},
+				{
+					Name: "NGC_API_KEY",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "",
+							},
+							Key: "NGC_API_KEY",
+						},
+					},
+				},
+				{
+					Name:  "OUTLINES_CACHE_DIR",
+					Value: "/tmp/outlines",
+				},
+				{
+					Name:  "NIM_SERVER_PORT",
+					Value: "8123",
+				},
+				{
+					Name:  "NIM_HTTP_API_PORT",
+					Value: "8123",
+				},
+				{
+					Name:  "NIM_JSONL_LOGGING",
+					Value: "1",
+				},
+				{
+					Name:  "NIM_LOG_LEVEL",
+					Value: "INFO",
+				},
+				{
+					Name:  "NIM_MPI_ALLOW_RUN_AS_ROOT",
+					Value: "0",
+				},
+				{
+					Name:  "NIM_NUM_COMPUTE_NODES",
+					Value: "2",
+				},
+				{
+					Name:  "NIM_MULTI_NODE",
+					Value: "1",
+				},
+				{
+					Name:  "NIM_TENSOR_PARALLEL_SIZE",
+					Value: "8",
+				},
+				{
+					Name:  "NIM_PIPELINE_PARALLEL_SIZE",
+					Value: "2",
+				},
+				{
+					Name: "NIM_NODE_RANK",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']",
+						},
+					},
+				},
+				{
+					Name:  "NIM_LEADER_ROLE",
+					Value: "1",
+				},
+				{
+					Name:  "OMPI_MCA_orte_keep_fqdn_hostnames",
+					Value: "true",
+				},
+				{
+					Name:  "OMPI_MCA_plm_rsh_args",
+					Value: "-o ConnectionAttempts=20",
+				},
+				{
+					Name:  "GPUS_PER_NODE",
+					Value: "8",
+				},
+				{
+					Name:  "CLUSTER_START_TIMEOUT",
+					Value: "300",
+				},
+				{
+					Name: "CLUSTER_SIZE",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.annotations['leaderworkerset.sigs.k8s.io/size']",
+						},
+					},
+				},
+				{
+					Name: "GROUP_INDEX",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.labels['leaderworkerset.sigs.k8s.io/group-index']",
+						},
+					},
+				},
+			})).To(BeTrue())
+
+			Expect(reflect.DeepEqual(workerEnv, []corev1.EnvVar{
+				{
+					Name:  "NIM_CACHE_PATH",
+					Value: "/model-store",
+				},
+				{
+					Name: "NGC_API_KEY",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "",
+							},
+							Key: "NGC_API_KEY",
+						},
+					},
+				},
+				{
+					Name:  "OUTLINES_CACHE_DIR",
+					Value: "/tmp/outlines",
+				},
+				{
+					Name:  "NIM_SERVER_PORT",
+					Value: "8123",
+				},
+				{
+					Name:  "NIM_HTTP_API_PORT",
+					Value: "8123",
+				},
+				{
+					Name:  "NIM_JSONL_LOGGING",
+					Value: "1",
+				},
+				{
+					Name:  "NIM_LOG_LEVEL",
+					Value: "INFO",
+				},
+				{
+					Name:  "NIM_MPI_ALLOW_RUN_AS_ROOT",
+					Value: "0",
+				},
+				{
+					Name:  "NIM_NUM_COMPUTE_NODES",
+					Value: "2",
+				},
+				{
+					Name:  "NIM_MULTI_NODE",
+					Value: "1",
+				},
+				{
+					Name:  "NIM_TENSOR_PARALLEL_SIZE",
+					Value: "8",
+				},
+				{
+					Name:  "NIM_PIPELINE_PARALLEL_SIZE",
+					Value: "2",
+				},
+				{
+					Name: "NIM_NODE_RANK",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']",
+						},
+					},
+				},
+				{
+					Name:  "NIM_LEADER_ROLE",
+					Value: "0",
+				},
+				{
+					Name: "LEADER_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.annotations['leaderworkerset.sigs.k8s.io/leader-name']",
+						},
+					},
+				},
+				{
+					Name: "NAMESPACE",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.namespace",
+						},
+					},
+				},
+				{
+					Name: "LWS_NAME",
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.labels['leaderworkerset.sigs.k8s.io/name']",
+						},
+					},
+				},
+			})).To(BeTrue())
 		})
 	})
 
