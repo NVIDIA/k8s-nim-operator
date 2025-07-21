@@ -301,8 +301,44 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 	return envVars
 }
 
-func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
+func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 	env := n.GetEnv()
+
+	env = utils.MergeEnvVars([]corev1.EnvVar{
+		{
+			Name:  "NIM_MPI_ALLOW_RUN_AS_ROOT",
+			Value: "0",
+		},
+		{
+			Name:  "NIM_NUM_COMPUTE_NODES",
+			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
+		},
+		{
+			Name:  "NIM_MULTI_NODE",
+			Value: "1",
+		},
+		{
+			Name:  "NIM_TENSOR_PARALLEL_SIZE",
+			Value: fmt.Sprintf("%d", n.Spec.MultiNode.GPUSPerPod),
+		},
+		{
+			Name:  "NIM_PIPELINE_PARALLEL_SIZE",
+			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
+		},
+		{
+			Name: "NIM_NODE_RANK",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']",
+				},
+			},
+		},
+	}, env)
+	return env
+}
+
+func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
+	env := n.getLWSCommonEnv()
 
 	mpiTimeout := DefaultMPITimeout
 	if n.Spec.MultiNode.MPI != nil && n.Spec.MultiNode.MPI.MPIStartTimeout != 0 {
@@ -315,20 +351,12 @@ func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
 			Value: "1",
 		},
 		{
-			Name:  "NIM_MPI_ALLOW_RUN_AS_ROOT",
-			Value: "0",
-		},
-		{
 			Name:  "OMPI_MCA_orte_keep_fqdn_hostnames",
 			Value: "true",
 		},
 		{
 			Name:  "OMPI_MCA_plm_rsh_args",
 			Value: "-o ConnectionAttempts=20",
-		},
-		{
-			Name:  "NIM_NUM_COMPUTE_NODES",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
 		},
 		{
 			Name:  "GPUS_PER_NODE",
@@ -359,20 +387,13 @@ func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
 }
 
 func (n *NIMService) GetLWSWorkerEnv() []corev1.EnvVar {
-	env := n.GetEnv()
+	env := n.getLWSCommonEnv()
 	env = utils.MergeEnvVars([]corev1.EnvVar{
 		{
 			Name:  "NIM_LEADER_ROLE",
 			Value: "0",
 		},
-		{
-			Name:  "NIM_MPI_ALLOW_RUN_AS_ROOT",
-			Value: "0",
-		},
-		{
-			Name:  "NIM_NUM_COMPUTE_NODES",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
-		},
+
 		{
 			Name: "LEADER_NAME",
 			ValueFrom: &corev1.EnvVarSource{
