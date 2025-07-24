@@ -1322,6 +1322,18 @@ spec:
               - delete
               - patch
               - update
+            - apiGroups:
+              - serving.kserve.io
+              resources:
+              - inferenceservices
+              verbs:
+              - create
+              - delete
+              - get
+              - list
+              - patch
+              - update
+              - watch
       deployments:
         - name: k8s-nim-operator
           spec:
