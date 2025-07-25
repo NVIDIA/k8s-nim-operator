@@ -44,6 +44,9 @@ const (
 
 	// NvidiaAnnotationParentSpecHashKey indicates annotation name for applied hash by the operator.
 	NvidiaAnnotationParentSpecHashKey = "nvidia.com/parent-spec-hash"
+
+	// DefaultModelStorePath is the default path for model store.
+	DefaultModelStorePath = "/model-store"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix

@@ -1158,7 +1158,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 				Name: hfDataSource.GetPullSecret(),
 			},
 		}
-	} else if nimCache.Spec.Source.NGC != nil {
+	case nimCache.Spec.Source.NGC != nil:
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
 				Name:    NIMCacheContainerName,
