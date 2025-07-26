@@ -235,7 +235,7 @@ rules:
   - patch
   - update
 - apiGroups:
-    - apps.nvidia.com
+      - apps.nvidia.com
   resources:
     - nimbuilds
   verbs:
@@ -559,6 +559,28 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - leaderworkerset.x-k8s.io
+  resources:
+  - leaderworkersets
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+  - patch
+  - update
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
