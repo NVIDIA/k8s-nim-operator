@@ -645,7 +645,7 @@ func (n *NIMService) GetDefaultStartupProbe() *corev1.Probe {
 		TimeoutSeconds:      1,
 		PeriodSeconds:       10,
 		SuccessThreshold:    1,
-		FailureThreshold:    30,
+		FailureThreshold:    120,
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/v1/health/ready",
