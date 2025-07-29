@@ -5,15 +5,13 @@ metadata:
   namespace: nemo
 spec:
   evaluationImages:
-    bigcodeEvalHarness: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-bigcode:0.12.21"
-    lmEvalHarness: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-lm-eval-harness:0.12.21"
-    similarityMetrics: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-custom-eval:0.12.21"
-    llmAsJudge: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.21"
-    mtBench: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-llm-as-a-judge:0.12.21"
-    retriever: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-retriever:0.12.21"
-    rag: "nvcr.io/nvidia/nemo-microservices/eval-tool-benchmark-rag:0.12.21"
-    bfcl: "nvcr.io/nvidia/nemo-microservices/eval-factory-benchmark-bfcl:25.6.1"
-    agenticEval: "nvcr.io/nvidia/nemo-microservices/eval-factory-benchmark-agentic-eval:25.6.1"
+    bigcodeEvalHarness: "nvcr.io/nvidia/eval-factory/bigcode-evaluation-harness:25.06.2"
+    lmEvalHarness: "nvcr.io/nvidia/eval-factory/lm-evaluation-harness:25.06.2"
+    retriever: "nvcr.io/nvidia/eval-factory/rag_retriever_eval:25.06.2"
+    rag: "nvcr.io/nvidia/eval-factory/rag_retriever_eval:25.06.2"
+    bfcl: "nvcr.io/nvidia/eval-factory/bfcl:25.06.2"
+    agenticEval: "nvcr.io/nvidia/eval-factory/agentic_eval:25.06.2"
+    safetyHarness: "nvcr.io/nvidia/eval-factory/safety-harness:25.06.1"
   image:
     repository: nvcr.io/nvidia/nemo-microservices/evaluator
     tag: "25.08"
