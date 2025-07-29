@@ -130,6 +130,7 @@ type EvaluationImages struct {
 	Rag                string `json:"rag,omitempty"`
 	BFCL               string `json:"bfcl,omitempty"`
 	AgenticEval        string `json:"agenticEval,omitempty"`
+	SafetyHarness      string `json:"safetyHarness,omitempty"`
 }
 
 // NemoEvaluatorStatus defines the observed state of NemoEvaluator.
@@ -200,6 +201,10 @@ func (ei EvaluationImages) GetEvaluationImageEnv() []corev1.EnvVar {
 		{
 			Name:  "AGENTIC_EVAL",
 			Value: ei.AgenticEval,
+		},
+		{
+			Name:  "SAFETY_HARNESS",
+			Value: ei.SafetyHarness,
 		},
 	}
 }
