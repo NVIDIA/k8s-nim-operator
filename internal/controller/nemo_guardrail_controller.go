@@ -132,14 +132,14 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	} else {
 		// The instance is being deleted
-		if controllerutil.ContainsFinalizer(NemoGuardrail, NemoGuardrailFinalizer) {
-			// Perform platform specific cleanup of resources
-			if err := r.cleanupNemoGuardrail(ctx, NemoGuardrail); err != nil {
-				r.GetEventRecorder().Eventf(NemoGuardrail, corev1.EventTypeNormal, "Delete",
-					"NemoGuardrail %s in deleted", NemoGuardrail.Name)
-				return ctrl.Result{}, err
-			}
+		// Perform platform specific cleanup of resources
+		if err := r.cleanupNemoGuardrail(ctx, NemoGuardrail); err != nil {
+			r.GetEventRecorder().Eventf(NemoGuardrail, corev1.EventTypeNormal, "Delete",
+				"NemoGuardrail %s is being deleted", NemoGuardrail.Name)
+			return ctrl.Result{}, err
+		}
 
+		if controllerutil.ContainsFinalizer(NemoGuardrail, NemoGuardrailFinalizer) {
 			// Remove finalizer to allow for deletion
 			controllerutil.RemoveFinalizer(NemoGuardrail, NemoGuardrailFinalizer)
 			if err := r.Update(ctx, NemoGuardrail); err != nil {
@@ -147,8 +147,9 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					"NemoGuardrail %s finalizer removed", NemoGuardrail.Name)
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil
 		}
+		// return as the cr is being deleted and GC will cleanup owned objects
+		return ctrl.Result{}, nil
 	}
 
 	// Fetch container orchestrator type
