@@ -4,17 +4,17 @@ These CRs are designed to deploy NeMo microservices using the NIM Operator.
 
 ## Compatible NIM Operator Version
 
-- **NIM Operator v2.0.2**
+- **NIM Operator v2.0.1**
 
 > Using these CRs with any other version may lead to validation or runtime errors.
 
 ## Notes
 
-- The CR schema and fields in this version match the capabilities of NIM Operator v2.0.2.
+- The CR schema and fields in this version match the capabilities of NIM Operator v2.0.1.
 
 ## Upgrade Notes
 
-If upgrading from a previous NeMo service version (e.g., `25.08`) using the existing operator version:
+If upgrading from a previous NeMo service version (e.g., `25.06`) using the existing operator version:
 - Check for renamed or deprecated fields.
 - Review updated model config parameters.
 - Revalidate against the new CR using:
