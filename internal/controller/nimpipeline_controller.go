@@ -89,19 +89,20 @@ func (r *NIMPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	} else {
 		// The instance is being deleted
-		if controllerutil.ContainsFinalizer(nimPipeline, NIMPipelineFinalizer) {
-			// Perform cleanup of resources
-			if err := r.cleanupNIMPipeline(ctx, nimPipeline); err != nil {
-				return ctrl.Result{}, err
-			}
+		// Perform cleanup of resources
+		if err := r.cleanupNIMPipeline(ctx, nimPipeline); err != nil {
+			return ctrl.Result{}, err
+		}
 
+		if controllerutil.ContainsFinalizer(nimPipeline, NIMPipelineFinalizer) {
 			// Remove finalizer to allow for deletion
 			controllerutil.RemoveFinalizer(nimPipeline, NIMPipelineFinalizer)
 			if err := r.Update(ctx, nimPipeline); err != nil {
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil
 		}
+		// return as the cr is being deleted and GC will cleanup owned objects
+		return ctrl.Result{}, nil
 	}
 
 	// Handle nim-cache reconciliation

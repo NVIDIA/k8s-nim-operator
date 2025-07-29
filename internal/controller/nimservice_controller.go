@@ -133,14 +133,14 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	} else {
 		// The instance is being deleted
-		if controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
-			// Perform platform specific cleanup of resources
-			if err := r.Platform.Delete(ctx, r, nimService); err != nil {
-				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
-					"NIMService %s in deleted", nimService.Name)
-				return ctrl.Result{}, err
-			}
+		// Perform platform specific cleanup of resources
+		if err := r.Platform.Delete(ctx, r, nimService); err != nil {
+			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
+				"NIMService %s is being deleted", nimService.Name)
+			return ctrl.Result{}, err
+		}
 
+		if controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
 			// Remove finalizer to allow for deletion
 			controllerutil.RemoveFinalizer(nimService, NIMServiceFinalizer)
 			if err := r.Update(ctx, nimService); err != nil {
@@ -148,8 +148,9 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					"NIMService %s finalizer removed", nimService.Name)
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil
 		}
+		// return as the cr is being deleted and GC will cleanup owned objects
+		return ctrl.Result{}, nil
 	}
 
 	// Fetch container orchestrator type
