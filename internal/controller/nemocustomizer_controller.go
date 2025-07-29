@@ -147,14 +147,14 @@ func (r *NemoCustomizerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	} else {
 		// The instance is being deleted
-		if controllerutil.ContainsFinalizer(NemoCustomizer, NemoCustomizerFinalizer) {
-			// Perform platform specific cleanup of resources
-			if err := r.cleanupNemoCustomizer(ctx, NemoCustomizer); err != nil {
-				r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeNormal, "Delete",
-					"NemoCustomizer %s in deleted", NemoCustomizer.Name)
-				return ctrl.Result{}, err
-			}
+		// Perform platform specific cleanup of resources
+		if err := r.cleanupNemoCustomizer(ctx, NemoCustomizer); err != nil {
+			r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeNormal, "Delete",
+				"NemoCustomizer %s in being deleted", NemoCustomizer.Name)
+			return ctrl.Result{}, err
+		}
 
+		if controllerutil.ContainsFinalizer(NemoCustomizer, NemoCustomizerFinalizer) {
 			// Remove finalizer to allow for deletion
 			controllerutil.RemoveFinalizer(NemoCustomizer, NemoCustomizerFinalizer)
 			if err := r.Update(ctx, NemoCustomizer); err != nil {
@@ -162,8 +162,9 @@ func (r *NemoCustomizerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 					"NemoCustomizer %s finalizer removed", NemoCustomizer.Name)
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil
 		}
+		// return as the cr is being deleted and GC will cleanup owned objects
+		return ctrl.Result{}, nil
 	}
 
 	// Fetch container orchestrator type
