@@ -16,7 +16,7 @@ spec:
     agenticEval: "nvcr.io/nvidia/nemo-microservices/eval-factory-benchmark-agentic-eval:25.6.1"
   image:
     repository: nvcr.io/nvidia/nemo-microservices/evaluator
-    tag: "25.08"
+    tag: "25.06"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
