@@ -137,18 +137,18 @@ func (r *NIMBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	} else {
 		// The instance is being deleted
+		// Perform cleanup of resources
+		if err = r.cleanupNIMBuild(ctx, nimBuild); err != nil {
+			return ctrl.Result{}, err
+		}
 		if controllerutil.ContainsFinalizer(nimBuild, NIMBuildFinalizer) {
-			// Perform cleanup of resources
-			if err = r.cleanupNIMBuild(ctx, nimBuild); err != nil {
-				return ctrl.Result{}, err
-			}
-
 			// Remove finalizer to allow for deletion
 			controllerutil.RemoveFinalizer(nimBuild, NIMBuildFinalizer)
 			if err := r.Update(ctx, nimBuild); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
+		// return as the cr is being deleted and GC will cleanup owned objects
 		return ctrl.Result{}, nil
 	}
 
