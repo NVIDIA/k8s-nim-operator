@@ -48,7 +48,6 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimparser"
 	nimparserutils "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/utils"
@@ -86,7 +85,6 @@ type NIMCacheReconciler struct {
 	client.Client
 	scheme           *runtime.Scheme
 	log              logr.Logger
-	Platform         platform.Platform
 	orchestratorType k8sutil.OrchestratorType
 	updater          conditions.Updater
 	recorder         record.EventRecorder
@@ -96,12 +94,11 @@ type NIMCacheReconciler struct {
 var _ shared.Reconciler = &NIMCacheReconciler{}
 
 // NewNIMCacheReconciler creates a new reconciler for NIMCache with the given platform.
-func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger, platform platform.Platform) *NIMCacheReconciler {
+func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger) *NIMCacheReconciler {
 	return &NIMCacheReconciler{
-		Client:   client,
-		scheme:   scheme,
-		log:      log,
-		Platform: platform,
+		Client: client,
+		scheme: scheme,
+		log:    log,
 	}
 }
 

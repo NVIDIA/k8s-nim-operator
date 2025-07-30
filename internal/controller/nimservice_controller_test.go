@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/standalone"
+	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
@@ -68,10 +68,10 @@ var _ = Describe("NIMService Controller", func() {
 			}).
 			Build()
 		reconciler = &NIMServiceReconciler{
-			Client:   testClient,
-			scheme:   scheme,
-			Platform: &standalone.Standalone{},
-			recorder: record.NewFakeRecorder(1000),
+			Client:                   testClient,
+			scheme:                   scheme,
+			InferencePlatformFactory: platform.NewFactory(),
+			recorder:                 record.NewFakeRecorder(1000),
 		}
 	})
 

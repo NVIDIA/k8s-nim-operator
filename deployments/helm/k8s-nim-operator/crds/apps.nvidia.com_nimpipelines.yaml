@@ -629,6 +629,15 @@ spec:
                           - repository
                           - tag
                           type: object
+                        inferencePlatform:
+                          default: standalone
+                          description: |-
+                            InferencePlatform specifies the inference platform to use for this NIMService.
+                            Valid values are "standalone" (default) and "kserve".
+                          enum:
+                          - standalone
+                          - kserve
+                          type: string
                         labels:
                           additionalProperties:
                             type: string

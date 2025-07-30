@@ -50,7 +50,6 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
@@ -72,7 +71,6 @@ type NIMBuildReconciler struct {
 	client.Client
 	scheme           *runtime.Scheme
 	log              logr.Logger
-	Platform         platform.Platform
 	orchestratorType k8sutil.OrchestratorType
 	updater          conditions.Updater
 	recorder         record.EventRecorder
@@ -82,12 +80,11 @@ type NIMBuildReconciler struct {
 var _ shared.Reconciler = &NIMBuildReconciler{}
 
 // NewNIMBuildReconciler creates a new reconciler for NIMBuild with the given platform.
-func NewNIMBuildReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger, platform platform.Platform) *NIMBuildReconciler {
+func NewNIMBuildReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger) *NIMBuildReconciler {
 	return &NIMBuildReconciler{
-		Client:   client,
-		scheme:   scheme,
-		log:      log,
-		Platform: platform,
+		Client: client,
+		scheme: scheme,
+		log:    log,
 	}
 }
 
