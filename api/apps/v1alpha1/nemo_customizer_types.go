@@ -396,6 +396,10 @@ func (n *NemoCustomizer) GetPostgresEnv() []corev1.EnvVar {
 				},
 			},
 		},
+		{
+			Name:  "POSTGRES_SECRET_NAME",
+			Value: n.Spec.DatabaseConfig.Credentials.SecretName,
+		},
 	}
 
 	return envVars
