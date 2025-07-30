@@ -144,14 +144,14 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	} else {
 		// The instance is being deleted
-		// Perform platform specific cleanup of resources
-		if err := r.Platform.Delete(ctx, r, nimService); err != nil {
-			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
-				"NIMService %s is being deleted", nimService.Name)
-			return ctrl.Result{}, err
-		}
-
 		if controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
+			// Perform platform specific cleanup of resources
+			if err := r.Platform.Delete(ctx, r, nimService); err != nil {
+				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
+					"NIMService %s is being deleted", nimService.Name)
+				return ctrl.Result{}, err
+			}
+
 			// Remove finalizer to allow for deletion
 			controllerutil.RemoveFinalizer(nimService, NIMServiceFinalizer)
 			if err := r.Update(ctx, nimService); err != nil {

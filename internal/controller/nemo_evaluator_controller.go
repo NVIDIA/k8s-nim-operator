@@ -133,13 +133,13 @@ func (r *NemoEvaluatorReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	} else {
 		// The instance is being deleted
-		// Perform platform specific cleanup of resources
-		if err := r.cleanupNemoEvaluator(ctx, NemoEvaluator); err != nil {
-			r.GetEventRecorder().Eventf(NemoEvaluator, corev1.EventTypeNormal, "Delete",
-				"NemoEvaluator %s is being deleted", NemoEvaluator.Name)
-			return ctrl.Result{}, err
-		}
 		if controllerutil.ContainsFinalizer(NemoEvaluator, NemoEvaluatorFinalizer) {
+			// Perform platform specific cleanup of resources
+			if err := r.cleanupNemoEvaluator(ctx, NemoEvaluator); err != nil {
+				r.GetEventRecorder().Eventf(NemoEvaluator, corev1.EventTypeNormal, "Delete",
+					"NemoEvaluator %s is being deleted", NemoEvaluator.Name)
+				return ctrl.Result{}, err
+			}
 			// Remove finalizer to allow for deletion
 			controllerutil.RemoveFinalizer(NemoEvaluator, NemoEvaluatorFinalizer)
 			if err := r.Update(ctx, NemoEvaluator); err != nil {

@@ -133,13 +133,13 @@ func (r *NemoDatastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	} else {
 		// The instance is being deleted
-		// Perform platform specific cleanup of resources
-		if err := r.cleanupNemoDatastore(ctx, NemoDatastore); err != nil {
-			r.GetEventRecorder().Eventf(NemoDatastore, corev1.EventTypeNormal, "Delete",
-				"NemoDatastore %s is being deleted", NemoDatastore.Name)
-			return ctrl.Result{}, err
-		}
 		if controllerutil.ContainsFinalizer(NemoDatastore, NemoDatastoreFinalizer) {
+			// Perform platform specific cleanup of resources
+			if err := r.cleanupNemoDatastore(ctx, NemoDatastore); err != nil {
+				r.GetEventRecorder().Eventf(NemoDatastore, corev1.EventTypeNormal, "Delete",
+					"NemoDatastore %s is being deleted", NemoDatastore.Name)
+				return ctrl.Result{}, err
+			}
 			// Remove finalizer to allow for deletion
 			controllerutil.RemoveFinalizer(NemoDatastore, NemoDatastoreFinalizer)
 			if err := r.Update(ctx, NemoDatastore); err != nil {
