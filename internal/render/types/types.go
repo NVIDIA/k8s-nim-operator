@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // DaemonsetParams holds the parameters for rendering a Daemonset template.
@@ -200,6 +201,16 @@ type RoleBindingParams struct {
 type SCCParams struct {
 	Name               string
 	ServiceAccountName string
+}
+
+// IngressParams holds the parameters for rendering an Ingress template.
+type HTTPRouteParams struct {
+	Enabled     bool
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	Spec        gatewayv1.HTTPRouteSpec
 }
 
 // IngressParams holds the parameters for rendering an Ingress template.

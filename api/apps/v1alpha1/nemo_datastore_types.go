@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -767,9 +768,17 @@ func (n *NemoDatastore) IsIngressEnabled() bool {
 	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
 }
 
+func (n *NemoDatastore) IsHTTPRouteEnabled() bool {
+	return n.Spec.Expose.HTTPRoute.Enabled != nil && *n.Spec.Expose.HTTPRoute.Enabled
+}
+
 // GetIngressSpec returns the Ingress spec NemoDatastore deployment.
 func (n *NemoDatastore) GetIngressSpec() networkingv1.IngressSpec {
 	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+}
+
+func (n *NemoDatastore) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
+	return n.Spec.Expose.HTTPRoute.GenerateGatewayHTTPRouteSpec(n.GetName())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoDatastore deployment.
@@ -967,6 +976,20 @@ func (n *NemoDatastore) GetIngressParams() *rendertypes.IngressParams {
 	return params
 }
 
+// GetHTTPRouteParams returns params to render HTTPRoute from templates.
+func (n *NemoDatastore) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
+	params := &rendertypes.HTTPRouteParams{}
+	params.Enabled = n.IsHTTPRouteEnabled()
+
+	// Set metadata
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetHTTPRouteAnnotations()
+	params.Spec = n.GetHTTPRouteSpec()
+	return params
+}
+
 // GetRoleParams returns params to render Role from templates.
 func (n *NemoDatastore) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
@@ -1075,6 +1098,15 @@ func (n *NemoDatastore) GetIngressAnnotations() map[string]string {
 		return utils.MergeMaps(NemoDatastoreAnnotations, n.Spec.Expose.Ingress.Annotations)
 	}
 	return NemoDatastoreAnnotations
+}
+
+func (n *NemoDatastore) GetHTTPRouteAnnotations() map[string]string {
+	annotations := n.GetNemoDatastoreAnnotations()
+
+	if n.Spec.Expose.HTTPRoute.Annotations != nil {
+		return utils.MergeMaps(annotations, n.Spec.Expose.HTTPRoute.Annotations)
+	}
+	return annotations
 }
 
 func (n *NemoDatastore) GetServiceAnnotations() map[string]string {

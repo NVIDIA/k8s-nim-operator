@@ -47,6 +47,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/kserve"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/standalone"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -61,6 +62,7 @@ func init() {
 	utilruntime.Must(monitoring.AddToScheme(scheme))
 	utilruntime.Must(lws.AddToScheme(scheme))
 	utilruntime.Must(kservev1beta1.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -205,6 +207,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoGuardrail"),
 	).SetupWithManager(mgr); err != nil {
@@ -216,6 +219,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoEvaluator"),
 	).SetupWithManager(mgr); err != nil {
@@ -227,6 +231,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoEntitystore"),
 	).SetupWithManager(mgr); err != nil {
@@ -238,6 +243,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoDatastore"),
 	).SetupWithManager(mgr); err != nil {
@@ -249,6 +255,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoCustomizer"),
 	).SetupWithManager(mgr); err != nil {

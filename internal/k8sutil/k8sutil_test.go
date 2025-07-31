@@ -84,7 +84,7 @@ var _ = Describe("K8s util tests", func() {
 		})
 	})
 
-	Context("CRDExists", func() {
+	Context("crdExists", func() {
 		var fakeDiscovery *discoveryfake.FakeDiscovery
 
 		BeforeEach(func() {
@@ -96,7 +96,7 @@ var _ = Describe("K8s util tests", func() {
 		})
 
 		It("should return error when discovery client is nil", func() {
-			exists, err := CRDExists(nil, schema.GroupVersionResource{
+			exists, err := crdExists(nil, schema.GroupVersionResource{
 				Group:    "test.example.com",
 				Version:  "v1",
 				Resource: "testresources",
@@ -117,7 +117,7 @@ var _ = Describe("K8s util tests", func() {
 				},
 			}
 
-			exists, err := CRDExists(fakeDiscovery, schema.GroupVersionResource{
+			exists, err := crdExists(fakeDiscovery, schema.GroupVersionResource{
 				Group:    "test.example.com",
 				Version:  "v1",
 				Resource: "testresources",
@@ -138,7 +138,7 @@ var _ = Describe("K8s util tests", func() {
 				},
 			}
 
-			exists, err := CRDExists(fakeDiscovery, schema.GroupVersionResource{
+			exists, err := crdExists(fakeDiscovery, schema.GroupVersionResource{
 				Group:    "test.example.com",
 				Version:  "v1",
 				Resource: "testresources",
@@ -159,7 +159,7 @@ var _ = Describe("K8s util tests", func() {
 				},
 			}
 
-			exists, err := CRDExists(fakeDiscovery, schema.GroupVersionResource{
+			exists, err := crdExists(fakeDiscovery, schema.GroupVersionResource{
 				Group:    "test.example.com",
 				Version:  "v1",
 				Resource: "testresources",
