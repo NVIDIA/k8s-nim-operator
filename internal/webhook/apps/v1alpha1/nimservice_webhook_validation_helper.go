@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -71,7 +70,7 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	errList = append(errList, validateImageConfiguration(&spec.Image, fldPath.Child("image"))...)
 	errList = append(errList, validateAuthSecret(&spec.AuthSecret, fldPath.Child("authSecret"))...)
 	errList = append(errList, validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))...)
-	errList = append(errList, validateExposeConfiguration(&spec.Expose, fldPath.Child("expose").Child("ingress"))...)
+	errList = append(errList, validateRouter(&spec.Router, fldPath.Child("router"))...)
 	errList = append(errList, validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))...)
 	errList = append(errList, validateScaleConfiguration(&spec.Scale, spec.Replicas, fldPath.Child("scale"))...)
 	errList = append(errList, validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))...)
@@ -358,13 +357,12 @@ func validateAuthSecret(authSecret *string, fldPath *field.Path) field.ErrorList
 }
 
 // If Spec.Expose.Ingress.Enabled is true, Spec.Expose.Ingress.Spec must be non-nil.
-func validateExposeConfiguration(expose *appsv1alpha1.Expose, fldPath *field.Path) field.ErrorList {
+func validateRouter(r *appsv1alpha1.Router, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
-	if expose.Ingress.Enabled != nil && *expose.Ingress.Enabled {
-		if reflect.DeepEqual(expose.Ingress.Spec, networkingv1.IngressSpec{}) {
-			errList = append(errList, field.Required(fldPath.Child("spec"), fmt.Sprintf("must be defined if %s is true", fldPath.Child("enabled"))))
-		}
+	if r.Gateway != nil && r.IngressClass != nil {
+		errList = append(errList, field.Forbidden(fldPath, "ingressClass and gateway cannot be specified together"))
 	}
+
 	return errList
 }
 
@@ -429,8 +427,12 @@ func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *fie
 		}
 
 		// Spec.Expose.Ingress cannot be set.
-		if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled {
-			errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("expose").Child("ingress"))))
+		if spec.Router.IngressClass != nil && *spec.Router.IngressClass != "" {
+			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingressClass"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("ingressClass"))))
+		}
+
+		if spec.Router.Gateway != nil {
+			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("gateway"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("gateway"))))
 		}
 
 		// Spec.Metrics.ServiceMonitor cannot be set.

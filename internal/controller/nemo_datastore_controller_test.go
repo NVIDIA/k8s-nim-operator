@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -93,6 +94,7 @@ var _ = Describe("NemoDatastore Controller", func() {
 		Expect(networkingv1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(appsv1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.AddToScheme(scheme)).To(Succeed())
 
 		manifestsDir, err := filepath.Abs("../../manifests")
 		Expect(err).ToNot(HaveOccurred())

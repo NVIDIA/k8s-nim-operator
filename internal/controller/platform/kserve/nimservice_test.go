@@ -65,6 +65,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func sortEnvVars(envVars []corev1.EnvVar) {
@@ -147,6 +148,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(kservev1beta1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -262,10 +264,9 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				},
 				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
-					Ingress: appsv1alpha1.Ingress{
-						Enabled:     ptr.To[bool](true),
-						Annotations: map[string]string{"annotation-key-specific": "ingress"},
-					},
+				},
+				Router: appsv1alpha1.Router{
+					IngressClass: ptr.To("nginx"),
 				},
 				Scale: appsv1alpha1.Autoscaling{
 					Enabled:     ptr.To[bool](true),
@@ -836,7 +837,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Get(context.TODO(), namespacedName, nimService)
 			Expect(err).NotTo(HaveOccurred())
 			nimService.Spec.Scale.Enabled = ptr.To(false)
-			nimService.Spec.Expose.Ingress.Enabled = ptr.To(false)
+			nimService.Spec.Router.IngressClass = nil
 			err = client.Update(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
 

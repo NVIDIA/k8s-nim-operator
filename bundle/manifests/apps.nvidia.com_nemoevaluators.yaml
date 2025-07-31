@@ -1223,47 +1223,8 @@ spec:
                     type: string
                 type: object
               expose:
-                description: ExposeV1 defines attributes to expose the service.
+                description: Expose defines attributes to expose the service.
                 properties:
-                  ingress:
-                    description: IngressV1 defines attributes for ingress
-                    properties:
-                      annotations:
-                        additionalProperties:
-                          type: string
-                        type: object
-                      enabled:
-                        type: boolean
-                      spec:
-                        properties:
-                          host:
-                            type: string
-                          ingressClassName:
-                            pattern: '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
-                            type: string
-                          paths:
-                            items:
-                              description: IngressPath defines attributes for ingress
-                                paths.
-                              properties:
-                                path:
-                                  default: /
-                                  type: string
-                                pathType:
-                                  default: Prefix
-                                  description: PathType represents the type of path
-                                    referred to by a HTTPIngressPath.
-                                  type: string
-                              type: object
-                            type: array
-                        required:
-                        - ingressClassName
-                        type: object
-                    type: object
-                    x-kubernetes-validations:
-                    - message: spec cannot be nil when ingress is enabled
-                      rule: (has(self.spec) && has(self.enabled) && self.enabled)
-                        || !has(self.enabled) || !self.enabled
                   service:
                     description: Service defines attributes to create a service.
                     properties:
@@ -1855,6 +1816,46 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
+              router:
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations for the router, e.g. for ingress class
+                      or gateway
+                    type: object
+                  gateway:
+                    description: Gateway is the gateway to use for the created HTTPRoute.
+                    properties:
+                      name:
+                        description: Name of the gateway
+                        minLength: 1
+                        type: string
+                      namespace:
+                        description: Namespace of the gateway
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
+                  hostDomainName:
+                    description: |-
+                      HostDomainName is the domain name of the hostname matched by the router.
+                      The hostname is constructed as "<nimServiceName>.<hostDomainName>", where the <nimServiceName> a subdomain of the matched hostname.
+                      eg. example.com for "<nimServiceName>.example.com"
+                    maxLength: 63
+                    minLength: 1
+                    pattern: ^(([a-z0-9][a-z0-9\-]*[a-z0-9])|[a-z0-9]+\.)*([a-z]+|xn\-\-[a-z0-9]+)\.?$
+                    type: string
+                  ingressClass:
+                    description: IngressClass is the class of the ingress controller
+                      to use for the created ingress.
+                    type: string
+                type: object
+                x-kubernetes-validations:
+                - message: ingressClass and gateway cannot be specified together
+                  rule: '!(has(self.gateway) && has(self.ingressClass))'
               runtimeClass:
                 type: string
               scale:

@@ -59,6 +59,8 @@ import (
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
@@ -146,6 +148,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(lwsv1.AddToScheme(scheme)).To(Succeed())
 		Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -260,34 +263,13 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
-					Ingress: appsv1alpha1.Ingress{
-						Enabled:     ptr.To[bool](true),
-						Annotations: map[string]string{"annotation-key-specific": "ingress"},
-						Spec: networkingv1.IngressSpec{
-							Rules: []networkingv1.IngressRule{
-								{
-									Host: "test-nimservice.default.example.com",
-									IngressRuleValue: networkingv1.IngressRuleValue{
-										HTTP: &networkingv1.HTTPIngressRuleValue{
-											Paths: []networkingv1.HTTPIngressPath{
-												{
-													Path: "/",
-													Backend: networkingv1.IngressBackend{
-														Service: &networkingv1.IngressServiceBackend{
-															Name: "test-nimservice",
-															Port: networkingv1.ServiceBackendPort{
-																Number: 8080,
-															},
-														},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
+				},
+				Router: appsv1alpha1.Router{
+					IngressClass: ptr.To("nginx"),
+					Annotations: map[string]string{
+						"annotation-key-specific": "ingress",
 					},
+					HostDomainName: "default.example.com",
 				},
 				Scale: appsv1alpha1.Autoscaling{
 					Enabled:     ptr.To[bool](true),
@@ -882,7 +864,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			err = client.Get(context.TODO(), namespacedName, nimService)
 			Expect(err).NotTo(HaveOccurred())
 			nimService.Spec.Scale.Enabled = ptr.To(false)
-			nimService.Spec.Expose.Ingress.Enabled = ptr.To(false)
+			nimService.Spec.Router.IngressClass = nil
 			err = client.Update(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -2273,7 +2255,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 
 		It("should return only svc endpoints when ingress is disabled", func() {
-			nimService.Spec.Expose.Ingress.Enabled = ptr.To(false)
+			nimService.Spec.Router.IngressClass = nil
 			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(internal).To(Equal("127.0.0.1:8123"))
@@ -2288,7 +2270,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 
 		It("should return ingress loadbalancer ip as external endpoint", func() {
-			nimService.Spec.Expose.Ingress.Spec.Rules[0].Host = ""
+			nimService.Spec.Router.IngressClass = ptr.To("nginx")
 			ingress.Spec.Rules[0].Host = ""
 			_ = client.Update(context.TODO(), ingress)
 			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
@@ -2298,7 +2280,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 
 		It("should return ingress loadbalancer hostname as external endpoint", func() {
-			nimService.Spec.Expose.Ingress.Spec.Rules[0].Host = ""
+			nimService.Spec.Router.IngressClass = ptr.To("nginx")
 			ingress.Spec.Rules[0].Host = ""
 			_ = client.Update(context.TODO(), ingress)
 			ingress.Status = networkingv1.IngressStatus{
