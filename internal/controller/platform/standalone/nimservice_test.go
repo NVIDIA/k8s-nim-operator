@@ -63,6 +63,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func sortEnvVars(envVars []corev1.EnvVar) {
@@ -145,6 +146,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(lwsv1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).

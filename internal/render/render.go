@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 	yamlConverter "sigs.k8s.io/yaml"
 
@@ -73,6 +74,7 @@ type Renderer interface {
 	RoleBinding(params *types.RoleBindingParams) (*rbacv1.RoleBinding, error)
 	SCC(params *types.SCCParams) (*securityv1.SecurityContextConstraints, error)
 	Ingress(params *types.IngressParams) (*networkingv1.Ingress, error)
+	HTTPRoute(params *types.HTTPRouteParams) (*gatewayv1.HTTPRoute, error)
 	HPA(params *types.HPAParams) (*autoscalingv2.HorizontalPodAutoscaler, error)
 	ServiceMonitor(params *types.ServiceMonitorParams) (*monitoringv1.ServiceMonitor, error)
 	ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error)
@@ -339,6 +341,23 @@ func (r *textTemplateRenderer) SCC(params *types.SCCParams) (*securityv1.Securit
 		return nil, fmt.Errorf("error converting unstructured object to SCC: %w", err)
 	}
 	return scc, nil
+}
+
+// HTTPRoute renders an HTTPRoute spec with the given template data.
+func (r *textTemplateRenderer) HTTPRoute(params *types.HTTPRouteParams) (*gatewayv1.HTTPRoute, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "httproute.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	httpRoute := &gatewayv1.HTTPRoute{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, httpRoute)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to HTTPRoute: %w", err)
+	}
+	return httpRoute, nil
 }
 
 // Ingress renders an Ingress spec with the given templating data.

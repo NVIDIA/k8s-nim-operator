@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/yaml"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -67,6 +68,7 @@ type NemoCustomizerReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
+	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
 	recorder         record.EventRecorder
@@ -77,13 +79,14 @@ type NemoCustomizerReconciler struct {
 var _ shared.Reconciler = &NemoCustomizerReconciler{}
 
 // NewNemoCustomizerReconciler creates a new reconciler for NemoCustomizer with the given platform.
-func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoCustomizerReconciler {
+func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NemoCustomizerReconciler {
 	return &NemoCustomizerReconciler{
-		Client:   client,
-		scheme:   scheme,
-		updater:  updater,
-		renderer: renderer,
-		log:      log,
+		Client:          client,
+		scheme:          scheme,
+		updater:         updater,
+		discoveryClient: discoveryClient,
+		renderer:        renderer,
+		log:             log,
 	}
 }
 
@@ -93,7 +96,7 @@ func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, u
 // +kubebuilder:rbac:groups=run.ai,resources=trainingworkloads;runaijobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=nvidia.com,resources=nemotrainingjobs;nemotrainingjobs/status;nemoentityhandlers,verbs=create;get;list;watch;update;delete;patch
-// +kubebuilder:rbac:groups=batch.volcano.sh,resources=jobs;jobs/status,verbs=get;list;watch
+// +kubebuilder:rbac:groups=batch.volcano.sh,resources=jobs;jobs/status,verbs=get;list;watch;create;update;delete;patch
 // +kubebuilder:rbac:groups=nodeinfo.volcano.sh,resources=numatopologies,verbs=get;list;watch
 // +kubebuilder:rbac:groups=scheduling.incubator.k8s.io;scheduling.volcano.sh,resources=queues;queues/status;podgroups,verbs=get;list;watch
 // +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions;proxies,verbs=get;list;watch
@@ -105,9 +108,10 @@ func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, u
 // +kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors;prometheusrules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=get;list;watch;create
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs;jobs/status,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalars,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 // +kubebuilder:rbac:groups="nodeinfo.volcano.sh",resources=numatopologies,verbs=get;list;watch
@@ -243,7 +247,7 @@ func (r *NemoCustomizerReconciler) GetOrchestratorType(ctx context.Context) (k8s
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoCustomizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nemo-customizer-service-controller")
-	return ctrl.NewControllerManagedBy(mgr).
+	bd := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoCustomizer{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -272,8 +276,19 @@ func (r *NemoCustomizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				// For other types we watch, reconcile them
 				return true
 			},
-		}).
-		Complete(r)
+		})
+
+	bd, err := k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		bd,
+		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		&gatewayv1.HTTPRoute{},
+	)
+	if err != nil {
+		return err
+	}
+
+	return bd.Complete(r)
 }
 
 func (r *NemoCustomizerReconciler) refreshMetrics(ctx context.Context) {
@@ -344,6 +359,21 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
+		if err != nil && !errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Sync HTTPRoute
+	if nemoCustomizer.IsHTTPRouteEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &gatewayv1.HTTPRoute{}, func() (client.Object, error) {
+			return renderer.HTTPRoute(nemoCustomizer.GetHTTPRouteParams())
+		}, "httproute", conditions.ReasonHTTPRouteFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
 		if err != nil && !errors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
