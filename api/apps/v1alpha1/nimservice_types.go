@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
@@ -128,6 +129,7 @@ type NIMServiceSpec struct {
 	RuntimeClassName string                     `json:"runtimeClassName,omitempty"`
 	Proxy            *ProxySpec                 `json:"proxy,omitempty"`
 	MultiNode        *NimServiceMultiNodeConfig `json:"multiNode,omitempty"`
+	Router           Router                     `json:"router,omitempty"`
 	// InferencePlatform specifies the inference platform to use for this NIMService.
 	// Valid values are "standalone" (default) and "kserve".
 	// +kubebuilder:validation:Enum=standalone;kserve
@@ -979,12 +981,20 @@ func (n *NIMService) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NIMService deployment.
 func (n *NIMService) IsIngressEnabled() bool {
-	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
+	return n.Spec.Router.IngressClass != nil && *n.Spec.Router.IngressClass != ""
 }
 
 // GetIngressSpec returns the Ingress spec NIMService deployment.
 func (n *NIMService) GetIngressSpec() networkingv1.IngressSpec {
-	return n.Spec.Expose.Ingress.Spec
+	return n.Spec.Router.GenerateIngressSpec(n.GetName())
+}
+
+func (n *NIMService) IsHTTPRouteEnabled() bool {
+	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.Name != "" && n.Spec.Router.Gateway.Namespace != ""
+}
+
+func (n *NIMService) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
+	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetName())
 }
 
 // IsHFModel returns true if the NIMService is using an HF model.
@@ -1367,8 +1377,22 @@ func (n *NIMService) GetIngressParams() *rendertypes.IngressParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetIngressAnnotations()
+	params.Annotations = n.GetRouterAnnotations()
 	params.Spec = n.GetIngressSpec()
+	return params
+}
+
+// GetHTTPRouteParams returns params to render HTTPRoute from templates.
+func (n *NIMService) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
+	params := &rendertypes.HTTPRouteParams{}
+	params.Enabled = n.IsHTTPRouteEnabled()
+
+	// Set metadata
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetRouterAnnotations()
+	params.Spec = n.GetHTTPRouteSpec()
 	return params
 }
 
@@ -1503,11 +1527,11 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 	return params
 }
 
-func (n *NIMService) GetIngressAnnotations() map[string]string {
+func (n *NIMService) GetRouterAnnotations() map[string]string {
 	nimServiceAnnotations := n.GetNIMServiceAnnotations()
 
-	if n.Spec.Expose.Ingress.Annotations != nil {
-		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Ingress.Annotations)
+	if n.Spec.Router.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Router.Annotations)
 	}
 	return nimServiceAnnotations
 }
