@@ -59,30 +59,28 @@ const NIMServiceFinalizer = "finalizer.nimservice.apps.nvidia.com"
 // NIMServiceReconciler reconciles a NIMService object.
 type NIMServiceReconciler struct {
 	client.Client
-	scheme                   *runtime.Scheme
-	log                      logr.Logger
-	updater                  conditions.Updater
-	discoveryClient          discovery.DiscoveryInterface
-	renderer                 render.Renderer
-	Config                   *rest.Config
-	InferencePlatformFactory *platform.Factory
-	orchestratorType         k8sutil.OrchestratorType
-	recorder                 record.EventRecorder
+	scheme           *runtime.Scheme
+	log              logr.Logger
+	updater          conditions.Updater
+	discoveryClient  discovery.DiscoveryInterface
+	renderer         render.Renderer
+	Config           *rest.Config
+	orchestratorType k8sutil.OrchestratorType
+	recorder         record.EventRecorder
 }
 
 // Ensure NIMServiceReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NIMServiceReconciler{}
 
 // NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform factory.
-func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger, platformFactory *platform.Factory) *NIMServiceReconciler {
+func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
-		Client:                   client,
-		scheme:                   scheme,
-		updater:                  updater,
-		discoveryClient:          discoveryClient,
-		renderer:                 renderer,
-		log:                      log,
-		InferencePlatformFactory: platformFactory,
+		Client:          client,
+		scheme:          scheme,
+		updater:         updater,
+		discoveryClient: discoveryClient,
+		renderer:        renderer,
+		log:             log,
 	}
 }
 
@@ -134,7 +132,7 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger.Info("Reconciling", "NIMService", nimService.Name)
 
 	// Get platform implementation based on NIMService's platform field
-	platformImpl, err := r.InferencePlatformFactory.GetInferencePlatform(nimService.Spec.InferencePlatform)
+	platformImpl, err := platform.GetInferencePlatform(nimService.Spec.InferencePlatform)
 	if err != nil {
 		logger.Error(err, "failed to get platform implementation", "platform", nimService.Spec.InferencePlatform)
 		return ctrl.Result{}, err

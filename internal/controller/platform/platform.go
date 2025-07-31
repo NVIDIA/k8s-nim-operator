@@ -35,16 +35,8 @@ type InferencePlatform interface {
 	Sync(ctx context.Context, r shared.Reconciler, resource client.Object) (ctrl.Result, error)
 }
 
-// Factory provides platform implementations based on platform type.
-type Factory struct{}
-
-// NewFactory creates a new platform factory.
-func NewFactory() *Factory {
-	return &Factory{}
-}
-
 // GetInferencePlatform returns an inference platform implementation based on the platform type.
-func (f *Factory) GetInferencePlatform(inferencePlatformType appsv1alpha1.PlatformType) (InferencePlatform, error) {
+func GetInferencePlatform(inferencePlatformType appsv1alpha1.PlatformType) (InferencePlatform, error) {
 	switch inferencePlatformType {
 	case appsv1alpha1.PlatformTypeStandalone, "": // Default to standalone for empty values
 		return &standalone.Standalone{}, nil

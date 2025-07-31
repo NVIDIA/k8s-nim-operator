@@ -44,7 +44,6 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller"
-	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	webhookappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/internal/webhook/apps/v1alpha1"
 	// +kubebuilder:scaffold:imports
@@ -98,15 +97,12 @@ func main() {
 		setupLog.Info("DEPRECATED: Global platform flag is deprecated. Use 'platform' field in NIMService CR instead.", "platform", platformType)
 		switch platformType {
 		case "standalone", "kserve":
-			// Valid platform types
+			// Valid platform types for the deprecated global platform flag. No need to throw an error.
 		default:
 			setupLog.Error(nil, "unsupported model-serving platform type", "platformType", platformType)
 			os.Exit(1)
 		}
 	}
-
-	// Create platform factory
-	platformFactory := platform.NewFactory()
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -181,7 +177,6 @@ func main() {
 		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NIMService"),
-		platformFactory,
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMService")
 		os.Exit(1)
