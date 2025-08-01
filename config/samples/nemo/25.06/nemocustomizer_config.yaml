@@ -1,0 +1,485 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nemo-training-config
+  namespace: nemo
+data:
+  training: |
+    # Optional additional configuration for training jobs
+    container_defaults:
+      imagePullPolicy: IfNotPresent
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nemo-model-config
+  namespace: nemo
+data:
+  customizationTargets: |
+    overrideExistingTargets: true
+    targets:
+      meta/llama-3.1-8b-instruct@2.0:
+        base_model: meta/llama-3.1-8b-instruct
+        enabled: true
+        model_path: llama-3_1-8b-instruct_2_0
+        model_uri: ngc://nvidia/nemo/llama-3_1-8b-instruct-nemo:2.0
+        name: llama-3.1-8b-instruct@2.0
+        namespace: meta
+        num_parameters: 8000000000
+        precision: bf16-mixed
+      meta/llama-3.1-70b-instruct@2.0:
+        base_model: meta/llama-3.1-70b-instruct
+        enabled: false
+        model_path: llama-3_1-70b-instruct_2_0
+        model_uri: ngc://nvidia/nemo/llama-3_1-70b-instruct-nemo:2.0
+        name: llama-3.1-70b-instruct@2.0
+        namespace: meta
+        num_parameters: 70000000000
+        precision: bf16-mixed
+      meta/llama-3.2-1b-embedding@0.0.1:
+        base_model: meta/llama-3.2-1b-embedding
+        enabled: false
+        model_path: llama32_1b-embedding
+        model_uri: ngc://nvidia/nemo/llama-3_2-1b-embedding-base:0.0.1
+        name: llama-3.2-1b-embedding@0.0.1
+        namespace: meta
+        num_parameters: 1000000000
+        precision: bf16-mixed
+      meta/llama-3.2-1b-instruct@2.0:
+        base_model: meta/llama-3.2-1b-instruct
+        enabled: true
+        model_path: llama32_1b-instruct_2_0
+        model_uri: ngc://nvidia/nemo/llama-3_2-1b-instruct:2.0
+        name: llama-3.2-1b-instruct@2.0
+        namespace: meta
+        num_parameters: 1000000000
+        precision: bf16-mixed
+      meta/llama-3.2-1b@2.0:
+        base_model: meta/llama-3.2-1b
+        enabled: false
+        model_path: llama32_1b_2_0
+        model_uri: ngc://nvidia/nemo/llama-3_2-1b:2.0
+        name: llama-3.2-1b@2.0
+        namespace: meta
+        num_parameters: 1000000000
+        precision: bf16-mixed
+      meta/llama-3.2-3b-instruct@2.0:
+        base_model: meta/llama-3.2-3b-instruct
+        enabled: false
+        model_path: llama32_3b-instruct_2_0
+        model_uri: ngc://nvidia/nemo/llama-3_2-3b-instruct:2.0
+        name: llama-3.2-3b-instruct@2.0
+        namespace: meta
+        num_parameters: 3000000000
+        precision: bf16-mixed
+      meta/llama-3.3-70b-instruct@2.0:
+        base_model: meta/llama-3.3-70b-instruct
+        enabled: false
+        model_path: llama-3_3-70b-instruct_2_0
+        model_uri: ngc://nvidia/nemo/llama-3_3-70b-instruct:2.0
+        name: llama-3.3-70b-instruct@2.0
+        namespace: meta
+        num_parameters: 70000000000
+        precision: bf16-mixed
+      meta/llama3-70b-instruct@2.0:
+        base_model: meta/llama3-70b-instruct
+        enabled: false
+        model_path: llama-3-70b-bf16_2_0
+        model_uri: ngc://nvidia/nemo/llama-3-70b-instruct-nemo:2.0
+        name: llama3-70b-instruct@2.0
+        namespace: meta
+        num_parameters: 70000000000
+        precision: bf16-mixed
+      microsoft/phi-4@1.0:
+        base_model: microsoft/phi-4
+        enabled: false
+        model_path: phi-4_1_0
+        model_uri: ngc://nvidia/nemo/phi-4:1.0
+        name: phi-4@1.0
+        namespace: microsoft
+        num_parameters: 14659507200
+        precision: bf16
+        version: "1.0"
+      nvidia/nemotron-nano-llama-3.1-8b@1.0:
+        base_model: nvidia/nemotron-nano-llama-3.1-8b
+        enabled: false
+        model_path: nemotron-nano-3_1-8b_0_0_1
+        model_uri: ngc://nvidia/nemo/nemotron-nano-3_1-8b:0.0.1
+        name: nemotron-nano-llama-3.1-8b@1.0
+        namespace: nvidia
+        num_parameters: 8000000000
+        precision: bf16-mixed
+      nvidia/nemotron-super-llama-3.3-49b@1.0:
+        base_model: nvidia/nemotron-super-llama-3.3-49b
+        enabled: false
+        model_path: nemotron-super-3_3-49b_v1
+        model_uri: ngc://nvidia/nemo/nemotron-super-3_3-49b:v1
+        name: nemotron-super-llama-3.3-49b@1.0
+        namespace: nvidia
+        num_parameters: 8000000000
+        precision: bf16-mixed
+
+  customizationConfigTemplates: |
+    overrideExistingTemplates: true
+    templates:
+      meta/llama-3.1-8b-instruct@v1.0.0+A100:
+        max_seq_length: 4096
+        name: llama-3.1-8b-instruct@v1.0.0+A100
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.1-8b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 1
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 8
+          num_nodes: 1
+          tensor_parallel_size: 4
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 1
+          tensor_parallel_size: 4
+          training_type: distillation
+      meta/llama-3.1-8b-instruct@v1.0.0+L40:
+        max_seq_length: 4096
+        name: llama-3.1-8b-instruct@v1.0.0+L40
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.1-8b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 2
+          tensor_parallel_size: 2
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 2
+          tensor_parallel_size: 4
+          training_type: sft
+      meta/llama-3.1-70b-instruct@v1.0.0+A100:
+        max_seq_length: 4096
+        name: llama-3.1-70b-instruct@v1.0.0+A100
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.1-70b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 1
+          tensor_parallel_size: 4
+          training_type: sft
+      meta/llama-3.1-70b-instruct@v1.0.0+L40:
+        max_seq_length: 4096
+        name: llama-3.1-70b-instruct@v1.0.0+L40
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.1-70b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 2
+          pipeline_parallel_size: 2
+          tensor_parallel_size: 4
+          training_type: sft
+      meta/llama-3.2-1b-embedding@0.0.1+A100:
+        max_seq_length: 2048
+        name: llama-3.2-1b-embedding@0.0.1+A100
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.2-1b-embedding@0.0.1
+        training_options:
+        - finetuning_type: all_weights
+          micro_batch_size: 8
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+      meta/llama-3.2-1b-embedding@0.0.1+L40:
+        max_seq_length: 2048
+        name: llama-3.2-1b-embedding@0.0.1+L40
+        namespace: meta
+        target: meta/llama-3.2-1b-embedding@0.0.1
+        training_options:
+        - finetuning_type: all_weights
+          micro_batch_size: 4
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+      meta/llama-3.2-1b-instruct@v1.0.0+A100:
+        max_seq_length: 4096
+        name: llama-3.2-1b-instruct@v1.0.0+A100
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.2-1b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: distillation
+      meta/llama-3.2-1b-instruct@v1.0.0+L40:
+        max_seq_length: 4096
+        name: llama-3.2-1b-instruct@v1.0.0+L40
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.2-1b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+      meta/llama-3.2-1b@v1.0.0+A100:
+        max_seq_length: 4096
+        name: llama-3.2-1b@v1.0.0+A100
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.2-1b@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: distillation
+      meta/llama-3.2-1b@v1.0.0+L40:
+        max_seq_length: 4096
+        name: llama-3.2-1b@v1.0.0+L40
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.2-1b@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+      meta/llama-3.2-3b-instruct@v1.0.0+A100:
+        max_seq_length: 4096
+        name: llama-3.2-3b-instruct@v1.0.0+A100
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.2-3b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 2
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: distillation
+      meta/llama-3.2-3b-instruct@v1.0.0+L40:
+        max_seq_length: 4096
+        name: llama-3.2-3b-instruct@v1.0.0+L40
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.2-3b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+      meta/llama-3.3-70b-instruct@v1.0.0+A100:
+        max_seq_length: 4096
+        name: llama-3.3-70b-instruct@v1.0.0+A100
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.3-70b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 1
+          tensor_parallel_size: 4
+          training_type: sft
+      meta/llama-3.3-70b-instruct@v1.0.0+L40:
+        max_seq_length: 4096
+        name: llama-3.3-70b-instruct@v1.0.0+L40
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama-3.3-70b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 2
+          pipeline_parallel_size: 2
+          tensor_parallel_size: 4
+          training_type: sft
+      meta/llama3-70b-instruct@v1.0.0+A100:
+        max_seq_length: 4096
+        name: llama3-70b-instruct@v1.0.0+A100
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama3-70b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 1
+          tensor_parallel_size: 4
+          training_type: sft
+      meta/llama3-70b-instruct@v1.0.0+L40:
+        max_seq_length: 4096
+        name: llama3-70b-instruct@v1.0.0+L40
+        namespace: meta
+        prompt_template: '{prompt} {completion}'
+        target: meta/llama3-70b-instruct@2.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 2
+          pipeline_parallel_size: 2
+          tensor_parallel_size: 4
+          training_type: sft
+      microsoft/phi-4@v1.0.0+A100:
+        max_seq_length: 4096
+        name: phi-4@v1.0.0+A100
+        namespace: microsoft
+        prompt_template: '{prompt} {completion}'
+        target: microsoft/phi-4@1.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          training_type: sft
+      microsoft/phi-4@v1.0.0+L40:
+        max_seq_length: 4096
+        name: phi-4@v1.0.0+L40
+        namespace: microsoft
+        prompt_template: '{prompt} {completion}'
+        target: microsoft/phi-4@1.0
+        training_options:
+        - data_parallel_size: 2
+          finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 2
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+      nvidia/nemotron-nano-llama-3.1-8b@v1.0.0+A100:
+        max_seq_length: 4096
+        name: nemotron-nano-llama-3.1-8b@v1.0.0+A100
+        namespace: nvidia
+        prompt_template: '{prompt} {completion}'
+        target: nvidia/nemotron-nano-llama-3.1-8b@1.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 1
+          num_nodes: 1
+          tensor_parallel_size: 1
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 8
+          num_nodes: 1
+          tensor_parallel_size: 4
+          training_type: sft
+      nvidia/nemotron-nano-llama-3.1-8b@v1.0.0+L40:
+        max_seq_length: 4096
+        name: nemotron-nano-llama-3.1-8b@v1.0.0+L40
+        namespace: nvidia
+        prompt_template: '{prompt} {completion}'
+        target: nvidia/nemotron-nano-llama-3.1-8b@1.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 2
+          num_nodes: 1
+          tensor_parallel_size: 2
+          training_type: sft
+        - finetuning_type: all_weights
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 2
+          pipeline_parallel_size: 2
+          tensor_parallel_size: 4
+          training_type: sft
+      nvidia/nemotron-super-llama-3.3-49b@v1.0.0+A100:
+        max_seq_length: 4096
+        name: nemotron-super-llama-3.3-49b@v1.0.0+A100
+        namespace: nvidia
+        prompt_template: '{prompt} {completion}'
+        target: nvidia/nemotron-super-llama-3.3-49b@1.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 1
+          tensor_parallel_size: 4
+          training_type: sft
+      nvidia/nemotron-super-llama-3.3-49b@v1.0.0+L40:
+        max_seq_length: 4096
+        name: nemotron-super-llama-3.3-49b@v1.0.0+L40
+        namespace: nvidia
+        prompt_template: '{prompt} {completion}'
+        target: nvidia/nemotron-super-llama-3.3-49b@1.0
+        training_options:
+        - finetuning_type: lora
+          micro_batch_size: 1
+          num_gpus: 4
+          num_nodes: 2
+          pipeline_parallel_size: 2
+          tensor_parallel_size: 4
+          training_type: sft
