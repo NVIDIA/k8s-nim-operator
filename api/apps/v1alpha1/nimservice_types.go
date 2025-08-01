@@ -77,6 +77,16 @@ const (
 	NIMBackendTypeLWS NIMBackendType = "lws"
 )
 
+// PlatformType defines the supported inference platform types.
+type PlatformType string
+
+const (
+	// PlatformTypeStandalone represents standalone deployment platform.
+	PlatformTypeStandalone PlatformType = "standalone"
+	// PlatformTypeKServe represents KServe deployment platform.
+	PlatformTypeKServe PlatformType = "kserve"
+)
+
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
 type NIMServiceSpec struct {
@@ -115,6 +125,11 @@ type NIMServiceSpec struct {
 	RuntimeClassName string                     `json:"runtimeClassName,omitempty"`
 	Proxy            *ProxySpec                 `json:"proxy,omitempty"`
 	MultiNode        *NimServiceMultiNodeConfig `json:"multiNode,omitempty"`
+	// InferencePlatform specifies the inference platform to use for this NIMService.
+	// Valid values are "standalone" (default) and "kserve".
+	// +kubebuilder:validation:Enum=standalone;kserve
+	// +kubebuilder:default:="standalone"
+	InferencePlatform PlatformType `json:"inferencePlatform,omitempty"`
 }
 
 // NimServiceMultiNodeConfig defines the configuration for multi-node NIMService.

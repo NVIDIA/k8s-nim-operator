@@ -44,9 +44,6 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller"
-	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
-	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/kserve"
-	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/standalone"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	webhookappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/internal/webhook/apps/v1alpha1"
 	// +kubebuilder:scaffold:imports
@@ -74,8 +71,9 @@ func main() {
 	var enableHTTP2 bool
 	var platformType string
 
-	flag.StringVar(&platformType, "platform", "standalone", "The model-serving inference platform to use."+
-		"E.g., 'standalone (default)', 'kserve'.")
+	flag.StringVar(&platformType, "platform", "", "DEPRECATED: Default platform for all NIMServices. "+
+		"Use the 'platform' field in NIMService CR instead. If specified, this value is used as fallback "+
+		"when NIMService doesn't specify a platform. Valid values: 'standalone', 'kserve'.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metric endpoint binds to. "+
 		"Use the port :8080. If not set, it will be 0 in order to disable the metrics server")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -94,15 +92,16 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	var platformImpl platform.Platform
-	switch platformType {
-	case "standalone":
-		platformImpl = &standalone.Standalone{}
-	case "kserve":
-		platformImpl = &kserve.KServe{}
-	default:
-		setupLog.Error(nil, "unsupported model-serving platform type", "platformType", platformType)
-		os.Exit(1)
+	// Validate the deprecated global platform flag if provided
+	if platformType != "" {
+		setupLog.Info("DEPRECATED: Global platform flag is deprecated. Use 'platform' field in NIMService CR instead.", "platform", platformType)
+		switch platformType {
+		case "standalone", "kserve":
+			// Valid platform types for the deprecated global platform flag. No need to throw an error.
+		default:
+			setupLog.Error(nil, "unsupported model-serving platform type", "platformType", platformType)
+			os.Exit(1)
+		}
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -166,7 +165,6 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		ctrl.Log.WithName("controllers").WithName("NIMCache"),
-		platformImpl,
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMCache")
 		os.Exit(1)
@@ -179,7 +177,6 @@ func main() {
 		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NIMService"),
-		platformImpl,
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMService")
 		os.Exit(1)
@@ -197,7 +194,6 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		ctrl.Log.WithName("controllers").WithName("NIMBuild"),
-		platformImpl,
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMBuild")
 		os.Exit(1)

@@ -65,7 +65,6 @@ type NIMServiceReconciler struct {
 	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
-	Platform         platform.Platform
 	orchestratorType k8sutil.OrchestratorType
 	recorder         record.EventRecorder
 }
@@ -73,8 +72,8 @@ type NIMServiceReconciler struct {
 // Ensure NIMServiceReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NIMServiceReconciler{}
 
-// NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform.
-func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
+// NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform factory.
+func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
 		Client:          client,
 		scheme:          scheme,
@@ -82,7 +81,6 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 		discoveryClient: discoveryClient,
 		renderer:        renderer,
 		log:             log,
-		Platform:        platform,
 	}
 }
 
@@ -133,6 +131,13 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	logger.Info("Reconciling", "NIMService", nimService.Name)
 
+	// Get platform implementation based on NIMService's platform field
+	platformImpl, err := platform.GetInferencePlatform(nimService.Spec.InferencePlatform)
+	if err != nil {
+		logger.Error(err, "failed to get platform implementation", "platform", nimService.Spec.InferencePlatform)
+		return ctrl.Result{}, err
+	}
+
 	// Check if the instance is marked for deletion
 	if nimService.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
@@ -146,7 +151,7 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// The instance is being deleted
 		if controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
 			// Perform platform specific cleanup of resources
-			if err := r.Platform.Delete(ctx, r, nimService); err != nil {
+			if err := platformImpl.Delete(ctx, r, nimService); err != nil {
 				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
 					"NIMService %s is being deleted", nimService.Name)
 				return ctrl.Result{}, err
@@ -165,13 +170,13 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Fetch container orchestrator type
-	_, err := r.GetOrchestratorType(ctx)
+	_, err = r.GetOrchestratorType(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
 
 	// Handle platform-specific reconciliation
-	result, err := r.Platform.Sync(ctx, r, nimService)
+	result, err := platformImpl.Sync(ctx, r, nimService)
 	if err != nil {
 		logger.Error(err, "error reconciling NIMService", "name", nimService.Name)
 		return result, err
