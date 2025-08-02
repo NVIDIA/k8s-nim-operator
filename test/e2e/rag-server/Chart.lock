@@ -1,0 +1,18 @@
+dependencies:
+- name: k8s-nim-operator
+  repository: https://helm.ngc.nvidia.com/nvidia
+  version: 2.0.0
+- name: frontend
+  repository: ""
+  version: v2.1.0
+- name: zipkin
+  repository: https://zipkin.io/zipkin-helm
+  version: 0.1.2
+- name: opentelemetry-collector
+  repository: https://open-telemetry.github.io/opentelemetry-helm-charts
+  version: 0.78.1
+- name: kube-prometheus-stack
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 69.7.2
+digest: sha256:290a7bf4f281ef2766ebb01042787a074753cfdf101a2af9cddce544f802fecb
+generated: "2025-06-26T07:57:13.133181-07:00"

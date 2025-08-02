@@ -92,3 +92,19 @@
          Then open http://localhost:8888/ in your browser.
         If prompted for a token, use: {{ jupyter_token }}
     when: install.jupyter == true
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  roles:
+    - role: rag
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: install.rag == true
+  tasks:
+  - name: RAG Details
+    debug:
+      msg:   
+        - "RAG minio Password: {{ minio.password }}"
+        - "RAG minio Username: {{ minio.username }}"
+    when: install.rag == true

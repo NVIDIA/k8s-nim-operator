@@ -1,0 +1,24 @@
+- name: Check if RAG dependencies are installed
+  shell: helm list -n {{ namespace }} | egrep 'rag-minio|rag-milvus' | awk '{print $1}' | wc -l | tr -d '\n'
+  register: rag_installed
+  ignore_errors: true
+
+- name: Uninstall Minio and Milvus helm charts
+  shell: helm list -n {{ namespace }} | awk '{print $1}' | grep -v NAME | egrep 'rag-minio|rag-milvus' | xargs helm del -n {{ namespace }}
+  ignore_errors: true
+
+- name: Delete RAG PVCs
+  shell: kubectl get pvc -n {{ namespace }} | egrep 'rag-milvus|rag-minio' | awk '{print $1}' | xargs kubectl delete pvc -n {{ namespace }}
+  ignore_errors: true
+
+- name: Delete Milvus SA
+  command: kubectl delete serviceaccount milvus -n {{ namespace }}
+  ignore_errors: true
+
+- name: Delete Milvus role
+  command: kubectl delete role scc-anyuid -n {{ namespace }}
+  ignore_errors: true
+
+- name: Delete Milvus rolebinding
+  command: kubectl delete rolebinding milvus-scc-anyuid-binding -n {{ namespace }}
+  ignore_errors: true
