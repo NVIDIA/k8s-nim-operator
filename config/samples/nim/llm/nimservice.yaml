@@ -19,6 +19,15 @@ spec:
     limits:
       nvidia.com/gpu: 1
   expose:
+    httpRoute:
+      enabled: true
+      spec:
+        parentRefs:
+          - name: istio-gateway
+        host: foobar.com
+        paths:
+          - type: PathPrefix
+            value: /
     service:
       type: ClusterIP
       port: 8000
