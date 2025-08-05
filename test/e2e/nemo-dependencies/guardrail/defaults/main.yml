@@ -1,0 +1,11 @@
+---
+# defaults file for guardrail
+namespace: "guardrail"
+
+postgresql:
+  enabled: true
+  helm_release_name: guardrail-pg
+  helm_oci_registry: oci://registry-1.docker.io/bitnamicharts/postgresql
+  username: guardrailuser
+  password: guardrailpass
+  database: guardraildb
