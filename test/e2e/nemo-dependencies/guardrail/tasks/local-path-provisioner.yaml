@@ -1,0 +1,26 @@
+- name: Check if 'local-path-storage' namespace exists
+  shell: kubectl get namespace local-path-storage --no-headers
+  register: ns_check
+  ignore_errors: true
+
+
+- name: Deploy local-path-storage if not already deployed
+  shell: >
+    kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/{{ localPathProvisioner.version }}/deploy/local-path-storage.yaml
+  when: ns_check.rc != 0
+
+- name: Wait for local-path-provisioner deployment to be available
+  command: kubectl rollout status deployment/local-path-provisioner -n local-path-storage --timeout=120s
+  register: rollout_status
+  retries: 5
+  delay: 10
+  until: rollout_status.rc == 0
+  when: ns_check.rc != 0
+
+- name: Set 'local-path' as the default StorageClass
+  shell: |
+    kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  register: sc_patch_result
+  changed_when: "'patched' in sc_patch_result.stdout"
+  failed_when: sc_patch_result.rc != 0
+  when: localPathProvisioner.default | bool

@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
@@ -81,6 +82,9 @@ type NemoGuardrailSpec struct {
 	UserID       *int64 `json:"userID,omitempty"`
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
+
+	// DatabaseConfig stores the metadata for the guardrail service.
+	DatabaseConfig *DatabaseConfig `json:"databaseConfig,omitempty"`
 }
 
 type NIMEndpoint struct {
@@ -229,7 +233,82 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 			})
 		}
 	}
+
+	if n.Spec.DatabaseConfig != nil {
+		// Append the environment variables for Postgres
+		envVars = append(envVars, n.GetPostgresEnv()...)
+	}
 	return envVars
+}
+
+// GetPostgresEnv returns the PostgreSQL environment variables for a Kubernetes pod.
+func (n *NemoGuardrail) GetPostgresEnv() []corev1.EnvVar {
+	envVars := []corev1.EnvVar{
+		{
+			Name: "POSTGRES_DB_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: n.Spec.DatabaseConfig.Credentials.PasswordKey,
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DatabaseConfig.Credentials.SecretName,
+					},
+				},
+			},
+		},
+		{
+			Name: "POSTGRES_URI",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "uri",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Name,
+					},
+				},
+			},
+		},
+		{
+			Name: "DB_URI", // guardrails requires this env for external DB
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "uri",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Name,
+					},
+				},
+			},
+		},
+	}
+
+	return envVars
+}
+
+// GeneratePostgresConnString generates a PostgreSQL connection string using the database config.
+func (n *NemoGuardrail) GeneratePostgresConnString(secretValue string) string {
+	// Construct the connection string
+	connString := fmt.Sprintf(
+		"postgresql://%s:%s@%s:%d/%s",
+		n.Spec.DatabaseConfig.Credentials.User,
+		secretValue,
+		n.Spec.DatabaseConfig.Host,
+		n.Spec.DatabaseConfig.Port,
+		n.Spec.DatabaseConfig.DatabaseName,
+	)
+
+	return connString
+}
+
+func (n *NemoGuardrail) GetSecretParams(secretMapData map[string]string) *rendertypes.SecretParams {
+	params := &rendertypes.SecretParams{}
+
+	// Set metadata
+	params.Name = n.Name
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetLabels()
+	params.Annotations = n.GetAnnotations()
+
+	params.SecretMapData = secretMapData
+
+	return params
 }
 
 // GetStandardAnnotations returns default annotations to apply to the NemoGuardrail instance.
@@ -797,6 +876,65 @@ func (n *NemoGuardrail) GetServiceMonitorAnnotations() map[string]string {
 		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
 	return NemoGuardrailAnnotations
+}
+
+// GetInitContainers returns the init containers for the NemoGuardrail.
+//
+// It creates and returns a slice of corev1.Container.
+// The init containers include a busybox container to wait for Postgres to start,
+// and an guardrail-db-migration container to run the database migration.
+//
+// Returns a slice of corev1.Container.
+func (n *NemoGuardrail) GetInitContainers() []corev1.Container {
+
+	connCmd := fmt.Sprintf(
+		"until nc -z %s %d; do echo \"Waiting for Postgres to start \"; sleep 5; done",
+		n.Spec.DatabaseConfig.Host,
+		n.Spec.DatabaseConfig.Port)
+
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "NAMESPACE",
+			Value: n.Namespace,
+		},
+		{
+			Name:  "PYTHONPATH",
+			Value: "/app/services/guardrails",
+		},
+	}
+	// Append the environment variables for Postgres
+	envVars = append(envVars, n.GetPostgresEnv()...)
+
+	return []corev1.Container{
+		{
+			Name:            "wait-for-postgres",
+			Image:           "busybox",
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"sh", "-c", connCmd,
+			},
+		},
+		{
+			Name:            "guardrail-db-migration",
+			Image:           n.GetImage(),
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"/app/.venv/bin/alembic",
+			},
+			Args: []string{
+				"upgrade",
+				"head",
+			},
+			Env:        envVars,
+			WorkingDir: "/app/services/guardrails",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
 }
 
 func init() {

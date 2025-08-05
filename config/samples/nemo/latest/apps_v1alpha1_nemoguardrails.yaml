@@ -14,6 +14,14 @@ spec:
       size: "1Gi"
   nimEndpoint:
     baseURL: "http://meta-llama3-1b-instruct.nemo.svc.cluster.local:8000/v1"
+  databaseConfig:
+    host: guardrail-pg-postgresql.nemo.svc.cluster.local
+    port: 5432
+    databaseName: guardraildb
+    credentials:
+      user: guardrailuser
+      secretName: guardrail-pg-existing-secret
+      passwordKey: password
   expose:
     service:
       type: ClusterIP

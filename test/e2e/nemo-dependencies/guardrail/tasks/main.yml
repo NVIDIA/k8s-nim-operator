@@ -1,0 +1,8 @@
+---
+# tasks file for guardrail
+- include_tasks: local-path-provisioner.yaml
+  when: localPathProvisioner.enabled
+- include_tasks: namespace.yaml
+- include_tasks: secrets.yaml
+- include_tasks: postgresql.yaml
+  when: postgresql.enabled

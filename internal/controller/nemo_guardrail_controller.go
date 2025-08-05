@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 
@@ -367,6 +368,28 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 		}
 	}
 
+	if nemoGuardrail.Spec.DatabaseConfig != nil {
+		secretValue, err := r.getValueFromSecret(ctx, nemoGuardrail.GetNamespace(), nemoGuardrail.Spec.DatabaseConfig.Credentials.SecretName, nemoGuardrail.Spec.DatabaseConfig.Credentials.PasswordKey)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		data := nemoGuardrail.GeneratePostgresConnString(secretValue)
+		// Encode to base64
+		encoded := base64.StdEncoding.EncodeToString([]byte(data))
+
+		secretMapData := map[string]string{
+			"uri": encoded,
+		}
+
+		// Sync Evaluator Secret
+		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &corev1.Secret{}, func() (client.Object, error) {
+			return renderer.Secret(nemoGuardrail.GetSecretParams(secretMapData))
+		}, "secret", conditions.ReasonSecretFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	deploymentParams := nemoGuardrail.GetDeploymentParams()
 
 	// Setup volume mounts with model store
@@ -377,7 +400,17 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
-		return renderer.Deployment(deploymentParams)
+		result, err := renderer.Deployment(deploymentParams)
+		if err != nil {
+			return nil, err
+		}
+		if nemoGuardrail.Spec.DatabaseConfig != nil {
+			initContainers := nemoGuardrail.GetInitContainers()
+			if len(initContainers) > 0 {
+				result.Spec.Template.Spec.InitContainers = initContainers
+			}
+		}
+		return result, err
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -504,4 +537,21 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 		return err
 	}
 	return nil
+}
+
+func (r *NemoGuardrailReconciler) getValueFromSecret(ctx context.Context, namespace, secretName, key string) (string, error) {
+	// Get the secret
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: namespace}, secret)
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret: %w", err)
+	}
+
+	// Extract the secret value
+	value, exists := secret.Data[key]
+
+	if !exists {
+		return "", fmt.Errorf("key '%s' not found in secret '%s'", key, secretName)
+	}
+	return string(value), nil
 }
