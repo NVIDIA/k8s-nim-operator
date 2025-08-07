@@ -307,8 +307,6 @@ spec:
                     type: string
                   retriever:
                     type: string
-                  safetyHarness:
-                    type: string
                   similarityMetrics:
                     type: string
                 type: object
