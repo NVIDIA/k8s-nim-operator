@@ -1388,6 +1388,8 @@ spec:
                           fieldRef:
                             apiVersion: v1
                             fieldPath: metadata.namespace
+                      - name: ENABLE_WEBHOOKS
+                        value: "true"
                     image: 'ghcr.io/nvidia/k8s-nim-operator:main'
                     imagePullPolicy: Always
                     livenessProbe:
@@ -1445,3 +1447,45 @@ spec:
       supported: false
     - type: AllNamespaces
       supported: true
+  webhookdefinitions:
+  - type: ValidatingAdmissionWebhook
+    admissionReviewVersions:
+      - v1
+    containerPort: 9443
+    targetPort: 9443          
+    deploymentName: k8s-nim-operator
+    failurePolicy: Fail
+    generateName: vnimcache-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - apps.nvidia.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - nimcaches
+    sideEffects: None
+    webhookPath: /validate-apps-nvidia-com-v1alpha1-nimcache
+  - type: ValidatingAdmissionWebhook
+    admissionReviewVersions:
+      - v1
+    containerPort: 9443  
+    targetPort: 9443 
+    deploymentName: k8s-nim-operator
+    failurePolicy: Fail
+    generateName: vnimservice-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - apps.nvidia.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - nimservices
+    sideEffects: None
+    webhookPath: /validate-apps-nvidia-com-v1alpha1-nimservice
+
