@@ -22,6 +22,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -389,4 +390,20 @@ func ControllerOwnsIfCRDExists(discoveryClient discovery.DiscoveryInterface,
 			return builder.Owns(object)
 		},
 	)
+}
+
+func SplitQualifiedName(name string, defaultDomain string) (string, string) {
+	sep := strings.Index(string(name), "/")
+	if sep == -1 {
+		return defaultDomain, string(name)
+	}
+	return string(name[0:sep]), string(name[sep+1:])
+}
+
+func NormalizeQualifiedName(name string, defaultDomain string) string {
+	domain, _ := SplitQualifiedName(name, "")
+	if domain == "" {
+		return fmt.Sprintf("%s/%s", defaultDomain, name)
+	}
+	return name
 }

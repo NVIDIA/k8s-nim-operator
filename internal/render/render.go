@@ -42,6 +42,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
@@ -80,6 +81,8 @@ type Renderer interface {
 	ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error)
 	Secret(params *types.SecretParams) (*corev1.Secret, error)
 	InferenceService(params *types.InferenceServiceParams) (*kservev1beta1.InferenceService, error)
+	ResourceClaim(params *types.ResourceClaimParams) (*resourcev1beta2.ResourceClaim, error)
+	ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1beta2.ResourceClaimTemplate, error)
 }
 
 // TemplateData is used by the templating engine to render templates.
@@ -464,4 +467,38 @@ func (r *textTemplateRenderer) InferenceService(params *types.InferenceServicePa
 		return nil, fmt.Errorf("error converting unstructured object to InferenceService: %w", err)
 	}
 	return inferenceService, nil
+}
+
+// ResourceClaim renders a ResourceClaim spec with given templating data.
+func (r *textTemplateRenderer) ResourceClaim(params *types.ResourceClaimParams) (*resourcev1beta2.ResourceClaim, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "resourceclaim.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	resourceClaim := &resourcev1beta2.ResourceClaim{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, resourceClaim)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to ResourceClaim: %w", err)
+	}
+	return resourceClaim, nil
+}
+
+// ResourceClaimTemplate renders a ResourceClaimTemplate spec with given templating data.
+func (r *textTemplateRenderer) ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1beta2.ResourceClaimTemplate, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "resourceclaimtemplate.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	resourceClaimTemplate := &resourcev1beta2.ResourceClaimTemplate{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, resourceClaimTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to ResourceClaimTemplate: %w", err)
+	}
+	return resourceClaimTemplate, nil
 }

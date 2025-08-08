@@ -322,3 +322,27 @@ type InferenceServiceParams struct {
 	PodResourceClaims  []corev1.PodResourceClaim
 	DeploymentMode     string
 }
+
+type DRADeviceParams struct {
+	Name            string
+	Count           uint32
+	DeviceClassName string
+	CELExpressions  []string
+}
+
+type ResourceClaimParams struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	Devices     []DRADeviceParams
+}
+
+type ResourceClaimTemplateParams struct {
+	Name             string
+	Namespace        string
+	Labels           map[string]string
+	Annotations      map[string]string
+	ClaimAnnotations map[string]string
+	Devices          []DRADeviceParams
+}

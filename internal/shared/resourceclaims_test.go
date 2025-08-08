@@ -267,7 +267,7 @@ var _ = Describe("DRA resourceclaim tests", func() {
 		),
 	)
 
-	Describe("GenerateUniquePodClaimName", func() {
+	Describe("generateUniquePodClaimName", func() {
 		var nameCache map[string]int
 		const nimServiceName = "test-service"
 		const nimServiceNameHash = "8568b4fb55" // hash of "test-service"
@@ -281,39 +281,30 @@ var _ = Describe("DRA resourceclaim tests", func() {
 
 		// Helper function to calculate expected prefix
 		expectedPrefix := func(claimHash string, fieldIdx int) string {
-			return fmt.Sprintf("%s%s-%d-%s", podClaimNamePrefix, nimServiceNameHash, fieldIdx, claimHash)
+			return fmt.Sprintf("%s-%s-%d-%s", podClaimNamePrefix, nimServiceNameHash, fieldIdx, claimHash)
 		}
 
 		It("should generate unique name for ResourceClaimName", func() {
-			resource := &appsv1alpha1.DRAResource{
-				ResourceClaimName: ptr.To("test-claim"),
-			}
+			resourceName := "test-claim"
 
-			name1 := GenerateUniquePodClaimName(nameCache, nimServiceName, resource)
+			name1 := generateUniquePodClaimName(nameCache, nimServiceName, resourceName, DRAResourceFieldTypeClaim)
 			Expect(name1).To(HavePrefix(expectedPrefix(testClaimHash, 0)))
 			Expect(name1).To(HaveSuffix("-0"))
 		})
 
 		It("should generate unique name for ResourceClaimTemplateName", func() {
-			resource := &appsv1alpha1.DRAResource{
-				ResourceClaimTemplateName: ptr.To("test-template"),
-			}
+			resourceName := "test-template"
 
-			name1 := GenerateUniquePodClaimName(nameCache, nimServiceName, resource)
+			name1 := generateUniquePodClaimName(nameCache, nimServiceName, resourceName, DRAResourceFieldTypeClaimTemplate)
 			Expect(name1).To(HavePrefix(expectedPrefix(testTemplateHash, 1)))
 			Expect(name1).To(HaveSuffix("-0"))
 		})
 
-		It("should handle different templateswith same name", func() {
-			resource1 := &appsv1alpha1.DRAResource{
-				ResourceClaimTemplateName: ptr.To("test-template"),
-			}
-			resource2 := &appsv1alpha1.DRAResource{
-				ResourceClaimTemplateName: ptr.To("test-template"),
-			}
+		It("should handle different templates with same name", func() {
+			resourceName := "test-template"
 
-			name1 := GenerateUniquePodClaimName(nameCache, nimServiceName, resource1)
-			name2 := GenerateUniquePodClaimName(nameCache, nimServiceName, resource2)
+			name1 := generateUniquePodClaimName(nameCache, nimServiceName, resourceName, DRAResourceFieldTypeClaimTemplate)
+			name2 := generateUniquePodClaimName(nameCache, nimServiceName, resourceName, DRAResourceFieldTypeClaimTemplate)
 
 			Expect(name1).ToNot(Equal(name2))
 			Expect(name1).To(HavePrefix(expectedPrefix(testTemplateHash, 1)))
@@ -323,15 +314,11 @@ var _ = Describe("DRA resourceclaim tests", func() {
 		})
 
 		It("should handle claims and templates with different names", func() {
-			resource1 := &appsv1alpha1.DRAResource{
-				ResourceClaimName: ptr.To("test-claim-1"),
-			}
-			resource2 := &appsv1alpha1.DRAResource{
-				ResourceClaimTemplateName: ptr.To("test-template"),
-			}
+			resourceName1 := "test-claim-1"
+			resourceName2 := "test-template"
 
-			name1 := GenerateUniquePodClaimName(nameCache, nimServiceName, resource1)
-			name2 := GenerateUniquePodClaimName(nameCache, nimServiceName, resource2)
+			name1 := generateUniquePodClaimName(nameCache, nimServiceName, resourceName1, DRAResourceFieldTypeClaim)
+			name2 := generateUniquePodClaimName(nameCache, nimServiceName, resourceName2, DRAResourceFieldTypeClaimTemplate)
 
 			Expect(name1).ToNot(Equal(name2))
 			Expect(name1).To(HavePrefix(expectedPrefix(testClaim1Hash, 0)))
@@ -341,15 +328,10 @@ var _ = Describe("DRA resourceclaim tests", func() {
 		})
 
 		It("should handle claims and templates with same name", func() {
-			resource1 := &appsv1alpha1.DRAResource{
-				ResourceClaimName: ptr.To("test-claim"),
-			}
-			resource2 := &appsv1alpha1.DRAResource{
-				ResourceClaimTemplateName: ptr.To("test-claim"),
-			}
+			resourceName := "test-claim"
 
-			name1 := GenerateUniquePodClaimName(nameCache, nimServiceName, resource1)
-			name2 := GenerateUniquePodClaimName(nameCache, nimServiceName, resource2)
+			name1 := generateUniquePodClaimName(nameCache, nimServiceName, resourceName, DRAResourceFieldTypeClaim)
+			name2 := generateUniquePodClaimName(nameCache, nimServiceName, resourceName, DRAResourceFieldTypeClaimTemplate)
 
 			// The names should be different due to the counter, but the prefix should be the same
 			Expect(name1).ToNot(Equal(name2))
@@ -357,6 +339,43 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			Expect(name1).To(HaveSuffix("-0"))
 			Expect(name2).To(HavePrefix(expectedPrefix(testClaimHash, 1)))
 			Expect(name2).To(HaveSuffix("-0"))
+		})
+	})
+
+	Describe("generateUniqueDRAResourceName", func() {
+		const nimServiceName = "test-service"
+		const nimServiceNameHash = "8568b4fb55" // hash of "test-service"
+
+		It("should generate correct DRA resource names", func() {
+			namePrefix := "claim"
+			result := generateUniqueDRAResourceName(nimServiceName, namePrefix, 0)
+			expected := fmt.Sprintf("%s-%s-0", namePrefix, nimServiceNameHash)
+			Expect(result).To(Equal(expected))
+		})
+
+		It("should handle different NIM service names", func() {
+			namePrefix := "claim"
+			result1 := generateUniqueDRAResourceName("service-1", namePrefix, 0)
+			result2 := generateUniqueDRAResourceName("service-2", namePrefix, 0)
+
+			// Should have different hashes but same structure
+			Expect(result1).To(HavePrefix("claim-"))
+			Expect(result2).To(HavePrefix("claim-"))
+			Expect(result1).ToNot(Equal(result2))
+			Expect(result1).To(HaveSuffix("-0"))
+			Expect(result2).To(HaveSuffix("-0"))
+		})
+
+		It("should handle different indices", func() {
+			namePrefix := "template"
+			result1 := generateUniqueDRAResourceName(nimServiceName, namePrefix, 0)
+			result2 := generateUniqueDRAResourceName(nimServiceName, namePrefix, 1)
+
+			Expect(result1).To(HavePrefix("template-"))
+			Expect(result2).To(HavePrefix("template-"))
+			Expect(result1).ToNot(Equal(result2))
+			Expect(result1).To(HaveSuffix("-0"))
+			Expect(result2).To(HaveSuffix("-1"))
 		})
 	})
 
@@ -390,6 +409,8 @@ var _ = Describe("DRA resourceclaim tests", func() {
 				DRAResource: appsv1alpha1.DRAResource{
 					ResourceClaimName: ptr.To("test-claim"),
 				},
+				FieldType:    DRAResourceFieldTypeClaim,
+				ResourceName: "test-claim",
 			}
 
 			status, err := generateDRAResourceStatus(ctx, client, ns, resource)
@@ -431,6 +452,8 @@ var _ = Describe("DRA resourceclaim tests", func() {
 				DRAResource: appsv1alpha1.DRAResource{
 					ResourceClaimTemplateName: ptr.To("test-template"),
 				},
+				FieldType:    DRAResourceFieldTypeClaimTemplate,
+				ResourceName: "test-template",
 			}
 
 			status, err := generateDRAResourceStatus(ctx, client, ns, resource)
@@ -486,6 +509,8 @@ var _ = Describe("DRA resourceclaim tests", func() {
 				DRAResource: appsv1alpha1.DRAResource{
 					ResourceClaimTemplateName: ptr.To("test-template"),
 				},
+				FieldType:    DRAResourceFieldTypeClaimTemplate,
+				ResourceName: "test-template",
 			}
 			status, err := generateDRAResourceStatus(ctx, client, ns, resource)
 			Expect(err).NotTo(HaveOccurred())
@@ -535,6 +560,8 @@ var _ = Describe("DRA resourceclaim tests", func() {
 				DRAResource: appsv1alpha1.DRAResource{
 					ResourceClaimTemplateName: ptr.To("test-template"),
 				},
+				FieldType:    DRAResourceFieldTypeClaimTemplate,
+				ResourceName: "test-template",
 			}
 			status, err := generateDRAResourceStatus(ctx, client, ns, resource)
 			Expect(err).NotTo(HaveOccurred())
@@ -570,6 +597,8 @@ var _ = Describe("DRA resourceclaim tests", func() {
 				DRAResource: appsv1alpha1.DRAResource{
 					ResourceClaimTemplateName: ptr.To("test-template"),
 				},
+				FieldType:    DRAResourceFieldTypeClaimTemplate,
+				ResourceName: "test-template",
 			}
 
 			status, err := generateDRAResourceStatus(ctx, client, ns, resource)
@@ -588,6 +617,8 @@ var _ = Describe("DRA resourceclaim tests", func() {
 				DRAResource: appsv1alpha1.DRAResource{
 					ResourceClaimTemplateName: ptr.To("test-template"),
 				},
+				FieldType:    DRAResourceFieldTypeClaimTemplate,
+				ResourceName: "test-template",
 			}
 
 			// Fake client with no resourcev1beta2scheme
