@@ -31,7 +31,7 @@ jobs:
     if: false # TODO: Disabled until e2e test infra is fixed
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         
       - name: Calculate build vars
         id: vars
