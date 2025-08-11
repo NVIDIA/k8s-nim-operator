@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -51,7 +52,6 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // NIMServiceFinalizer is the finalizer annotation.
@@ -305,6 +305,9 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			)
 		},
 	)
+	if err != nil {
+		return err
+	}
 
 	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
 		r.discoveryClient,

@@ -122,7 +122,7 @@ type Ingress struct {
 	Spec        networkingv1.IngressSpec `json:"spec,omitempty"`
 }
 
-// HTTPRoute defines attributes to HTTPRoute in Gateway API
+// HTTPRoute defines attributes to HTTPRoute in Gateway API.
 type HTTPRoute struct {
 	Enabled     *bool             `json:"enabled,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`

@@ -350,7 +350,7 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 	case *kservev1beta1.InferenceService:
 		return updateInferenceService(castedObj, desired.(*kservev1beta1.InferenceService)) //nolint:forcetypeassert
 	case *gatewayv1.HTTPRoute:
-		return updateHTTPRoute(castedObj, desired.(*gatewayv1.HTTPRoute))
+		return updateHTTPRoute(castedObj, desired.(*gatewayv1.HTTPRoute)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
