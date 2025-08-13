@@ -722,17 +722,16 @@ func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimServ
 		return "", "", err
 	}
 
-	if deploymentMode == kserveconstants.RawDeployment {
-		if isvc.Status.Address != nil && isvc.Status.Address.URL != nil {
-			clusterEndpoint := isvc.Status.Address.URL.String()
-			return clusterEndpoint, externalEndpoint, nil
-		} else {
-			err := fmt.Errorf("cluster endpoint not available, nimservice %s", nimService.GetName())
-			logger.Error(err, "unable to get cluster endpoint", "nimservice", nimService.GetName(), "inferenceservice", isvc.GetName())
-			return "", "", err
-		}
+	var clusterEndpoint string
+	if isvc.Status.Address != nil && isvc.Status.Address.URL != nil {
+		clusterEndpoint = isvc.Status.Address.URL.String()
+	} else {
+		err := fmt.Errorf("cluster endpoint not available, nimservice %s", nimService.GetName())
+		logger.Error(err, "unable to get cluster endpoint", "nimservice", nimService.GetName(), "inferenceservice", isvc.GetName())
+		return "", "", err
 	}
-	return externalEndpoint, externalEndpoint, nil
+
+	return clusterEndpoint, externalEndpoint, nil
 }
 
 func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEndpoint string) (string, error) {

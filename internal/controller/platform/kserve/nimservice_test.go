@@ -1589,7 +1589,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			_ = client.Update(context.TODO(), isvc)
 			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.Serverless)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(internal).To(Equal("external.example.com"))
+			Expect(internal).To(Equal("cluster.example.com"))
 			Expect(external).To(Equal("external.example.com"))
 		})
 
