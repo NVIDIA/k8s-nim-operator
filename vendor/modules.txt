@@ -56,8 +56,8 @@ github.com/AdaLogics/go-fuzz-headers
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/BurntSushi/toml v1.3.2
-## explicit; go 1.16
+# github.com/BurntSushi/toml v1.4.0
+## explicit; go 1.18
 github.com/BurntSushi/toml
 github.com/BurntSushi/toml/internal
 # github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.25.0
@@ -84,16 +84,13 @@ github.com/Masterminds/sprig/v3
 # github.com/Masterminds/squirrel v1.5.4
 ## explicit; go 1.14
 github.com/Masterminds/squirrel
-# github.com/Microsoft/go-winio v0.6.1
-## explicit; go 1.17
+# github.com/Microsoft/go-winio v0.6.2
+## explicit; go 1.21
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/internal/fs
 github.com/Microsoft/go-winio/internal/socket
 github.com/Microsoft/go-winio/internal/stringbuffer
 github.com/Microsoft/go-winio/pkg/guid
-# github.com/Microsoft/hcsshim v0.11.4
-## explicit; go 1.18
-github.com/Microsoft/hcsshim/osversion
 # github.com/NVIDIA/k8s-test-infra v0.0.0-20240806103558-2d7411125519
 ## explicit; go 1.22.3
 github.com/NVIDIA/k8s-test-infra/pkg/diagnostics
@@ -224,8 +221,8 @@ github.com/cncf/xds/go/xds/data/orca/v3
 github.com/cncf/xds/go/xds/service/orca/v3
 github.com/cncf/xds/go/xds/type/matcher/v3
 github.com/cncf/xds/go/xds/type/v3
-# github.com/containerd/containerd v1.7.12
-## explicit; go 1.19
+# github.com/containerd/containerd v1.7.24
+## explicit; go 1.21
 github.com/containerd/containerd/archive/compression
 github.com/containerd/containerd/content
 github.com/containerd/containerd/content/local
@@ -235,9 +232,7 @@ github.com/containerd/containerd/images
 github.com/containerd/containerd/labels
 github.com/containerd/containerd/log
 github.com/containerd/containerd/pkg/randutil
-github.com/containerd/containerd/platforms
 github.com/containerd/containerd/reference
-github.com/containerd/containerd/reference/docker
 github.com/containerd/containerd/remotes
 github.com/containerd/containerd/remotes/docker
 github.com/containerd/containerd/remotes/docker/auth
@@ -245,16 +240,22 @@ github.com/containerd/containerd/remotes/docker/schema1
 github.com/containerd/containerd/remotes/errors
 github.com/containerd/containerd/tracing
 github.com/containerd/containerd/version
+# github.com/containerd/errdefs v0.3.0
+## explicit; go 1.20
+github.com/containerd/errdefs
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
-# github.com/cyphar/filepath-securejoin v0.3.1
+# github.com/containerd/platforms v0.2.1
 ## explicit; go 1.20
+github.com/containerd/platforms
+# github.com/cyphar/filepath-securejoin v0.3.6
+## explicit; go 1.18
 github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/distribution/reference v0.5.0
+# github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
 # github.com/docker/cli v25.0.1+incompatible
@@ -822,7 +823,7 @@ github.com/prometheus/procfs/internal/util
 # github.com/rivo/uniseg v0.4.4
 ## explicit; go 1.18
 github.com/rivo/uniseg
-# github.com/rubenv/sql-migrate v1.7.0
+# github.com/rubenv/sql-migrate v1.7.1
 ## explicit; go 1.21
 github.com/rubenv/sql-migrate
 github.com/rubenv/sql-migrate/sqlparse
@@ -955,14 +956,6 @@ go.opentelemetry.io/proto/otlp/collector/trace/v1
 go.opentelemetry.io/proto/otlp/common/v1
 go.opentelemetry.io/proto/otlp/resource/v1
 go.opentelemetry.io/proto/otlp/trace/v1
-# go.starlark.net v0.0.0-20231121155337-90ade8b19d09
-## explicit; go 1.18
-go.starlark.net/internal/compile
-go.starlark.net/internal/spell
-go.starlark.net/resolve
-go.starlark.net/starlark
-go.starlark.net/starlarkstruct
-go.starlark.net/syntax
 # go.uber.org/automaxprocs v1.6.0
 ## explicit; go 1.20
 go.uber.org/automaxprocs
@@ -1016,9 +1009,6 @@ golang.org/x/crypto/ssh/knownhosts
 ## explicit; go 1.22.0
 golang.org/x/exp/constraints
 golang.org/x/exp/slices
-# golang.org/x/mod v0.24.0
-## explicit; go 1.23.0
-golang.org/x/mod/semver
 # golang.org/x/net v0.39.0
 ## explicit; go 1.23.0
 golang.org/x/net/context
@@ -1099,27 +1089,9 @@ golang.org/x/text/unicode/norm
 golang.org/x/time/rate
 # golang.org/x/tools v0.31.0
 ## explicit; go 1.23.0
-golang.org/x/tools/cmd/stringer
 golang.org/x/tools/cover
 golang.org/x/tools/go/ast/inspector
-golang.org/x/tools/go/gcexportdata
-golang.org/x/tools/go/packages
-golang.org/x/tools/go/types/objectpath
-golang.org/x/tools/go/types/typeutil
-golang.org/x/tools/internal/aliases
 golang.org/x/tools/internal/astutil/edge
-golang.org/x/tools/internal/event
-golang.org/x/tools/internal/event/core
-golang.org/x/tools/internal/event/keys
-golang.org/x/tools/internal/event/label
-golang.org/x/tools/internal/gcimporter
-golang.org/x/tools/internal/gocommand
-golang.org/x/tools/internal/packagesinternal
-golang.org/x/tools/internal/pkgbits
-golang.org/x/tools/internal/stdlib
-golang.org/x/tools/internal/typeparams
-golang.org/x/tools/internal/typesinternal
-golang.org/x/tools/internal/versions
 # gomodules.xyz/jsonpatch/v2 v2.5.0
 ## explicit; go 1.20
 gomodules.xyz/jsonpatch/v2
@@ -1361,14 +1333,11 @@ gopkg.in/inf.v0
 # gopkg.in/warnings.v0 v0.1.2
 ## explicit
 gopkg.in/warnings.v0
-# gopkg.in/yaml.v2 v2.4.0
-## explicit; go 1.15
-gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# helm.sh/helm/v3 v3.16.1
-## explicit; go 1.22.0
+# helm.sh/helm/v3 v3.17.4
+## explicit; go 1.23.0
 helm.sh/helm/v3/internal/fileutil
 helm.sh/helm/v3/internal/resolver
 helm.sh/helm/v3/internal/sympath
@@ -1596,8 +1565,8 @@ k8s.io/apiserver/pkg/warning
 k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics
-# k8s.io/cli-runtime v0.31.0
-## explicit; go 1.22.0
+# k8s.io/cli-runtime v0.32.2
+## explicit; go 1.23.0
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/genericiooptions
 k8s.io/cli-runtime/pkg/printers
@@ -1940,8 +1909,8 @@ k8s.io/kube-openapi/pkg/validation/errors
 k8s.io/kube-openapi/pkg/validation/spec
 k8s.io/kube-openapi/pkg/validation/strfmt
 k8s.io/kube-openapi/pkg/validation/strfmt/bson
-# k8s.io/kubectl v0.31.0
-## explicit; go 1.22.0
+# k8s.io/kubectl v0.32.2
+## explicit; go 1.23.0
 k8s.io/kubectl/pkg/cmd/util
 k8s.io/kubectl/pkg/scheme
 k8s.io/kubectl/pkg/util/i18n
@@ -2078,8 +2047,8 @@ sigs.k8s.io/gateway-api/apis/v1
 ## explicit; go 1.23
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
-# sigs.k8s.io/kustomize/api v0.17.2
-## explicit; go 1.21
+# sigs.k8s.io/kustomize/api v0.18.0
+## explicit; go 1.22.7
 sigs.k8s.io/kustomize/api/filters/annotations
 sigs.k8s.io/kustomize/api/filters/fieldspec
 sigs.k8s.io/kustomize/api/filters/filtersutil
@@ -2124,8 +2093,8 @@ sigs.k8s.io/kustomize/api/provider
 sigs.k8s.io/kustomize/api/resmap
 sigs.k8s.io/kustomize/api/resource
 sigs.k8s.io/kustomize/api/types
-# sigs.k8s.io/kustomize/kyaml v0.17.1
-## explicit; go 1.21
+# sigs.k8s.io/kustomize/kyaml v0.18.1
+## explicit; go 1.22.7
 sigs.k8s.io/kustomize/kyaml/comments
 sigs.k8s.io/kustomize/kyaml/errors
 sigs.k8s.io/kustomize/kyaml/ext
@@ -2134,10 +2103,7 @@ sigs.k8s.io/kustomize/kyaml/filesys
 sigs.k8s.io/kustomize/kyaml/fn/runtime/container
 sigs.k8s.io/kustomize/kyaml/fn/runtime/exec
 sigs.k8s.io/kustomize/kyaml/fn/runtime/runtimeutil
-sigs.k8s.io/kustomize/kyaml/fn/runtime/starlark
-sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/qri-io/starlib/util
 sigs.k8s.io/kustomize/kyaml/kio
-sigs.k8s.io/kustomize/kyaml/kio/filters
 sigs.k8s.io/kustomize/kyaml/kio/kioutil
 sigs.k8s.io/kustomize/kyaml/openapi
 sigs.k8s.io/kustomize/kyaml/openapi/kubernetesapi
@@ -2157,7 +2123,6 @@ sigs.k8s.io/kustomize/kyaml/yaml/internal/k8sgen/pkg/util/sets
 sigs.k8s.io/kustomize/kyaml/yaml/internal/k8sgen/pkg/util/validation
 sigs.k8s.io/kustomize/kyaml/yaml/internal/k8sgen/pkg/util/validation/field
 sigs.k8s.io/kustomize/kyaml/yaml/merge2
-sigs.k8s.io/kustomize/kyaml/yaml/merge3
 sigs.k8s.io/kustomize/kyaml/yaml/schema
 sigs.k8s.io/kustomize/kyaml/yaml/walk
 # sigs.k8s.io/lws v0.6.2
