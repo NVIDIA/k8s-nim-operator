@@ -134,8 +134,10 @@ rules:
   - watch
 - apiGroups:
   - batch
+  - batch.volcano.sh
   resources:
   - jobs
+  - jobs/status
   verbs:
   - create
   - delete
@@ -145,15 +147,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - batch.volcano.sh
-  resources:
-  - jobs
-  - jobs/status
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - config.openshift.io
   resources:
   - clusterversions
@@ -161,6 +154,18 @@ rules:
   verbs:
   - get
   - list
+  - watch
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - httproutes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - leaderworkerset.x-k8s.io
