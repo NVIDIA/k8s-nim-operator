@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -338,18 +339,26 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 	r.GetEventRecorder().Eventf(nimPipeline, corev1.EventTypeNormal, overallState,
 		"NIMPipeline %s status %s, service states %v", nimPipeline.Name, overallState, serviceStates)
 
-	if err := r.Status().Update(ctx, nimPipeline); err != nil {
-		logger.Error(err, "Failed to update NIMPipeline status")
-		return err
-	}
-
-	return nil
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		obj := &appsv1alpha1.NIMPipeline{}
+		errGet := r.Get(ctx, types.NamespacedName{Name: nimPipeline.Name, Namespace: nimPipeline.GetNamespace()}, obj)
+		if errGet != nil {
+			logger.Error(errGet, "error getting NIMPipeline", "name", nimPipeline.Name)
+			return errGet
+		}
+		obj.Status = nimPipeline.Status
+		if err := r.Status().Update(ctx, obj); err != nil {
+			logger.Error(err, "Failed to update status", "NIMPipeline", nimPipeline.Name)
+			return err
+		}
+		return nil
+	})
 }
 
 func (r *NIMPipelineReconciler) deleteService(ctx context.Context, svc *appsv1alpha1.NIMService) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Deleting NIMService", "name", svc.Name, "namespace", svc.Namespace)
-	if err := r.Delete(ctx, svc); err != nil {
+	if err := r.Delete(ctx, svc); err != nil && !errors.IsNotFound(err) {
 		logger.Error(err, "Failed to delete NIMService", "name", svc.Name)
 		return err
 	}
