@@ -548,3 +548,108 @@ func TestValidatePVCImmutability(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateKServeConfiguration covers all KServe-specific validation rules.
+func TestValidateKServeConfiguration(t *testing.T) {
+	fld := field.NewPath("spec")
+
+	trueVal := true
+
+	tests := []struct {
+		name     string
+		modify   func(*appsv1alpha1.NIMService)
+		wantErrs int
+	}{
+		{
+			name: "standalone platform – no errors",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeStandalone
+			},
+			wantErrs: 0,
+		},
+		{
+			name: "kserve serverless (annotation absent) – valid",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				// No annotation ⇒ serverless by default.
+			},
+			wantErrs: 0,
+		},
+		{
+			name: "kserve serverless (annotation present) – autoscaling set",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ns.Spec.Annotations = map[string]string{"serving.kserve.org/deploymentMode": "Serverless"}
+				ns.Spec.Scale.Enabled = &trueVal
+			},
+			wantErrs: 1,
+		},
+		{
+			name: "kserve serverless – ingress set",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ingEnabled := true
+				ns.Spec.Expose.Ingress.Enabled = &ingEnabled
+			},
+			wantErrs: 1,
+		},
+		{
+			name: "kserve serverless – servicemonitor set",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ns.Spec.Metrics.Enabled = &trueVal
+			},
+			wantErrs: 1,
+		},
+		{
+			name: "kserve serverless – all prohibited set",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ns.Spec.Scale.Enabled = &trueVal
+				ingEnabled := true
+				ns.Spec.Expose.Ingress.Enabled = &ingEnabled
+				ns.Spec.Metrics.Enabled = &trueVal
+			},
+			wantErrs: 3,
+		},
+		{
+			name: "kserve rawdeployment – allowed autoscaling, but multidnode forbidden",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ns.Spec.Annotations = map[string]string{"serving.kserve.org/deploymentMode": "RawDeployment"}
+				ns.Spec.Scale.Enabled = &trueVal // should be fine
+				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 1}
+			},
+			wantErrs: 1, // only multiNode should trigger
+		},
+		{
+			name: "kserve – multidnode alone",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 2}
+			},
+			wantErrs: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ns := baseNIMService()
+			// Ensure nested structs are initialised to avoid nil panics when we set sub-fields.
+			ns.Spec.Scale = appsv1alpha1.Autoscaling{}
+			ns.Spec.Expose = appsv1alpha1.Expose{}
+			ns.Spec.Expose.Ingress = appsv1alpha1.Ingress{}
+			ns.Spec.Metrics = appsv1alpha1.Metrics{}
+
+			tc.modify(ns)
+
+			errs := validateKServeConfiguration(&ns.Spec, fld)
+			if got := len(errs); got != tc.wantErrs {
+				for i, err := range errs {
+					t.Logf("  %d: %s", i+1, err.Error())
+				}
+				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+			}
+		})
+	}
+}

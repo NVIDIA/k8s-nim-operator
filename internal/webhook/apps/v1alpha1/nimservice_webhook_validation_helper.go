@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -34,6 +35,27 @@ var validPVCAccessModeStrs = []corev1.PersistentVolumeAccessMode{
 	corev1.ReadOnlyMany,
 	corev1.ReadWriteMany,
 	corev1.ReadWriteOncePod,
+}
+
+// validateNIMServiceSpec aggregates all structural validation checks for a NIMService
+// object. It is intended to be invoked by both ValidateCreate and ValidateUpdate to
+// ensure the resource is well-formed before any other validation (e.g. immutability)
+// is performed.
+func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, kubeVersion string) field.ErrorList {
+	errList := field.ErrorList{}
+
+	// Validate individual sections of the spec using existing helper functions.
+	errList = append(errList, validateImageConfiguration(&spec.Image, fldPath.Child("image"))...)
+	errList = append(errList, validateAuthSecret(&spec.AuthSecret, fldPath.Child("authSecret"))...)
+	errList = append(errList, validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))...)
+	errList = append(errList, validateExposeConfiguration(&spec.Expose, fldPath.Child("expose").Child("ingress"))...)
+	errList = append(errList, validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))...)
+	errList = append(errList, validateScaleConfiguration(&spec.Scale, fldPath.Child("scale"))...)
+	errList = append(errList, validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))...)
+	errList = append(errList, validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)...)
+	errList = append(errList, validateKServeConfiguration(spec, fldPath)...)
+
+	return errList
 }
 
 func validateImageConfiguration(image *appsv1alpha1.Image, fldPath *field.Path) field.ErrorList {
@@ -212,22 +234,39 @@ func validateResourcesConfiguration(resources *corev1.ResourceRequirements, fldP
 	return errList
 }
 
-// validateNIMServiceSpec aggregates all structural validation checks for a NIMService
-// object. It is intended to be invoked by both ValidateCreate and ValidateUpdate to
-// ensure the resource is well-formed before any other validation (e.g. immutability)
-// is performed.
-func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, kubeVersion string) field.ErrorList {
+// validateKServeonfiguration implements required KServe validations.
+func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
 
-	// Validate individual sections of the spec using existing helper functions.
-	errList = append(errList, validateImageConfiguration(&spec.Image, fldPath.Child("image"))...)
-	errList = append(errList, validateAuthSecret(&spec.AuthSecret, fldPath.Child("authSecret"))...)
-	errList = append(errList, validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))...)
-	errList = append(errList, validateExposeConfiguration(&spec.Expose, fldPath.Child("expose").Child("ingress"))...)
-	errList = append(errList, validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))...)
-	errList = append(errList, validateScaleConfiguration(&spec.Scale, fldPath.Child("scale"))...)
-	errList = append(errList, validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))...)
-	errList = append(errList, validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)...)
+	platformIsKServe := spec.InferencePlatform == appsv1alpha1.PlatformTypeKServe
+
+	// mode is the value, and annotated is true if the key-value pair exist.
+	mode, annotated := spec.Annotations["serving.kserve.org/deploymentMode"]
+	// If the annotation is absent, kserve defaults to serverless.
+	serverless := !annotated || strings.EqualFold(mode, "serverless")
+
+	// When Spec.InferencePlatform is "kserve" and used in "serverless" mode:
+	if platformIsKServe && serverless {
+		// Spec.Scale (autoscaling) cannot be set.
+		if spec.Scale.Enabled != nil && *spec.Scale.Enabled {
+			errList = append(errList, field.Forbidden(fldPath.Child("scale").Child("enabled"), fmt.Sprintf("%s (autoscaling) cannot be set when KServe runs in serverless mode", fldPath.Child("scale"))))
+		}
+
+		// Spec.Expose.Ingress cannot be set.
+		if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled {
+			errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("expose").Child("ingress"))))
+		}
+
+		// Spec.Metrics.ServiceMonitor cannot be set.
+		if spec.Metrics.Enabled != nil && *spec.Metrics.Enabled {
+			errList = append(errList, field.Forbidden(fldPath.Child("metrics").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("metrics").Child("serviceMonitor"))))
+		}
+	}
+
+	// Spec.MultiNode cannot be enabled when inferencePlatform is kserve.
+	if platformIsKServe && spec.MultiNode != nil {
+		errList = append(errList, field.Forbidden(fldPath.Child("multiNode"), "cannot be set when KServe runs in serverless mode"))
+	}
 
 	return errList
 }
