@@ -70,13 +70,13 @@ func (v *NIMCacheCustomValidator) ValidateCreate(_ context.Context, obj runtime.
 
 	fldPath := field.NewPath("nimcache").Child("spec")
 	// Perform structural validation via helper.
-	errList := validateNIMCacheSpec(&nimcache.Spec, fldPath)
+	warningList, errList := validateNIMCacheSpec(&nimcache.Spec, fldPath)
 
 	if len(errList) > 0 {
-		return nil, errList.ToAggregate()
+		return warningList, errList.ToAggregate()
 	}
 
-	return nil, nil
+	return warningList, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NIMCache.
@@ -91,7 +91,7 @@ func (v *NIMCacheCustomValidator) ValidateUpdate(_ context.Context, oldObj, newO
 	fldPath := field.NewPath("nimcache").Child("spec")
 
 	// Begin by validating the new spec structurally.
-	errList := validateNIMCacheSpec(&nimcache.Spec, fldPath)
+	warningList, errList := validateNIMCacheSpec(&nimcache.Spec, fldPath)
 
 	oldNIMCache, ok := oldObj.(*appsv1alpha1.NIMCache)
 	if !ok {
@@ -103,13 +103,15 @@ func (v *NIMCacheCustomValidator) ValidateUpdate(_ context.Context, oldObj, newO
 	}
 
 	// Append immutability errors after structural checks.
-	errList = append(errList, validateImmutableNIMCacheSpec(oldNIMCache, newNIMCache, field.NewPath("nimcache"))...)
+	wList, eList := validateImmutableNIMCacheSpec(oldNIMCache, newNIMCache, field.NewPath("nimcache"))
+	warningList = append(warningList, wList...)
+	errList = append(errList, eList...)
 
 	if len(errList) > 0 {
-		return nil, errList.ToAggregate()
+		return warningList, errList.ToAggregate()
 	}
 
-	return nil, nil
+	return warningList, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type NIMCache.

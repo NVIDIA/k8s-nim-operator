@@ -30,21 +30,24 @@ func TestValidateNGCSource(t *testing.T) {
 	fldPath := field.NewPath("spec").Child("source").Child("ngc")
 
 	tests := []struct {
-		name     string
-		src      *appsv1alpha1.NGCSource
-		wantErrs int
+		name         string
+		src          *appsv1alpha1.NGCSource
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "nil source",
-			src:      nil,
-			wantErrs: 0,
+			name:         "nil source",
+			src:          nil,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "missing secrets and puller",
 			src: &appsv1alpha1.NGCSource{
 				Model: &appsv1alpha1.ModelSpec{},
 			},
-			wantErrs: 2,
+			wantErrs:     2,
+			wantWarnings: 0,
 		},
 		{
 			name: "ngcsource.model.profiles contains 'all' and more values",
@@ -55,7 +58,8 @@ func TestValidateNGCSource(t *testing.T) {
 					Profiles: []string{"all", "foo"},
 				},
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "profiles with forbidden additional fields",
@@ -68,7 +72,8 @@ func TestValidateNGCSource(t *testing.T) {
 					Engine:    "test",
 				},
 			},
-			wantErrs: 2,
+			wantErrs:     2,
+			wantWarnings: 0,
 		},
 		{
 			name: "invalid qos profile",
@@ -79,7 +84,8 @@ func TestValidateNGCSource(t *testing.T) {
 					QoSProfile: "fast",
 				},
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid source",
@@ -91,7 +97,8 @@ func TestValidateNGCSource(t *testing.T) {
 					QoSProfile: "throughput",
 				},
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid source #2",
@@ -102,7 +109,8 @@ func TestValidateNGCSource(t *testing.T) {
 					Profiles: []string{"foo"},
 				},
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid source #3",
@@ -113,19 +121,19 @@ func TestValidateNGCSource(t *testing.T) {
 					QoSProfile: "latency",
 				},
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateNGCSource(tc.src, fldPath)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateNGCSource(tc.src, fldPath)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -139,14 +147,16 @@ func TestValidateNIMCacheStorageConfiguration(t *testing.T) {
 	trueVal := true
 
 	tests := []struct {
-		name     string
-		storage  *appsv1alpha1.NIMCacheStorage
-		wantErrs int
+		name         string
+		storage      *appsv1alpha1.NIMCacheStorage
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "empty storage",
-			storage:  &appsv1alpha1.NIMCacheStorage{},
-			wantErrs: 1,
+			name:         "empty storage",
+			storage:      &appsv1alpha1.NIMCacheStorage{},
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "create false name empty",
@@ -155,7 +165,8 @@ func TestValidateNIMCacheStorageConfiguration(t *testing.T) {
 					Create: &falseVal,
 				},
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "invalid volume access mode",
@@ -165,7 +176,8 @@ func TestValidateNIMCacheStorageConfiguration(t *testing.T) {
 					VolumeAccessMode: "RandomMode",
 				},
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid storage",
@@ -177,19 +189,19 @@ func TestValidateNIMCacheStorageConfiguration(t *testing.T) {
 					VolumeAccessMode: corev1.ReadWriteOnce,
 				},
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateNIMCacheStorageConfiguration(tc.storage, fldPath)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateNIMCacheStorageConfiguration(tc.storage, fldPath)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -200,40 +212,46 @@ func TestValidateProxyConfiguration(t *testing.T) {
 	fldPath := field.NewPath("spec").Child("proxy")
 
 	tests := []struct {
-		name     string
-		proxy    *appsv1alpha1.ProxySpec
-		wantErrs int
+		name         string
+		proxy        *appsv1alpha1.ProxySpec
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "nil proxy",
-			proxy:    nil,
-			wantErrs: 0,
+			name:         "nil proxy",
+			proxy:        nil,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
-			name:     "empty proxy",
-			proxy:    &appsv1alpha1.ProxySpec{},
-			wantErrs: 0,
+			name:         "empty proxy",
+			proxy:        &appsv1alpha1.ProxySpec{},
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "invalid noProxy token",
 			proxy: &appsv1alpha1.ProxySpec{
 				NoProxy: "invalid_token$",
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "missing scheme http proxy",
 			proxy: &appsv1alpha1.ProxySpec{
 				HttpProxy: "proxy:8080",
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "missing scheme https proxy",
 			proxy: &appsv1alpha1.ProxySpec{
 				HttpsProxy: "proxy:8443",
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid proxy spec",
@@ -242,19 +260,19 @@ func TestValidateProxyConfiguration(t *testing.T) {
 				HttpsProxy: "https://proxy:8443",
 				NoProxy:    "localhost,.example.com,10.1.2.3",
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateProxyConfiguration(tc.proxy, fldPath)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateProxyConfiguration(tc.proxy, fldPath)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -265,14 +283,16 @@ func TestValidateNIMSourceConfiguration(t *testing.T) {
 	fldPath := field.NewPath("spec").Child("source")
 
 	tests := []struct {
-		name     string
-		source   *appsv1alpha1.NIMSource
-		wantErrs int
+		name         string
+		source       *appsv1alpha1.NIMSource
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "empty NIMSource (no NGC)",
-			source:   &appsv1alpha1.NIMSource{},
-			wantErrs: 0,
+			name:         "empty NIMSource (no NGC)",
+			source:       &appsv1alpha1.NIMSource{},
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "NGC errors propagate",
@@ -285,19 +305,18 @@ func TestValidateNIMSourceConfiguration(t *testing.T) {
 					},
 				},
 			},
-			wantErrs: 5, // missing authSecret & modelPuller, profiles should only have one entry. If profiles is defined, all other model fields must be empty
+			wantErrs:     5, // missing authSecret & modelPuller, profiles should only have one entry. If profiles is defined, all other model fields must be empty
+			wantWarnings: 0,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateNIMSourceConfiguration(tc.source, fldPath)
-			if got := len(errs); got != tc.wantErrs {
-				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+			w, errs := validateNIMSourceConfiguration(tc.source, fldPath)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -321,34 +340,36 @@ func TestValidateImmutableNIMCacheSpec(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		oldObj   *appsv1alpha1.NIMCache
-		newObj   *appsv1alpha1.NIMCache
-		wantErrs int
+		name         string
+		oldObj       *appsv1alpha1.NIMCache
+		newObj       *appsv1alpha1.NIMCache
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "spec unchanged",
-			oldObj:   buildCache("10Gi"),
-			newObj:   buildCache("10Gi"),
-			wantErrs: 0,
+			name:         "spec unchanged",
+			oldObj:       buildCache("10Gi"),
+			newObj:       buildCache("10Gi"),
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
-			name:     "spec changed (PVC size)",
-			oldObj:   buildCache("10Gi"),
-			newObj:   buildCache("20Gi"),
-			wantErrs: 1,
+			name:         "spec changed (PVC size)",
+			oldObj:       buildCache("10Gi"),
+			newObj:       buildCache("20Gi"),
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateImmutableNIMCacheSpec(tc.oldObj, tc.newObj, fldPath)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateImmutableNIMCacheSpec(tc.oldObj, tc.newObj, fldPath)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
