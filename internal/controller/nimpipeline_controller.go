@@ -310,6 +310,10 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 		switch svc.Status.State {
 		case appsv1alpha1.NIMServiceStatusReady:
 			// Leave the overall status as is
+		case appsv1alpha1.NIMServiceStatusFailed:
+			// If any service has failed, set the overall state to "Failed"
+			overallState = appsv1alpha1.NIMServiceStatusFailed
+			allServicesReady = false
 		default:
 			// If any service is not ready, set overall readiness to false
 			allServicesReady = false
