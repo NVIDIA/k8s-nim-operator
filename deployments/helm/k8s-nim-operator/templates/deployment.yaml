@@ -28,7 +28,8 @@ spec:
         {{- end }}
     spec:
       containers:
-      - args: {{- toYaml .Values.operator.args | nindent 8 }}
+      - args:
+        {{- include "k8s-nim-operator.fullArgs" . | nindent 8 }}
         command:
         - /manager
         image: {{ include "k8s-nim-operator.fullimage" . }}
