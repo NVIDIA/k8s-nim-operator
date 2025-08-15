@@ -308,19 +308,17 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 		serviceStates[svc.Name] = svc.Status.State
 
 		switch svc.Status.State {
-		case appsv1alpha1.NIMServiceStatusFailed:
-			// If any service has failed, set the overall state to "Failed"
-			overallState = appsv1alpha1.NIMServiceStatusFailed
-			allServicesReady = false
-		case appsv1alpha1.NIMServiceStatusNotReady, appsv1alpha1.NIMServiceStatusPending:
-			// If any service is not ready or pending, set overall readiness to false
+		case appsv1alpha1.NIMServiceStatusReady:
+			// Leave the overall status as is
+		default:
+			// If any service is not ready, set overall readiness to false
 			allServicesReady = false
 		}
 	}
 
 	// Check if any enabled services are missing
-	for serviceName := range enabledServices {
-		if !foundServices[serviceName] {
+	for serviceName, enabled := range enabledServices {
+		if enabled && !foundServices[serviceName] {
 			// A required service is missing, mark as "NotReady"
 			allServicesReady = false
 			serviceStates[serviceName] = appsv1alpha1.NIMServiceStatusNotReady
