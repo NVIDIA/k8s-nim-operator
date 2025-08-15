@@ -1,0 +1,45 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama3-8b-instruct
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: "1.8.3"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama3-8b-instruct
+      profile: ''
+  replicas: 1
+  draResources:
+  - claimSpec:
+      isTemplate: true
+      devices:
+      - name: gpu
+        deviceClassName: gpu.nvidia.com
+        driverName: gpu.nvidia.com
+        matchAttributes:
+        - key: index
+          op: NotEqual
+          value:
+            intValue: 0
+        - key: driverVersion
+          op: GreaterThanOrEqual
+          value:
+            versionValue: "550.127.8"
+        - key: architecture
+          op: Equal
+          value:
+            stringValue: Ampere
+        matchCapacity:
+        - key: memory
+          op: Equal
+          value: 40Gi
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
