@@ -24,6 +24,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -36,7 +37,8 @@ var validPVCAccessModeStrs = []corev1.PersistentVolumeAccessMode{
 	corev1.ReadWriteOncePod,
 }
 
-func validateImageConfiguration(image *appsv1alpha1.Image, fldPath *field.Path) field.ErrorList {
+func validateImageConfiguration(image *appsv1alpha1.Image, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if image.Repository == "" {
 		errList = append(errList, field.Required(fldPath.Child("repository"), "is required"))
@@ -44,10 +46,11 @@ func validateImageConfiguration(image *appsv1alpha1.Image, fldPath *field.Path) 
 	if image.Tag == "" {
 		errList = append(errList, field.Required(fldPath.Child("tag"), "is required"))
 	}
-	return errList
+	return warningList, errList
 }
 
-func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage, fldPath *field.Path) field.ErrorList {
+func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	// If size limit is defined, it must be greater than 0
 	if storage.SharedMemorySizeLimit != nil {
@@ -98,10 +101,11 @@ func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage
 		errList = append(errList, validatePVCConfiguration(&storage.PVC, fldPath.Child("pvc"))...)
 	}
 
-	return errList
+	return warningList, errList
 }
 
-func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, k8sVersion string) field.ErrorList {
+func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, k8sVersion string) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	draResourcesPath := fldPath.Child("draResources")
 
@@ -151,19 +155,21 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 			}
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
-func validateAuthSecret(authSecret *string, fldPath *field.Path) field.ErrorList {
+func validateAuthSecret(authSecret *string, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if *authSecret == "" {
 		errList = append(errList, field.Required(fldPath, "is required"))
 	}
-	return errList
+	return warningList, errList
 }
 
 // If Spec.Expose.Ingress.Enabled is true, Spec.Expose.Ingress.Spec must be non-nil.
-func validateExposeConfiguration(expose *appsv1alpha1.Expose, fldPath *field.Path) field.ErrorList {
+func validateExposeConfiguration(expose *appsv1alpha1.Expose, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if expose.Ingress.Enabled != nil && *expose.Ingress.Enabled {
 		if reflect.DeepEqual(expose.Ingress.Spec, networkingv1.IngressSpec{}) {
@@ -176,73 +182,102 @@ func validateExposeConfiguration(expose *appsv1alpha1.Expose, fldPath *field.Pat
 			errList = append(errList, field.Required(fldPath.Child("spec"), fmt.Sprintf("must be defined if %s is true", fldPath.Child("enabled"))))
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
 // If Spec.Metrics.Enabled is true, Spec.Metrics.ServiceMonitor must not be empty.
-func validateMetricsConfiguration(metrics *appsv1alpha1.Metrics, fldPath *field.Path) field.ErrorList {
+func validateMetricsConfiguration(metrics *appsv1alpha1.Metrics, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if metrics.Enabled != nil && *metrics.Enabled {
 		if reflect.DeepEqual(metrics.ServiceMonitor, appsv1alpha1.ServiceMonitor{}) {
 			errList = append(errList, field.Required(fldPath.Child("serviceMonitor"), fmt.Sprintf("must be defined if %s is true", fldPath.Child("enabled"))))
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
 // If Spec.Scale.Enabled is true, Spec.Scale.HPA must be non-empty HorizontalPodAutoScaler.
-func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, fldPath *field.Path) field.ErrorList {
+func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if scale.Enabled != nil && *scale.Enabled {
 		if reflect.DeepEqual(scale.HPA, appsv1alpha1.HorizontalPodAutoscalerSpec{}) {
 			errList = append(errList, field.Required(fldPath.Child("hpa"), fmt.Sprintf("must be defined if %s is true", fldPath.Child("enabled"))))
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
 // Spec.Resources.Claims must be empty.
-func validateResourcesConfiguration(resources *corev1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
+func validateResourcesConfiguration(resources *corev1.ResourceRequirements, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if resources != nil {
 		if resources.Claims != nil || len(resources.Claims) != 0 {
 			errList = append(errList, field.Forbidden(fldPath.Child("claims"), "must be empty"))
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
 // validateNIMServiceSpec aggregates all structural validation checks for a NIMService
 // object. It is intended to be invoked by both ValidateCreate and ValidateUpdate to
 // ensure the resource is well-formed before any other validation (e.g. immutability)
 // is performed.
-func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, kubeVersion string) field.ErrorList {
+func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, kubeVersion string) (admission.Warnings, field.ErrorList) {
 	errList := field.ErrorList{}
+	warningList := admission.Warnings{}
 
-	// Validate individual sections of the spec using existing helper functions.
-	errList = append(errList, validateImageConfiguration(&spec.Image, fldPath.Child("image"))...)
-	errList = append(errList, validateAuthSecret(&spec.AuthSecret, fldPath.Child("authSecret"))...)
-	errList = append(errList, validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))...)
-	errList = append(errList, validateExposeConfiguration(&spec.Expose, fldPath.Child("expose").Child("ingress"))...)
-	errList = append(errList, validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))...)
-	errList = append(errList, validateScaleConfiguration(&spec.Scale, fldPath.Child("scale"))...)
-	errList = append(errList, validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))...)
-	errList = append(errList, validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)...)
+	// TODO abstract all validation functions with a single signature validateFunc(*appsv1alpha1.NIMServiceSpec, *field.Path) (admission.Warnings, field.ErrorList)
+	w, err := validateImageConfiguration(&spec.Image, fldPath.Child("image"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
 
-	return errList
+	w, err = validateAuthSecret(&spec.AuthSecret, fldPath.Child("authSecret"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateExposeConfiguration(&spec.Expose, fldPath.Child("expose").Child("ingress"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateScaleConfiguration(&spec.Scale, fldPath.Child("scale"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	return warningList, errList
 }
 
 // validateMultiNodeImmutability ensures that the MultiNode field remains unchanged after creation.
-func validateMultiNodeImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) field.ErrorList {
+func validateMultiNodeImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if !equality.Semantic.DeepEqual(oldNs.Spec.MultiNode, newNs.Spec.MultiNode) {
 		errList = append(errList, field.Forbidden(fldPath, "is immutable once the resource is created"))
 	}
-	return errList
+	return warningList, errList
 }
 
 // validatePVCImmutability verifies that once a PVC is created with create: true, no further modifications are allowed.
-func validatePVCImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) field.ErrorList {
+func validatePVCImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	oldPVC := oldNs.Spec.Storage.PVC
 	newPVC := newNs.Spec.Storage.PVC
@@ -251,5 +286,5 @@ func validatePVCImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *fie
 			errList = append(errList, field.Forbidden(fldPath, fmt.Sprintf("is immutable once it is created with %s = true", fldPath.Child("create"))))
 		}
 	}
-	return errList
+	return warningList, errList
 }

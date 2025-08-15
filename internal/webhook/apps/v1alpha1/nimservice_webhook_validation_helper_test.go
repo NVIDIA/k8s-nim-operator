@@ -32,41 +32,45 @@ func TestValidateImageConfiguration(t *testing.T) {
 	fldPath := field.NewPath("spec").Child("image")
 
 	tests := []struct {
-		name     string
-		image    *appsv1alpha1.Image
-		wantErrs int
+		name         string
+		image        *appsv1alpha1.Image
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "valid image",
-			image:    &appsv1alpha1.Image{Repository: "repo", Tag: "latest"},
-			wantErrs: 0,
+			name:         "valid image",
+			image:        &appsv1alpha1.Image{Repository: "repo", Tag: "latest"},
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
-			name:     "missing repository",
-			image:    &appsv1alpha1.Image{Tag: "v1"},
-			wantErrs: 1,
+			name:         "missing repository",
+			image:        &appsv1alpha1.Image{Tag: "v1"},
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
-			name:     "missing tag",
-			image:    &appsv1alpha1.Image{Repository: "repo"},
-			wantErrs: 1,
+			name:         "missing tag",
+			image:        &appsv1alpha1.Image{Repository: "repo"},
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
-			name:     "missing both",
-			image:    &appsv1alpha1.Image{},
-			wantErrs: 2,
+			name:         "missing both",
+			image:        &appsv1alpha1.Image{},
+			wantErrs:     2,
+			wantWarnings: 0,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateImageConfiguration(tc.image, fldPath)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateImageConfiguration(tc.image, fldPath)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -91,14 +95,16 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 	sizeNeg := resource.MustParse("0")
 
 	tests := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "missing both nimCache and pvc",
-			modify:   func(ns *appsv1alpha1.NIMService) {},
-			wantErrs: 1,
+			name:         "missing both nimCache and pvc",
+			modify:       func(ns *appsv1alpha1.NIMService) {},
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "both nimCache and pvc defined",
@@ -106,14 +112,16 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 				ns.Spec.Storage.NIMCache = appsv1alpha1.NIMCacheVolSpec{Name: "cache", Profile: "p"}
 				ns.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Name: "pvc"}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "nimCache missing name",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.Storage.NIMCache = appsv1alpha1.NIMCacheVolSpec{Profile: "p"}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "pvc create false name empty",
@@ -122,7 +130,8 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 					Create: &falseVal,
 				}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "pvc invalid volumeaccessmode",
@@ -132,7 +141,8 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 					VolumeAccessMode: "BadMode",
 				}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "shared memory size <=0",
@@ -140,14 +150,16 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 				ns.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Name: "pvc"}
 				ns.Spec.Storage.SharedMemorySizeLimit = &sizeNeg
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid nimCache",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.Storage.NIMCache = appsv1alpha1.NIMCacheVolSpec{Name: "cache", Profile: "default"}
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid pvc",
@@ -160,7 +172,8 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 					VolumeAccessMode: corev1.ReadWriteOnce,
 				}
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 	}
 
@@ -168,13 +181,12 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateServiceStorageConfiguration(&ns.Spec.Storage, fldPath)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateServiceStorageConfiguration(&ns.Spec.Storage, fldPath)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -186,16 +198,18 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 	fld := field.NewPath("spec")
 
 	cases := []struct {
-		name       string
-		modify     func(*appsv1alpha1.NIMService)
-		k8sVersion string
-		wantErrs   int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		k8sVersion   string
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:       "no dra resources",
-			modify:     func(ns *appsv1alpha1.NIMService) {},
-			k8sVersion: "v1.34.0",
-			wantErrs:   0,
+			name:         "no dra resources",
+			modify:       func(ns *appsv1alpha1.NIMService) {},
+			k8sVersion:   "v1.34.0",
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "unsupported k8s version",
@@ -204,8 +218,9 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
 				}}
 			},
-			k8sVersion: "v1.32.0", // below MinSupportedClusterVersionForDRA
-			wantErrs:   1,
+			k8sVersion:   "v1.32.0", // below MinSupportedClusterVersionForDRA
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "both name and template provided",
@@ -215,16 +230,18 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
 				}}
 			},
-			k8sVersion: "v1.34.0",
-			wantErrs:   1,
+			k8sVersion:   "v1.34.0",
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "neither name nor template provided",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{}}
 			},
-			k8sVersion: "v1.34.0",
-			wantErrs:   1,
+			k8sVersion:   "v1.34.0",
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "resourceClaimName with replicas>1",
@@ -234,8 +251,9 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimName: ptr.To("claim1"),
 				}}
 			},
-			k8sVersion: "v1.34.0",
-			wantErrs:   1,
+			k8sVersion:   "v1.34.0",
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "resourceClaimName with autoscaling enabled",
@@ -246,8 +264,9 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimName: ptr.To("claim1"),
 				}}
 			},
-			k8sVersion: "v1.34.0",
-			wantErrs:   1,
+			k8sVersion:   "v1.34.0",
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "duplicate resourceClaimNames",
@@ -257,8 +276,9 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					{ResourceClaimName: ptr.To("dup")},
 				}
 			},
-			k8sVersion: "v1.34.0",
-			wantErrs:   1,
+			k8sVersion:   "v1.34.0",
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid template",
@@ -267,8 +287,9 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
 				}}
 			},
-			k8sVersion: "v1.34.0",
-			wantErrs:   0,
+			k8sVersion:   "v1.34.0",
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid multiple templates",
@@ -279,8 +300,9 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl2"),
 				}}
 			},
-			k8sVersion: "v1.34.0",
-			wantErrs:   0,
+			k8sVersion:   "v1.34.0",
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 	}
 
@@ -288,13 +310,12 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateDRAResourcesConfiguration(&ns.Spec, fld, tc.k8sVersion)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateDRAResourcesConfiguration(&ns.Spec, fld, tc.k8sVersion)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -304,22 +325,22 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 func TestValidateAuthSecret(t *testing.T) {
 	fld := field.NewPath("spec").Child("authSecret")
 	cases := []struct {
-		name     string
-		value    string
-		wantErrs int
+		name         string
+		value        string
+		wantErrs     int
+		wantWarnings int
 	}{
-		{"non-empty", "secret", 0},
-		{"empty", "", 1},
+		{"non-empty", "secret", 0, 0},
+		{"empty", "", 1, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateAuthSecret(&tc.value, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateAuthSecret(&tc.value, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -332,21 +353,24 @@ func TestValidateExposeIngressConfiguration(t *testing.T) {
 	class := "nginx"
 
 	cases := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "ingress disabled",
-			modify:   func(ns *appsv1alpha1.NIMService) {},
-			wantErrs: 0,
+			name:         "ingress disabled",
+			modify:       func(ns *appsv1alpha1.NIMService) {},
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "enabled empty spec",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.Expose.Ingress.Enabled = &enabled
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "enabled with spec",
@@ -354,20 +378,20 @@ func TestValidateExposeIngressConfiguration(t *testing.T) {
 				ns.Spec.Expose.Ingress.Enabled = &enabled
 				ns.Spec.Expose.Ingress.Spec.IngressClassName = &class
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateExposeConfiguration(&ns.Spec.Expose, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateExposeConfiguration(&ns.Spec.Expose, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -379,21 +403,24 @@ func TestValidateMetricsConfiguration(t *testing.T) {
 	enabled := true
 
 	cases := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "metrics disabled",
-			modify:   func(ns *appsv1alpha1.NIMService) {},
-			wantErrs: 0,
+			name:         "metrics disabled",
+			modify:       func(ns *appsv1alpha1.NIMService) {},
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "enabled empty monitor",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.Metrics.Enabled = &enabled
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "enabled valid",
@@ -401,20 +428,20 @@ func TestValidateMetricsConfiguration(t *testing.T) {
 				ns.Spec.Metrics.Enabled = &enabled
 				ns.Spec.Metrics.ServiceMonitor.Interval = "30s"
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateMetricsConfiguration(&ns.Spec.Metrics, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateMetricsConfiguration(&ns.Spec.Metrics, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -426,25 +453,25 @@ func TestValidateScaleConfiguration(t *testing.T) {
 	enabled := true
 
 	cases := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
-		{"autoscaling disabled", func(ns *appsv1alpha1.NIMService) {}, 0},
-		{"enabled empty HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled }, 1},
-		{"enabled valid HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled; ns.Spec.Scale.HPA.MaxReplicas = 3 }, 0},
+		{"autoscaling disabled", func(ns *appsv1alpha1.NIMService) {}, 0, 0},
+		{"enabled empty HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled }, 1, 0},
+		{"enabled valid HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled; ns.Spec.Scale.HPA.MaxReplicas = 3 }, 0, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateScaleConfiguration(&ns.Spec.Scale, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateScaleConfiguration(&ns.Spec.Scale, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -455,26 +482,26 @@ func TestValidateResourcesConfiguration(t *testing.T) {
 	fld := field.NewPath("spec").Child("resources")
 
 	cases := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
-		{"nil resources", func(ns *appsv1alpha1.NIMService) {}, 0},
+		{"nil resources", func(ns *appsv1alpha1.NIMService) {}, 0, 0},
 		{"with claims", func(ns *appsv1alpha1.NIMService) {
 			ns.Spec.Resources = &corev1.ResourceRequirements{Claims: []corev1.ResourceClaim{{Name: "c1"}}}
-		}, 1},
+		}, 1, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateResourcesConfiguration(ns.Spec.Resources, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateResourcesConfiguration(ns.Spec.Resources, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -487,26 +514,30 @@ func TestValidateMultiNodeImmutability(t *testing.T) {
 	old.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 1}
 
 	cases := []struct {
-		name     string
-		newObj   *appsv1alpha1.NIMService
-		wantErrs int
+		name         string
+		newObj       *appsv1alpha1.NIMService
+		wantErrs     int
+		wantWarnings int
 	}{
 		{"unchanged", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
 			n.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 1}
 			return n
-		}(), 0},
+		}(), 0, 0},
 		{"changed", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
 			n.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 2}
 			return n
-		}(), 1},
+		}(), 1, 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			errs := validateMultiNodeImmutability(old, c.newObj, fld)
-			if got := len(errs); got != c.wantErrs {
-				t.Fatalf("got %d errs, want %d", got, c.wantErrs)
+			w, errs := validateMultiNodeImmutability(old, c.newObj, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != c.wantErrs || gotWarnings != c.wantWarnings {
+				t.Logf("Validation errors:")
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, c.wantErrs, c.wantWarnings)
 			}
 		})
 	}
@@ -520,30 +551,30 @@ func TestValidatePVCImmutability(t *testing.T) {
 	old.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Create: &trueVal, Size: "10Gi"}
 
 	cases := []struct {
-		name     string
-		newObj   *appsv1alpha1.NIMService
-		wantErrs int
+		name         string
+		newObj       *appsv1alpha1.NIMService
+		wantErrs     int
+		wantWarnings int
 	}{
 		{"no change", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
 			n.Spec.Storage.PVC = old.Spec.Storage.PVC
 			return n
-		}(), 0},
+		}(), 0, 0},
 		{"changed size", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
 			n.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Create: &trueVal, Size: "20Gi"}
 			return n
-		}(), 1},
+		}(), 1, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validatePVCImmutability(old, tc.newObj, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validatePVCImmutability(old, tc.newObj, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
