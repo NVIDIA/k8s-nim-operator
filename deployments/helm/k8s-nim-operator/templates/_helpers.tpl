@@ -56,3 +56,28 @@ Full image name with tag
 {{- define "k8s-nim-operator.fullimage" -}}
 {{- .Values.operator.image.repository -}}:{{- .Values.operator.image.tag | default (printf "v%s" .Chart.AppVersion) -}}
 {{- end }}
+
+{{/*
+Return merged operator args with zap logging args
+*/}}
+{{- define "k8s-nim-operator.fullArgs" -}}
+{{- $op := .Values.operator | default dict -}}
+{{- $log := $op.log | default dict -}}
+
+{{- $zapDevel   := $log.development     | default false -}}
+{{- $zapLevel   := $log.level           | default "info" -}}
+{{- $zapStack   := $log.stacktraceLevel | default "error" -}}
+{{- $zapEncoder := $log.encoder         | default "json" -}}
+
+{{- $args := list -}}
+{{- range ($op.args | default (list)) }}
+  {{- $args = append $args . -}}
+{{- end -}}
+
+{{- $args = append $args (printf "--zap-devel=%v" $zapDevel) -}}
+{{- $args = append $args (printf "--zap-log-level=%s" $zapLevel) -}}
+{{- $args = append $args (printf "--zap-stacktrace-level=%s" $zapStack) -}}
+{{- $args = append $args (printf "--zap-encoder=%s" $zapEncoder) -}}
+
+{{- toYaml $args -}}
+{{- end }}

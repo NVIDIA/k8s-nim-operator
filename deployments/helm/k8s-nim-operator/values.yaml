@@ -10,6 +10,15 @@ operator:
     - --health-probe-bind-address=:8081
     - --metrics-bind-address=:8080
     - --leader-elect
+  log:
+    # Enable development mode
+    development: false
+    # Log verbosity level (debug | info | warn | error | dpanic | panic | fatal)
+    level: info
+    # Stacktrace generation level (debug | info | warn | error | dpanic | panic | fatal)
+    stacktraceLevel: error
+    # Log encoder format (json|console)
+    encoder: json
   resources:
       limits:
         cpu: "1"
