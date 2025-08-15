@@ -212,6 +212,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 
 			// Disable nim-llm-service in the pipeline spec
+			Expect(client.Get(context.TODO(), namespacedName, updatePipeline)).To(Succeed())
 			updatePipeline.Spec.Services[0].Enabled = ptr.To(false)
 			Expect(client.Update(ctx, updatePipeline)).To(Succeed())
 
