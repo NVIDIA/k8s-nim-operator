@@ -41,7 +41,6 @@ var validPVCAccessModeStrs = []corev1.PersistentVolumeAccessMode{
 	corev1.ReadWriteMany,
 	corev1.ReadWriteOncePod,
 }
-
 var validDRADeviceAttributeSelectorOps = []appsv1alpha1.DRADeviceAttributeSelectorOp{
 	appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
 	appsv1alpha1.DRADeviceAttributeSelectorOpNotEqual,
@@ -159,7 +158,7 @@ func validateImageConfiguration(image *appsv1alpha1.Image, fldPath *field.Path) 
 	if image.Tag == "" {
 		errList = append(errList, field.Required(fldPath.Child("tag"), "is required"))
 	}
-	return errList
+	return warningList, errList
 }
 
 func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
@@ -225,7 +224,8 @@ func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage
 	return warningList, errList
 }
 
-func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, k8sVersion string) field.ErrorList {
+func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, k8sVersion string) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	draResourcesPath := fldPath.Child("draResources")
 
@@ -289,13 +289,16 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 		}
 
 		if hasSpec {
-			errList = append(errList, validateDRAClaimCreationSpec(&dra, idxPath.Child("claimCreationSpec"))...)
+			wList, eList := validateDRAClaimCreationSpec(&dra, idxPath.Child("claimCreationSpec"))
+			warningList = append(warningList, wList...)
+			errList = append(errList, eList...)
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
-func validateDRAClaimCreationSpec(dra *appsv1alpha1.DRAResource, fldPath *field.Path) field.ErrorList {
+func validateDRAClaimCreationSpec(dra *appsv1alpha1.DRAResource, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	// Ensure claimCreationSpec.devices is non-empty
 	if len(dra.ClaimCreationSpec.Devices) == 0 {
@@ -305,12 +308,15 @@ func validateDRAClaimCreationSpec(dra *appsv1alpha1.DRAResource, fldPath *field.
 	// Validate attributes.
 	for j, device := range dra.ClaimCreationSpec.Devices {
 		devicePath := fldPath.Child("devices").Index(j)
-		errList = append(errList, validateDRADeviceSpec(&device, devicePath)...)
+		wList, eList := validateDRADeviceSpec(&device, devicePath)
+		warningList = append(warningList, wList...)
+		errList = append(errList, eList...)
 	}
-	return errList
+	return warningList, errList
 }
 
-func validateDRADeviceSpec(device *appsv1alpha1.DRADeviceSpec, fldPath *field.Path) field.ErrorList {
+func validateDRADeviceSpec(device *appsv1alpha1.DRADeviceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if device.Name == "" {
 		errList = append(errList, field.Required(fldPath.Child("name"), "is required"))
@@ -332,7 +338,9 @@ func validateDRADeviceSpec(device *appsv1alpha1.DRADeviceSpec, fldPath *field.Pa
 		} else {
 			seen[qualifiedName] = struct{}{}
 		}
-		errList = append(errList, validateDRADeviceAttributeSelector(&selector, fldPath.Child("attributeSelectors").Index(idx))...)
+		wList, eList := validateDRADeviceAttributeSelector(&selector, fldPath.Child("attributeSelectors").Index(idx))
+		warningList = append(warningList, wList...)
+		errList = append(errList, eList...)
 	}
 
 	for idx, selector := range device.CapacitySelectors {
@@ -342,17 +350,20 @@ func validateDRADeviceSpec(device *appsv1alpha1.DRADeviceSpec, fldPath *field.Pa
 		} else {
 			seen[qualifiedName] = struct{}{}
 		}
-		errList = append(errList, validateDRAResourceQuantitySelector(&selector, fldPath.Child("capacitySelectors").Index(idx))...)
+		wList, eList := validateDRAResourceQuantitySelector(&selector, fldPath.Child("capacitySelectors").Index(idx))
+		warningList = append(warningList, wList...)
+		errList = append(errList, eList...)
 	}
 
-	return errList
+	return warningList, errList
 }
 
-func validateDRADeviceAttributeSelector(selector *appsv1alpha1.DRADeviceAttributeSelector, fldPath *field.Path) field.ErrorList {
+func validateDRADeviceAttributeSelector(selector *appsv1alpha1.DRADeviceAttributeSelector, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	errList = append(errList, validateDRADeviceAttributeSelectorOp(selector.Op, fldPath.Child("op"))...)
 	errList = append(errList, validateDRADeviceAttributeSelectorValue(selector.Value, fldPath.Child("value"))...)
-	return errList
+	return warningList, errList
 }
 
 func validateDRADeviceAttributeSelectorOp(op appsv1alpha1.DRADeviceAttributeSelectorOp, fldPath *field.Path) field.ErrorList {
@@ -398,28 +409,30 @@ func validateDRADeviceAttributeSelectorValue(attribute *appsv1alpha1.DRADeviceAt
 	return errList
 }
 
-func validateDRAResourceQuantitySelector(selector *appsv1alpha1.DRAResourceQuantitySelector, fldPath *field.Path) field.ErrorList {
-	errList := field.ErrorList{}
-	errList = append(errList, validateDRAResourceQuantitySelectorOp(selector.Op, fldPath.Child("op"))...)
-	errList = append(errList, validateDRAResourceQuantitySelectorValue(selector.Value, fldPath.Child("value"))...)
-	return errList
+func validateDRAResourceQuantitySelector(selector *appsv1alpha1.DRAResourceQuantitySelector, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList, errList := validateDRAResourceQuantitySelectorOp(selector.Op, fldPath.Child("op"))
+	wList, eList := validateDRAResourceQuantitySelectorValue(selector.Value, fldPath.Child("value"))
+	warningList = append(warningList, wList...)
+	errList = append(errList, eList...)
+	return warningList, errList
 }
 
-func validateDRAResourceQuantitySelectorOp(op appsv1alpha1.DRAResourceQuantitySelectorOp, fldPath *field.Path) field.ErrorList {
+func validateDRAResourceQuantitySelectorOp(op appsv1alpha1.DRAResourceQuantitySelectorOp, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if !slices.Contains(validDRAResourceQuantitySelectorOps, op) {
 		errList = append(errList, field.Invalid(fldPath, op, fmt.Sprintf("must be one of %v", validDRAResourceQuantitySelectorOps)))
 	}
-	return errList
+	return warningList, errList
 }
 
-func validateDRAResourceQuantitySelectorValue(value *apiresource.Quantity, fldPath *field.Path) field.ErrorList {
-
+func validateDRAResourceQuantitySelectorValue(value *apiresource.Quantity, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if value == nil {
 		errList = append(errList, field.Required(fldPath, "is required"))
 	}
-	return errList
+	return warningList, errList
 }
 
 func validateAuthSecret(authSecret *string, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
@@ -477,19 +490,21 @@ func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, replicas *int32
 }
 
 // Spec.Resources.Claims must be empty.
-func validateResourcesConfiguration(resources *corev1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
+func validateResourcesConfiguration(resources *corev1.ResourceRequirements, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if resources != nil {
 		if resources.Claims != nil || len(resources.Claims) != 0 {
 			errList = append(errList, field.Forbidden(fldPath.Child("claims"), "must be empty"))
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
 // validateKServeonfiguration implements required KServe validations.
-func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) field.ErrorList {
+func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	errList := field.ErrorList{}
+	warningList := admission.Warnings{}
 
 	platformIsKServe := spec.InferencePlatform == appsv1alpha1.PlatformTypeKServe
 
@@ -505,9 +520,9 @@ func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *fie
 			errList = append(errList, field.Forbidden(fldPath.Child("scale").Child("enabled"), fmt.Sprintf("%s (autoscaling) cannot be set when KServe runs in serverless mode", fldPath.Child("scale"))))
 		}
 
-		// Spec.Expose.Ingress cannot be set.
-		if spec.Router.IngressClass != nil && *spec.Router.IngressClass != "" {
-			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingressClass"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("ingressClass"))))
+		// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+		if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled { //nolint:staticcheck
+			errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("expose").Child("ingress").Child("enabled"))))
 		}
 
 		// Spec.Expose.Router.Ingress cannot be set.
@@ -531,20 +546,22 @@ func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *fie
 		errList = append(errList, field.Forbidden(fldPath.Child("multiNode"), "cannot be set when KServe runs in serverless mode"))
 	}
 
-	return errList
+	return warningList, errList
 }
 
 // validateMultiNodeImmutability ensures that the MultiNode field remains unchanged after creation.
-func validateMultiNodeImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) field.ErrorList {
+func validateMultiNodeImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if !equality.Semantic.DeepEqual(oldNs.Spec.MultiNode, newNs.Spec.MultiNode) {
 		errList = append(errList, field.Forbidden(fldPath, "is immutable once the resource is created"))
 	}
-	return errList
+	return warningList, errList
 }
 
 // validatePVCImmutability verifies that once a PVC is created with create: true, no further modifications are allowed.
-func validatePVCImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) field.ErrorList {
+func validatePVCImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	oldPVC := oldNs.Spec.Storage.PVC
 	newPVC := newNs.Spec.Storage.PVC
@@ -553,11 +570,12 @@ func validatePVCImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *fie
 			errList = append(errList, field.Forbidden(fldPath, fmt.Sprintf("is immutable once it is created with %s = true", fldPath.Child("create"))))
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
 // validateDRAResourceImmutability ensures that the DRA resources remain unchanged after creation.
-func validateDRAResourceImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) field.ErrorList {
+func validateDRAResourceImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	oldDRAResources := oldNs.Spec.DRAResources
 	newDRAResources := newNs.Spec.DRAResources
@@ -566,5 +584,5 @@ func validateDRAResourceImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldP
 			errList = append(errList, field.Forbidden(fldPath, "is immutable"))
 		}
 	}
-	return errList
+	return warningList, errList
 }
