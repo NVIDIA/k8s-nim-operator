@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
@@ -39,21 +40,21 @@ var (
 var validQoSProfiles = []string{"latency", "throughput"}
 
 // validateNIMSourceConfiguration validates the NIMSource configuration in the NIMCache spec.
-func validateNIMSourceConfiguration(source *appsv1alpha1.NIMSource, fldPath *field.Path) field.ErrorList {
-	errList := field.ErrorList{}
+func validateNIMSourceConfiguration(source *appsv1alpha1.NIMSource, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	// Evalutate NGCSource if it is set. NemoDataStoreSource and HuggingFaceHubSource do not require any additional validation.
-	errList = append(errList, validateNGCSource(source.NGC, fldPath.Child("ngc"))...)
-	return errList
+	warnList, errList := validateNGCSource(source.NGC, fldPath.Child("ngc"))
+	return warnList, errList
 }
 
 // ValidateNGCSource checks the NGCSource configuration.
-func validateNGCSource(ngcSource *appsv1alpha1.NGCSource, fldPath *field.Path) field.ErrorList {
-	errList := field.ErrorList{}
-
+func validateNGCSource(ngcSource *appsv1alpha1.NGCSource, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	// Return early if NGCSource is nil
 	if ngcSource == nil {
-		return nil
+		return nil, nil
 	}
+
+	// Evaluate NGCSource.Model fields
+	warnList, errList := validateModel(ngcSource.Model, fldPath.Child("model"))
 
 	// Ensure AuthSecret is a non-empty string
 	if ngcSource.AuthSecret == "" {
@@ -65,14 +66,12 @@ func validateNGCSource(ngcSource *appsv1alpha1.NGCSource, fldPath *field.Path) f
 		errList = append(errList, field.Required(fldPath.Child("modelPuller"), "must be non-empty"))
 	}
 
-	// Evaluate NGCSource.Model fields
-	errList = append(errList, validateModel(ngcSource.Model, fldPath.Child("model"))...)
-
-	return errList
+	return warnList, errList
 }
 
-func validateModel(model *appsv1alpha1.ModelSpec, fldPath *field.Path) field.ErrorList {
+func validateModel(model *appsv1alpha1.ModelSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	errList := field.ErrorList{}
+	warnList := admission.Warnings{}
 
 	if model == nil {
 		return errList
@@ -116,7 +115,7 @@ func validateModel(model *appsv1alpha1.ModelSpec, fldPath *field.Path) field.Err
 		errList = append(errList, field.NotSupported(fldPath.Child("qosProfile"), model.QoSProfile, validQoSProfiles))
 	}
 
-	return errList
+	return warnList, errList
 }
 
 func isValidQoSProfile(profile string) bool {
@@ -128,23 +127,19 @@ func isValidQoSProfile(profile string) bool {
 	return false
 }
 
-func validateNIMCacheStorageConfiguration(storage *appsv1alpha1.NIMCacheStorage, fldPath *field.Path) field.ErrorList {
-	errList := field.ErrorList{}
-
+func validateNIMCacheStorageConfiguration(storage *appsv1alpha1.NIMCacheStorage, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	// Spec.Storage must not be empty
 	if reflect.DeepEqual(storage.PVC, appsv1alpha1.PersistentVolumeClaim{}) {
-		errList = append(errList, field.Required(fldPath, "must not be empty"))
 		// Don't validate PVC configuration if storage is completely empty
-		return errList
+		return admission.Warnings{}, field.ErrorList{field.Required(fldPath, "must not be empty")}
 	}
 
-	errList = append(errList, validatePVCConfiguration(&storage.PVC, fldPath.Child("pvc"))...)
-
-	return errList
+	return validatePVCConfiguration(&storage.PVC, fldPath.Child("pvc"))
 }
 
-func validatePVCConfiguration(pvc *appsv1alpha1.PersistentVolumeClaim, fldPath *field.Path) field.ErrorList {
+func validatePVCConfiguration(pvc *appsv1alpha1.PersistentVolumeClaim, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	errList := field.ErrorList{}
+	warnList := admission.Warnings{}
 
 	// If PVC.Create is False, PVC.Name cannot be empty
 	if (pvc.Create == nil || !*pvc.Create) && pvc.Name == "" {
@@ -166,13 +161,14 @@ func validatePVCConfiguration(pvc *appsv1alpha1.PersistentVolumeClaim, fldPath *
 		}
 	}
 
-	return errList
+	return warnList, errList
 }
 
-func validateProxyConfiguration(proxy *appsv1alpha1.ProxySpec, fldPath *field.Path) field.ErrorList {
+func validateProxyConfiguration(proxy *appsv1alpha1.ProxySpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warnList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if proxy == nil {
-		return nil
+		return nil, nil
 	}
 
 	// If Proxy is not nil, ensure Proxy.NoProxy is a valid proxy string
@@ -198,7 +194,7 @@ func validateProxyConfiguration(proxy *appsv1alpha1.ProxySpec, fldPath *field.Pa
 		errList = append(errList, field.Invalid(fldPath.Child("httpProxy"), proxy.HttpProxy, "must start with http:// or https://"))
 	}
 
-	return errList
+	return warnList, errList
 }
 
 // validateNIMCacheSpec aggregates all structural validation rules for a NIMCache
@@ -213,23 +209,27 @@ func validateProxyConfiguration(proxy *appsv1alpha1.ProxySpec, fldPath *field.Pa
 //	  field.NewPath("nimcache").Child("spec")).
 //
 // Returns a field.ErrorList with any validation errors encountered.
-func validateNIMCacheSpec(spec *appsv1alpha1.NIMCacheSpec, fldPath *field.Path) field.ErrorList {
-	errList := field.ErrorList{}
+func validateNIMCacheSpec(spec *appsv1alpha1.NIMCacheSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList, errList := validateNIMSourceConfiguration(&spec.Source, fldPath.Child("source"))
 
 	// Delegate to existing granular validators.
-	errList = append(errList, validateNIMSourceConfiguration(&spec.Source, fldPath.Child("source"))...)
-	errList = append(errList, validateNIMCacheStorageConfiguration(&spec.Storage, fldPath.Child("storage"))...)
-	errList = append(errList, validateProxyConfiguration(spec.Proxy, fldPath.Child("proxy"))...)
+	wList, eList := validateNIMCacheStorageConfiguration(&spec.Storage, fldPath.Child("storage"))
+	warningList = append(warningList, wList...)
+	errList = append(errList, eList...)
 
-	return errList
+	wList, eList = validateProxyConfiguration(spec.Proxy, fldPath.Child("proxy"))
+	warningList = append(warningList, wList...)
+	errList = append(errList, eList...)
+
+	return warningList, errList
 }
 
-func validateImmutableNIMCacheSpec(oldNIMCache, newNIMCache *appsv1alpha1.NIMCache, fldPath *field.Path) field.ErrorList {
+func validateImmutableNIMCacheSpec(oldNIMCache, newNIMCache *appsv1alpha1.NIMCache, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	errList := field.ErrorList{}
-
+	warningList := admission.Warnings{}
 	if !equality.Semantic.DeepEqual(oldNIMCache.Spec, newNIMCache.Spec) {
 		errList = append(errList, field.Forbidden(fldPath.Child("spec"), "is immutable once the object is created"))
 	}
 
-	return errList
+	return warningList, errList
 }
