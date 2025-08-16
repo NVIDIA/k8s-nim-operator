@@ -5,7 +5,7 @@ metadata:
 spec:
   image:
     repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
-    tag: "1.8"
+    tag: "1.8.3"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
@@ -15,9 +15,10 @@ spec:
       name: meta-llama3-8b-instruct
       profile: ''
   replicas: 1
-  resources:
-    limits:
-      nvidia.com/gpu: 1
+  draResources:
+  - claimSpec:
+      devices:
+      - name: gpu
   expose:
     service:
       type: ClusterIP
