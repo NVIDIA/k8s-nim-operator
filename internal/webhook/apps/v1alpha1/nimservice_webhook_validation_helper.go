@@ -19,14 +19,19 @@ package v1alpha1
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
+	utilversion "k8s.io/apimachinery/pkg/util/version"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
@@ -35,6 +40,19 @@ var validPVCAccessModeStrs = []corev1.PersistentVolumeAccessMode{
 	corev1.ReadOnlyMany,
 	corev1.ReadWriteMany,
 	corev1.ReadWriteOncePod,
+}
+
+var validDRADeviceAttributeMatcherOps = []appsv1alpha1.DRADeviceAttributeMatcherOp{
+	appsv1alpha1.DRADeviceAttributeMatcherOpEqual,
+	appsv1alpha1.DRADeviceAttributeMatcherOpNotEqual,
+	appsv1alpha1.DRADeviceAttributeMatcherOpGreaterThan,
+	appsv1alpha1.DRADeviceAttributeMatcherOpGreaterThanOrEqual,
+	appsv1alpha1.DRADeviceAttributeMatcherOpLessThan,
+	appsv1alpha1.DRADeviceAttributeMatcherOpLessThanOrEqual,
+}
+
+var validDRAResourceQuantityMatcherOps = []appsv1alpha1.DRAResourceQuantityMatcherOp{
+	appsv1alpha1.DRAResourceQuantityMatcherOpEqual,
 }
 
 // validateNIMServiceSpec aggregates all structural validation checks for a NIMService
@@ -141,16 +159,30 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 
 		hasName := dra.ResourceClaimName != nil && *dra.ResourceClaimName != ""
 		hasTemplate := dra.ResourceClaimTemplateName != nil && *dra.ResourceClaimTemplateName != ""
+		hasSpec := dra.ClaimSpec != nil
 
-		// Exactly one of resourceClaimName or resourceClaimTemplateName must be provided
-		if hasName == hasTemplate { // both true or both false
-			errList = append(errList, field.Invalid(
-				idxPath,
-				dra,
-				fmt.Sprintf("must specify exactly one of %s or %s", fldPath.Child("resourceClaimName"), fldPath.Child("resourceClaimTemplateName"))))
+		var fieldCount int
+		if hasName {
+			fieldCount++
+		}
+		if hasTemplate {
+			fieldCount++
+		}
+		if hasSpec {
+			fieldCount++
 		}
 
-		if hasName {
+		// Exactly one of resourceClaimName, resourceClaimTemplateName, or claimSpec must be provided
+		if fieldCount == 0 {
+			errList = append(errList, field.Required(idxPath, fmt.Sprintf("one of %s, %s, or %s must be provided", fldPath.Child("resourceClaimName"), fldPath.Child("resourceClaimTemplateName"), fldPath.Child("claimSpec"))))
+		} else if fieldCount > 1 {
+			errList = append(errList, field.Invalid(
+				idxPath,
+				"multiple dra resource sources defined",
+				fmt.Sprintf("must specify exactly one of %s, %s, or %s", fldPath.Child("resourceClaimName"), fldPath.Child("resourceClaimTemplateName"), fldPath.Child("claimSpec"))))
+		}
+
+		if hasName || (hasSpec && !dra.ClaimSpec.IsTemplateSpec()) {
 			// resourceClaimName: spec.relicas must be <= 1 and spec.scale.enabled must be false.
 			if spec.Replicas > 1 {
 				errList = append(errList, field.Forbidden(
@@ -164,7 +196,9 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 					fmt.Sprintf("must not be set when %s is true, use %s instead", fldPath.Child("scale").Child("enabled"), idxPath.Child("resourceClaimTemplateName")),
 				))
 			}
+		}
 
+		if hasName {
 			// Ensure resourceClaimName values are unique within draResources
 			if _, exists := seen[*dra.ResourceClaimName]; exists {
 				errList = append(errList, field.Duplicate(idxPath.Child("resourceClaimName"), *dra.ResourceClaimName))
@@ -172,6 +206,137 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 				seen[*dra.ResourceClaimName] = struct{}{}
 			}
 		}
+
+		if hasSpec {
+			errList = append(errList, validateDRAClaimSpec(&dra, idxPath.Child("claimSpec"))...)
+		}
+	}
+	return errList
+}
+
+func validateDRAClaimSpec(dra *appsv1alpha1.DRAResource, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+	// Ensure claimSpec.devices is non-empty
+	if len(dra.ClaimSpec.Devices) == 0 {
+		errList = append(errList, field.Required(fldPath.Child("devices"), "must be non-empty"))
+	}
+
+	// Validate attributes.
+	for j, device := range dra.ClaimSpec.Devices {
+		devicePath := fldPath.Child("devices").Index(j)
+		errList = append(errList, validateDRADeviceSpec(&device, devicePath)...)
+	}
+	return errList
+}
+
+func validateDRADeviceSpec(device *appsv1alpha1.DRADeviceSpec, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+	if device.Name == "" {
+		errList = append(errList, field.Required(fldPath.Child("name"), "is required"))
+	}
+	if device.Count <= 0 {
+		errList = append(errList, field.Invalid(fldPath.Child("count"), int(device.Count), "must be > 0"))
+	}
+	if device.DeviceClassName == "" {
+		errList = append(errList, field.Required(fldPath.Child("deviceClassName"), "is required"))
+	}
+	if device.DriverName == "" {
+		errList = append(errList, field.Required(fldPath.Child("driverName"), "is required"))
+	}
+	seen := make(map[string]struct{})
+	for idx, matcher := range device.MatchAttributes {
+		qualifiedName := k8sutil.NormalizeQualifiedName(matcher.Key, device.DriverName)
+		if _, exists := seen[qualifiedName]; exists {
+			errList = append(errList, field.Duplicate(fldPath.Child("matchAttributes").Index(idx), qualifiedName))
+		} else {
+			seen[qualifiedName] = struct{}{}
+		}
+		errList = append(errList, validateDRADeviceAttributeMatcher(&matcher, fldPath.Child("matchAttributes").Index(idx))...)
+	}
+
+	for idx, matcher := range device.MatchCapacity {
+		qualifiedName := k8sutil.NormalizeQualifiedName(matcher.Key, device.DriverName)
+		if _, exists := seen[qualifiedName]; exists {
+			errList = append(errList, field.Duplicate(fldPath.Child("matchCapacity").Index(idx), qualifiedName))
+		} else {
+			seen[qualifiedName] = struct{}{}
+		}
+		errList = append(errList, validateDRAResourceQuantityMatcher(&matcher, fldPath.Child("matchCapacity").Index(idx))...)
+	}
+
+	return errList
+}
+
+func validateDRADeviceAttributeMatcher(matcher *appsv1alpha1.DRADeviceAttributeMatcher, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+	errList = append(errList, validateDRADeviceAttributeMatcherOp(matcher.Op, fldPath.Child("op"))...)
+	errList = append(errList, validateDRADeviceAttributeMatcherValue(matcher.Value, fldPath.Child("value"))...)
+	return errList
+}
+
+func validateDRADeviceAttributeMatcherOp(op appsv1alpha1.DRADeviceAttributeMatcherOp, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+	if op == "" {
+		errList = append(errList, field.Required(fldPath, "is required"))
+		return errList
+	}
+
+	if !slices.Contains(validDRADeviceAttributeMatcherOps, op) {
+		errList = append(errList, field.Invalid(fldPath, op, fmt.Sprintf("must be one of %v", validDRADeviceAttributeMatcherOps)))
+	}
+	return errList
+}
+
+func validateDRADeviceAttributeMatcherValue(attribute *appsv1alpha1.DRADeviceAttributeMatcherValue, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+	var fieldCount int
+	if attribute.BoolValue != nil {
+		fieldCount++
+	}
+	if attribute.IntValue != nil {
+		fieldCount++
+	}
+	if attribute.StringValue != nil {
+		fieldCount++
+	}
+	if attribute.VersionValue != nil {
+		fieldCount++
+	}
+	if fieldCount == 0 {
+		errList = append(errList, field.Required(fldPath, fmt.Sprintf("must specify exactly one of %s, %s, %s, or %s", fldPath.Child("boolValue"), fldPath.Child("intValue"), fldPath.Child("stringValue"), fldPath.Child("versionValue"))))
+	} else if fieldCount > 1 {
+		errList = append(errList, field.Invalid(fldPath, "multiple attribute values defined", fmt.Sprintf("must specify exactly one of %s, %s, %s, or %s", fldPath.Child("boolValue"), fldPath.Child("intValue"), fldPath.Child("stringValue"), fldPath.Child("versionValue"))))
+	}
+
+	if attribute.VersionValue != nil {
+		_, err := utilversion.ParseSemantic(*attribute.VersionValue)
+		if err != nil {
+			errList = append(errList, field.Invalid(fldPath, attribute.VersionValue, "must be a valid semantic version"))
+		}
+	}
+	return errList
+}
+
+func validateDRAResourceQuantityMatcher(matcher *appsv1alpha1.DRAResourceQuantityMatcher, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+	errList = append(errList, validateDRAResourceQuantityMatcherOp(matcher.Op, fldPath.Child("op"))...)
+	errList = append(errList, validateDRAResourceQuantityMatcherValue(matcher.Value, fldPath.Child("value"))...)
+	return errList
+}
+
+func validateDRAResourceQuantityMatcherOp(op appsv1alpha1.DRAResourceQuantityMatcherOp, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+	if !slices.Contains(validDRAResourceQuantityMatcherOps, op) {
+		errList = append(errList, field.Invalid(fldPath, op, fmt.Sprintf("must be one of %v", validDRAResourceQuantityMatcherOps)))
+	}
+	return errList
+}
+
+func validateDRAResourceQuantityMatcherValue(value *apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+
+	errList := field.ErrorList{}
+	if value == nil {
+		errList = append(errList, field.Required(fldPath, "is required"))
 	}
 	return errList
 }
@@ -288,6 +453,19 @@ func validatePVCImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *fie
 	if oldPVC.Create != nil && *oldPVC.Create {
 		if !equality.Semantic.DeepEqual(oldPVC, newPVC) {
 			errList = append(errList, field.Forbidden(fldPath, fmt.Sprintf("is immutable once it is created with %s = true", fldPath.Child("create"))))
+		}
+	}
+	return errList
+}
+
+// validateDRAResourceImmutability ensures that the DRA resources remain unchanged after creation.
+func validateDRAResourceImmutability(oldNs, newNs *appsv1alpha1.NIMService, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+	oldDRAResources := oldNs.Spec.DRAResources
+	newDRAResources := newNs.Spec.DRAResources
+	if len(oldDRAResources) > 0 {
+		if !equality.Semantic.DeepEqual(oldDRAResources, newDRAResources) {
+			errList = append(errList, field.Forbidden(fldPath, "is immutable"))
 		}
 	}
 	return errList

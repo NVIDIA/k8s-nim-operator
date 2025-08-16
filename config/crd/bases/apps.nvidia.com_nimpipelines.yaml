@@ -113,9 +113,167 @@ spec:
                               When creating the NIMService pods, it adds a name (`DNS_LABEL` format) to it
                               that uniquely identifies the DRA resource.
                             properties:
+                              claimSpec:
+                                description: ClaimSpec is the spec to auto-generate
+                                  a DRA resource claim/resource claim template. Only
+                                  one of ClaimSpec, ResourceClaimName or ResourceClaimTemplateName
+                                  must be specified.
+                                properties:
+                                  devices:
+                                    items:
+                                      properties:
+                                        count:
+                                          default: 1
+                                          description: Count is the number of devices
+                                            to request.
+                                          format: int32
+                                          type: integer
+                                        deviceClassName:
+                                          default: gpu.nvidia.com
+                                          description: DeviceClassName references
+                                            a specific DeviceClass to inherit configuration
+                                            and selectors from.
+                                          type: string
+                                        driverName:
+                                          default: gpu.nvidia.com
+                                          description: |-
+                                            DriverName is the name of the DRA driver providing the capacity information.
+                                            Must be a DNS subdomain.
+                                          maxLength: 253
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
+                                          type: string
+                                        matchAttributes:
+                                          description: MatchAttributes defines the
+                                            criteria which must be satisfied by the
+                                            device attributes of a device.
+                                          items:
+                                            description: DRADeviceAttributeMatcher
+                                              defines the matcher expression for a
+                                              DRA device attribute.
+                                            properties:
+                                              key:
+                                                description: |-
+                                                  Key is the name of the device attribute to match.
+                                                  This is either a qualified name or a simple name.
+                                                  If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
+                                                  Eg: "gpu.nvidia.com/productName" is equivalent to "productName" if the driver name is "gpu.nvidia.com". Otherwise they're treated as 2 different attributes.
+                                                maxLength: 64
+                                                type: string
+                                              op:
+                                                default: Equal
+                                                description: |-
+                                                  Op is the operator to use for matching the device attribute. Supported operators are:
+                                                  * Equal: The device attribute value must be equal to the value specified in the matcher.
+                                                  * NotEqual: The device attribute value must not be equal to the value specified in the matcher.
+                                                  * GreaterThan: The device attribute value must be greater than the value specified in the matcher.
+                                                  * GreaterThanOrEqual: The device attribute value must be greater than or equal to the value specified in the matcher.
+                                                  * LessThan: The device attribute value must be less than the value specified in the matcher.
+                                                  * LessThanOrEqual: The device attribute value must be less than or equal to the value specified in the matcher.
+                                                enum:
+                                                - Equal
+                                                - NotEqual
+                                                - GreaterThan
+                                                - GreaterThanOrEqual
+                                                - LessThan
+                                                - LessThanOrEqual
+                                                type: string
+                                              value:
+                                                description: Value is the value to
+                                                  match the device attribute against.
+                                                properties:
+                                                  boolValue:
+                                                    description: BoolValue is a true/false
+                                                      value.
+                                                    type: boolean
+                                                  intValue:
+                                                    description: IntValue is a number.
+                                                    format: int32
+                                                    type: integer
+                                                  stringValue:
+                                                    description: StringValue is a
+                                                      string value.
+                                                    maxLength: 64
+                                                    type: string
+                                                  versionValue:
+                                                    description: VersionValue is a
+                                                      semantic version according to
+                                                      semver.org spec 2.0.0.
+                                                    maxLength: 64
+                                                    type: string
+                                                type: object
+                                            required:
+                                            - key
+                                            - op
+                                            type: object
+                                          type: array
+                                        matchCapacity:
+                                          description: MatchCapacity defines the criteria
+                                            which must be satisfied by the device
+                                            capacity of a device.
+                                          items:
+                                            description: DRAResourceQuantityMatcher
+                                              defines the matcher expression for a
+                                              DRA device capacity.
+                                            properties:
+                                              key:
+                                                description: |-
+                                                  Key is the name of the resource quantity to match.
+                                                  This is either a qualified name or a simple name.
+                                                  If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
+                                                  Eg: "gpu.nvidia.com/memory" is equivalent to "memory" if the driver name is "gpu.nvidia.com". Otherwise they're treated as 2 different attributes.
+                                                maxLength: 64
+                                                type: string
+                                              op:
+                                                default: Equal
+                                                description: |-
+                                                  Op is the operator to use for matching the device capacity. Supported operators are:
+                                                  * Equal: The resource quantity value must be equal to the value specified in the matcher.
+                                                enum:
+                                                - Equal
+                                                type: string
+                                              value:
+                                                anyOf:
+                                                - type: integer
+                                                - type: string
+                                                description: Value is the quantity
+                                                  to match the device capacity against.
+                                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                                x-kubernetes-int-or-string: true
+                                            required:
+                                            - key
+                                            - op
+                                            - value
+                                            type: object
+                                          type: array
+                                        name:
+                                          description: |-
+                                            Name is the name of the device request to use in the generated claim spec.
+                                            Must be a valid DNS_LABEL.
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
+                                          type: string
+                                      required:
+                                      - count
+                                      - deviceClassName
+                                      - name
+                                      type: object
+                                    type: array
+                                  generateName:
+                                    description: GenerateName is an optional name
+                                      prefix to use for generating the resource claim/resource
+                                      claim template.
+                                    maxLength: 16
+                                    minLength: 1
+                                    type: string
+                                  isTemplate:
+                                    type: boolean
+                                required:
+                                - devices
+                                type: object
                               requests:
                                 description: |-
-                                  Requests is the list of requests in the referenced ResourceClaim/ResourceClaimTemplate
+                                  Requests is the list of requests in the referenced DRA resource claim/resource claim template
                                   to be made available to the model container of the NIMService pods.
 
                                   If empty, everything from the claim is made available, otherwise
@@ -126,7 +284,7 @@ spec:
                                 type: array
                               resourceClaimName:
                                 description: |-
-                                  ResourceClaimName is the name of a ResourceClaim object in the same
+                                  ResourceClaimName is the name of a DRA resource claim object in the same
                                   namespace as the NIMService.
 
                                   Exactly one of ResourceClaimName and ResourceClaimTemplateName must
@@ -137,10 +295,10 @@ spec:
                                 type: string
                               resourceClaimTemplateName:
                                 description: |-
-                                  ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+                                  ResourceClaimTemplateName is the name of a DRA resource claim template
                                   object in the same namespace as the pods for this NIMService.
 
-                                  The template will be used to create a new ResourceClaim, which will
+                                  The template will be used to create a new DRA resource claim, which will
                                   be bound to the pods created for this NIMService.
 
                                   Exactly one of ResourceClaimName and ResourceClaimTemplateName must
@@ -151,9 +309,10 @@ spec:
                                 type: string
                             type: object
                             x-kubernetes-validations:
-                            - message: exactly one of spec.resourceClaimName and spec.resourceClaimTemplateName
-                                must be set.
-                              rule: has(self.resourceClaimName) != has(self.resourceClaimTemplateName)
+                            - message: exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName,
+                                or spec.claimSpec must be set.
+                              rule: '(has(self.resourceClaimName) ? 1 : 0) + (has(self.resourceClaimTemplateName)
+                                ? 1 : 0) + (has(self.claimSpec) ? 1 : 0) == 1'
                           type: array
                         env:
                           items:

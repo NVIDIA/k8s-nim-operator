@@ -75,6 +75,10 @@ const (
 	ReasonDRAResourcesUnsupported = "DRAResourcesUnsupported"
 	// ReasonInferenceServiceFailed indicates that the creation of inferenceservice has failed.
 	ReasonInferenceServiceFailed = "InferenceServiceFailed"
+	// ReasonResourceClaimFailed indicates that the creation of resourceclaim has failed.
+	ReasonResourceClaimFailed = "ResourceClaimFailed"
+	// ReasonResourceClaimTemplateFailed indicates that the creation of resourceclaimtemplate has failed.
+	ReasonResourceClaimTemplateFailed = "ResourceClaimTemplateFailed"
 )
 
 // Updater is the condition updater.

@@ -269,6 +269,8 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&networkingv1.Ingress{}).
 		Owns(&autoscalingv2.HorizontalPodAutoscaler{}).
+		Owns(&resourcev1beta2.ResourceClaimTemplate{}).
+		Owns(&resourcev1beta2.ResourceClaim{}).
 		WithEventFilter(predicate.Funcs{
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				// Type assert to NIMService
@@ -382,21 +384,15 @@ func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context,
 	// Enqueue reconciliation for each matching NIMService
 	requests := make([]ctrl.Request, 0)
 	for _, item := range nimServices.Items {
-		nameCache := make(map[string]int)
-		for _, draResource := range item.Spec.DRAResources {
-			if draResource.ResourceClaimName != nil && *draResource.ResourceClaimName == resourceClaim.GetName() {
-				requests = append(requests, ctrl.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      item.Name,
-						Namespace: item.Namespace,
-					},
-				})
-				break
+		namedDraResources := shared.GenerateNamedDRAResources(&item)
+		for _, draResource := range namedDraResources {
+			if shared.ShouldCreateDRAResource(draResource.DRAResource) {
+				continue
 			}
-			if draResource.ResourceClaimTemplateName != nil {
-				draResourceName := shared.GenerateUniquePodClaimName(nameCache, item.Name, &draResource)
+
+			if !draResource.IsClaim() {
 				podClaimName, ok := resourceClaim.GetAnnotations()[utils.DRAPodClaimNameAnnotationKey]
-				if ok && podClaimName == draResourceName {
+				if ok && podClaimName == draResource.Name {
 					requests = append(requests, ctrl.Request{
 						NamespacedName: types.NamespacedName{
 							Name:      item.Name,
@@ -405,6 +401,14 @@ func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context,
 					})
 					break
 				}
+			} else if draResource.ResourceName == resourceClaim.GetName() {
+				requests = append(requests, ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      item.Name,
+						Namespace: item.Namespace,
+					},
+				})
+				break
 			}
 		}
 	}
