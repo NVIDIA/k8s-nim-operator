@@ -116,11 +116,10 @@ var _ = Describe("CEL Expression Builder", func() {
 			Entry("invalid operator", ComparisonOperator("unknown"), ptr.To(resource.MustParse("100")), "", true),
 		)
 
-		DescribeTable("nil values result in empty string and no error",
+		DescribeTable("nil values result in error",
 			func(vt ValueType) {
-				result, err := BuildExpr("device.attributes[\"nvidia.com\"].test", OpEqual, nil, vt)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(result).To(Equal(""))
+				_, err := BuildExpr("device.attributes[\"nvidia.com\"].test", OpEqual, nil, vt)
+				Expect(err).To(HaveOccurred())
 			},
 			Entry("bool type", TypeBool),
 			Entry("int type", TypeInt),
@@ -128,6 +127,27 @@ var _ = Describe("CEL Expression Builder", func() {
 			Entry("semver type", TypeSemver),
 			Entry("quantity type", TypeQuantity),
 			Entry("unknown type", TypeUnknown),
+		)
+
+		DescribeTable("should validate CEL expressions",
+			func(expression string, expectError bool) {
+				err := ValidateExpr(expression)
+				if expectError {
+					Expect(err).To(HaveOccurred())
+				} else {
+					Expect(err).NotTo(HaveOccurred())
+				}
+			},
+			Entry("valid attribute expression", "device.attributes[\"nvidia.com\"].test == true", false),
+			Entry("valid capacity expression", "device.capacity[\"nvidia.com\"].test == quantity(\"100\")", false),
+			Entry("valid driver expression", "device.driver == \"nvidia.com\"", false),
+			Entry("invalid capacity type", "device.capacity[\"nvidia.com\"].test == \"100\"", true),
+			Entry("invalid driver type", "device.driver == 1", true),
+			Entry("invalid expression", "device.attributes[\"nvidia.com/test\"] == true", true),
+			Entry("invalid device expression", "device.foo == true", true),
+			Entry("invalid attribute expression", "device.attributes == true", true),
+			Entry("invalid capacity expression", "device.capacity == true", true),
+			Entry("invalid device", "foo.attributes[\"nvidia.com\"].test == true", true),
 		)
 	})
 })

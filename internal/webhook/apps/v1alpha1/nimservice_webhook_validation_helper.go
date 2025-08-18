@@ -42,17 +42,17 @@ var validPVCAccessModeStrs = []corev1.PersistentVolumeAccessMode{
 	corev1.ReadWriteOncePod,
 }
 
-var validDRADeviceAttributeMatcherOps = []appsv1alpha1.DRADeviceAttributeMatcherOp{
-	appsv1alpha1.DRADeviceAttributeMatcherOpEqual,
-	appsv1alpha1.DRADeviceAttributeMatcherOpNotEqual,
-	appsv1alpha1.DRADeviceAttributeMatcherOpGreaterThan,
-	appsv1alpha1.DRADeviceAttributeMatcherOpGreaterThanOrEqual,
-	appsv1alpha1.DRADeviceAttributeMatcherOpLessThan,
-	appsv1alpha1.DRADeviceAttributeMatcherOpLessThanOrEqual,
+var validDRADeviceAttributeSelectorOps = []appsv1alpha1.DRADeviceAttributeSelectorOp{
+	appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+	appsv1alpha1.DRADeviceAttributeSelectorOpNotEqual,
+	appsv1alpha1.DRADeviceAttributeSelectorOpGreaterThan,
+	appsv1alpha1.DRADeviceAttributeSelectorOpGreaterThanOrEqual,
+	appsv1alpha1.DRADeviceAttributeSelectorOpLessThan,
+	appsv1alpha1.DRADeviceAttributeSelectorOpLessThanOrEqual,
 }
 
-var validDRAResourceQuantityMatcherOps = []appsv1alpha1.DRAResourceQuantityMatcherOp{
-	appsv1alpha1.DRAResourceQuantityMatcherOpEqual,
+var validDRAResourceQuantitySelectorOps = []appsv1alpha1.DRAResourceQuantitySelectorOp{
+	appsv1alpha1.DRAResourceQuantitySelectorOpEqual,
 }
 
 // validateNIMServiceSpec aggregates all structural validation checks for a NIMService
@@ -244,50 +244,50 @@ func validateDRADeviceSpec(device *appsv1alpha1.DRADeviceSpec, fldPath *field.Pa
 		errList = append(errList, field.Required(fldPath.Child("driverName"), "is required"))
 	}
 	seen := make(map[string]struct{})
-	for idx, matcher := range device.MatchAttributes {
-		qualifiedName := k8sutil.NormalizeQualifiedName(matcher.Key, device.DriverName)
+	for idx, selector := range device.AttributeSelectors {
+		qualifiedName := k8sutil.NormalizeQualifiedName(selector.Key, device.DriverName)
 		if _, exists := seen[qualifiedName]; exists {
-			errList = append(errList, field.Duplicate(fldPath.Child("matchAttributes").Index(idx), qualifiedName))
+			errList = append(errList, field.Duplicate(fldPath.Child("attributeSelectors").Index(idx), qualifiedName))
 		} else {
 			seen[qualifiedName] = struct{}{}
 		}
-		errList = append(errList, validateDRADeviceAttributeMatcher(&matcher, fldPath.Child("matchAttributes").Index(idx))...)
+		errList = append(errList, validateDRADeviceAttributeSelector(&selector, fldPath.Child("attributeSelectors").Index(idx))...)
 	}
 
-	for idx, matcher := range device.MatchCapacity {
-		qualifiedName := k8sutil.NormalizeQualifiedName(matcher.Key, device.DriverName)
+	for idx, selector := range device.CapacitySelectors {
+		qualifiedName := k8sutil.NormalizeQualifiedName(selector.Key, device.DriverName)
 		if _, exists := seen[qualifiedName]; exists {
-			errList = append(errList, field.Duplicate(fldPath.Child("matchCapacity").Index(idx), qualifiedName))
+			errList = append(errList, field.Duplicate(fldPath.Child("capacitySelectors").Index(idx), qualifiedName))
 		} else {
 			seen[qualifiedName] = struct{}{}
 		}
-		errList = append(errList, validateDRAResourceQuantityMatcher(&matcher, fldPath.Child("matchCapacity").Index(idx))...)
+		errList = append(errList, validateDRAResourceQuantitySelector(&selector, fldPath.Child("capacitySelectors").Index(idx))...)
 	}
 
 	return errList
 }
 
-func validateDRADeviceAttributeMatcher(matcher *appsv1alpha1.DRADeviceAttributeMatcher, fldPath *field.Path) field.ErrorList {
+func validateDRADeviceAttributeSelector(selector *appsv1alpha1.DRADeviceAttributeSelector, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
-	errList = append(errList, validateDRADeviceAttributeMatcherOp(matcher.Op, fldPath.Child("op"))...)
-	errList = append(errList, validateDRADeviceAttributeMatcherValue(matcher.Value, fldPath.Child("value"))...)
+	errList = append(errList, validateDRADeviceAttributeSelectorOp(selector.Op, fldPath.Child("op"))...)
+	errList = append(errList, validateDRADeviceAttributeSelectorValue(selector.Value, fldPath.Child("value"))...)
 	return errList
 }
 
-func validateDRADeviceAttributeMatcherOp(op appsv1alpha1.DRADeviceAttributeMatcherOp, fldPath *field.Path) field.ErrorList {
+func validateDRADeviceAttributeSelectorOp(op appsv1alpha1.DRADeviceAttributeSelectorOp, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
 	if op == "" {
 		errList = append(errList, field.Required(fldPath, "is required"))
 		return errList
 	}
 
-	if !slices.Contains(validDRADeviceAttributeMatcherOps, op) {
-		errList = append(errList, field.Invalid(fldPath, op, fmt.Sprintf("must be one of %v", validDRADeviceAttributeMatcherOps)))
+	if !slices.Contains(validDRADeviceAttributeSelectorOps, op) {
+		errList = append(errList, field.Invalid(fldPath, op, fmt.Sprintf("must be one of %v", validDRADeviceAttributeSelectorOps)))
 	}
 	return errList
 }
 
-func validateDRADeviceAttributeMatcherValue(attribute *appsv1alpha1.DRADeviceAttributeMatcherValue, fldPath *field.Path) field.ErrorList {
+func validateDRADeviceAttributeSelectorValue(attribute *appsv1alpha1.DRADeviceAttributeSelectorValue, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
 	var fieldCount int
 	if attribute.BoolValue != nil {
@@ -317,22 +317,22 @@ func validateDRADeviceAttributeMatcherValue(attribute *appsv1alpha1.DRADeviceAtt
 	return errList
 }
 
-func validateDRAResourceQuantityMatcher(matcher *appsv1alpha1.DRAResourceQuantityMatcher, fldPath *field.Path) field.ErrorList {
+func validateDRAResourceQuantitySelector(selector *appsv1alpha1.DRAResourceQuantitySelector, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
-	errList = append(errList, validateDRAResourceQuantityMatcherOp(matcher.Op, fldPath.Child("op"))...)
-	errList = append(errList, validateDRAResourceQuantityMatcherValue(matcher.Value, fldPath.Child("value"))...)
+	errList = append(errList, validateDRAResourceQuantitySelectorOp(selector.Op, fldPath.Child("op"))...)
+	errList = append(errList, validateDRAResourceQuantitySelectorValue(selector.Value, fldPath.Child("value"))...)
 	return errList
 }
 
-func validateDRAResourceQuantityMatcherOp(op appsv1alpha1.DRAResourceQuantityMatcherOp, fldPath *field.Path) field.ErrorList {
+func validateDRAResourceQuantitySelectorOp(op appsv1alpha1.DRAResourceQuantitySelectorOp, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
-	if !slices.Contains(validDRAResourceQuantityMatcherOps, op) {
-		errList = append(errList, field.Invalid(fldPath, op, fmt.Sprintf("must be one of %v", validDRAResourceQuantityMatcherOps)))
+	if !slices.Contains(validDRAResourceQuantitySelectorOps, op) {
+		errList = append(errList, field.Invalid(fldPath, op, fmt.Sprintf("must be one of %v", validDRAResourceQuantitySelectorOps)))
 	}
 	return errList
 }
 
-func validateDRAResourceQuantityMatcherValue(value *apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+func validateDRAResourceQuantitySelectorValue(value *apiresource.Quantity, fldPath *field.Path) field.ErrorList {
 
 	errList := field.ErrorList{}
 	if value == nil {

@@ -452,7 +452,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].driverName: Required value: is required"},
 		},
 		{
-			name: "claimSpec with duplicate matchAttributes keys",
+			name: "claimSpec with duplicate attributeSelectors keys",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
@@ -461,18 +461,18 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchAttributes: []appsv1alpha1.DRADeviceAttributeMatcher{
+							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
 								{
 									Key: "memory", // This normalizes to the same as "gpu.nvidia.com/memory"
-									Op:  appsv1alpha1.DRADeviceAttributeMatcherOpEqual,
-									Value: &appsv1alpha1.DRADeviceAttributeMatcherValue{
+									Op:  appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
 										StringValue: ptr.To("8Gi"),
 									},
 								},
 								{
 									Key: "gpu.nvidia.com/memory",
-									Op:  appsv1alpha1.DRADeviceAttributeMatcherOpEqual,
-									Value: &appsv1alpha1.DRADeviceAttributeMatcherValue{
+									Op:  appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
 										StringValue: ptr.To("16Gi"),
 									},
 								},
@@ -483,10 +483,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].matchAttributes[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
+			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
 		},
 		{
-			name: "claimSpec with duplicate matchCapacity keys",
+			name: "claimSpec with duplicate capacitySelectors keys",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
@@ -495,15 +495,15 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchCapacity: []appsv1alpha1.DRAResourceQuantityMatcher{
+							CapacitySelectors: []appsv1alpha1.DRAResourceQuantitySelector{
 								{
 									Key:   "memory", // This normalizes to the same as "gpu.nvidia.com/memory"
-									Op:    appsv1alpha1.DRAResourceQuantityMatcherOpEqual,
+									Op:    appsv1alpha1.DRAResourceQuantitySelectorOpEqual,
 									Value: resource.NewQuantity(8*1024*1024*1024, resource.BinarySI),
 								},
 								{
 									Key:   "gpu.nvidia.com/memory",
-									Op:    appsv1alpha1.DRAResourceQuantityMatcherOpEqual,
+									Op:    appsv1alpha1.DRAResourceQuantitySelectorOpEqual,
 									Value: resource.NewQuantity(16*1024*1024*1024, resource.BinarySI),
 								},
 							},
@@ -513,10 +513,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].matchCapacity[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
+			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].capacitySelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
 		},
 		{
-			name: "claimSpec with invalid attribute matcher - missing op",
+			name: "claimSpec with invalid attribute selector - missing op",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
@@ -525,11 +525,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchAttributes: []appsv1alpha1.DRADeviceAttributeMatcher{
+							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
 								{
 									Key: "memory",
 									// Op is intentionally missing
-									Value: &appsv1alpha1.DRADeviceAttributeMatcherValue{
+									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
 										StringValue: ptr.To("8Gi"),
 									},
 								},
@@ -540,10 +540,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].matchAttributes[0].op: Required value: is required"},
+			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].op: Required value: is required"},
 		},
 		{
-			name: "claimSpec with invalid attribute matcher - invalid op",
+			name: "claimSpec with invalid attribute selector - invalid op",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
@@ -552,11 +552,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchAttributes: []appsv1alpha1.DRADeviceAttributeMatcher{
+							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
 								{
 									Key: "memory",
-									Op:  "InvalidOp",
-									Value: &appsv1alpha1.DRADeviceAttributeMatcherValue{
+									Op:  "InvalidOp", // Invalid op
+									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
 										StringValue: ptr.To("8Gi"),
 									},
 								},
@@ -567,10 +567,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].matchAttributes[0].op: Invalid value: \"InvalidOp\": must be one of [Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual]"},
+			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual]"},
 		},
 		{
-			name: "claimSpec with invalid attribute matcher - no value",
+			name: "claimSpec with invalid attribute selector - no value",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
@@ -579,11 +579,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchAttributes: []appsv1alpha1.DRADeviceAttributeMatcher{
+							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
 								{
 									Key:   "memory",
-									Op:    appsv1alpha1.DRADeviceAttributeMatcherOpEqual,
-									Value: &appsv1alpha1.DRADeviceAttributeMatcherValue{},
+									Op:    appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{},
 								},
 							},
 						}},
@@ -592,10 +592,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value: Required value: must specify exactly one of spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value.boolValue, spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value.intValue, spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value.stringValue, or spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value.versionValue"},
+			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value: Required value: must specify exactly one of spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.versionValue"},
 		},
 		{
-			name: "claimSpec with invalid attribute matcher - multiple values",
+			name: "claimSpec with invalid attribute selector - multiple values",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
@@ -604,11 +604,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchAttributes: []appsv1alpha1.DRADeviceAttributeMatcher{
+							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
 								{
 									Key: "memory",
-									Op:  appsv1alpha1.DRADeviceAttributeMatcherOpEqual,
-									Value: &appsv1alpha1.DRADeviceAttributeMatcherValue{
+									Op:  appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
 										StringValue: ptr.To("8Gi"),
 										IntValue:    ptr.To(int32(8)),
 									},
@@ -620,7 +620,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value: Invalid value: \"multiple attribute values defined\": must specify exactly one of spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value.boolValue, spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value.intValue, spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value.stringValue, or spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value.versionValue"},
+			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value: Invalid value: \"multiple attribute values defined\": must specify exactly one of spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.versionValue"},
 		},
 		{
 			name: "claimSpec with invalid version value",
@@ -632,11 +632,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchAttributes: []appsv1alpha1.DRADeviceAttributeMatcher{
+							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
 								{
 									Key: "driver-version",
-									Op:  appsv1alpha1.DRADeviceAttributeMatcherOpEqual,
-									Value: &appsv1alpha1.DRADeviceAttributeMatcherValue{
+									Op:  appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
 										VersionValue: ptr.To("not-a-version"),
 									},
 								},
@@ -647,10 +647,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].matchAttributes[0].value: Invalid value: \"not-a-version\": must be a valid semantic version"},
+			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value: Invalid value: \"not-a-version\": must be a valid semantic version"},
 		},
 		{
-			name: "claimSpec with invalid quantity matcher - invalid op",
+			name: "claimSpec with invalid quantity selector - invalid op",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
@@ -659,7 +659,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchCapacity: []appsv1alpha1.DRAResourceQuantityMatcher{
+							CapacitySelectors: []appsv1alpha1.DRAResourceQuantitySelector{
 								{
 									Key:   "memory",
 									Op:    "InvalidOp",
@@ -672,10 +672,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].matchCapacity[0].op: Invalid value: \"InvalidOp\": must be one of [Equal]"},
+			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].capacitySelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal]"},
 		},
 		{
-			name: "claimSpec with invalid quantity matcher - missing value",
+			name: "claimSpec with invalid quantity selector - missing value",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
@@ -684,10 +684,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchCapacity: []appsv1alpha1.DRAResourceQuantityMatcher{
+							CapacitySelectors: []appsv1alpha1.DRAResourceQuantitySelector{
 								{
 									Key: "memory",
-									Op:  appsv1alpha1.DRAResourceQuantityMatcherOpEqual,
+									Op:  appsv1alpha1.DRAResourceQuantitySelectorOpEqual,
 									// Value is intentionally missing
 								},
 							},
@@ -697,7 +697,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].matchCapacity[0].value: Required value: is required"},
+			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].capacitySelectors[0].value: Required value: is required"},
 		},
 		{
 			name: "valid template",
@@ -744,7 +744,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			wantErrMsgs: nil,
 		},
 		{
-			name: "valid claimSpec with attributes and capacity matchers",
+			name: "valid claimSpec with attributes and capacity selectors",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
@@ -753,26 +753,26 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 							Count:           2,
 							DeviceClassName: "gpu.nvidia.com",
 							DriverName:      "gpu.nvidia.com",
-							MatchAttributes: []appsv1alpha1.DRADeviceAttributeMatcher{
+							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
 								{
 									Key: "compute-capability",
-									Op:  appsv1alpha1.DRADeviceAttributeMatcherOpEqual,
-									Value: &appsv1alpha1.DRADeviceAttributeMatcherValue{
+									Op:  appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
 										StringValue: ptr.To("8.6"),
 									},
 								},
 								{
 									Key: "nvidia.com/driver-version",
-									Op:  appsv1alpha1.DRADeviceAttributeMatcherOpEqual,
-									Value: &appsv1alpha1.DRADeviceAttributeMatcherValue{
+									Op:  appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
 										VersionValue: ptr.To("12.2.0"),
 									},
 								},
 							},
-							MatchCapacity: []appsv1alpha1.DRAResourceQuantityMatcher{
+							CapacitySelectors: []appsv1alpha1.DRAResourceQuantitySelector{
 								{
 									Key:   "memory",
-									Op:    appsv1alpha1.DRAResourceQuantityMatcherOpEqual,
+									Op:    appsv1alpha1.DRAResourceQuantitySelectorOpEqual,
 									Value: resource.NewQuantity(8*1024*1024*1024, resource.BinarySI),
 								},
 							},

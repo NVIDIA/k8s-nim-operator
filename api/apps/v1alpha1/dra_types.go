@@ -70,9 +70,9 @@ type DRAResource struct {
 	Requests []string `json:"requests,omitempty"`
 }
 
-// DRADeviceAttributeMatcherValue defines the value of a device attribute to match.
+// DRADeviceAttributeSelectorValue defines the value of a device attribute to compare.
 // Exactly one of the fields must be set.
-type DRADeviceAttributeMatcherValue struct {
+type DRADeviceAttributeSelectorValue struct {
 	// BoolValue is a true/false value.
 	BoolValue *bool `json:"boolValue,omitempty"`
 	// IntValue is a number.
@@ -85,7 +85,7 @@ type DRADeviceAttributeMatcherValue struct {
 	VersionValue *string `json:"versionValue,omitempty"`
 }
 
-func (d *DRADeviceAttributeMatcherValue) GetValue() any {
+func (d *DRADeviceAttributeSelectorValue) GetValue() any {
 	switch {
 	case d.BoolValue != nil:
 		return *d.BoolValue
@@ -99,7 +99,7 @@ func (d *DRADeviceAttributeMatcherValue) GetValue() any {
 	return nil
 }
 
-func (d *DRADeviceAttributeMatcherValue) GetValueType() k8sutilcel.ValueType {
+func (d *DRADeviceAttributeSelectorValue) GetValueType() k8sutilcel.ValueType {
 	switch {
 	case d.BoolValue != nil:
 		return k8sutilcel.TypeBool
@@ -114,103 +114,103 @@ func (d *DRADeviceAttributeMatcherValue) GetValueType() k8sutilcel.ValueType {
 	}
 }
 
-// DRADeviceAttributeMatcherOp defines the operator to use for matching a device attribute.
-type DRADeviceAttributeMatcherOp string
+// DRADeviceAttributeSelectorOp defines the operator to use for comparing against a device attribute value.
+type DRADeviceAttributeSelectorOp string
 
 const (
-	DRADeviceAttributeMatcherOpEqual              DRADeviceAttributeMatcherOp = "Equal"
-	DRADeviceAttributeMatcherOpNotEqual           DRADeviceAttributeMatcherOp = "NotEqual"
-	DRADeviceAttributeMatcherOpGreaterThan        DRADeviceAttributeMatcherOp = "GreaterThan"
-	DRADeviceAttributeMatcherOpGreaterThanOrEqual DRADeviceAttributeMatcherOp = "GreaterThanOrEqual"
-	DRADeviceAttributeMatcherOpLessThan           DRADeviceAttributeMatcherOp = "LessThan"
-	DRADeviceAttributeMatcherOpLessThanOrEqual    DRADeviceAttributeMatcherOp = "LessThanOrEqual"
+	DRADeviceAttributeSelectorOpEqual              DRADeviceAttributeSelectorOp = "Equal"
+	DRADeviceAttributeSelectorOpNotEqual           DRADeviceAttributeSelectorOp = "NotEqual"
+	DRADeviceAttributeSelectorOpGreaterThan        DRADeviceAttributeSelectorOp = "GreaterThan"
+	DRADeviceAttributeSelectorOpGreaterThanOrEqual DRADeviceAttributeSelectorOp = "GreaterThanOrEqual"
+	DRADeviceAttributeSelectorOpLessThan           DRADeviceAttributeSelectorOp = "LessThan"
+	DRADeviceAttributeSelectorOpLessThanOrEqual    DRADeviceAttributeSelectorOp = "LessThanOrEqual"
 )
 
-func (d DRADeviceAttributeMatcherOp) GetCELOperator() k8sutilcel.ComparisonOperator {
+func (d DRADeviceAttributeSelectorOp) GetCELOperator() k8sutilcel.ComparisonOperator {
 	switch d {
-	case DRADeviceAttributeMatcherOpEqual:
+	case DRADeviceAttributeSelectorOpEqual:
 		return k8sutilcel.OpEqual
-	case DRADeviceAttributeMatcherOpNotEqual:
+	case DRADeviceAttributeSelectorOpNotEqual:
 		return k8sutilcel.OpNotEqual
-	case DRADeviceAttributeMatcherOpGreaterThan:
+	case DRADeviceAttributeSelectorOpGreaterThan:
 		return k8sutilcel.OpGreater
-	case DRADeviceAttributeMatcherOpGreaterThanOrEqual:
+	case DRADeviceAttributeSelectorOpGreaterThanOrEqual:
 		return k8sutilcel.OpGreaterOrEqual
-	case DRADeviceAttributeMatcherOpLessThan:
+	case DRADeviceAttributeSelectorOpLessThan:
 		return k8sutilcel.OpLess
-	case DRADeviceAttributeMatcherOpLessThanOrEqual:
+	case DRADeviceAttributeSelectorOpLessThanOrEqual:
 		return k8sutilcel.OpLessOrEqual
 	default:
 		return k8sutilcel.OpEqual
 	}
 }
 
-// DRADeviceAttributeMatcher defines the matcher expression for a DRA device attribute.
-type DRADeviceAttributeMatcher struct {
-	// Key is the name of the device attribute to match.
+// DRADeviceAttributeSelector defines the selector expression for a DRA device attribute.
+type DRADeviceAttributeSelector struct {
+	// Key is the name of the device attribute.
 	// This is either a qualified name or a simple name.
 	// If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
 	// Eg: "gpu.nvidia.com/productName" is equivalent to "productName" if the driver name is "gpu.nvidia.com". Otherwise they're treated as 2 different attributes.
 	// +kubebuilder:validation:MaxLength=64
 	Key string `json:"key"`
-	// Op is the operator to use for matching the device attribute. Supported operators are:
-	// * Equal: The device attribute value must be equal to the value specified in the matcher.
-	// * NotEqual: The device attribute value must not be equal to the value specified in the matcher.
-	// * GreaterThan: The device attribute value must be greater than the value specified in the matcher.
-	// * GreaterThanOrEqual: The device attribute value must be greater than or equal to the value specified in the matcher.
-	// * LessThan: The device attribute value must be less than the value specified in the matcher.
-	// * LessThanOrEqual: The device attribute value must be less than or equal to the value specified in the matcher.
+	// Op is the operator to use for comparing the device attribute value. Supported operators are:
+	// * Equal: The device attribute value must be equal to the value specified in the selector.
+	// * NotEqual: The device attribute value must not be equal to the value specified in the selector.
+	// * GreaterThan: The device attribute value must be greater than the value specified in the selector.
+	// * GreaterThanOrEqual: The device attribute value must be greater than or equal to the value specified in the selector.
+	// * LessThan: The device attribute value must be less than the value specified in the selector.
+	// * LessThanOrEqual: The device attribute value must be less than or equal to the value specified in the selector.
 	//
 	// +kubebuilder:validation:Enum=Equal;NotEqual;GreaterThan;GreaterThanOrEqual;LessThan;LessThanOrEqual
 	// +kubebuilder:default=Equal
-	Op DRADeviceAttributeMatcherOp `json:"op"`
-	// Value is the value to match the device attribute against.
-	Value *DRADeviceAttributeMatcherValue `json:"value,omitempty"`
+	Op DRADeviceAttributeSelectorOp `json:"op"`
+	// Value is the value to compare against the device attribute.
+	Value *DRADeviceAttributeSelectorValue `json:"value,omitempty"`
 }
 
-func (d *DRADeviceAttributeMatcher) GetCELExpression(driverName string) (string, error) {
+func (d *DRADeviceAttributeSelector) GetCELExpression(driverName string) (string, error) {
 	domain, name := k8sutil.SplitQualifiedName(d.Key, driverName)
 	attrKey := fmt.Sprintf("device.attributes[%q].%s", domain, name)
 	return k8sutilcel.BuildExpr(attrKey, d.Op.GetCELOperator(), d.Value.GetValue(), d.Value.GetValueType())
 }
 
-// DRAResourceQuantityMatcherOp defines the operator to use for matching a resource quantity.
-type DRAResourceQuantityMatcherOp string
+// DRAResourceQuantitySelectorOp defines the operator to use for comparing against a resource quantity.
+type DRAResourceQuantitySelectorOp string
 
 const (
-	DRAResourceQuantityMatcherOpEqual DRAResourceQuantityMatcherOp = "Equal"
+	DRAResourceQuantitySelectorOpEqual DRAResourceQuantitySelectorOp = "Equal"
 )
 
-func (d DRAResourceQuantityMatcherOp) GetCELOperator() k8sutilcel.ComparisonOperator {
+func (d DRAResourceQuantitySelectorOp) GetCELOperator() k8sutilcel.ComparisonOperator {
 	switch d {
-	case DRAResourceQuantityMatcherOpEqual:
+	case DRAResourceQuantitySelectorOpEqual:
 		return k8sutilcel.OpEqual
 	default:
 		return k8sutilcel.OpEqual
 	}
 }
 
-// DRAResourceQuantityMatcher defines the matcher expression for a DRA device capacity.
-type DRAResourceQuantityMatcher struct {
-	// Key is the name of the resource quantity to match.
+// DRAResourceQuantitySelector defines the selector expression for a DRA device capacity.
+type DRAResourceQuantitySelector struct {
+	// Key is the name of the resource.
 	// This is either a qualified name or a simple name.
 	// If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
 	// Eg: "gpu.nvidia.com/memory" is equivalent to "memory" if the driver name is "gpu.nvidia.com". Otherwise they're treated as 2 different attributes.
 	// +kubebuilder:validation:MaxLength=64
 	Key string `json:"key"`
-	// Op is the operator to use for matching the device capacity. Supported operators are:
-	// * Equal: The resource quantity value must be equal to the value specified in the matcher.
+	// Op is the operator to use for comparing against the device capacity. Supported operators are:
+	// * Equal: The resource quantity value must be equal to the value specified in the selector.
 	//
 	// +kubebuilder:validation:Enum=Equal
 	// +kubebuilder:default=Equal
-	Op DRAResourceQuantityMatcherOp `json:"op"`
-	// Value is the quantity to match the device capacity against.
+	Op DRAResourceQuantitySelectorOp `json:"op"`
+	// Value is the resource quantity to compare against.
 	//
 	// +kubebuilder:validation:Required
 	Value *apiresource.Quantity `json:"value,omitempty"`
 }
 
-func (d *DRAResourceQuantityMatcher) GetCELExpression(driverName string) (string, error) {
+func (d *DRAResourceQuantitySelector) GetCELExpression(driverName string) (string, error) {
 	domain, name := k8sutil.SplitQualifiedName(d.Key, driverName)
 	attrKey := fmt.Sprintf("device.capacity[%q].%s", domain, name)
 	return k8sutilcel.BuildExpr(attrKey, d.Op.GetCELOperator(), d.Value, k8sutilcel.TypeQuantity)
@@ -236,12 +236,14 @@ type DRADeviceSpec struct {
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
 	// +kubebuilder:default=gpu.nvidia.com
 	DriverName string `json:"driverName,omitempty"`
-	// MatchAttributes defines the criteria which must be satisfied by the device attributes of a device.
+	// AttributeSelectors defines the criteria which must be satisfied by the device attributes of a device.
 	// +kubebuilder:validation:MaxSize=20
-	MatchAttributes []DRADeviceAttributeMatcher `json:"matchAttributes,omitempty"`
-	// MatchCapacity defines the criteria which must be satisfied by the device capacity of a device.
+	AttributeSelectors []DRADeviceAttributeSelector `json:"attributeSelectors,omitempty"`
+	// CapacitySelectors defines the criteria which must be satisfied by the device capacity of a device.
 	// +kubebuilder:validation:MaxSize=12
-	MatchCapacity []DRAResourceQuantityMatcher `json:"matchCapacity,omitempty"`
+	CapacitySelectors []DRAResourceQuantitySelector `json:"capacitySelectors,omitempty"`
+	// CELExpressions is a list of CEL expressions that must be satisfied by the DRA device.
+	CELExpressions []string `json:"celExpressions,omitempty"`
 }
 
 // DRAClaimSpec defines the spec for generating a DRA resource claim/resource claim template.
