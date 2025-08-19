@@ -19,7 +19,7 @@ spec:
     app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 ---
-{{- if and .Values.operator.admissionController.enabled .Values.operator.admissionController.useCertManager }}
+{{- if .Values.operator.admissionController.enabled }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -38,7 +38,7 @@ spec:
   secretName: {{ include "k8s-nim-operator.fullname" . }}-webhook-server-cert
 {{- end }}
 ---
-{{- if and .Values.operator.admissionController.enabled .Values.operator.admissionController.useCertManager }}
+{{- if .Values.operator.admissionController.enabled }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
@@ -56,10 +56,8 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: {{ include "k8s-nim-operator.fullname" . }}-validating-webhook-configuration
-  {{- if .Values.operator.admissionController.useCertManager }}
   annotations:
     cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "k8s-nim-operator.fullname" . }}-serving-cert
-  {{- end }}
   labels:
     app.kubernetes.io/name: k8s-nim-operator
     app.kubernetes.io/managed-by: helm
@@ -71,9 +69,6 @@ webhooks:
         name: {{ include "k8s-nim-operator.fullname" . }}-webhook-service
         namespace: {{ .Release.Namespace }}
         path: /validate-apps-nvidia-com-v1alpha1-nimcache
-      {{- if not .Values.operator.admissionController.useCertManager }}
-      caBundle: {{ .Values.operator.admissionController.certificate.caCrt | b64enc | quote }}
-      {{- end }}
     failurePolicy: Fail
     rules:
       - apiGroups: ["apps.nvidia.com"]
@@ -88,9 +83,6 @@ webhooks:
         name: {{ include "k8s-nim-operator.fullname" . }}-webhook-service
         namespace: {{ .Release.Namespace }}
         path: /validate-apps-nvidia-com-v1alpha1-nimservice
-      {{- if not .Values.operator.admissionController.useCertManager }}
-      caBundle: {{ .Values.operator.admissionController.certificate.caCrt | b64enc | quote }}
-      {{- end }}
     failurePolicy: Fail
     rules:
       - apiGroups: ["apps.nvidia.com"]
@@ -98,16 +90,4 @@ webhooks:
         operations: ["CREATE", "UPDATE"]
         resources: ["nimservices"]
     sideEffects: None
-{{- end }} 
----
-{{- if and .Values.operator.admissionController.enabled (not .Values.operator.admissionController.useCertManager) }}
-apiVersion: v1
-kind: Secret
-metadata:
-  name: webhook-server-cert
-  namespace: {{ .Release.Namespace }}
-type: Opaque
-data:
-  tls.crt: {{ .Values.operator.admissionController.certificate.tlsCrt | b64enc | quote }}
-  tls.key: {{ .Values.operator.admissionController.certificate.tlsKey | b64enc | quote }}
 {{- end }}
