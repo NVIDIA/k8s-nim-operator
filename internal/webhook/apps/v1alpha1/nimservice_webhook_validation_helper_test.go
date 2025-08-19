@@ -315,49 +315,6 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			wantErrMsgs: []string{"spec.draResources[0].resourceClaimName: Forbidden: must not be set when spec.scale.enabled is true, use spec.draResources[0].resourceClaimTemplateName instead"},
 		},
 		{
-			name: "claimSpec with isTemplate=false and replicas>1",
-			modify: func(ns *appsv1alpha1.NIMService) {
-				ns.Spec.Replicas = 2
-				isTemplate := false
-				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
-						IsTemplate: &isTemplate,
-						Devices: []appsv1alpha1.DRADeviceSpec{{
-							Name:            "gpu",
-							Count:           1,
-							DeviceClassName: "gpu.nvidia.com",
-							DriverName:      "gpu.nvidia.com",
-						}},
-					},
-				}}
-			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].resourceClaimName: Forbidden: must not be set when spec.replicas > 1, use spec.draResources[0].resourceClaimTemplateName instead"},
-		},
-		{
-			name: "claimSpec with isTemplate=false and autoscaling enabled",
-			modify: func(ns *appsv1alpha1.NIMService) {
-				enabled := true
-				isTemplate := false
-				ns.Spec.Scale.Enabled = &enabled
-				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
-						IsTemplate: &isTemplate,
-						Devices: []appsv1alpha1.DRADeviceSpec{{
-							Name:            "gpu",
-							Count:           1,
-							DeviceClassName: "gpu.nvidia.com",
-							DriverName:      "gpu.nvidia.com",
-						}},
-					},
-				}}
-			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].resourceClaimName: Forbidden: must not be set when spec.scale.enabled is true, use spec.draResources[0].resourceClaimTemplateName instead"},
-		},
-		{
 			name: "duplicate resourceClaimNames",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{
@@ -724,12 +681,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			wantErrMsgs: nil,
 		},
 		{
-			name: "valid claimSpec with isTemplate=true",
+			name: "valid claimSpec",
 			modify: func(ns *appsv1alpha1.NIMService) {
-				isTemplate := true
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
-						IsTemplate: &isTemplate,
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,

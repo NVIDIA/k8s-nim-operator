@@ -330,14 +330,6 @@ type DRADeviceParams struct {
 	CELExpressions  []string
 }
 
-type ResourceClaimParams struct {
-	Name        string
-	Namespace   string
-	Labels      map[string]string
-	Annotations map[string]string
-	Devices     []DRADeviceParams
-}
-
 type ResourceClaimTemplateParams struct {
 	Name             string
 	Namespace        string

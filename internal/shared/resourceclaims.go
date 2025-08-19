@@ -102,11 +102,7 @@ func GenerateNamedDRAResources(nimService *appsv1alpha1.NIMService) []NamedDRARe
 			namedDraResources[idx].FieldType = DRAResourceFieldTypeClaimTemplate
 			namedDraResources[idx].ResourceName = *resource.ResourceClaimTemplateName
 		case ShouldCreateDRAResource(resource):
-			if resource.ClaimSpec.IsTemplateSpec() {
-				namedDraResources[idx].FieldType = DRAResourceFieldTypeClaimTemplate
-			} else {
-				namedDraResources[idx].FieldType = DRAResourceFieldTypeClaim
-			}
+			namedDraResources[idx].FieldType = DRAResourceFieldTypeClaimTemplate
 			namedDraResources[idx].ResourceName = generateUniqueDRAResourceName(nimService.Name, resource.ClaimSpec.GetNamePrefix(), idx)
 		}
 

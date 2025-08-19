@@ -279,8 +279,6 @@ spec:
                                     maxLength: 16
                                     minLength: 1
                                     type: string
-                                  isTemplate:
-                                    type: boolean
                                 required:
                                 - devices
                                 type: object

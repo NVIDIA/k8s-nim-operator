@@ -255,12 +255,6 @@ type DRAClaimSpec struct {
 	GenerateName string `json:"generateName,omitempty"`
 	// +kubebuilder:validation:MinSize=1
 	Devices []DRADeviceSpec `json:"devices"`
-	// TODO: Warn that if set to false, then this NIMService cannot be scaled up.
-	IsTemplate *bool `json:"isTemplate,omitempty"`
-}
-
-func (d *DRAClaimSpec) IsTemplateSpec() bool {
-	return d.IsTemplate != nil && *d.IsTemplate
 }
 
 func (d *DRAClaimSpec) GetNamePrefix() string {
@@ -268,10 +262,7 @@ func (d *DRAClaimSpec) GetNamePrefix() string {
 	if namePrefix != "" {
 		return namePrefix
 	}
-	if d.IsTemplateSpec() {
-		return "claimtemplate"
-	}
-	return "claim"
+	return "claimtemplate"
 }
 
 // DRAResourceStatus defines the status of the DRAResource.

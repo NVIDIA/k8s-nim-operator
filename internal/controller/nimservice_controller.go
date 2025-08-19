@@ -322,16 +322,6 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
 		r.discoveryClient,
 		nimServiceBuilder,
-		resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"),
-		&resourcev1beta2.ResourceClaim{},
-	)
-	if err != nil {
-		return err
-	}
-
-	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		nimServiceBuilder,
 		lwsv1.SchemeGroupVersion.WithResource("leaderworkersets"),
 		&lwsv1.LeaderWorkerSet{},
 	)

@@ -182,7 +182,7 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 				fmt.Sprintf("must specify exactly one of %s, %s, or %s", fldPath.Child("resourceClaimName"), fldPath.Child("resourceClaimTemplateName"), fldPath.Child("claimSpec"))))
 		}
 
-		if hasName || (hasSpec && !dra.ClaimSpec.IsTemplateSpec()) {
+		if hasName {
 			// resourceClaimName: spec.relicas must be <= 1 and spec.scale.enabled must be false.
 			if spec.Replicas > 1 {
 				errList = append(errList, field.Forbidden(
@@ -196,9 +196,6 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 					fmt.Sprintf("must not be set when %s is true, use %s instead", fldPath.Child("scale").Child("enabled"), idxPath.Child("resourceClaimTemplateName")),
 				))
 			}
-		}
-
-		if hasName {
 			// Ensure resourceClaimName values are unique within draResources
 			if _, exists := seen[*dra.ResourceClaimName]; exists {
 				errList = append(errList, field.Duplicate(idxPath.Child("resourceClaimName"), *dra.ResourceClaimName))

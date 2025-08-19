@@ -17,13 +17,13 @@ spec:
   replicas: 1
   draResources:
   - claimSpec:
-      isTemplate: true
       devices:
       - name: gpu
         deviceClassName: gpu.nvidia.com
         driverName: gpu.nvidia.com
         celExpressions:
         - (device.attributes["gpu.nvidia.com"].productName.lowerAscii().matches("^.*a100.*$") && device.capacity["gpu.nvidia.com"].memory.compareTo(quantity("40Gi")) >= 0) || (device.attributes["gpu.nvidia.com"].productName.lowerAscii().matches("^.*h100.*$") && device.attributes["gpu.nvidia.com"].driverVersion.compareTo(semver("550.127.8")) >= 0)
+  expose:
     service:
       type: ClusterIP
       port: 8000
