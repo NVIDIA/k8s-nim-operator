@@ -23,11 +23,7 @@ spec:
         deviceClassName: gpu.nvidia.com
         driverName: gpu.nvidia.com
         celExpressions:
-        - device.attributes["gpu.nvidia.com"].index != 0
-        - (device.attributes["gpu.nvidia.com"].driverVersion).compareTo(semver("550.127.8")) >= 0
-        - device.attributes["gpu.nvidia.com"].productName == "NVIDIA A100-PCIE-40GB"
-        - (device.capacity["gpu.nvidia.com"].memory).compareTo(quantity("40Gi")) == 0
-  expose:
+        - (device.attributes["gpu.nvidia.com"].productName.lowerAscii().matches("^.*a100.*$") && device.capacity["gpu.nvidia.com"].memory.compareTo(quantity("40Gi")) >= 0) || (device.attributes["gpu.nvidia.com"].productName.lowerAscii().matches("^.*h100.*$") && device.attributes["gpu.nvidia.com"].driverVersion.compareTo(semver("550.127.8")) >= 0)
     service:
       type: ClusterIP
       port: 8000

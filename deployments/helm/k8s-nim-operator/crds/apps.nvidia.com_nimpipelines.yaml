@@ -265,6 +265,12 @@ spec:
                                       - deviceClassName
                                       - name
                                       type: object
+                                      x-kubernetes-validations:
+                                      - message: celExpressions must not be set if
+                                          attributeSelectors or capacitySelectors
+                                          are set
+                                        rule: (has(self.celExpressions) && !(has(self.attributeSelectors)
+                                          || has(self.capacitySelectors))) || !has(self.celExpressions)
                                     type: array
                                   generateName:
                                     description: GenerateName is an optional name

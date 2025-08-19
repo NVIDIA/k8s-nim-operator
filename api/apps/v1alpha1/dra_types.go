@@ -216,6 +216,7 @@ func (d *DRAResourceQuantitySelector) GetCELExpression(driverName string) (strin
 	return k8sutilcel.BuildExpr(attrKey, d.Op.GetCELOperator(), d.Value, k8sutilcel.TypeQuantity)
 }
 
+// +kubebuilder:validation:XValidation:rule="(has(self.celExpressions) && !(has(self.attributeSelectors) || has(self.capacitySelectors))) || !has(self.celExpressions)",message="celExpressions must not be set if attributeSelectors or capacitySelectors are set"
 type DRADeviceSpec struct {
 	// Name is the name of the device request to use in the generated claim spec.
 	// Must be a valid DNS_LABEL.
