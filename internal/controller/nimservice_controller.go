@@ -269,8 +269,6 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&networkingv1.Ingress{}).
 		Owns(&autoscalingv2.HorizontalPodAutoscaler{}).
-		Owns(&resourcev1beta2.ResourceClaimTemplate{}).
-		Owns(&resourcev1beta2.ResourceClaim{}).
 		WithEventFilter(predicate.Funcs{
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				// Type assert to NIMService
@@ -306,6 +304,26 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 			)
 		},
+	)
+	if err != nil {
+		return err
+	}
+
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaimtemplates"),
+		&resourcev1beta2.ResourceClaimTemplate{},
+	)
+	if err != nil {
+		return err
+	}
+
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"),
+		&resourcev1beta2.ResourceClaim{},
 	)
 	if err != nil {
 		return err

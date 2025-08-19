@@ -195,7 +195,7 @@ type NIMService struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// +kubebuilder:validation:XValidation:rule="self.draResources == oldSelf.draResources",message="spec.draResources is immutable"
+	// +kubebuilder:validation:XValidation:rule="(has(self.draResources) && has(oldSelf.draResources) && self.draResources == oldSelf.draResources) || (!has(self.draResources) && !has(oldSelf.draResources))",message="spec.draResources is immutable"
 	Spec   NIMServiceSpec   `json:"spec,omitempty"`
 	Status NIMServiceStatus `json:"status,omitempty"`
 }
