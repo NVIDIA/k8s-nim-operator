@@ -54,14 +54,9 @@ operator:
       drop:
         - ALL
   admissionController:
-    # -- Deploy with admission controller.
+    # Enable the admission controller. 
+    # Note: cert-manager must be installed beforehand, as it is required to generate the TLS certificates.
     enabled: false
-    # -- Use cert-manager for generating self-signed certificate.
-    useCertManager: true
-    # certificate:
-    #   caCrt: |-
-    #   tlsCrt: |-
-    #   tlsKey: |-
 
 metricsService:
   ports:
