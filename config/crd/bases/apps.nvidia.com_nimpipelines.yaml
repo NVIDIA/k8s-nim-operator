@@ -122,38 +122,18 @@ spec:
                                   devices:
                                     items:
                                       properties:
-                                        count:
-                                          default: 1
-                                          description: Count is the number of devices
-                                            to request.
-                                          format: int32
-                                          type: integer
-                                        deviceClassName:
-                                          default: gpu.nvidia.com
-                                          description: DeviceClassName references
-                                            a specific DeviceClass to inherit configuration
-                                            and selectors from.
-                                          type: string
-                                        driverName:
-                                          default: gpu.nvidia.com
-                                          description: |-
-                                            DriverName is the name of the DRA driver providing the capacity information.
-                                            Must be a DNS subdomain.
-                                          maxLength: 253
-                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
-                                          type: string
-                                        matchAttributes:
-                                          description: MatchAttributes defines the
-                                            criteria which must be satisfied by the
-                                            device attributes of a device.
+                                        attributeSelectors:
+                                          description: AttributeSelectors defines
+                                            the criteria which must be satisfied by
+                                            the device attributes of a device.
                                           items:
-                                            description: DRADeviceAttributeMatcher
-                                              defines the matcher expression for a
-                                              DRA device attribute.
+                                            description: DRADeviceAttributeSelector
+                                              defines the selector expression for
+                                              a DRA device attribute.
                                             properties:
                                               key:
                                                 description: |-
-                                                  Key is the name of the device attribute to match.
+                                                  Key is the name of the device attribute.
                                                   This is either a qualified name or a simple name.
                                                   If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
                                                   Eg: "gpu.nvidia.com/productName" is equivalent to "productName" if the driver name is "gpu.nvidia.com". Otherwise they're treated as 2 different attributes.
@@ -162,13 +142,13 @@ spec:
                                               op:
                                                 default: Equal
                                                 description: |-
-                                                  Op is the operator to use for matching the device attribute. Supported operators are:
-                                                  * Equal: The device attribute value must be equal to the value specified in the matcher.
-                                                  * NotEqual: The device attribute value must not be equal to the value specified in the matcher.
-                                                  * GreaterThan: The device attribute value must be greater than the value specified in the matcher.
-                                                  * GreaterThanOrEqual: The device attribute value must be greater than or equal to the value specified in the matcher.
-                                                  * LessThan: The device attribute value must be less than the value specified in the matcher.
-                                                  * LessThanOrEqual: The device attribute value must be less than or equal to the value specified in the matcher.
+                                                  Op is the operator to use for comparing the device attribute value. Supported operators are:
+                                                  * Equal: The device attribute value must be equal to the value specified in the selector.
+                                                  * NotEqual: The device attribute value must not be equal to the value specified in the selector.
+                                                  * GreaterThan: The device attribute value must be greater than the value specified in the selector.
+                                                  * GreaterThanOrEqual: The device attribute value must be greater than or equal to the value specified in the selector.
+                                                  * LessThan: The device attribute value must be less than the value specified in the selector.
+                                                  * LessThanOrEqual: The device attribute value must be less than or equal to the value specified in the selector.
                                                 enum:
                                                 - Equal
                                                 - NotEqual
@@ -179,7 +159,7 @@ spec:
                                                 type: string
                                               value:
                                                 description: Value is the value to
-                                                  match the device attribute against.
+                                                  compare against the device attribute.
                                                 properties:
                                                   boolValue:
                                                     description: BoolValue is a true/false
@@ -206,18 +186,18 @@ spec:
                                             - op
                                             type: object
                                           type: array
-                                        matchCapacity:
-                                          description: MatchCapacity defines the criteria
-                                            which must be satisfied by the device
-                                            capacity of a device.
+                                        capacitySelectors:
+                                          description: CapacitySelectors defines the
+                                            criteria which must be satisfied by the
+                                            device capacity of a device.
                                           items:
-                                            description: DRAResourceQuantityMatcher
-                                              defines the matcher expression for a
-                                              DRA device capacity.
+                                            description: DRAResourceQuantitySelector
+                                              defines the selector expression for
+                                              a DRA device capacity.
                                             properties:
                                               key:
                                                 description: |-
-                                                  Key is the name of the resource quantity to match.
+                                                  Key is the name of the resource.
                                                   This is either a qualified name or a simple name.
                                                   If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
                                                   Eg: "gpu.nvidia.com/memory" is equivalent to "memory" if the driver name is "gpu.nvidia.com". Otherwise they're treated as 2 different attributes.
@@ -226,8 +206,8 @@ spec:
                                               op:
                                                 default: Equal
                                                 description: |-
-                                                  Op is the operator to use for matching the device capacity. Supported operators are:
-                                                  * Equal: The resource quantity value must be equal to the value specified in the matcher.
+                                                  Op is the operator to use for comparing against the device capacity. Supported operators are:
+                                                  * Equal: The resource quantity value must be equal to the value specified in the selector.
                                                 enum:
                                                 - Equal
                                                 type: string
@@ -235,8 +215,8 @@ spec:
                                                 anyOf:
                                                 - type: integer
                                                 - type: string
-                                                description: Value is the quantity
-                                                  to match the device capacity against.
+                                                description: Value is the resource
+                                                  quantity to compare against.
                                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                                 x-kubernetes-int-or-string: true
                                             required:
@@ -245,6 +225,33 @@ spec:
                                             - value
                                             type: object
                                           type: array
+                                        celExpressions:
+                                          description: CELExpressions is a list of
+                                            CEL expressions that must be satisfied
+                                            by the DRA device.
+                                          items:
+                                            type: string
+                                          type: array
+                                        count:
+                                          default: 1
+                                          description: Count is the number of devices
+                                            to request.
+                                          format: int32
+                                          type: integer
+                                        deviceClassName:
+                                          default: gpu.nvidia.com
+                                          description: DeviceClassName references
+                                            a specific DeviceClass to inherit configuration
+                                            and selectors from.
+                                          type: string
+                                        driverName:
+                                          default: gpu.nvidia.com
+                                          description: |-
+                                            DriverName is the name of the DRA driver providing the capacity information.
+                                            Must be a DNS subdomain.
+                                          maxLength: 253
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
+                                          type: string
                                         name:
                                           description: |-
                                             Name is the name of the device request to use in the generated claim spec.
@@ -258,6 +265,12 @@ spec:
                                       - deviceClassName
                                       - name
                                       type: object
+                                      x-kubernetes-validations:
+                                      - message: celExpressions must not be set if
+                                          attributeSelectors or capacitySelectors
+                                          are set
+                                        rule: (has(self.celExpressions) && !(has(self.attributeSelectors)
+                                          || has(self.capacitySelectors))) || !has(self.celExpressions)
                                     type: array
                                   generateName:
                                     description: GenerateName is an optional name

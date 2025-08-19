@@ -22,24 +22,8 @@ spec:
       - name: gpu
         deviceClassName: gpu.nvidia.com
         driverName: gpu.nvidia.com
-        attributeSelectors:
-        - key: index
-          op: NotEqual
-          value:
-            intValue: 0
-        - key: driverVersion
-          op: GreaterThanOrEqual
-          value:
-            versionValue: "550.127.8"
-        - key: architecture
-          op: Equal
-          value:
-            stringValue: Ampere
-        capacitySelectors:
-        - key: memory
-          op: Equal
-          value: 40Gi
-  expose:
+        celExpressions:
+        - (device.attributes["gpu.nvidia.com"].productName.lowerAscii().matches("^.*a100.*$") && device.capacity["gpu.nvidia.com"].memory.compareTo(quantity("40Gi")) >= 0) || (device.attributes["gpu.nvidia.com"].productName.lowerAscii().matches("^.*h100.*$") && device.attributes["gpu.nvidia.com"].driverVersion.compareTo(semver("550.127.8")) >= 0)
     service:
       type: ClusterIP
       port: 8000

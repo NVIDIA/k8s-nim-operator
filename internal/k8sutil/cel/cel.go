@@ -89,7 +89,7 @@ func (vt ValueType) CELType() *celgo.Type {
 // BuildExpr("ver", OpGreater, "1.2.3", TypeSemver) => "semver(ver).compareTo(semver(\"1.2.3\")) > 0".
 func BuildExpr(key string, op ComparisonOperator, value interface{}, vt ValueType) (string, error) {
 	if value == nil {
-		return "", nil
+		return "", fmt.Errorf("value is nil")
 	}
 
 	var expr string
@@ -138,10 +138,10 @@ func BuildExpr(key string, op ComparisonOperator, value interface{}, vt ValueTyp
 	if expr == "" {
 		return "", fmt.Errorf("invalid value type %q", vt)
 	}
-	return expr, validateExpr(expr)
+	return expr, ValidateExpr(expr)
 }
 
-func validateExpr(expression string) error {
+func ValidateExpr(expression string) error {
 	compiler := dracel.GetCompiler()
 	result := compiler.CompileCELExpression(expression, dracel.Options{DisableCostEstimation: true})
 

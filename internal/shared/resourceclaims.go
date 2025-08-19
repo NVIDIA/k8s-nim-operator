@@ -26,6 +26,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	k8sutilcel "github.com/NVIDIA/k8s-nim-operator/internal/k8sutil/cel"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
@@ -202,9 +203,16 @@ func ShouldCreateDRAResource(resource appsv1alpha1.DRAResource) bool {
 
 func GetDRADeviceCELExpressions(device appsv1alpha1.DRADeviceSpec) ([]string, error) {
 	celExpressions := make([]string, 0)
+	for _, expr := range device.CELExpressions {
+		err := k8sutilcel.ValidateExpr(expr)
+		if err != nil {
+			return nil, err
+		}
+		celExpressions = append(celExpressions, expr)
+	}
 	celExpressions = append(celExpressions, fmt.Sprintf("device.driver == %q", device.DriverName))
-	for _, matcher := range device.MatchAttributes {
-		expr, err := matcher.GetCELExpression(device.DriverName)
+	for _, selector := range device.AttributeSelectors {
+		expr, err := selector.GetCELExpression(device.DriverName)
 		if err != nil {
 			return nil, err
 		}
@@ -213,8 +221,8 @@ func GetDRADeviceCELExpressions(device appsv1alpha1.DRADeviceSpec) ([]string, er
 		}
 	}
 
-	for _, matcher := range device.MatchCapacity {
-		expr, err := matcher.GetCELExpression(device.DriverName)
+	for _, selector := range device.CapacitySelectors {
+		expr, err := selector.GetCELExpression(device.DriverName)
 		if err != nil {
 			return nil, err
 		}
