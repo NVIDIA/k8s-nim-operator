@@ -53,6 +53,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
@@ -89,6 +90,10 @@ func NewNIMServiceReconciler(ctx context.Context, r shared.Reconciler) *NIMServi
 		recorder:         r.GetEventRecorder(),
 		orchestratorType: orchestratorType,
 	}
+}
+
+func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
+	return r.renderer
 }
 
 func (r *NIMServiceReconciler) cleanupNIMService(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
@@ -440,6 +445,11 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 	initContainers = nimService.GetInitContainers()
 	namedDraResources := shared.GenerateNamedDRAResources(nimService)
+	err := r.reconcileDRAResources(ctx, nimService, namedDraResources)
+	if err != nil {
+		logger.Error(err, "Failed to reconcile DRAResources")
+		return err
+	}
 
 	isvcParams := nimService.GetInferenceServiceParams(deploymentMode)
 	isvcParams.DeploymentMode = string(deploymentMode)
@@ -490,7 +500,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	failedCon = conditions.ReasonDeploymentFailed
 	renderObj = &kservev1beta1.InferenceService{}
 
-	err := r.renderAndSyncResource(ctx, nimService, renderObj, renderFunc, conType, failedCon)
+	err = r.renderAndSyncResource(ctx, nimService, renderObj, renderFunc, conType, failedCon)
 	if err != nil {
 		return err
 	}
@@ -914,4 +924,71 @@ func (r *NIMServiceReconciler) getKServeDeploymentMode(ctx context.Context,
 
 	deploymentMode := isvcutils.GetDeploymentMode(annotations, deployConfig)
 	return deploymentMode, nil
+}
+
+func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources []shared.NamedDRAResource) error {
+	for _, namedDraResource := range namedDraResources {
+		if !shared.ShouldCreateDRAResource(namedDraResource.DRAResource) {
+			continue
+		}
+
+		labels := nimService.GetServiceLabels()
+		annotations := nimService.GetNIMServiceAnnotations()
+		claimAnnotations := nimService.GetNIMServiceAnnotations()
+		delete(claimAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
+		var err error
+		if !namedDraResource.IsClaim() {
+			// Sync ResourceClaiomTemplate
+			err = r.renderAndSyncResource(ctx, nimService, &resourcev1beta2.ResourceClaimTemplate{}, func() (client.Object, error) {
+				resourceClaimTemplateParams := &rendertypes.ResourceClaimTemplateParams{
+					Name:             namedDraResource.ResourceName,
+					Namespace:        nimService.GetNamespace(),
+					Labels:           labels,
+					Annotations:      annotations,
+					ClaimAnnotations: claimAnnotations,
+				}
+				for _, device := range namedDraResource.ClaimSpec.Devices {
+					exprs, err := shared.GetDRADeviceCELExpressions(device)
+					if err != nil {
+						return nil, err
+					}
+					resourceClaimTemplateParams.Devices = append(resourceClaimTemplateParams.Devices, rendertypes.DRADeviceParams{
+						Name:            device.Name,
+						Count:           device.Count,
+						DeviceClassName: device.DeviceClassName,
+						CELExpressions:  exprs,
+					})
+				}
+				return r.renderer.ResourceClaimTemplate(resourceClaimTemplateParams)
+			}, "resourceclaimtemplate", conditions.ReasonResourceClaimTemplateFailed)
+		} else {
+			// Sync ResourceClaim
+			err = r.renderAndSyncResource(ctx, nimService, &resourcev1beta2.ResourceClaim{}, func() (client.Object, error) {
+				resourceClaimParams := &rendertypes.ResourceClaimParams{
+					Name:        namedDraResource.ResourceName,
+					Namespace:   nimService.GetNamespace(),
+					Labels:      labels,
+					Annotations: annotations,
+				}
+				for _, device := range namedDraResource.ClaimSpec.Devices {
+					exprs, err := shared.GetDRADeviceCELExpressions(device)
+					if err != nil {
+						return nil, err
+					}
+					resourceClaimParams.Devices = append(resourceClaimParams.Devices, rendertypes.DRADeviceParams{
+						Name:            device.Name,
+						Count:           device.Count,
+						DeviceClassName: device.DeviceClassName,
+						CELExpressions:  exprs,
+					})
+				}
+				return r.renderer.ResourceClaim(resourceClaimParams)
+			}, "resourceclaim", conditions.ReasonResourceClaimFailed)
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to reconcile DRAResource %s: %w", namedDraResource.ResourceName, err)
+		}
+	}
+	return nil
 }

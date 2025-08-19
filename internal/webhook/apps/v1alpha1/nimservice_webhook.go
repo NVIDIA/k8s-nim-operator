@@ -130,6 +130,7 @@ func (v *NIMServiceCustomValidator) ValidateUpdate(_ context.Context, oldObj, ne
 
 	errList = append(errList, validateMultiNodeImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("multiNode"))...)
 	errList = append(errList, validatePVCImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("storage").Child("pvc"))...)
+	errList = append(errList, validateDRAResourceImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("draResources"))...)
 
 	if len(errList) > 0 {
 		return nil, errList.ToAggregate()

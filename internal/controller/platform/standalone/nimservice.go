@@ -147,6 +147,7 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 		}
 		resourceClaimNames[*resource.ResourceClaimName] = true
 	}
+
 	return true, "", nil
 }
 
@@ -378,6 +379,11 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	initContainers = nimService.GetInitContainers()
 	namedDraResources := shared.GenerateNamedDRAResources(nimService)
+
+	err = r.reconcileDRAResources(ctx, nimService, namedDraResources)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	if nimService.Spec.MultiNode != nil && nimService.Spec.MultiNode.BackendType == appsv1alpha1.NIMBackendTypeLWS {
 		lwsParams := nimService.GetLWSParams()
@@ -1033,4 +1039,76 @@ func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *
 	resources.Requests[gpuResourceName] = gpuQuantity
 	resources.Limits[gpuResourceName] = gpuQuantity
 	return resources, nil
+}
+
+func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources []shared.NamedDRAResource) error {
+	logger := log.FromContext(ctx)
+
+	renderer := r.GetRenderer()
+	for _, namedDraResource := range namedDraResources {
+		if !shared.ShouldCreateDRAResource(namedDraResource.DRAResource) {
+			continue
+		}
+
+		labels := nimService.GetServiceLabels()
+		annotations := nimService.GetNIMServiceAnnotations()
+		claimAnnotations := nimService.GetNIMServiceAnnotations()
+		delete(claimAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
+		var err error
+		if !namedDraResource.IsClaim() {
+			// Sync ResourceClaiomTemplate
+			err = r.renderAndSyncResource(ctx, nimService, &renderer, &resourcev1beta2.ResourceClaimTemplate{}, func() (client.Object, error) {
+				resourceClaimTemplateParams := &rendertypes.ResourceClaimTemplateParams{
+					Name:             namedDraResource.ResourceName,
+					Namespace:        nimService.GetNamespace(),
+					Labels:           labels,
+					Annotations:      annotations,
+					ClaimAnnotations: claimAnnotations,
+				}
+				for _, device := range namedDraResource.ClaimSpec.Devices {
+					exprs, err := shared.GetDRADeviceCELExpressions(device)
+					if err != nil {
+						logger.Error(err, "failed to get CEL expressions for device", "device", device.Name)
+						return nil, err
+					}
+					resourceClaimTemplateParams.Devices = append(resourceClaimTemplateParams.Devices, rendertypes.DRADeviceParams{
+						Name:            device.Name,
+						Count:           device.Count,
+						DeviceClassName: device.DeviceClassName,
+						CELExpressions:  exprs,
+					})
+				}
+				return renderer.ResourceClaimTemplate(resourceClaimTemplateParams)
+			}, "resourceclaimtemplate", conditions.ReasonResourceClaimTemplateFailed)
+		} else {
+			// Sync ResourceClaim
+			err = r.renderAndSyncResource(ctx, nimService, &renderer, &resourcev1beta2.ResourceClaim{}, func() (client.Object, error) {
+				resourceClaimParams := &rendertypes.ResourceClaimParams{
+					Name:        namedDraResource.ResourceName,
+					Namespace:   nimService.GetNamespace(),
+					Labels:      labels,
+					Annotations: annotations,
+				}
+				for _, device := range namedDraResource.ClaimSpec.Devices {
+					exprs, err := shared.GetDRADeviceCELExpressions(device)
+					if err != nil {
+						logger.Error(err, "failed to get CEL expressions for device", "device", device.Name)
+						return nil, err
+					}
+					resourceClaimParams.Devices = append(resourceClaimParams.Devices, rendertypes.DRADeviceParams{
+						Name:            device.Name,
+						Count:           device.Count,
+						DeviceClassName: device.DeviceClassName,
+						CELExpressions:  exprs,
+					})
+				}
+				return renderer.ResourceClaim(resourceClaimParams)
+			}, "resourceclaim", conditions.ReasonResourceClaimFailed)
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to reconcile DRAResource %s: %w", namedDraResource.ResourceName, err)
+		}
+	}
+	return nil
 }

@@ -26,20 +26,34 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
+	k8sutilcel "github.com/NVIDIA/k8s-nim-operator/internal/k8sutil/cel"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 const (
-	podClaimNamePrefix = "claim-"
+	podClaimNamePrefix = "claim"
+)
+
+type DraResourceFieldType int
+
+const (
+	DRAResourceFieldTypeClaim DraResourceFieldType = iota
+	DRAResourceFieldTypeClaimTemplate
 )
 
 type NamedDRAResource struct {
 	Name string
 	appsv1alpha1.DRAResource
+	FieldType    DraResourceFieldType
+	ResourceName string
 }
 
-func UpdateContainerResourceClaims(containers []corev1.Container, draContainerClaims []NamedDRAResource) {
-	for _, resource := range draContainerClaims {
+func (n *NamedDRAResource) IsClaim() bool {
+	return n.FieldType == DRAResourceFieldTypeClaim
+}
+
+func UpdateContainerResourceClaims(containers []corev1.Container, resources []NamedDRAResource) {
+	for _, resource := range resources {
 		var found bool
 		// Check if the resource claim is already referenced by a container.
 		for _, container := range containers {
@@ -74,32 +88,37 @@ func UpdateContainerResourceClaims(containers []corev1.Container, draContainerCl
 
 func GenerateNamedDRAResources(nimService *appsv1alpha1.NIMService) []NamedDRAResource {
 	nameCache := make(map[string]int)
-	claims := make([]NamedDRAResource, len(nimService.Spec.DRAResources))
+	namedDraResources := make([]NamedDRAResource, len(nimService.Spec.DRAResources))
 	for idx, resource := range nimService.Spec.DRAResources {
-		draResource := appsv1alpha1.DRAResource{
-			ResourceClaimName:         resource.ResourceClaimName,
-			ResourceClaimTemplateName: resource.ResourceClaimTemplateName,
-			Requests:                  resource.Requests,
+		namedDraResources[idx] = NamedDRAResource{
+			DRAResource: resource,
 		}
-		claims[idx] = NamedDRAResource{
-			Name:        GenerateUniquePodClaimName(nameCache, nimService.Name, &draResource),
-			DRAResource: draResource,
+
+		switch {
+		case resource.ResourceClaimName != nil:
+			namedDraResources[idx].FieldType = DRAResourceFieldTypeClaim
+			namedDraResources[idx].ResourceName = *resource.ResourceClaimName
+		case resource.ResourceClaimTemplateName != nil:
+			namedDraResources[idx].FieldType = DRAResourceFieldTypeClaimTemplate
+			namedDraResources[idx].ResourceName = *resource.ResourceClaimTemplateName
+		case ShouldCreateDRAResource(resource):
+			if resource.ClaimSpec.IsTemplateSpec() {
+				namedDraResources[idx].FieldType = DRAResourceFieldTypeClaimTemplate
+			} else {
+				namedDraResources[idx].FieldType = DRAResourceFieldTypeClaim
+			}
+			namedDraResources[idx].ResourceName = generateUniqueDRAResourceName(nimService.Name, resource.ClaimSpec.GetNamePrefix(), idx)
 		}
+
+		namedDraResources[idx].Name = generateUniquePodClaimName(nameCache, nimService.Name, namedDraResources[idx].ResourceName, namedDraResources[idx].FieldType)
 	}
-	return claims
+	return namedDraResources
 }
 
-func GenerateUniquePodClaimName(nameCache map[string]int, nimServiceName string, resource *appsv1alpha1.DRAResource) string {
-	var fieldIdx int
-	claimName := resource.ResourceClaimName
-	if resource.ResourceClaimTemplateName != nil {
-		claimName = resource.ResourceClaimTemplateName
-		fieldIdx = 1
-	}
-
+func generateUniquePodClaimName(nameCache map[string]int, nimServiceName string, resourceName string, fieldType DraResourceFieldType) string {
 	nimServiceNameHash := utils.GetTruncatedStringHash(nimServiceName, 12)
-	claimNameHash := utils.GetTruncatedStringHash(*claimName, 12)
-	uniqueName := fmt.Sprintf("%s%s-%d-%s", podClaimNamePrefix, nimServiceNameHash, fieldIdx, claimNameHash)
+	resourceNameHash := utils.GetTruncatedStringHash(resourceName, 12)
+	uniqueName := fmt.Sprintf("%s-%s-%d-%s", podClaimNamePrefix, nimServiceNameHash, fieldType, resourceNameHash)
 	count, ok := nameCache[uniqueName]
 	if ok {
 		nameCache[uniqueName] = count + 1
@@ -109,13 +128,22 @@ func GenerateUniquePodClaimName(nameCache map[string]int, nimServiceName string,
 	return fmt.Sprintf("%s-%d", uniqueName, nameCache[uniqueName])
 }
 
-func GetPodResourceClaims(draResources []NamedDRAResource) []corev1.PodResourceClaim {
-	claims := make([]corev1.PodResourceClaim, len(draResources))
-	for idx, resource := range draResources {
+func generateUniqueDRAResourceName(nimServiceName string, namePrefix string, idx int) string {
+	nimServiceNameHash := utils.GetTruncatedStringHash(nimServiceName, 12)
+	uniqueName := fmt.Sprintf("%s-%s-%d", namePrefix, nimServiceNameHash, idx)
+	return uniqueName
+}
+
+func GetPodResourceClaims(resources []NamedDRAResource) []corev1.PodResourceClaim {
+	claims := make([]corev1.PodResourceClaim, len(resources))
+	for idx, resource := range resources {
 		claims[idx] = corev1.PodResourceClaim{
-			Name:                      resource.Name,
-			ResourceClaimName:         resource.ResourceClaimName,
-			ResourceClaimTemplateName: resource.ResourceClaimTemplateName,
+			Name: resource.Name,
+		}
+		if resource.IsClaim() {
+			claims[idx].ResourceClaimName = &resource.ResourceName
+		} else {
+			claims[idx].ResourceClaimTemplateName = &resource.ResourceName
 		}
 	}
 	return claims
@@ -137,29 +165,27 @@ func generateDRAResourceStatus(ctx context.Context, client client.Client, namesp
 	status := &appsv1alpha1.DRAResourceStatus{
 		Name: resource.Name,
 	}
-	if resource.ResourceClaimName != nil {
-		claim, err := k8sutil.GetResourceClaim(ctx, client, *resource.ResourceClaimName, namespace)
+	if resource.IsClaim() {
+		claim, err := k8sutil.GetResourceClaim(ctx, client, resource.ResourceName, namespace)
 		if err != nil {
 			return nil, err
 		}
 		status.ResourceClaimStatus = getDRAResourceClaimStatus(claim)
 		return status, nil
 	}
-	if resource.ResourceClaimTemplateName != nil {
-		claimTemplateStatus := appsv1alpha1.DRAResourceClaimTemplateStatusInfo{
-			Name: *resource.ResourceClaimTemplateName,
-		}
-
-		resourceClaims, err := k8sutil.ListResourceClaimsByPodClaimName(ctx, client, namespace, resource.Name)
-		if err != nil {
-			return nil, err
-		}
-		for _, claim := range resourceClaims {
-			claimStatus := getDRAResourceClaimStatus(&claim)
-			claimTemplateStatus.ResourceClaimStatuses = append(claimTemplateStatus.ResourceClaimStatuses, *claimStatus)
-		}
-		status.ResourceClaimTemplateStatus = &claimTemplateStatus
+	claimTemplateStatus := appsv1alpha1.DRAResourceClaimTemplateStatusInfo{
+		Name: resource.ResourceName,
 	}
+
+	resourceClaims, err := k8sutil.ListResourceClaimsByPodClaimName(ctx, client, namespace, resource.Name)
+	if err != nil {
+		return nil, err
+	}
+	for _, claim := range resourceClaims {
+		claimStatus := getDRAResourceClaimStatus(&claim)
+		claimTemplateStatus.ResourceClaimStatuses = append(claimTemplateStatus.ResourceClaimStatuses, *claimStatus)
+	}
+	status.ResourceClaimTemplateStatus = &claimTemplateStatus
 	return status, nil
 }
 
@@ -169,4 +195,40 @@ func getDRAResourceClaimStatus(resourceClaim *resourcev1beta2.ResourceClaim) *ap
 		State: k8sutil.GetResourceClaimState(resourceClaim),
 	}
 	return claimStatus
+}
+
+func ShouldCreateDRAResource(resource appsv1alpha1.DRAResource) bool {
+	return resource.ClaimSpec != nil
+}
+
+func GetDRADeviceCELExpressions(device appsv1alpha1.DRADeviceSpec) ([]string, error) {
+	celExpressions := make([]string, 0)
+	for _, expr := range device.CELExpressions {
+		err := k8sutilcel.ValidateExpr(expr)
+		if err != nil {
+			return nil, err
+		}
+		celExpressions = append(celExpressions, expr)
+	}
+	celExpressions = append(celExpressions, fmt.Sprintf("device.driver == %q", device.DriverName))
+	for _, selector := range device.AttributeSelectors {
+		expr, err := selector.GetCELExpression(device.DriverName)
+		if err != nil {
+			return nil, err
+		}
+		if expr != "" {
+			celExpressions = append(celExpressions, expr)
+		}
+	}
+
+	for _, selector := range device.CapacitySelectors {
+		expr, err := selector.GetCELExpression(device.DriverName)
+		if err != nil {
+			return nil, err
+		}
+		if expr != "" {
+			celExpressions = append(celExpressions, expr)
+		}
+	}
+	return celExpressions, nil
 }

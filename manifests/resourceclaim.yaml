@@ -1,0 +1,28 @@
+apiVersion: resource.k8s.io/v1beta2
+kind: ResourceClaim
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  {{- if .Labels }}
+  labels:
+    {{- .Labels | yaml | nindent 4 }}
+  {{- end }}
+  {{- if .Annotations }}
+  annotations:
+    {{- .Annotations | yaml | nindent 4 }}
+  {{- end }}
+spec:
+  devices:
+    requests:
+    {{- range .Devices }}
+    - name: {{ .Name }}
+      exactly:
+        allocationMode: ExactCount
+        count: {{ .Count }}
+        deviceClassName: {{ .DeviceClassName }}
+        selectors:
+        {{- range .CELExpressions }}
+        - cel:
+            expression: {{ . }}
+        {{- end }}
+    {{- end }}
