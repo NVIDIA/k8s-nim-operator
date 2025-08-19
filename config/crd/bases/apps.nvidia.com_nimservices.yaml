@@ -2766,7 +2766,8 @@ spec:
             type: object
             x-kubernetes-validations:
             - message: spec.draResources is immutable
-              rule: self.draResources == oldSelf.draResources
+              rule: (has(self.draResources) && has(oldSelf.draResources) && self.draResources
+                == oldSelf.draResources) || (!has(self.draResources) && !has(oldSelf.draResources))
             - message: autoScaling must be nil or disabled when multiNode is set
               rule: '!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled)
                 && self.scale.enabled)'
