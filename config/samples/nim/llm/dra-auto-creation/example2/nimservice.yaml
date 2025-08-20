@@ -16,7 +16,7 @@ spec:
       profile: ''
   replicas: 1
   draResources:
-  - claimSpec:
+  - claimCreationSpec:
       devices:
       - name: gpu
         deviceClassName: gpu.nvidia.com

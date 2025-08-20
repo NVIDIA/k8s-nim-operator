@@ -945,7 +945,7 @@ func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimSer
 				Annotations:      annotations,
 				ClaimAnnotations: claimAnnotations,
 			}
-			for _, device := range namedDraResource.ClaimSpec.Devices {
+			for _, device := range namedDraResource.ClaimCreationSpec.Devices {
 				exprs, err := shared.GetDRADeviceCELExpressions(device)
 				if err != nil {
 					return nil, err

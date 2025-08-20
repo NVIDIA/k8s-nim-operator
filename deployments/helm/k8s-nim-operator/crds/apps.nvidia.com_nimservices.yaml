@@ -73,10 +73,10 @@ spec:
                     When creating the NIMService pods, it adds a name (`DNS_LABEL` format) to it
                     that uniquely identifies the DRA resource.
                   properties:
-                    claimSpec:
-                      description: ClaimSpec is the spec to auto-generate a DRA resource
-                        claim/resource claim template. Only one of ClaimSpec, ResourceClaimName
-                        or ResourceClaimTemplateName must be specified.
+                    claimCreationSpec:
+                      description: |-
+                        ClaimSpec is the spec to auto-generate a DRA resource claim template.
+                        Only one of ClaimSpec, ResourceClaimName or ResourceClaimTemplateName must be specified.
                       properties:
                         devices:
                           items:
@@ -225,7 +225,7 @@ spec:
                           type: array
                         generateName:
                           description: GenerateName is an optional name prefix to
-                            use for generating the resource claim/resource claim template.
+                            use for generating the resource claim template.
                           maxLength: 16
                           minLength: 1
                           type: string
@@ -234,7 +234,7 @@ spec:
                       type: object
                     requests:
                       description: |-
-                        Requests is the list of requests in the referenced DRA resource claim/resource claim template
+                        Requests is the list of requests in the referenced DRA resource claim.
                         to be made available to the model container of the NIMService pods.
 
                         If empty, everything from the claim is made available, otherwise
@@ -271,9 +271,9 @@ spec:
                   type: object
                   x-kubernetes-validations:
                   - message: exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName,
-                      or spec.claimSpec must be set.
+                      or spec.claimCreationSpec must be set.
                     rule: '(has(self.resourceClaimName) ? 1 : 0) + (has(self.resourceClaimTemplateName)
-                      ? 1 : 0) + (has(self.claimSpec) ? 1 : 0) == 1'
+                      ? 1 : 0) + (has(self.claimCreationSpec) ? 1 : 0) == 1'
                 type: array
               env:
                 items:

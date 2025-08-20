@@ -220,14 +220,14 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimSpec"},
+			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
 		},
 		{
-			name: "both name and claimSpec provided",
+			name: "both name and claimCreationSpec provided",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ResourceClaimName: ptr.To("claim1"),
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -239,14 +239,14 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimSpec"},
+			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
 		},
 		{
-			name: "both template and claimSpec provided",
+			name: "both template and claimCreationSpec provided",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -258,7 +258,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimSpec"},
+			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
 		},
 		{
 			name: "all three fields provided",
@@ -266,7 +266,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ResourceClaimName:         ptr.To("claim1"),
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -278,16 +278,16 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimSpec"},
+			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
 		},
 		{
-			name: "neither name nor template nor claimSpec provided",
+			name: "neither name nor template nor claimCreationSpec provided",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{}}
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Required value: one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimSpec must be provided"},
+			wantErrMsgs: []string{"spec.draResources[0]: Required value: one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec must be provided"},
 		},
 		{
 			name: "resourceClaimName with replicas>1",
@@ -327,23 +327,23 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			wantErrMsgs: []string{"spec.draResources[1].resourceClaimName: Duplicate value: \"dup\""},
 		},
 		{
-			name: "claimSpec with empty devices",
+			name: "claimCreationSpec with empty devices",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{},
 					},
 				}}
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices: Required value: must be non-empty"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices: Required value: must be non-empty"},
 		},
 		{
-			name: "claimSpec with invalid device - missing name",
+			name: "claimCreationSpec with invalid device - missing name",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Count:           1,
 							DeviceClassName: "gpu.nvidia.com",
@@ -354,13 +354,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].name: Required value: is required"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].name: Required value: is required"},
 		},
 		{
-			name: "claimSpec with invalid device - zero count",
+			name: "claimCreationSpec with invalid device - zero count",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           0,
@@ -372,13 +372,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].count: Invalid value: 0: must be > 0"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].count: Invalid value: 0: must be > 0"},
 		},
 		{
-			name: "claimSpec with invalid device - missing deviceClassName",
+			name: "claimCreationSpec with invalid device - missing deviceClassName",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:       "gpu",
 							Count:      1,
@@ -389,13 +389,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].deviceClassName: Required value: is required"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].deviceClassName: Required value: is required"},
 		},
 		{
-			name: "claimSpec with invalid device - missing driverName",
+			name: "claimCreationSpec with invalid device - missing driverName",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -406,13 +406,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].driverName: Required value: is required"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].driverName: Required value: is required"},
 		},
 		{
-			name: "claimSpec with duplicate attributeSelectors keys",
+			name: "claimCreationSpec with duplicate attributeSelectors keys",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -440,13 +440,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
 		},
 		{
-			name: "claimSpec with duplicate capacitySelectors keys",
+			name: "claimCreationSpec with duplicate capacitySelectors keys",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -470,13 +470,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].capacitySelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
 		},
 		{
-			name: "claimSpec with invalid attribute selector - missing op",
+			name: "claimCreationSpec with invalid attribute selector - missing op",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -497,13 +497,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].op: Required value: is required"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].op: Required value: is required"},
 		},
 		{
-			name: "claimSpec with invalid attribute selector - invalid op",
+			name: "claimCreationSpec with invalid attribute selector - invalid op",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -524,13 +524,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual]"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual]"},
 		},
 		{
-			name: "claimSpec with invalid attribute selector - no value",
+			name: "claimCreationSpec with invalid attribute selector - no value",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -549,13 +549,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value: Required value: must specify exactly one of spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.versionValue"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Required value: must specify exactly one of spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.versionValue"},
 		},
 		{
-			name: "claimSpec with invalid attribute selector - multiple values",
+			name: "claimCreationSpec with invalid attribute selector - multiple values",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -577,13 +577,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value: Invalid value: \"multiple attribute values defined\": must specify exactly one of spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value.versionValue"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Invalid value: \"multiple attribute values defined\": must specify exactly one of spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.versionValue"},
 		},
 		{
-			name: "claimSpec with invalid version value",
+			name: "claimCreationSpec with invalid version value",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -604,13 +604,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].attributeSelectors[0].value: Invalid value: \"not-a-version\": must be a valid semantic version"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Invalid value: \"not-a-version\": must be a valid semantic version"},
 		},
 		{
-			name: "claimSpec with invalid quantity selector - invalid op",
+			name: "claimCreationSpec with invalid quantity selector - invalid op",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -629,13 +629,13 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].capacitySelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal]"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal]"},
 		},
 		{
-			name: "claimSpec with invalid quantity selector - missing value",
+			name: "claimCreationSpec with invalid quantity selector - missing value",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -654,7 +654,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimSpec.devices[0].capacitySelectors[0].value: Required value: is required"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[0].value: Required value: is required"},
 		},
 		{
 			name: "valid template",
@@ -681,10 +681,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			wantErrMsgs: nil,
 		},
 		{
-			name: "valid claimSpec",
+			name: "valid claimCreationSpec",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           1,
@@ -699,10 +699,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			wantErrMsgs: nil,
 		},
 		{
-			name: "valid claimSpec with attributes and capacity selectors",
+			name: "valid claimCreationSpec with attributes and capacity selectors",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimSpec: &appsv1alpha1.DRAClaimSpec{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
 						Devices: []appsv1alpha1.DRADeviceSpec{{
 							Name:            "gpu",
 							Count:           2,
