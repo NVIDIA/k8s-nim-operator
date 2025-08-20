@@ -75,8 +75,8 @@ spec:
                   properties:
                     claimCreationSpec:
                       description: |-
-                        ClaimSpec is the spec to auto-generate a DRA resource claim template.
-                        Only one of ClaimSpec, ResourceClaimName or ResourceClaimTemplateName must be specified.
+                        ClaimCreationSpec is the spec to auto-generate a DRA resource claim template.
+                        Only one of ClaimCreationSpec, ResourceClaimName or ResourceClaimTemplateName must be specified.
                       properties:
                         devices:
                           items:

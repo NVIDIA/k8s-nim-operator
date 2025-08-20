@@ -57,8 +57,8 @@ type DRAResource struct {
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
 
-	// ClaimSpec is the spec to auto-generate a DRA resource claim template.
-	// Only one of ClaimSpec, ResourceClaimName or ResourceClaimTemplateName must be specified.
+	// ClaimCreationSpec is the spec to auto-generate a DRA resource claim template.
+	// Only one of ClaimCreationSpec, ResourceClaimName or ResourceClaimTemplateName must be specified.
 	ClaimCreationSpec *DRAClaimCreationSpec `json:"claimCreationSpec,omitempty"`
 
 	// Requests is the list of requests in the referenced DRA resource claim.
