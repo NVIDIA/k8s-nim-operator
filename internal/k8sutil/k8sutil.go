@@ -27,6 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metaerrors "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -143,12 +144,16 @@ func CleanupResource(ctx context.Context, k8sClient client.Client, obj client.Ob
 	logger := log.FromContext(ctx)
 
 	err := k8sClient.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
 
-	if errors.IsNotFound(err) {
-		return nil
+		if metaerrors.IsNoMatchError(err) || strings.Contains(err.Error(), "no matches for kind") {
+			return nil
+		}
+
+		return err
 	}
 
 	err = k8sClient.Delete(ctx, obj)
