@@ -386,6 +386,8 @@ rules:
   - get
   - list
   - watch
+  - create
+  - delete
 - apiGroups:
   - route.openshift.io
   resources:
