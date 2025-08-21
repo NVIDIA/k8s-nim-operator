@@ -1346,6 +1346,17 @@ spec:
               - patch
               - update
               - watch
+            - apiGroups:
+              - resource.k8s.io
+              resources:
+              - resourceclaims
+              - resourceclaimtemplates
+              verbs:
+              - get
+              - list
+              - watch
+              - create
+              - delete
       deployments:
         - name: k8s-nim-operator
           spec:
