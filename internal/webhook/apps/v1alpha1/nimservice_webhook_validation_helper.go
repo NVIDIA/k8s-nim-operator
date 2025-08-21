@@ -159,7 +159,7 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 
 		hasName := dra.ResourceClaimName != nil && *dra.ResourceClaimName != ""
 		hasTemplate := dra.ResourceClaimTemplateName != nil && *dra.ResourceClaimTemplateName != ""
-		hasSpec := dra.ClaimSpec != nil
+		hasSpec := dra.ClaimCreationSpec != nil
 
 		var fieldCount int
 		if hasName {
@@ -172,17 +172,17 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 			fieldCount++
 		}
 
-		// Exactly one of resourceClaimName, resourceClaimTemplateName, or claimSpec must be provided
+		// Exactly one of resourceClaimName, resourceClaimTemplateName, or claimCreationSpec must be provided
 		if fieldCount == 0 {
-			errList = append(errList, field.Required(idxPath, fmt.Sprintf("one of %s, %s, or %s must be provided", fldPath.Child("resourceClaimName"), fldPath.Child("resourceClaimTemplateName"), fldPath.Child("claimSpec"))))
+			errList = append(errList, field.Required(idxPath, fmt.Sprintf("one of %s, %s, or %s must be provided", fldPath.Child("resourceClaimName"), fldPath.Child("resourceClaimTemplateName"), fldPath.Child("claimCreationSpec"))))
 		} else if fieldCount > 1 {
 			errList = append(errList, field.Invalid(
 				idxPath,
 				"multiple dra resource sources defined",
-				fmt.Sprintf("must specify exactly one of %s, %s, or %s", fldPath.Child("resourceClaimName"), fldPath.Child("resourceClaimTemplateName"), fldPath.Child("claimSpec"))))
+				fmt.Sprintf("must specify exactly one of %s, %s, or %s", fldPath.Child("resourceClaimName"), fldPath.Child("resourceClaimTemplateName"), fldPath.Child("claimCreationSpec"))))
 		}
 
-		if hasName || (hasSpec && !dra.ClaimSpec.IsTemplateSpec()) {
+		if hasName {
 			// resourceClaimName: spec.relicas must be <= 1 and spec.scale.enabled must be false.
 			if spec.Replicas > 1 {
 				errList = append(errList, field.Forbidden(
@@ -196,9 +196,6 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 					fmt.Sprintf("must not be set when %s is true, use %s instead", fldPath.Child("scale").Child("enabled"), idxPath.Child("resourceClaimTemplateName")),
 				))
 			}
-		}
-
-		if hasName {
 			// Ensure resourceClaimName values are unique within draResources
 			if _, exists := seen[*dra.ResourceClaimName]; exists {
 				errList = append(errList, field.Duplicate(idxPath.Child("resourceClaimName"), *dra.ResourceClaimName))
@@ -208,21 +205,21 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 		}
 
 		if hasSpec {
-			errList = append(errList, validateDRAClaimSpec(&dra, idxPath.Child("claimSpec"))...)
+			errList = append(errList, validateDRAClaimCreationSpec(&dra, idxPath.Child("claimCreationSpec"))...)
 		}
 	}
 	return errList
 }
 
-func validateDRAClaimSpec(dra *appsv1alpha1.DRAResource, fldPath *field.Path) field.ErrorList {
+func validateDRAClaimCreationSpec(dra *appsv1alpha1.DRAResource, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
-	// Ensure claimSpec.devices is non-empty
-	if len(dra.ClaimSpec.Devices) == 0 {
+	// Ensure claimCreationSpec.devices is non-empty
+	if len(dra.ClaimCreationSpec.Devices) == 0 {
 		errList = append(errList, field.Required(fldPath.Child("devices"), "must be non-empty"))
 	}
 
 	// Validate attributes.
-	for j, device := range dra.ClaimSpec.Devices {
+	for j, device := range dra.ClaimCreationSpec.Devices {
 		devicePath := fldPath.Child("devices").Index(j)
 		errList = append(errList, validateDRADeviceSpec(&device, devicePath)...)
 	}

@@ -30,7 +30,7 @@ import (
 //
 // When creating the NIMService pods, it adds a name (`DNS_LABEL` format) to it
 // that uniquely identifies the DRA resource.
-// +kubebuilder:validation:XValidation:rule="(has(self.resourceClaimName) ? 1 : 0) + (has(self.resourceClaimTemplateName) ? 1 : 0) + (has(self.claimSpec) ? 1 : 0) == 1",message="exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimSpec must be set."
+// +kubebuilder:validation:XValidation:rule="(has(self.resourceClaimName) ? 1 : 0) + (has(self.resourceClaimTemplateName) ? 1 : 0) + (has(self.claimCreationSpec) ? 1 : 0) == 1",message="exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec must be set."
 type DRAResource struct {
 	// ResourceClaimName is the name of a DRA resource claim object in the same
 	// namespace as the NIMService.
@@ -57,10 +57,11 @@ type DRAResource struct {
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
 
-	// ClaimSpec is the spec to auto-generate a DRA resource claim/resource claim template. Only one of ClaimSpec, ResourceClaimName or ResourceClaimTemplateName must be specified.
-	ClaimSpec *DRAClaimSpec `json:"claimSpec,omitempty"`
+	// ClaimCreationSpec is the spec to auto-generate a DRA resource claim template.
+	// Only one of ClaimCreationSpec, ResourceClaimName or ResourceClaimTemplateName must be specified.
+	ClaimCreationSpec *DRAClaimCreationSpec `json:"claimCreationSpec,omitempty"`
 
-	// Requests is the list of requests in the referenced DRA resource claim/resource claim template
+	// Requests is the list of requests in the referenced DRA resource claim.
 	// to be made available to the model container of the NIMService pods.
 	//
 	// If empty, everything from the claim is made available, otherwise
@@ -247,31 +248,23 @@ type DRADeviceSpec struct {
 	CELExpressions []string `json:"celExpressions,omitempty"`
 }
 
-// DRAClaimSpec defines the spec for generating a DRA resource claim/resource claim template.
-type DRAClaimSpec struct {
-	// GenerateName is an optional name prefix to use for generating the resource claim/resource claim template.
+// DRAClaimCreationSpec defines the spec for generating a DRA resource claim template.
+type DRAClaimCreationSpec struct {
+	// GenerateName is an optional name prefix to use for generating the resource claim template.
+	//
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=16
 	GenerateName string `json:"generateName,omitempty"`
 	// +kubebuilder:validation:MinSize=1
 	Devices []DRADeviceSpec `json:"devices"`
-	// TODO: Warn that if set to false, then this NIMService cannot be scaled up.
-	IsTemplate *bool `json:"isTemplate,omitempty"`
 }
 
-func (d *DRAClaimSpec) IsTemplateSpec() bool {
-	return d.IsTemplate != nil && *d.IsTemplate
-}
-
-func (d *DRAClaimSpec) GetNamePrefix() string {
+func (d *DRAClaimCreationSpec) GetNamePrefix() string {
 	namePrefix := d.GenerateName
 	if namePrefix != "" {
 		return namePrefix
 	}
-	if d.IsTemplateSpec() {
-		return "claimtemplate"
-	}
-	return "claim"
+	return "claimtemplate"
 }
 
 // DRAResourceStatus defines the status of the DRAResource.

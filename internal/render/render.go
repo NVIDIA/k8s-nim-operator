@@ -81,7 +81,6 @@ type Renderer interface {
 	ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error)
 	Secret(params *types.SecretParams) (*corev1.Secret, error)
 	InferenceService(params *types.InferenceServiceParams) (*kservev1beta1.InferenceService, error)
-	ResourceClaim(params *types.ResourceClaimParams) (*resourcev1beta2.ResourceClaim, error)
 	ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1beta2.ResourceClaimTemplate, error)
 }
 
@@ -467,23 +466,6 @@ func (r *textTemplateRenderer) InferenceService(params *types.InferenceServicePa
 		return nil, fmt.Errorf("error converting unstructured object to InferenceService: %w", err)
 	}
 	return inferenceService, nil
-}
-
-// ResourceClaim renders a ResourceClaim spec with given templating data.
-func (r *textTemplateRenderer) ResourceClaim(params *types.ResourceClaimParams) (*resourcev1beta2.ResourceClaim, error) {
-	objs, err := r.renderFile(path.Join(r.directory, "resourceclaim.yaml"), &TemplateData{Data: params})
-	if err != nil {
-		return nil, err
-	}
-	if len(objs) == 0 {
-		return nil, nil
-	}
-	resourceClaim := &resourcev1beta2.ResourceClaim{}
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, resourceClaim)
-	if err != nil {
-		return nil, fmt.Errorf("error converting unstructured object to ResourceClaim: %w", err)
-	}
-	return resourceClaim, nil
 }
 
 // ResourceClaimTemplate renders a ResourceClaimTemplate spec with given templating data.

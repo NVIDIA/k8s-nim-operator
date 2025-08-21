@@ -102,12 +102,8 @@ func GenerateNamedDRAResources(nimService *appsv1alpha1.NIMService) []NamedDRARe
 			namedDraResources[idx].FieldType = DRAResourceFieldTypeClaimTemplate
 			namedDraResources[idx].ResourceName = *resource.ResourceClaimTemplateName
 		case ShouldCreateDRAResource(resource):
-			if resource.ClaimSpec.IsTemplateSpec() {
-				namedDraResources[idx].FieldType = DRAResourceFieldTypeClaimTemplate
-			} else {
-				namedDraResources[idx].FieldType = DRAResourceFieldTypeClaim
-			}
-			namedDraResources[idx].ResourceName = generateUniqueDRAResourceName(nimService.Name, resource.ClaimSpec.GetNamePrefix(), idx)
+			namedDraResources[idx].FieldType = DRAResourceFieldTypeClaimTemplate
+			namedDraResources[idx].ResourceName = generateUniqueDRAResourceName(nimService.Name, resource.ClaimCreationSpec.GetNamePrefix(), idx)
 		}
 
 		namedDraResources[idx].Name = generateUniquePodClaimName(nameCache, nimService.Name, namedDraResources[idx].ResourceName, namedDraResources[idx].FieldType)
@@ -198,7 +194,7 @@ func getDRAResourceClaimStatus(resourceClaim *resourcev1beta2.ResourceClaim) *ap
 }
 
 func ShouldCreateDRAResource(resource appsv1alpha1.DRAResource) bool {
-	return resource.ClaimSpec != nil
+	return resource.ClaimCreationSpec != nil
 }
 
 func GetDRADeviceCELExpressions(device appsv1alpha1.DRADeviceSpec) ([]string, error) {
