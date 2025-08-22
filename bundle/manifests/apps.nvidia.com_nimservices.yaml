@@ -1236,11 +1236,6 @@ spec:
                     enum:
                     - lws
                     type: string
-                  gpusPerPod:
-                    default: 1
-                    description: GPUSPerPod specifies the number of GPUs for each
-                      instance. In most cases, this should match `resources.limits.nvidia.com/gpu`.
-                    type: integer
                   mpi:
                     description: MPI config for NIMService using LeaderWorkerSet
                     properties:

@@ -74,9 +74,16 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	errList = append(errList, validateExposeConfiguration(&spec.Expose, fldPath.Child("expose").Child("ingress"))...)
 	errList = append(errList, validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))...)
 	errList = append(errList, validateScaleConfiguration(&spec.Scale, fldPath.Child("scale"))...)
-	errList = append(errList, validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))...)
+	errList = append(errList, validateResourcesConfiguration(spec, fldPath.Child("resources"))...)
 	errList = append(errList, validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)...)
 	errList = append(errList, validateKServeConfiguration(spec, fldPath)...)
+
+	// Validate MultiNode configuration
+	if spec.MultiNode != nil {
+		if spec.Resources != nil && spec.Resources.Limits != nil {
+			errList = append(errList, field.Invalid(fldPath.Child("multiNode").Child("size"), spec.MultiNode.Size, "must be > 0"))
+		}
+	}
 
 	return errList
 }
@@ -391,13 +398,45 @@ func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, fldPath *field.
 }
 
 // Spec.Resources.Claims must be empty.
-func validateResourcesConfiguration(resources *corev1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
+func validateResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
-	if resources != nil {
-		if resources.Claims != nil || len(resources.Claims) != 0 {
-			errList = append(errList, field.Forbidden(fldPath.Child("claims"), "must be empty"))
-		}
+
+	// Validate that Claims must be empty
+	if spec.Resources != nil && spec.Resources.Claims != nil && len(spec.Resources.Claims) > 0 {
+		errList = append(errList, field.Forbidden(fldPath.Child("claims"), "must be empty"))
 	}
+
+	// Validate GPU requirements when MultiNode is enabled
+	if spec.MultiNode != nil {
+		errList = append(errList, validateGPURequirements(spec, fldPath)...)
+	}
+
+	return errList
+}
+
+// validateGPURequirements ensures that GPU resources are properly configured for MultiNode deployments.
+func validateGPURequirements(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+
+	gpuResourceName := corev1.ResourceName("nvidia.com/gpu")
+
+	// Check if GPU requests are specified
+	if spec.Resources == nil || spec.Resources.Requests == nil {
+		errList = append(errList, field.Required(fldPath.Child("requests"), "GPU requests must be specified for MultiNode deployments"))
+		return errList
+	}
+
+	gpuQuantity, exists := spec.Resources.Requests[gpuResourceName]
+	if !exists {
+		errList = append(errList, field.Required(fldPath.Child("requests").Child("nvidia.com/gpu"), "nvidia.com/gpu must be specified in requests for MultiNode deployments"))
+		return errList
+	}
+
+	// Validate that GPU quantity is positive
+	if gpuQuantity.IsZero() || gpuQuantity.Value() <= 0 {
+		errList = append(errList, field.Invalid(fldPath.Child("requests").Child("nvidia.com/gpu"), gpuQuantity.String(), "must be greater than 0"))
+	}
+
 	return errList
 }
 
