@@ -145,10 +145,6 @@ type NimServiceMultiNodeConfig struct {
 	// +kubebuilder:validation:Minimum=1
 	Size int `json:"size,omitempty"`
 
-	// +kubebuilder:default:=1
-	// GPUSPerPod specifies the number of GPUs for each instance. In most cases, this should match `resources.limits.nvidia.com/gpu`.
-	GPUSPerPod int `json:"gpusPerPod,omitempty"`
-
 	// MPI config for NIMService using LeaderWorkerSet
 	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
 }
@@ -225,6 +221,16 @@ type NIMServiceStorage struct {
 // GetLWSName returns the name to be used for the LeaderWorkerSet based on the custom spec.
 func (n *NIMService) GetLWSName() string {
 	return fmt.Sprintf("%s-lws", n.GetName())
+}
+
+// GetMultiNodeGPUsPerPod returns the number of GPUs per pod for the multi-node NIMService.
+func (n *NIMService) GetMultiNodeGPUsPerPod() int {
+	gpuQuantity, ok := n.Spec.Resources.Requests["nvidia.com/gpu"]
+	if !ok {
+		// return 0 if no GPU limit is specified because auto determine base on tp*pp/(.spec.multiNode.size) is a TODO
+		return 0
+	}
+	return int(gpuQuantity.Value())
 }
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
@@ -336,7 +342,7 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_TENSOR_PARALLEL_SIZE",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.GPUSPerPod),
+			Value: fmt.Sprintf("%d", n.GetMultiNodeGPUsPerPod()),
 		},
 		{
 			Name:  "NIM_PIPELINE_PARALLEL_SIZE",
@@ -377,7 +383,7 @@ func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "GPUS_PER_NODE",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.GPUSPerPod),
+			Value: fmt.Sprintf("%d", n.GetMultiNodeGPUsPerPod()),
 		},
 		{
 			Name:  "CLUSTER_START_TIMEOUT",
@@ -1198,10 +1204,10 @@ func (n *NIMService) generateMPIConfigData() map[string]string {
 	// Construct ConfigMap data
 	data := make(map[string]string)
 	for i := 0; i < n.Spec.Replicas; i++ {
-		hostfile := fmt.Sprintf("localhost slots=%d\n", n.Spec.MultiNode.GPUSPerPod)
+		hostfile := fmt.Sprintf("localhost slots=%d\n", n.GetMultiNodeGPUsPerPod())
 		for j := 1; j < n.Spec.MultiNode.Size; j++ {
 			workerHostname := fmt.Sprintf("%s-%d-%d.%s.%s.svc slots=%d",
-				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.Spec.MultiNode.GPUSPerPod)
+				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.GetMultiNodeGPUsPerPod())
 			hostfile += workerHostname + "\n"
 		}
 		dataKey := fmt.Sprintf("hostfile-%d", i)

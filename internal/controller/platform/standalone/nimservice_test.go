@@ -1024,12 +1024,16 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
+						},
+					},
 					Expose: appsv1alpha1.Expose{
 						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
-						Size:       2,
-						GPUSPerPod: 8,
+						Size: 2,
 					},
 				},
 			}
@@ -1851,7 +1855,11 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
 						BackendType: appsv1alpha1.NIMBackendTypeLWS,
 						Size:        2,
-						GPUSPerPod:  2,
+					},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("2"),
+						},
 					},
 				},
 			}
@@ -2074,7 +2082,11 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
 						BackendType: appsv1alpha1.NIMBackendTypeLWS,
 						Size:        2,
-						GPUSPerPod:  2,
+					},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("2"),
+						},
 					},
 				},
 			}
@@ -2356,23 +2368,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
 			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
-		})
-
-		It("should assign GPU resource equal to multiNode.GPUSPerPod in multi-node deployment", func() {
-			nimService.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{
-				GPUSPerPod: 2,
-			}
-			profile := &appsv1alpha1.NIMProfile{
-				Name:   "test-profile",
-				Config: map[string]string{"tp": "4"},
-			}
-
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resources).ToNot(BeNil())
-
-			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("2")))
-			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("2")))
 		})
 
 		It("should return an error if tensor parallelism cannot be parsed", func() {
