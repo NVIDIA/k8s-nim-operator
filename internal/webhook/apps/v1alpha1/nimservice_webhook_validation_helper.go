@@ -53,6 +53,11 @@ var validDRADeviceAttributeSelectorOps = []appsv1alpha1.DRADeviceAttributeSelect
 
 var validDRAResourceQuantitySelectorOps = []appsv1alpha1.DRAResourceQuantitySelectorOp{
 	appsv1alpha1.DRAResourceQuantitySelectorOpEqual,
+	appsv1alpha1.DRAResourceQuantitySelectorOpNotEqual,
+	appsv1alpha1.DRAResourceQuantitySelectorOpGreaterThan,
+	appsv1alpha1.DRAResourceQuantitySelectorOpGreaterThanOrEqual,
+	appsv1alpha1.DRAResourceQuantitySelectorOpLessThan,
+	appsv1alpha1.DRAResourceQuantitySelectorOpLessThanOrEqual,
 }
 
 // validateNIMServiceSpec aggregates all structural validation checks for a NIMService
