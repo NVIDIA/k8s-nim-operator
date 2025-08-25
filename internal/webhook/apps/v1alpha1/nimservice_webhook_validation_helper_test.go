@@ -937,7 +937,7 @@ func TestValidateResourcesConfiguration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateResourcesConfiguration(ns.Spec.Resources, fld)
+			errs := validateResourcesConfiguration(&ns.Spec, fld)
 			if got := len(errs); got != tc.wantErrs {
 				t.Logf("Validation errors:")
 				for i, err := range errs {
