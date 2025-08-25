@@ -22,10 +22,6 @@ spec:
         deviceClassName: gpu.nvidia.com
         driverName: gpu.nvidia.com
         attributeSelectors:
-        - key: index
-          op: NotEqual
-          value:
-            intValue: 0
         - key: driverVersion
           op: GreaterThanOrEqual
           value:
@@ -36,7 +32,7 @@ spec:
             stringValue: Ampere
         capacitySelectors:
         - key: memory
-          op: Equal
+          op: GreaterThanOrEqual
           value: 40Gi
   expose:
     service:

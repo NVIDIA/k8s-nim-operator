@@ -629,7 +629,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal]"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual]"},
 		},
 		{
 			name: "claimCreationSpec with invalid quantity selector - missing value",

@@ -179,13 +179,28 @@ func (d *DRADeviceAttributeSelector) GetCELExpression(driverName string) (string
 type DRAResourceQuantitySelectorOp string
 
 const (
-	DRAResourceQuantitySelectorOpEqual DRAResourceQuantitySelectorOp = "Equal"
+	DRAResourceQuantitySelectorOpEqual              DRAResourceQuantitySelectorOp = "Equal"
+	DRAResourceQuantitySelectorOpNotEqual           DRAResourceQuantitySelectorOp = "NotEqual"
+	DRAResourceQuantitySelectorOpGreaterThan        DRAResourceQuantitySelectorOp = "GreaterThan"
+	DRAResourceQuantitySelectorOpGreaterThanOrEqual DRAResourceQuantitySelectorOp = "GreaterThanOrEqual"
+	DRAResourceQuantitySelectorOpLessThan           DRAResourceQuantitySelectorOp = "LessThan"
+	DRAResourceQuantitySelectorOpLessThanOrEqual    DRAResourceQuantitySelectorOp = "LessThanOrEqual"
 )
 
 func (d DRAResourceQuantitySelectorOp) GetCELOperator() k8sutilcel.ComparisonOperator {
 	switch d {
 	case DRAResourceQuantitySelectorOpEqual:
 		return k8sutilcel.OpEqual
+	case DRAResourceQuantitySelectorOpNotEqual:
+		return k8sutilcel.OpNotEqual
+	case DRAResourceQuantitySelectorOpGreaterThan:
+		return k8sutilcel.OpGreater
+	case DRAResourceQuantitySelectorOpGreaterThanOrEqual:
+		return k8sutilcel.OpGreaterOrEqual
+	case DRAResourceQuantitySelectorOpLessThan:
+		return k8sutilcel.OpLess
+	case DRAResourceQuantitySelectorOpLessThanOrEqual:
+		return k8sutilcel.OpLessOrEqual
 	default:
 		return k8sutilcel.OpEqual
 	}
@@ -201,8 +216,13 @@ type DRAResourceQuantitySelector struct {
 	Key string `json:"key"`
 	// Op is the operator to use for comparing against the device capacity. Supported operators are:
 	// * Equal: The resource quantity value must be equal to the value specified in the selector.
+	// * NotEqual: The resource quantity value must not be equal to the value specified in the selector.
+	// * GreaterThan: The resource quantity value must be greater than the value specified in the selector.
+	// * GreaterThanOrEqual: The resource quantity value must be greater than or equal to the value specified in the selector.
+	// * LessThan: The resource quantity value must be less than the value specified in the selector.
+	// * LessThanOrEqual: The resource quantity value must be less than or equal to the value specified in the selector.
 	//
-	// +kubebuilder:validation:Enum=Equal
+	// +kubebuilder:validation:Enum=Equal;NotEqual;GreaterThan;GreaterThanOrEqual;LessThan;LessThanOrEqual
 	// +kubebuilder:default=Equal
 	Op DRAResourceQuantitySelectorOp `json:"op"`
 	// Value is the resource quantity to compare against.

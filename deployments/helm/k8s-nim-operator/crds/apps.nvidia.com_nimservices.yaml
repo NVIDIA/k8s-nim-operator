@@ -162,8 +162,18 @@ spec:
                                       description: |-
                                         Op is the operator to use for comparing against the device capacity. Supported operators are:
                                         * Equal: The resource quantity value must be equal to the value specified in the selector.
+                                        * NotEqual: The resource quantity value must not be equal to the value specified in the selector.
+                                        * GreaterThan: The resource quantity value must be greater than the value specified in the selector.
+                                        * GreaterThanOrEqual: The resource quantity value must be greater than or equal to the value specified in the selector.
+                                        * LessThan: The resource quantity value must be less than the value specified in the selector.
+                                        * LessThanOrEqual: The resource quantity value must be less than or equal to the value specified in the selector.
                                       enum:
                                       - Equal
+                                      - NotEqual
+                                      - GreaterThan
+                                      - GreaterThanOrEqual
+                                      - LessThan
+                                      - LessThanOrEqual
                                       type: string
                                     value:
                                       anyOf:
