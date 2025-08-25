@@ -24,12 +24,10 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
-// GetMultiNodeGPUsPerPod returns the number of GPUs per pod for the multi-node NIMService.
-// If the NIMService is not a multi-node NIMService, it returns the number of GPUs per pod based on the user-provided GPU resource requests.
-// If the NIMService is a multi-node NIMService, it returns the number of GPUs per pod based on the DRA resources.
-func GetMultiNodeGPUsPerPod(ctx context.Context, client client.Client, nimService *appsv1alpha1.NIMService) (int, error) {
+// GetGPUCountPerPod returns the number of GPUs per pod for the NIMService.
+func GetGPUCountPerPod(ctx context.Context, client client.Client, nimService *appsv1alpha1.NIMService) (int, error) {
 
-	if nimService.Spec.MultiNode == nil {
+	if nimService.Spec.DRAResources == nil {
 		if nimService.Spec.Resources == nil {
 			return 0, nil
 		}

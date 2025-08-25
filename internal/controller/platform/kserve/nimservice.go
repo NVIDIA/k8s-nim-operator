@@ -412,7 +412,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	var conType, failedCon string
 	var renderObj client.Object
 
-	multiNodeGPUsPerPod, err := shared.GetMultiNodeGPUsPerPod(ctx, r.Client, nimService)
+	gpuCountPerPod, err := shared.GetGPUCountPerPod(ctx, r.Client, nimService)
 	if err != nil {
 		logger.Error(err, "Failed to get multi-node GPUs per pod")
 		return err
@@ -439,7 +439,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 			// Auto assign GPU resources in case of the optimized profile
 			if profile != nil {
-				gpuResources, err = r.addGPUResources(ctx, nimService, profile, multiNodeGPUsPerPod)
+				gpuResources, err = r.addGPUResources(ctx, nimService, profile, gpuCountPerPod)
 				if err != nil {
 					logger.Error(err, "Failed to get GPU resources")
 					return err

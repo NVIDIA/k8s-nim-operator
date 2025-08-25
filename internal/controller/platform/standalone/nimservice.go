@@ -369,7 +369,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	var conType, failedCon string
 	var renderObj client.Object
 
-	multiNodeGPUsPerPod, err := shared.GetMultiNodeGPUsPerPod(ctx, r.GetClient(), nimService)
+	gpuCountPerPod, err := shared.GetGPUCountPerPod(ctx, r.GetClient(), nimService)
 	if err != nil {
 		logger.Error(err, "failed to get GPU count for DRA resources")
 		return ctrl.Result{}, err
@@ -392,7 +392,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 			// Auto assign GPU resources in case of the optimized profile
 			if profile != nil {
-				gpuResources, err = r.addGPUResources(ctx, nimService, profile, multiNodeGPUsPerPod)
+				gpuResources, err = r.addGPUResources(ctx, nimService, profile, gpuCountPerPod)
 				if err != nil {
 					logger.Error(err, "Failed to get GPU resources")
 					return ctrl.Result{}, err
@@ -412,7 +412,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	if nimService.Spec.MultiNode != nil && nimService.Spec.MultiNode.BackendType == appsv1alpha1.NIMBackendTypeLWS {
-		lwsParams := nimService.GetLWSParams(multiNodeGPUsPerPod)
+		lwsParams := nimService.GetLWSParams(gpuCountPerPod)
 		lwsParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
 		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
 		lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(*modelPVC)
@@ -454,7 +454,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		renderObj = &lws.LeaderWorkerSet{}
 
 		// Create configmap for MPI
-		err = r.createMultiNodeVolumeObjects(ctx, nimService, multiNodeGPUsPerPod)
+		err = r.createMultiNodeVolumeObjects(ctx, nimService, gpuCountPerPod)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to create multi-node volumes: %v", err)
 		}
