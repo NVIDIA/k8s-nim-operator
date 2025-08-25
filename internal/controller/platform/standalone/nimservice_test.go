@@ -134,6 +134,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		originalTransport = http.DefaultTransport
 		discoveryClient   *discoveryfake.FakeDiscovery
 	)
+
 	BeforeEach(func() {
 		scheme = runtime.NewScheme()
 		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
@@ -586,7 +587,29 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 
 		Context("spec reconciliation with DRAResources", func() {
+
 			It("should request resource claims", func() {
+
+				resourceClaim := &resourcev1beta2.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-resource-claim",
+						Namespace: "default",
+					},
+					Spec: resourcev1beta2.ResourceClaimSpec{
+						Devices: resourcev1beta2.DeviceClaim{
+							Requests: []resourcev1beta2.DeviceRequest{
+								{
+									Name: "test-gpu",
+									Exactly: &resourcev1beta2.ExactDeviceRequest{
+										DeviceClassName: "gpu.nvidia.com",
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(client.Create(context.TODO(), resourceClaim)).To(Succeed())
+
 				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
 					{
 						ResourceClaimName: ptr.To("test-resource-claim"),
@@ -613,6 +636,29 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			})
 
 			It("should request resource claims templates", func() {
+
+				resourceClaimTemplate := &resourcev1beta2.ResourceClaimTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-resource-claim-template",
+						Namespace: "default",
+					},
+					Spec: resourcev1beta2.ResourceClaimTemplateSpec{
+						Spec: resourcev1beta2.ResourceClaimSpec{
+							Devices: resourcev1beta2.DeviceClaim{
+								Requests: []resourcev1beta2.DeviceRequest{
+									{
+										Name: "test-gpu",
+										Exactly: &resourcev1beta2.ExactDeviceRequest{
+											DeviceClassName: "gpu.nvidia.com",
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(client.Create(context.TODO(), resourceClaimTemplate)).To(Succeed())
+
 				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
 					{
 						ResourceClaimTemplateName: ptr.To("test-resource-claim-template"),
@@ -639,6 +685,27 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			})
 
 			It("should only contain the requests from the resource claims", func() {
+
+				resourceClaim := &resourcev1beta2.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-resource-claim",
+						Namespace: "default",
+					},
+					Spec: resourcev1beta2.ResourceClaimSpec{
+						Devices: resourcev1beta2.DeviceClaim{
+							Requests: []resourcev1beta2.DeviceRequest{
+								{
+									Name: "test-gpu",
+									Exactly: &resourcev1beta2.ExactDeviceRequest{
+										DeviceClassName: "gpu.nvidia.com",
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(client.Create(context.TODO(), resourceClaim)).To(Succeed())
+
 				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
 					{
 						ResourceClaimName: ptr.To("test-resource-claim"),
