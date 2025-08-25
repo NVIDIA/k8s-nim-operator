@@ -369,6 +369,12 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	var conType, failedCon string
 	var renderObj client.Object
 
+	multiNodeGPUsPerPod, err := shared.GetMultiNodeGPUsPerPod(ctx, r.GetClient(), nimService)
+	if err != nil {
+		logger.Error(err, "failed to get GPU count for DRA resources")
+		return ctrl.Result{}, err
+	}
+
 	if modelProfile != "" {
 		profileEnv = &[]corev1.EnvVar{{
 			Name:  "NIM_MODEL_PROFILE",
@@ -386,7 +392,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 			// Auto assign GPU resources in case of the optimized profile
 			if profile != nil {
-				gpuResources, err = r.addGPUResources(ctx, nimService, profile)
+				gpuResources, err = r.addGPUResources(ctx, nimService, profile, multiNodeGPUsPerPod)
 				if err != nil {
 					logger.Error(err, "Failed to get GPU resources")
 					return ctrl.Result{}, err
@@ -406,7 +412,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	if nimService.Spec.MultiNode != nil && nimService.Spec.MultiNode.BackendType == appsv1alpha1.NIMBackendTypeLWS {
-		lwsParams := nimService.GetLWSParams()
+		lwsParams := nimService.GetLWSParams(multiNodeGPUsPerPod)
 		lwsParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
 		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
 		lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(*modelPVC)
@@ -448,7 +454,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		renderObj = &lws.LeaderWorkerSet{}
 
 		// Create configmap for MPI
-		err = r.createMultiNodeVolumeObjects(ctx, nimService)
+		err = r.createMultiNodeVolumeObjects(ctx, nimService, multiNodeGPUsPerPod)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to create multi-node volumes: %v", err)
 		}
@@ -543,8 +549,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	return ctrl.Result{}, nil
 }
 
-func (r *NIMServiceReconciler) createMultiNodeVolumeObjects(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
-	if err := r.createMultiNodeConfigMap(ctx, nimService, nimService.GetMPIConfigParams()); err != nil {
+func (r *NIMServiceReconciler) createMultiNodeVolumeObjects(ctx context.Context, nimService *appsv1alpha1.NIMService, multiNodeGPUsPerPod int) error {
+	if err := r.createMultiNodeConfigMap(ctx, nimService, nimService.GetMPIConfigParams(multiNodeGPUsPerPod)); err != nil {
 		return fmt.Errorf("failed to create MPI configmap for %s: %v", nimService.Name, err)
 	}
 
@@ -995,7 +1001,7 @@ func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimServic
 // If the TP value is not present, the function defaults to allocating 1 GPU.
 //
 // In case of multi-node NIMs, this function assigns the number of GPUs equal to .spec.multiNode.gpuPerWorker.
-func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile) (*corev1.ResourceRequirements, error) {
+func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile, multiNodeGPUsPerPod int) (*corev1.ResourceRequirements, error) {
 	logger := log.FromContext(ctx)
 
 	// TODO: Refine this to detect GPU claims and only assign GPU resources if no GPU claims are present.
@@ -1024,7 +1030,7 @@ func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *
 	// if deployed as multi-node, use the GPU per worker value to assign GPU resources to each worker
 	// TODO auto determine base on tp*pp/(.spec.multiNode.size)
 	if nimService.Spec.MultiNode != nil {
-		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", nimService.GetMultiNodeGPUsPerPod()))
+		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", multiNodeGPUsPerPod))
 		if err != nil {
 			logger.Error(err, "Failed to parse GPU per worker value")
 			return nil, err
@@ -1103,5 +1109,6 @@ func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimSer
 			return fmt.Errorf("failed to reconcile DRAResource %s: %w", namedDraResource.ResourceName, err)
 		}
 	}
+
 	return nil
 }

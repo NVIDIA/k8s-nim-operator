@@ -74,3 +74,11 @@ func GetResourceClaimState(claim *resourcev1beta2.ResourceClaim) string {
 	}
 	return strings.Join(states, ",")
 }
+
+func GetResourceClaimTemplate(ctx context.Context, k8sclient client.Client, name string, namespace string) (*resourcev1beta2.ResourceClaimTemplate, error) {
+	claimTemplate := &resourcev1beta2.ResourceClaimTemplate{}
+	if err := k8sclient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, claimTemplate); err != nil {
+		return nil, err
+	}
+	return claimTemplate, nil
+}

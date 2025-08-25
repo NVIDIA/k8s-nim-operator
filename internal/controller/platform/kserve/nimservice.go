@@ -412,6 +412,12 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	var conType, failedCon string
 	var renderObj client.Object
 
+	multiNodeGPUsPerPod, err := shared.GetMultiNodeGPUsPerPod(ctx, r.Client, nimService)
+	if err != nil {
+		logger.Error(err, "Failed to get multi-node GPUs per pod")
+		return err
+	}
+
 	// Setup env for explicit override profile is specified
 	if modelProfile != "" {
 		profileEnv = &[]corev1.EnvVar{
@@ -433,7 +439,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 			// Auto assign GPU resources in case of the optimized profile
 			if profile != nil {
-				gpuResources, err = r.addGPUResources(ctx, nimService, profile)
+				gpuResources, err = r.addGPUResources(ctx, nimService, profile, multiNodeGPUsPerPod)
 				if err != nil {
 					logger.Error(err, "Failed to get GPU resources")
 					return err
@@ -446,7 +452,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 	initContainers = nimService.GetInitContainers()
 	namedDraResources := shared.GenerateNamedDRAResources(nimService)
-	err := r.reconcileDRAResources(ctx, nimService, namedDraResources)
+	err = r.reconcileDRAResources(ctx, nimService, namedDraResources)
 	if err != nil {
 		logger.Error(err, "Failed to reconcile DRAResources")
 		return err
@@ -549,7 +555,7 @@ func (r *NIMServiceReconciler) getNIMCacheProfile(ctx context.Context, nimServic
 // If the TP value is not present, the function defaults to allocating 1 GPU.
 //
 // In case of multi-node NIMs, this function assigns the number of GPUs equal to .spec.multiNode.gpuPerWorker.
-func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile) (*corev1.ResourceRequirements, error) {
+func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *appsv1alpha1.NIMService, profile *appsv1alpha1.NIMProfile, multiNodeGPUsPerPod int) (*corev1.ResourceRequirements, error) {
 	logger := log.FromContext(ctx)
 
 	// TODO: Refine this to detect GPU claims and only assign GPU resources if no GPU claims are present.
@@ -578,7 +584,7 @@ func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *
 	// if deployed as multi-node, use the GPU per worker value to assign GPU resources to each worker
 	// TODO auto determine base on tp*pp/(.spec.multiNode.size)
 	if nimService.Spec.MultiNode != nil {
-		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", nimService.GetMultiNodeGPUsPerPod()))
+		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", multiNodeGPUsPerPod))
 		if err != nil {
 			logger.Error(err, "Failed to parse GPU per worker value")
 			return nil, err

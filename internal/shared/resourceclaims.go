@@ -19,9 +19,11 @@ package shared
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -234,4 +236,139 @@ func GetDRADeviceCELExpressions(device appsv1alpha1.DRADeviceSpec) ([]string, er
 		}
 	}
 	return celExpressions, nil
+}
+
+// Constants for GPU device detection.
+const (
+	// NVIDIA identifiers used to detect GPU devices.
+	NVIDIAIdentifier    = "nvidia"
+	NVIDIAComIdentifier = "nvidia.com"
+)
+
+// isNVIDIAGPU checks if a device class represents an NVIDIA GPU.
+func isNVIDIAGPU(ctx context.Context, client client.Client, deviceClassName string) (bool, error) {
+	if deviceClassName == "" {
+		return false, nil
+	}
+
+	var dc resourcev1beta2.DeviceClass
+	if err := client.Get(ctx, types.NamespacedName{Name: deviceClassName}, &dc); err != nil {
+		return false, fmt.Errorf("failed to get device class %s: %w", deviceClassName, err)
+	}
+
+	hint := strings.ToLower(fmt.Sprint(dc.Spec))
+	return strings.Contains(hint, NVIDIAIdentifier) || strings.Contains(hint, NVIDIAComIdentifier), nil
+}
+
+// GetGPUCountForDRAResources calculates the total GPU count across all DRA resources.
+func GetGPUCountForDRAResources(ctx context.Context, client client.Client, namespace string, resourceClaimName string, nimService *appsv1alpha1.NIMService) (int, error) {
+	totalGPUCount := 0
+	for i, resource := range nimService.Spec.DRAResources {
+		var gpuCount int
+		var err error
+
+		switch {
+		case resource.ResourceClaimName != nil:
+			gpuCount, err = GetGPUDeviceCountForClaim(ctx, client, *resource.ResourceClaimName, namespace)
+		case resource.ResourceClaimTemplateName != nil:
+			gpuCount, err = GetGPUDeviceCountForClaimTemplate(ctx, client, *resource.ResourceClaimTemplateName, namespace)
+		case resource.ClaimCreationSpec != nil:
+			gpuCount, err = GetGPUDeviceCountForClaimCreationSpec(ctx, client, *resource.ClaimCreationSpec, namespace)
+		}
+
+		if err != nil {
+			return 0, fmt.Errorf("failed to get GPU count for DRA resource at index %d: %w", i, err)
+		}
+
+		totalGPUCount += gpuCount
+	}
+
+	return totalGPUCount, nil
+}
+
+// GetGPUDeviceCountForClaim calculates GPU count for a specific resource claim.
+func GetGPUDeviceCountForClaim(ctx context.Context, client client.Client, resourceClaimName string, namespace string) (int, error) {
+	if resourceClaimName == "" {
+		return 0, fmt.Errorf("resourceClaimName cannot be empty")
+	}
+	if namespace == "" {
+		return 0, fmt.Errorf("namespace cannot be empty")
+	}
+
+	claim, err := k8sutil.GetResourceClaim(ctx, client, resourceClaimName, namespace)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get resource claim %s in namespace %s: %w", resourceClaimName, namespace, err)
+	}
+
+	return getGPUCountFromDeviceRequests(ctx, client, claim.Spec.Devices.Requests)
+}
+
+// GetGPUDeviceCountForClaimTemplate calculates GPU count for a resource claim template.
+func GetGPUDeviceCountForClaimTemplate(ctx context.Context, client client.Client, resourceClaimTemplateName string, namespace string) (int, error) {
+	if resourceClaimTemplateName == "" {
+		return 0, fmt.Errorf("resourceClaimTemplateName cannot be empty")
+	}
+	if namespace == "" {
+		return 0, fmt.Errorf("namespace cannot be empty")
+	}
+
+	claimTemplate, err := k8sutil.GetResourceClaimTemplate(ctx, client, resourceClaimTemplateName, namespace)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get resource claim template %s in namespace %s: %w", resourceClaimTemplateName, namespace, err)
+	}
+
+	return getGPUCountFromDeviceRequests(ctx, client, claimTemplate.Spec.Spec.Devices.Requests)
+}
+
+// GetGPUDeviceCountForClaimCreationSpec calculates GPU count for a claim creation specification.
+func GetGPUDeviceCountForClaimCreationSpec(ctx context.Context, client client.Client, claimCreationSpec appsv1alpha1.DRAClaimCreationSpec, namespace string) (int, error) {
+	if namespace == "" {
+		return 0, fmt.Errorf("namespace cannot be empty")
+	}
+
+	return getGPUCountFromDeviceSpecs(ctx, client, claimCreationSpec.Devices)
+}
+
+// getGPUCountFromDeviceRequests is a helper function to extract GPU count from device requests.
+func getGPUCountFromDeviceRequests(ctx context.Context, client client.Client, requests []resourcev1beta2.DeviceRequest) (int, error) {
+
+	for _, req := range requests {
+		if req.Exactly.DeviceClassName == "" {
+			continue
+		}
+
+		isGPU, err := isNVIDIAGPU(ctx, client, req.Exactly.DeviceClassName)
+		if err != nil {
+			// This allows partial success scenarios
+			continue
+		}
+
+		if isGPU {
+			return int(req.Exactly.Count), nil
+		}
+	}
+
+	return 0, nil
+}
+
+// getGPUCountFromDeviceSpecs is a helper function to extract GPU count from device specifications.
+func getGPUCountFromDeviceSpecs(ctx context.Context, client client.Client, devices []appsv1alpha1.DRADeviceSpec) (int, error) {
+
+	for _, dev := range devices {
+		if dev.DeviceClassName == "" {
+			continue
+		}
+
+		isGPU, err := isNVIDIAGPU(ctx, client, dev.DeviceClassName)
+		if err != nil {
+			// This allows partial success scenarios
+			continue
+		}
+
+		if isGPU {
+			return int(dev.Count), nil
+		}
+	}
+
+	return 0, nil
 }
