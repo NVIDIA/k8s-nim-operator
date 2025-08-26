@@ -722,6 +722,16 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 	// Merge env with the user provided values
 	pod.Spec.Containers[0].Env = utils.MergeEnvVars(pod.Spec.Containers[0].Env, nimBuild.Spec.Env)
 
+	// If LORA is enabled, set NIM_PEFT_SOURCE to run NIM with LORA enabled
+	if inputNimProfile.Config["feat_lora"] == "true" {
+		pod.Spec.Containers[0].Env = utils.MergeEnvVars(pod.Spec.Containers[0].Env, []corev1.EnvVar{
+			{
+				Name:  "NIM_PEFT_SOURCE",
+				Value: "/tmp",
+			},
+		})
+	}
+
 	return pod, nil
 }
 
