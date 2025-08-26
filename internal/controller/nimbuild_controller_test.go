@@ -1080,5 +1080,140 @@ var _ = Describe("NIMBuild Controller", func() {
 			Expect(customModelPathFound).To(BeTrue(), "NIM_MODEL_PATH should be overridden in created pod")
 			Expect(defaultCachePathFound).To(BeTrue(), "Default NIM_CACHE_PATH should be preserved in created pod")
 		})
+
+		It("should set NIM_PEFT_SOURCE when LORA is enabled in profile", func() {
+			// Create a profile with LORA enabled
+			loraProfile := appsv1alpha1.NIMProfile{
+				Name:   "lora-profile",
+				Model:  "test-model",
+				Config: map[string]string{"feat_lora": "true", "trtllm_buildable": "true"},
+			}
+
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+				},
+			}
+
+			// Test pod construction with LORA-enabled profile
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, loraProfile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that NIM_PEFT_SOURCE environment variable is set
+			envVars := pod.Spec.Containers[0].Env
+			var nimPeftSourceFound bool
+			for _, env := range envVars {
+				if env.Name == "NIM_PEFT_SOURCE" {
+					Expect(env.Value).To(Equal("/tmp"))
+					nimPeftSourceFound = true
+					break
+				}
+			}
+			Expect(nimPeftSourceFound).To(BeTrue(), "NIM_PEFT_SOURCE should be set when LORA is enabled")
+		})
+
+		It("should not set NIM_PEFT_SOURCE when LORA is disabled in profile", func() {
+			// Create a profile with LORA disabled
+			noLoraProfile := appsv1alpha1.NIMProfile{
+				Name:   "no-lora-profile",
+				Model:  "test-model",
+				Config: map[string]string{"feat_lora": "false", "trtllm_buildable": "true"},
+			}
+
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+				},
+			}
+
+			// Test pod construction with LORA-disabled profile
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, noLoraProfile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that NIM_PEFT_SOURCE environment variable is NOT set
+			envVars := pod.Spec.Containers[0].Env
+			for _, env := range envVars {
+				Expect(env.Name).NotTo(Equal("NIM_PEFT_SOURCE"), "NIM_PEFT_SOURCE should not be set when LORA is disabled")
+			}
+		})
+
+		It("should not set NIM_PEFT_SOURCE when LORA config is missing from profile", func() {
+			// Create a profile without LORA config
+			noLoraConfigProfile := appsv1alpha1.NIMProfile{
+				Name:   "no-lora-config-profile",
+				Model:  "test-model",
+				Config: map[string]string{"trtllm_buildable": "true"},
+			}
+
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+				},
+			}
+
+			// Test pod construction with profile missing LORA config
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, noLoraConfigProfile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that NIM_PEFT_SOURCE environment variable is NOT set
+			envVars := pod.Spec.Containers[0].Env
+			for _, env := range envVars {
+				Expect(env.Name).NotTo(Equal("NIM_PEFT_SOURCE"), "NIM_PEFT_SOURCE should not be set when LORA config is missing")
+			}
+		})
 	})
 })
