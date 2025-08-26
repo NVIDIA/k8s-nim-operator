@@ -134,7 +134,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		originalTransport = http.DefaultTransport
 		discoveryClient   *discoveryfake.FakeDiscovery
 	)
-
 	BeforeEach(func() {
 		scheme = runtime.NewScheme()
 		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
@@ -587,7 +586,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 
 		Context("spec reconciliation with DRAResources", func() {
-
 			It("should request resource claims", func() {
 
 				resourceClaim := &resourcev1beta2.ResourceClaim{

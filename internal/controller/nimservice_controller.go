@@ -76,7 +76,6 @@ var _ shared.Reconciler = &NIMServiceReconciler{}
 
 // NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform factory.
 func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NIMServiceReconciler {
-
 	return &NIMServiceReconciler{
 		Client:          client,
 		scheme:          scheme,

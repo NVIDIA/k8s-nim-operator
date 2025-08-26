@@ -1094,6 +1094,5 @@ func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimSer
 			return fmt.Errorf("failed to reconcile DRAResource %s: %w", namedDraResource.ResourceName, err)
 		}
 	}
-
 	return nil
 }

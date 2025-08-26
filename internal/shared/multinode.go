@@ -30,13 +30,13 @@ func GetGPUCountPerPod(ctx context.Context, client client.Client, nimService *ap
 
 	if len(nimService.Spec.DRAResources) == 0 {
 		if nimService.Spec.Resources == nil {
-			return 0, nil
+			return 0, errors.New("GPU resource not specified for multi-node NIMService")
 		}
 		gpuQuantity, ok := nimService.Spec.Resources.Requests["nvidia.com/gpu"]
 		if !ok {
 			gpuQuantity, ok = nimService.Spec.Resources.Limits["nvidia.com/gpu"]
 			if !ok {
-				return 0, errors.New("no GPU request or limit is specified for multi-node NIMService")
+				return 0, errors.New("GPU resource requests/limits not specified for multi-node NIMService")
 			}
 		}
 		return int(gpuQuantity.Value()), nil

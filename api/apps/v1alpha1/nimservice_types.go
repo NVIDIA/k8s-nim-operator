@@ -228,7 +228,7 @@ func (n *NIMService) GetLWSName() string {
 func (n *NIMService) GetGPUCountPerPod() int {
 	gpuQuantity, ok := n.Annotations[utils.GPUCountPerPodAnnotationKey]
 	if !ok {
-		// return 0 if no GPU limit is specified because auto determine base on tp*pp/(.spec.multiNode.size) is a TODO
+		// return 0 if annotation is not present
 		return 0
 	}
 	count, err := strconv.Atoi(gpuQuantity)
