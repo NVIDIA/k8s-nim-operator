@@ -338,8 +338,7 @@ func getGPUCountFromDeviceRequests(ctx context.Context, client client.Client, re
 
 		isGPU, err := isNVIDIAGPU(ctx, client, req.Exactly.DeviceClassName)
 		if err != nil {
-			// This allows partial success scenarios
-			continue
+			return 0, fmt.Errorf("failed to check if device class %s is a GPU: %w", req.Exactly.DeviceClassName, err)
 		}
 
 		if isGPU {
@@ -360,8 +359,7 @@ func getGPUCountFromDeviceSpecs(ctx context.Context, client client.Client, devic
 
 		isGPU, err := isNVIDIAGPU(ctx, client, dev.DeviceClassName)
 		if err != nil {
-			// This allows partial success scenarios
-			continue
+			return 0, fmt.Errorf("failed to check if device class %s is a GPU: %w", dev.DeviceClassName, err)
 		}
 
 		if isGPU {

@@ -134,7 +134,10 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	logger.Info("Reconciling", "NIMService", nimService.Name)
 
-	if nimService.Spec.MultiNode != nil && nimService.Annotations != nil {
+	if nimService.Spec.MultiNode != nil {
+		if nimService.Annotations == nil {
+			nimService.Annotations = map[string]string{}
+		}
 		if _, ok := nimService.Annotations[utils.GPUCountPerPodAnnotationKey]; !ok {
 			gpuCountPerPod, err := shared.GetGPUCountPerPod(ctx, r.GetClient(), nimService)
 			if err != nil {
@@ -270,6 +273,16 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	)
 	if err != nil {
 		return err
+	}
+
+	exists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("deviceclasses"))
+	if err != nil {
+		return err
+	}
+	if exists {
+		if _, err := mgr.GetCache().GetInformer(context.Background(), &resourcev1beta2.DeviceClass{}); err != nil {
+			return err
+		}
 	}
 
 	nimServiceBuilder := ctrl.NewControllerManagedBy(mgr).

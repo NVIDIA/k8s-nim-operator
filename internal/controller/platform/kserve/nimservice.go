@@ -579,7 +579,7 @@ func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *
 	// Get tensorParallelism from the profile
 	tensorParallelism, err := utils.GetTensorParallelismByProfileTags(profile.Config)
 	if err != nil {
-		logger.Error(err, "Failed to retrieve tensorParallelism")
+		logger.Error(err, "Missing nvidia.com/gpu resource request/limit and unable to retrieve tensorParallelism for NIM profile")
 		return nil, err
 	}
 	if tensorParallelism != "" {
