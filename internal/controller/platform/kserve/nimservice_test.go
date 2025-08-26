@@ -1758,7 +1758,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				},
 			}
 
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 8)
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).ToNot(BeNil())
 
@@ -1773,7 +1773,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Config: map[string]string{"tp": "4"},
 			}
 
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 0)
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).ToNot(BeNil())
 
@@ -1787,7 +1787,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Config: map[string]string{},
 			}
 
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 8)
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).ToNot(BeNil())
 
@@ -1803,7 +1803,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Config: map[string]string{},
 			}
 
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 0)
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).ToNot(BeNil())
 
@@ -1817,7 +1817,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Config: map[string]string{"tp": "invalid"},
 			}
 
-			_, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 0)
+			_, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).To(HaveOccurred())
 		})
 	})

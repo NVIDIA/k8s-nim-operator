@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
@@ -47,7 +48,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
-	platform "github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
+	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
@@ -75,6 +76,7 @@ var _ shared.Reconciler = &NIMServiceReconciler{}
 
 // NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform factory.
 func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NIMServiceReconciler {
+
 	return &NIMServiceReconciler{
 		Client:          client,
 		scheme:          scheme,
@@ -132,6 +134,18 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	logger.Info("Reconciling", "NIMService", nimService.Name)
+
+	if nimService.Spec.MultiNode != nil && nimService.Annotations != nil {
+		if _, ok := nimService.Annotations[utils.GPUCountPerPodAnnotationKey]; !ok {
+			gpuCountPerPod, err := shared.GetGPUCountPerPod(ctx, r.GetClient(), nimService)
+			if err != nil {
+				logger.Error(err, "failed to get GPU count per pod for multi-node NIMService", "name", nimService.Name)
+				return ctrl.Result{}, err
+			}
+			logger.Info("GPU count per pod", "count", gpuCountPerPod)
+			nimService.Annotations[utils.GPUCountPerPodAnnotationKey] = strconv.Itoa(gpuCountPerPod)
+		}
+	}
 
 	// Get platform implementation based on NIMService's platform field
 	platformImpl, err := platform.GetInferencePlatform(nimService.Spec.InferencePlatform)

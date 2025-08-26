@@ -74,7 +74,7 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	errList = append(errList, validateExposeConfiguration(&spec.Expose, fldPath.Child("expose").Child("ingress"))...)
 	errList = append(errList, validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))...)
 	errList = append(errList, validateScaleConfiguration(&spec.Scale, fldPath.Child("scale"))...)
-	errList = append(errList, validateResourcesConfiguration(spec, fldPath.Child("resources"))...)
+	errList = append(errList, validateResourcesConfiguration(spec, fldPath)...)
 	errList = append(errList, validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)...)
 	errList = append(errList, validateKServeConfiguration(spec, fldPath)...)
 
@@ -402,7 +402,7 @@ func validateResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *
 	errList := field.ErrorList{}
 
 	// Validate that Claims must be empty
-	if spec.Resources != nil && spec.Resources.Claims != nil && len(spec.Resources.Claims) > 0 {
+	if spec.Resources != nil && len(spec.Resources.Claims) > 0 {
 		errList = append(errList, field.Forbidden(fldPath.Child("claims"), "must be empty"))
 	}
 
@@ -420,21 +420,35 @@ func validateGPURequirements(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.P
 
 	gpuResourceName := corev1.ResourceName("nvidia.com/gpu")
 
-	// Check if GPU requests are specified
-	if spec.Resources == nil || spec.Resources.Requests == nil {
-		errList = append(errList, field.Required(fldPath.Child("requests"), "GPU requests must be specified for MultiNode deployments"))
+	// Check if GPU requests or limits are specified
+	if spec.Resources == nil {
+		errList = append(errList, field.Required(fldPath.Child("resources"), "GPU resources must be specified for MultiNode deployments"))
 		return errList
 	}
 
-	gpuQuantity, exists := spec.Resources.Requests[gpuResourceName]
-	if !exists {
-		errList = append(errList, field.Required(fldPath.Child("requests").Child("nvidia.com/gpu"), "nvidia.com/gpu must be specified in requests for MultiNode deployments"))
+	// At least one of requests or limits must be specified
+	_, hasRequests := spec.Resources.Requests[gpuResourceName]
+	_, hasLimits := spec.Resources.Limits[gpuResourceName]
+
+	if !hasRequests && !hasLimits {
+		errList = append(errList, field.Required(fldPath.Child("resources"), "Either GPU requests or limits must be specified for MultiNode deployments"))
 		return errList
 	}
 
-	// Validate that GPU quantity is positive
-	if gpuQuantity.IsZero() || gpuQuantity.Value() <= 0 {
-		errList = append(errList, field.Invalid(fldPath.Child("requests").Child("nvidia.com/gpu"), gpuQuantity.String(), "must be greater than 0"))
+	// Validate GPU requests if specified
+	if hasRequests {
+		gpuRequests := spec.Resources.Requests[gpuResourceName]
+		if gpuRequests.IsZero() || gpuRequests.Value() <= 0 {
+			errList = append(errList, field.Invalid(fldPath.Child("requests").Child("nvidia.com/gpu"), gpuRequests.String(), "must be greater than 0"))
+		}
+	}
+
+	// Validate GPU limits if specified
+	if hasLimits {
+		gpuLimits := spec.Resources.Limits[gpuResourceName]
+		if gpuLimits.IsZero() || gpuLimits.Value() <= 0 {
+			errList = append(errList, field.Invalid(fldPath.Child("limits").Child("nvidia.com/gpu"), gpuLimits.String(), "must be greater than 0"))
+		}
 	}
 
 	return errList

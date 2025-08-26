@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strconv"
 
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -223,6 +224,20 @@ func (n *NIMService) GetLWSName() string {
 	return fmt.Sprintf("%s-lws", n.GetName())
 }
 
+// GetGPUCountPerPod returns the number of GPUs per pod for the NIMService.
+func (n *NIMService) GetGPUCountPerPod() int {
+	gpuQuantity, ok := n.Annotations[utils.GPUCountPerPodAnnotationKey]
+	if !ok {
+		// return 0 if no GPU limit is specified because auto determine base on tp*pp/(.spec.multiNode.size) is a TODO
+		return 0
+	}
+	count, err := strconv.Atoi(gpuQuantity)
+	if err != nil {
+		return 0
+	}
+	return count
+}
+
 // GetPVCName returns the name to be used for the PVC based on the custom spec
 // Prefers pvc.Name if explicitly set by the user in the NIMService instance.
 func (n *NIMService) GetPVCName(pvc PersistentVolumeClaim) string {
@@ -314,7 +329,7 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 	return envVars
 }
 
-func (n *NIMService) getLWSCommonEnv(multiNodeGPUsPerPod int) []corev1.EnvVar {
+func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 	env := n.GetEnv()
 
 	env = utils.MergeEnvVars([]corev1.EnvVar{
@@ -332,7 +347,7 @@ func (n *NIMService) getLWSCommonEnv(multiNodeGPUsPerPod int) []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_TENSOR_PARALLEL_SIZE",
-			Value: fmt.Sprintf("%d", multiNodeGPUsPerPod),
+			Value: fmt.Sprintf("%d", n.GetGPUCountPerPod()),
 		},
 		{
 			Name:  "NIM_PIPELINE_PARALLEL_SIZE",
@@ -350,8 +365,8 @@ func (n *NIMService) getLWSCommonEnv(multiNodeGPUsPerPod int) []corev1.EnvVar {
 	return env
 }
 
-func (n *NIMService) GetLWSLeaderEnv(multiNodeGPUsPerPod int) []corev1.EnvVar {
-	env := n.getLWSCommonEnv(multiNodeGPUsPerPod)
+func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
+	env := n.getLWSCommonEnv()
 
 	mpiTimeout := DefaultMPITimeout
 	if n.Spec.MultiNode.MPI != nil && n.Spec.MultiNode.MPI.MPIStartTimeout != 0 {
@@ -373,7 +388,7 @@ func (n *NIMService) GetLWSLeaderEnv(multiNodeGPUsPerPod int) []corev1.EnvVar {
 		},
 		{
 			Name:  "GPUS_PER_NODE",
-			Value: fmt.Sprintf("%d", multiNodeGPUsPerPod),
+			Value: fmt.Sprintf("%d", n.GetGPUCountPerPod()),
 		},
 		{
 			Name:  "CLUSTER_START_TIMEOUT",
@@ -399,8 +414,8 @@ func (n *NIMService) GetLWSLeaderEnv(multiNodeGPUsPerPod int) []corev1.EnvVar {
 	return env
 }
 
-func (n *NIMService) GetLWSWorkerEnv(multiNodeGPUsPerPod int) []corev1.EnvVar {
-	env := n.getLWSCommonEnv(multiNodeGPUsPerPod)
+func (n *NIMService) GetLWSWorkerEnv() []corev1.EnvVar {
+	env := n.getLWSCommonEnv()
 	env = utils.MergeEnvVars([]corev1.EnvVar{
 		{
 			Name:  "NIM_LEADER_ROLE",
@@ -1083,7 +1098,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	return params
 }
 
-func (n *NIMService) GetLWSParams(multiNodeGPUsPerPod int) *rendertypes.LeaderWorkerSetParams {
+func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
 	params := &rendertypes.LeaderWorkerSetParams{}
 
 	// Set metadata
@@ -1100,8 +1115,8 @@ func (n *NIMService) GetLWSParams(multiNodeGPUsPerPod int) *rendertypes.LeaderWo
 	params.ContainerName = n.GetContainerName()
 	params.Args = n.GetArgs()
 	params.Command = n.GetCommand()
-	params.LeaderEnvs = n.GetLWSLeaderEnv(multiNodeGPUsPerPod)
-	params.WorkerEnvs = n.GetLWSWorkerEnv(multiNodeGPUsPerPod)
+	params.LeaderEnvs = n.GetLWSLeaderEnv()
+	params.WorkerEnvs = n.GetLWSWorkerEnv()
 	params.UserID = n.GetUserID()
 	params.GroupID = n.GetGroupID()
 	params.Image = n.GetImage()
@@ -1190,14 +1205,14 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	return params
 }
 
-func (n *NIMService) generateMPIConfigData(multiNodeGPUsPerPod int) map[string]string {
+func (n *NIMService) generateMPIConfigData() map[string]string {
 	// Construct ConfigMap data
 	data := make(map[string]string)
 	for i := 0; i < n.Spec.Replicas; i++ {
-		hostfile := fmt.Sprintf("localhost slots=%d\n", multiNodeGPUsPerPod)
+		hostfile := fmt.Sprintf("localhost slots=%d\n", n.GetGPUCountPerPod())
 		for j := 1; j < n.Spec.MultiNode.Size; j++ {
 			workerHostname := fmt.Sprintf("%s-%d-%d.%s.%s.svc slots=%d",
-				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), multiNodeGPUsPerPod)
+				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.GetGPUCountPerPod())
 			hostfile += workerHostname + "\n"
 		}
 		dataKey := fmt.Sprintf("hostfile-%d", i)
@@ -1206,14 +1221,14 @@ func (n *NIMService) generateMPIConfigData(multiNodeGPUsPerPod int) map[string]s
 	return data
 }
 
-func (n *NIMService) GetMPIConfigParams(multiNodeGPUsPerPod int) *rendertypes.ConfigMapParams {
+func (n *NIMService) GetMPIConfigParams() *rendertypes.ConfigMapParams {
 	if n.Spec.MultiNode == nil {
 		return nil
 	}
 	return &rendertypes.ConfigMapParams{
 		Name:          fmt.Sprintf("%s-mpi-config", n.GetName()),
 		Namespace:     n.GetNamespace(),
-		ConfigMapData: n.generateMPIConfigData(multiNodeGPUsPerPod),
+		ConfigMapData: n.generateMPIConfigData(),
 		Labels:        n.GetLabels(),
 		Annotations:   n.GetAnnotations(),
 	}

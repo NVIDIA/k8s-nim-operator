@@ -18,6 +18,7 @@ package shared
 
 import (
 	"context"
+	"errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -27,14 +28,16 @@ import (
 // GetGPUCountPerPod returns the number of GPUs per pod for the NIMService.
 func GetGPUCountPerPod(ctx context.Context, client client.Client, nimService *appsv1alpha1.NIMService) (int, error) {
 
-	if nimService.Spec.DRAResources == nil {
+	if len(nimService.Spec.DRAResources) == 0 {
 		if nimService.Spec.Resources == nil {
 			return 0, nil
 		}
 		gpuQuantity, ok := nimService.Spec.Resources.Requests["nvidia.com/gpu"]
 		if !ok {
-			// return 0 if no GPU limit is specified because auto determine base on tp*pp/(.spec.multiNode.size) is a TODO
-			return 0, nil
+			gpuQuantity, ok = nimService.Spec.Resources.Limits["nvidia.com/gpu"]
+			if !ok {
+				return 0, errors.New("no GPU request or limit is specified for multi-node NIMService")
+			}
 		}
 		return int(gpuQuantity.Value()), nil
 	} else {

@@ -55,6 +55,8 @@ const (
 
 	// DefaultModelStorePath is the default path for model store.
 	DefaultModelStorePath = "/model-store"
+
+	GPUCountPerPodAnnotationKey = "nvidia.com/gpu-count-per-pod"
 )
 
 const (

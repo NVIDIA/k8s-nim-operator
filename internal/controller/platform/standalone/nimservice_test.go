@@ -1171,6 +1171,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-nimservice",
 					Namespace: "default",
+					Annotations: map[string]string{
+						utils.GPUCountPerPodAnnotationKey: "8",
+					},
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
 					Resources: &corev1.ResourceRequirements{
@@ -1187,9 +1190,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 			}
 
-			leaderEnv := utils.SortKeys(nimService.GetLWSLeaderEnv(8))
-			workerEnv := utils.SortKeys(nimService.GetLWSWorkerEnv(8))
+			leaderEnv := utils.SortKeys(nimService.GetLWSLeaderEnv())
+			workerEnv := utils.SortKeys(nimService.GetLWSWorkerEnv())
 
+			fmt.Println("leaderEnv", leaderEnv)
 			Expect(reflect.DeepEqual(leaderEnv, []corev1.EnvVar{
 				{
 					Name:  "NIM_CACHE_PATH",
@@ -2466,7 +2470,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 			}
 
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 8)
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).ToNot(BeNil())
 
@@ -2481,7 +2485,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Config: map[string]string{"tp": "4"},
 			}
 
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 0)
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).ToNot(BeNil())
 
@@ -2495,7 +2499,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Config: map[string]string{},
 			}
 
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 0)
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).ToNot(BeNil())
 
@@ -2511,7 +2515,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Config: map[string]string{},
 			}
 
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 0)
+			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resources).ToNot(BeNil())
 
@@ -2525,7 +2529,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Config: map[string]string{"tp": "invalid"},
 			}
 
-			_, err := reconciler.addGPUResources(context.TODO(), nimService, profile, 0)
+			_, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
 			Expect(err).To(HaveOccurred())
 		})
 	})

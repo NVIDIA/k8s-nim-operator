@@ -241,8 +241,7 @@ func GetDRADeviceCELExpressions(device appsv1alpha1.DRADeviceSpec) ([]string, er
 // Constants for GPU device detection.
 const (
 	// NVIDIA identifiers used to detect GPU devices.
-	NVIDIAIdentifier    = "nvidia"
-	NVIDIAComIdentifier = "nvidia.com"
+	NVIDIAGPUComIdentifier = "gpu.nvidia.com"
 )
 
 // isNVIDIAGPU checks if a device class represents an NVIDIA GPU.
@@ -257,7 +256,7 @@ func isNVIDIAGPU(ctx context.Context, client client.Client, deviceClassName stri
 	}
 
 	hint := strings.ToLower(fmt.Sprint(dc.Spec))
-	return strings.Contains(hint, NVIDIAIdentifier) || strings.Contains(hint, NVIDIAComIdentifier), nil
+	return strings.Contains(hint, NVIDIAGPUComIdentifier), nil
 }
 
 // GetGPUCountForDRAResources calculates the total GPU count across all DRA resources.
