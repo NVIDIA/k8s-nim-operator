@@ -7,6 +7,7 @@ toolchain go1.24.1
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/k8s-test-infra v0.0.0-20240806103558-2d7411125519
+	github.com/blang/semver/v4 v4.0.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-logr/logr v1.4.2
 	github.com/google/cel-go v0.23.2
@@ -60,7 +61,6 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go v1.55.6 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

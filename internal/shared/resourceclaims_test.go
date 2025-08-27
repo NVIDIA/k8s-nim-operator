@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -627,6 +628,193 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			status, err := generateDRAResourceStatus(ctx, errorClient, ns, resource)
 			Expect(err).To(HaveOccurred())
 			Expect(status).To(BeNil())
+		})
+	})
+
+	Describe("GetDRADeviceCELExpressions", func() {
+		It("should return driver expression when only driver is specified", func() {
+			device := appsv1alpha1.DRADeviceSpec{
+				DriverName: "gpu.nvidia.com",
+			}
+
+			expressions, err := GetDRADeviceCELExpressions(device)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(expressions).To(HaveLen(1))
+			Expect(expressions[0]).To(Equal(`device.driver == "gpu.nvidia.com"`))
+		})
+
+		It("should return driver expression and custom CEL expressions when provided", func() {
+			device := appsv1alpha1.DRADeviceSpec{
+				DriverName: "gpu.nvidia.com",
+				CELExpressions: []string{
+					`device.attributes["gpu.nvidia.com"].foo >= 8`,
+					`device.attributes["gpu.nvidia.com"].bar.compareTo(semver('7.0')) >= 0`,
+				},
+			}
+
+			expressions, err := GetDRADeviceCELExpressions(device)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(expressions).To(HaveLen(3))
+			Expect(expressions[0]).To(Equal(`device.driver == "gpu.nvidia.com"`))
+			Expect(expressions[1]).To(Equal(`device.attributes["gpu.nvidia.com"].foo >= 8`))
+			Expect(expressions[2]).To(Equal(`device.attributes["gpu.nvidia.com"].bar.compareTo(semver('7.0')) >= 0`))
+		})
+
+		It("should return error when CEL expressions and attribute selectors are both set", func() {
+			device := appsv1alpha1.DRADeviceSpec{
+				DriverName: "gpu.nvidia.com",
+				CELExpressions: []string{
+					`device.attributes["gpu.nvidia.com"].foo >= 8`,
+				},
+				AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
+					{
+						Key: "bar",
+						Op:  appsv1alpha1.DRADeviceAttributeSelectorOpGreaterThanOrEqual,
+						Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
+							VersionValue: ptr.To("7.0"),
+						},
+					},
+				},
+			}
+
+			expressions, err := GetDRADeviceCELExpressions(device)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("CELExpressions must not be set if attributeSelectors or capacitySelectors are set"))
+			Expect(expressions).To(BeNil())
+		})
+
+		It("should return error when CEL expressions and capacity selectors are both set", func() {
+			device := appsv1alpha1.DRADeviceSpec{
+				DriverName: "gpu.nvidia.com",
+				CELExpressions: []string{
+					`device.attributes["gpu.nvidia.com"].foo >= 8`,
+				},
+				CapacitySelectors: []appsv1alpha1.DRAResourceQuantitySelector{
+					{
+						Key:   "memory",
+						Op:    appsv1alpha1.DRAResourceQuantitySelectorOpGreaterThanOrEqual,
+						Value: &apiresource.Quantity{},
+					},
+				},
+			}
+
+			expressions, err := GetDRADeviceCELExpressions(device)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("CELExpressions must not be set if attributeSelectors or capacitySelectors are set"))
+			Expect(expressions).To(BeNil())
+		})
+
+		It("should return error when CEL expressions, attribute selectors, and capacity selectors are all set", func() {
+			device := appsv1alpha1.DRADeviceSpec{
+				DriverName: "gpu.nvidia.com",
+				CELExpressions: []string{
+					`device.attributes["gpu.nvidia.com"].foo >= 8`,
+				},
+				AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
+					{
+						Key: "bar",
+						Op:  appsv1alpha1.DRADeviceAttributeSelectorOpGreaterThanOrEqual,
+						Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
+							VersionValue: ptr.To("7.0"),
+						},
+					},
+				},
+				CapacitySelectors: []appsv1alpha1.DRAResourceQuantitySelector{
+					{
+						Key:   "memory",
+						Op:    appsv1alpha1.DRAResourceQuantitySelectorOpGreaterThanOrEqual,
+						Value: &apiresource.Quantity{},
+					},
+				},
+			}
+
+			expressions, err := GetDRADeviceCELExpressions(device)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("CELExpressions must not be set if attributeSelectors or capacitySelectors are set"))
+			Expect(expressions).To(BeNil())
+		})
+
+		It("should return driver expression and attribute selector expressions when only attribute selectors are set", func() {
+			device := appsv1alpha1.DRADeviceSpec{
+				DriverName: "gpu.nvidia.com",
+				AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
+					{
+						Key: "foo",
+						Op:  appsv1alpha1.DRADeviceAttributeSelectorOpGreaterThanOrEqual,
+						Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
+							IntValue: ptr.To[int32](8),
+						},
+					},
+					{
+						Key: "bar",
+						Op:  appsv1alpha1.DRADeviceAttributeSelectorOpGreaterThanOrEqual,
+						Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
+							VersionValue: ptr.To("7.0"),
+						},
+					},
+				},
+			}
+
+			expressions, err := GetDRADeviceCELExpressions(device)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(expressions).To(HaveLen(3))
+			Expect(expressions[0]).To(Equal(`device.driver == "gpu.nvidia.com"`))
+			Expect(expressions[1]).To(Equal(`device.attributes["gpu.nvidia.com"].foo >= 8`))
+			Expect(expressions[2]).To(Equal(`(device.attributes["gpu.nvidia.com"].bar).compareTo(semver("7.0")) >= 0`))
+		})
+
+		It("should return driver expression and capacity selector expressions when only capacity selectors are set", func() {
+			device := appsv1alpha1.DRADeviceSpec{
+				DriverName: "gpu.nvidia.com",
+				CapacitySelectors: []appsv1alpha1.DRAResourceQuantitySelector{
+					{
+						Key:   "foo",
+						Op:    appsv1alpha1.DRAResourceQuantitySelectorOpGreaterThanOrEqual,
+						Value: apiresource.NewQuantity(8, apiresource.DecimalSI),
+					},
+					{
+						Key:   "bar",
+						Op:    appsv1alpha1.DRAResourceQuantitySelectorOpGreaterThanOrEqual,
+						Value: apiresource.NewQuantity(7, apiresource.DecimalSI),
+					},
+				},
+			}
+
+			expressions, err := GetDRADeviceCELExpressions(device)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(expressions).To(HaveLen(3))
+			Expect(expressions[0]).To(Equal(`device.driver == "gpu.nvidia.com"`))
+			Expect(expressions[1]).To(Equal(`(device.capacity["gpu.nvidia.com"].foo).compareTo(quantity("8")) >= 0`))
+			Expect(expressions[2]).To(Equal(`(device.capacity["gpu.nvidia.com"].bar).compareTo(quantity("7")) >= 0`))
+		})
+
+		It("should return driver expression and both attribute and capacity selector expressions when both are set", func() {
+			device := appsv1alpha1.DRADeviceSpec{
+				DriverName: "gpu.nvidia.com",
+				AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
+					{
+						Key: "foo",
+						Op:  appsv1alpha1.DRADeviceAttributeSelectorOpGreaterThanOrEqual,
+						Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
+							IntValue: ptr.To[int32](8),
+						},
+					},
+				},
+				CapacitySelectors: []appsv1alpha1.DRAResourceQuantitySelector{
+					{
+						Key:   "bar",
+						Op:    appsv1alpha1.DRAResourceQuantitySelectorOpGreaterThanOrEqual,
+						Value: apiresource.NewQuantity(8, apiresource.DecimalSI),
+					},
+				},
+			}
+
+			expressions, err := GetDRADeviceCELExpressions(device)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(expressions).To(HaveLen(3))
+			Expect(expressions[0]).To(Equal(`device.driver == "gpu.nvidia.com"`))
+			Expect(expressions[1]).To(Equal(`device.attributes["gpu.nvidia.com"].foo >= 8`))
+			Expect(expressions[2]).To(Equal(`(device.capacity["gpu.nvidia.com"].bar).compareTo(quantity("8")) >= 0`))
 		})
 	})
 })

@@ -145,6 +145,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(lwsv1.AddToScheme(scheme)).To(Succeed())
 		Expect(gatewayv1.Install(scheme)).To(Succeed())
+		Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -755,6 +756,87 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
 				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
 				Expect(failedCondition.Message).To(Equal("spec.draResources[1].resourceClaimName: duplicate resource claim name: 'test-resource-claim'"))
+			})
+
+			It("should mark NIMService as failed when ClaimCreationSpec.Devices[].AttributeSelectors version value is invalid", func() {
+				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
+					{
+						ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
+							Devices: []appsv1alpha1.DRADeviceSpec{
+								{
+									Name:            "test-device",
+									Count:           1,
+									DriverName:      "gpu.nvidia.com",
+									DeviceClassName: "gpu.nvidia.com",
+									AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
+										{
+											Key: "testKey",
+											Op:  "GreaterThan",
+											Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
+												VersionValue: ptr.To("550.127.08"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+				err := client.Create(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				obj := &appsv1alpha1.NIMService{}
+				err = client.Get(context.TODO(), nimServiceKey, obj)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
+				failedCondition := getCondition(obj, conditions.Failed)
+				Expect(failedCondition).NotTo(BeNil())
+				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
+				Expect(failedCondition.Message).To(ContainSubstring("spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.versionValue.version: invalid version \"550.127.08\":"))
+			})
+
+			It("should succeed with valid ClaimCreationSpec", func() {
+				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
+					{
+						ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
+							Devices: []appsv1alpha1.DRADeviceSpec{
+								{
+									Name:            "test-device",
+									Count:           1,
+									DriverName:      "gpu.nvidia.com",
+									DeviceClassName: "gpu.nvidia.com",
+									AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
+										{
+											Key: "testKey",
+											Op:  "GreaterThan",
+											Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
+												VersionValue: ptr.To("550.127.8"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+				err := client.Create(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				obj := &appsv1alpha1.NIMService{}
+				err = client.Get(context.TODO(), nimServiceKey, obj)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(obj.Status.State).NotTo(Equal(appsv1alpha1.NIMServiceStatusFailed))
+				failedCondition := getCondition(obj, conditions.Failed)
+				Expect(failedCondition.Status).To(Equal(metav1.ConditionFalse))
 			})
 		})
 
