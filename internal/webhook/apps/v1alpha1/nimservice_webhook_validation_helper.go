@@ -28,7 +28,7 @@ import (
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"github.com/blang/semver/v4"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
@@ -311,9 +311,9 @@ func validateDRADeviceAttributeSelectorValue(attribute *appsv1alpha1.DRADeviceAt
 	}
 
 	if attribute.VersionValue != nil {
-		_, err := utilversion.ParseSemantic(*attribute.VersionValue)
+		_, err := semver.Parse(*attribute.VersionValue)
 		if err != nil {
-			errList = append(errList, field.Invalid(fldPath, attribute.VersionValue, "must be a valid semantic version"))
+			errList = append(errList, field.Invalid(fldPath, attribute.VersionValue, fmt.Sprintf("must be a valid semantic version: %v", err)))
 		}
 	}
 	return errList

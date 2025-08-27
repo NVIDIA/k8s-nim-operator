@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
@@ -829,6 +830,26 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 			return false, msg, nil
 		}
 		resourceClaimNames[*resource.ResourceClaimName] = true
+	}
+
+	// Check AttributeSelector version values.
+	for idx, resource := range nimService.Spec.DRAResources {
+		if resource.ClaimCreationSpec == nil {
+			continue
+		}
+		for deviceIdx, device := range resource.ClaimCreationSpec.Devices {
+			for attributeIdx, attribute := range device.AttributeSelectors {
+				if attribute.Value.VersionValue == nil {
+					continue
+				}
+				_, err := semver.Parse(*attribute.Value.VersionValue)
+				if err != nil {
+					msg := fmt.Sprintf("spec.draResources[%d].claimCreationSpec.devices[%d].attributeSelectors[%d].value.versionValue.version: invalid version %q: %v", idx, deviceIdx, attributeIdx, *attribute.Value.VersionValue, err)
+					logger.Error(err, msg, "nimService", nimService.Name)
+					return false, msg, nil
+				}
+			}
+		}
 	}
 	return true, "", nil
 }

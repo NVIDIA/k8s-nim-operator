@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -148,6 +149,25 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 		resourceClaimNames[*resource.ResourceClaimName] = true
 	}
 
+	// Check AttributeSelector version values.
+	for idx, resource := range nimService.Spec.DRAResources {
+		if resource.ClaimCreationSpec == nil {
+			continue
+		}
+		for deviceIdx, device := range resource.ClaimCreationSpec.Devices {
+			for attributeIdx, attribute := range device.AttributeSelectors {
+				if attribute.Value.VersionValue == nil {
+					continue
+				}
+				_, err := semver.Parse(*attribute.Value.VersionValue)
+				if err != nil {
+					msg := fmt.Sprintf("spec.draResources[%d].claimCreationSpec.devices[%d].attributeSelectors[%d].value.versionValue.version: invalid version %q: %v", idx, deviceIdx, attributeIdx, *attribute.Value.VersionValue, err)
+					logger.Error(err, msg, "nimService", nimService.Name)
+					return false, msg, nil
+				}
+			}
+		}
+	}
 	return true, "", nil
 }
 

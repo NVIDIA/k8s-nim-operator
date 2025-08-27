@@ -594,7 +594,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 									Key: "driver-version",
 									Op:  appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
 									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
-										VersionValue: ptr.To("not-a-version"),
+										VersionValue: ptr.To("550.127.08"),
 									},
 								},
 							},
@@ -604,7 +604,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			},
 			k8sVersion:  "v1.34.0",
 			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Invalid value: \"not-a-version\": must be a valid semantic version"},
+			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Invalid value: \"550.127.08\": must be a valid semantic version: Patch number must not contain leading zeroes \"08\""},
 		},
 		{
 			name: "claimCreationSpec with invalid quantity selector - invalid op",

@@ -199,14 +199,21 @@ func ShouldCreateDRAResource(resource appsv1alpha1.DRAResource) bool {
 
 func GetDRADeviceCELExpressions(device appsv1alpha1.DRADeviceSpec) ([]string, error) {
 	celExpressions := make([]string, 0)
-	for _, expr := range device.CELExpressions {
-		err := k8sutilcel.ValidateExpr(expr)
-		if err != nil {
-			return nil, err
-		}
-		celExpressions = append(celExpressions, expr)
-	}
 	celExpressions = append(celExpressions, fmt.Sprintf("device.driver == %q", device.DriverName))
+	if len(device.CELExpressions) > 0 {
+		if len(device.AttributeSelectors) > 0 || len(device.CapacitySelectors) > 0 {
+			return nil, fmt.Errorf("CELExpressions must not be set if attributeSelectors or capacitySelectors are set")
+		}
+		for _, expr := range device.CELExpressions {
+			err := k8sutilcel.ValidateExpr(expr)
+			if err != nil {
+				return nil, err
+			}
+			celExpressions = append(celExpressions, expr)
+		}
+		return celExpressions, nil
+	}
+
 	for _, selector := range device.AttributeSelectors {
 		expr, err := selector.GetCELExpression(device.DriverName)
 		if err != nil {
