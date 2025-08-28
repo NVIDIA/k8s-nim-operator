@@ -642,6 +642,11 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
 		r.recorder.Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
 			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
+		if err != nil {
+			logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.Ready)
+			return &ctrl.Result{}, err
+		}
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	} else {
 		// Update NIMServiceStatus with model config.
 		updateErr := r.updateModelStatus(ctx, nimService, deploymentMode)
@@ -654,14 +659,12 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
 		r.recorder.Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
 			"NIMService %s ready, msg: %s", nimService.Name, msg)
+		if err != nil {
+			logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.Ready)
+			return &ctrl.Result{}, err
+		}
+		return &ctrl.Result{}, nil
 	}
-
-	if err != nil {
-		logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.Ready)
-		return &ctrl.Result{}, err
-	}
-
-	return &ctrl.Result{}, nil
 }
 
 // isInferenceServiceReady checks if the InferenceService is ready.
