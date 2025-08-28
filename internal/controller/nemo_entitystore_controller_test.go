@@ -173,7 +173,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
-				Expose: appsv1alpha1.ExposeV1{
+				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{
 						Type: corev1.ServiceTypeClusterIP,
 						Port: ptr.To[int32](8000),
@@ -181,20 +181,9 @@ var _ = Describe("NemoEntitystore Controller", func() {
 							"annotation-key-specific": "service",
 						},
 					},
-					Ingress: appsv1alpha1.IngressV1{
-						Enabled:     ptr.To(true),
-						Annotations: map[string]string{"annotation-key-specific": "ingress"},
-						Spec: &appsv1alpha1.IngressSpec{
-							IngressClassName: "nginx",
-							Host:             "full-nemoentitystore.default.example.com",
-							Paths: []appsv1alpha1.IngressPath{
-								{
-									Path:     "/",
-									PathType: ptr.To(networkingv1.PathTypePrefix),
-								},
-							},
-						},
-					},
+				},
+				Router: appsv1alpha1.Router{
+					IngressClass: ptr.To("nginx"),
 				},
 				Scale: appsv1alpha1.Autoscaling{
 					Enabled:     ptr.To(true),

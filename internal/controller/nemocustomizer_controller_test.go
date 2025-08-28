@@ -236,7 +236,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
-				Expose: appsv1alpha1.ExposeV1{
+				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{
 						Type: corev1.ServiceTypeClusterIP,
 						Port: ptr.To[int32](8000),
@@ -244,20 +244,9 @@ var _ = Describe("NemoCustomizer Controller", func() {
 							"annotation-key-specific": "service",
 						},
 					},
-					Ingress: appsv1alpha1.IngressV1{
-						Enabled:     ptr.To[bool](true),
-						Annotations: map[string]string{"annotation-key-specific": "ingress"},
-						Spec: &appsv1alpha1.IngressSpec{
-							IngressClassName: "nginx",
-							Host:             "test-nemocustomizer.default.example.com",
-							Paths: []appsv1alpha1.IngressPath{
-								{
-									Path:     "/",
-									PathType: ptr.To(networkingv1.PathTypePrefix),
-								},
-							},
-						},
-					},
+				},
+				Router: appsv1alpha1.Router{
+					IngressClass: ptr.To("nginx"),
 				},
 				Scale: appsv1alpha1.Autoscaling{
 					Enabled:     ptr.To[bool](true),
@@ -678,7 +667,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			err = client.Get(context.TODO(), namespacedName, nemoCustomizer)
 			Expect(err).NotTo(HaveOccurred())
 			nemoCustomizer.Spec.Scale.Enabled = ptr.To[bool](false)
-			nemoCustomizer.Spec.Expose.Ingress.Enabled = ptr.To[bool](false)
+			nemoCustomizer.Spec.Router.IngressClass = nil
 			err = client.Update(context.TODO(), nemoCustomizer)
 			Expect(err).NotTo(HaveOccurred())
 

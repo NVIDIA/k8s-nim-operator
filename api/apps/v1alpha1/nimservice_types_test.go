@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/utils/ptr"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -117,43 +119,29 @@ func TestGetVolumes(t *testing.T) {
 }
 
 func TestHTTpRoute(t *testing.T) {
-	enabled := true
 	prefixTypeMatch := gatewayv1.PathMatchPathPrefix
 	root := "/"
 	var port gatewayv1.PortNumber = DefaultAPIPort
 
 	tests := []struct {
 		name          string
-		nimSpec       *HTTPRoute
+		router        Router
 		desiredGWSpec gatewayv1.HTTPRouteSpec
 	}{
 		{
-			name: "should return empty gatewayv1.HTTPRouteSpec if HTTPRouteSpec is nil",
-			nimSpec: &HTTPRoute{
-				Enabled: &enabled,
-				Spec:    nil,
+			name: "should return empty gatewayv1.HTTPRouteSpec if Router does not have a gateway defined.",
+			router: Router{
+				Gateway: nil,
 			},
 			desiredGWSpec: gatewayv1.HTTPRouteSpec{},
 		},
 		{
 			name: "should correctly translate to gatewayv1.HTTPRouteSpec",
-			nimSpec: &HTTPRoute{
-				Enabled: &enabled,
-				Spec: &HTTPRouteSpec{
-					CommonRouteSpec: gatewayv1.CommonRouteSpec{
-						ParentRefs: []gatewayv1.ParentReference{
-							{
-								Name: "istio-gateway",
-							},
-						},
-					},
-					Host: "foobar.nim",
-					Paths: []HTTPPathMatch{
-						{
-							Type:  &prefixTypeMatch,
-							Value: &root,
-						},
-					},
+			router: Router{
+				HostDomainName: "foobar.nim",
+				Gateway: &Gateway{
+					Name:      "istio-gateway",
+					Namespace: "istio-system",
 				},
 			},
 			desiredGWSpec: gatewayv1.HTTPRouteSpec{
@@ -165,7 +153,7 @@ func TestHTTpRoute(t *testing.T) {
 					},
 				},
 				Hostnames: []gatewayv1.Hostname{
-					"foobar.nim",
+					"test.foobar.nim",
 				},
 				Rules: []gatewayv1.HTTPRouteRule{
 					{
@@ -195,9 +183,48 @@ func TestHTTpRoute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gwSpec := tt.nimSpec.GenerateGatewayHTTPRouteSpec("test")
+			gwSpec := tt.router.GenerateGatewayHTTPRouteSpec("test")
 			if !reflect.DeepEqual(gwSpec, tt.desiredGWSpec) {
 				t.Errorf("GenerateGatewayHTTPRouteSpec() = %+v, want %+v", gwSpec, tt.desiredGWSpec)
+			}
+		})
+	}
+}
+
+func TestIngress(t *testing.T) {
+	tests := []struct {
+		name               string
+		router             Router
+		desiredIngressSpec networkingv1.IngressSpec
+	}{
+		{
+			name: "should return empty networkingv1.IngressSpec if Router does not have an ingress class defined.",
+			router: Router{
+				IngressClass: nil,
+			},
+			desiredIngressSpec: networkingv1.IngressSpec{},
+		},
+		{
+			name: "should correctly translate to networkingv1.IngressSpec",
+			router: Router{
+				HostDomainName: "foobar.nim",
+				IngressClass:   ptr.To("nginx"),
+			},
+			desiredIngressSpec: networkingv1.IngressSpec{
+				IngressClassName: ptr.To("nginx"),
+				Rules: []networkingv1.IngressRule{
+					{
+						Host: "test.foobar.nim",
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ingressSpec := tt.router.GenerateIngressSpec("test")
+			if !reflect.DeepEqual(ingressSpec, tt.desiredIngressSpec) {
+				t.Errorf("GenerateIngressSpec() = %+v, want %+v", ingressSpec, tt.desiredIngressSpec)
 			}
 		})
 	}

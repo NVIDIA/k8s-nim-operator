@@ -796,8 +796,7 @@ func TestValidateAuthSecret(t *testing.T) {
 
 // TestValidateExposeIngressConfiguration table-driven.
 func TestValidateExposeIngressConfiguration(t *testing.T) {
-	fld := field.NewPath("spec").Child("expose").Child("ingress")
-	enabled := true
+	fld := field.NewPath("spec").Child("router")
 	class := "nginx"
 
 	cases := []struct {
@@ -811,26 +810,18 @@ func TestValidateExposeIngressConfiguration(t *testing.T) {
 			wantErrs: 0,
 		},
 		{
-			name: "enabled empty spec",
+			name: "ingress enabled",
 			modify: func(ns *appsv1alpha1.NIMService) {
-				ns.Spec.Expose.Ingress.Enabled = &enabled
+				ns.Spec.Router.IngressClass = &class
 			},
 			wantErrs: 1,
-		},
-		{
-			name: "enabled with spec",
-			modify: func(ns *appsv1alpha1.NIMService) {
-				ns.Spec.Expose.Ingress.Enabled = &enabled
-				ns.Spec.Expose.Ingress.Spec.IngressClassName = &class
-			},
-			wantErrs: 0,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateExposeConfiguration(&ns.Spec.Expose, fld)
+			errs := validateRouter(&ns.Spec.Router, fld)
 			if got := len(errs); got != tc.wantErrs {
 				t.Logf("Validation errors:")
 				for i, err := range errs {
@@ -1057,8 +1048,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			name: "kserve serverless – ingress set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				ingEnabled := true
-				ns.Spec.Expose.Ingress.Enabled = &ingEnabled
+				ns.Spec.Router.IngressClass = ptr.To("nginx")
 			},
 			wantErrs: 1,
 		},
@@ -1075,8 +1065,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				ns.Spec.Scale.Enabled = &trueVal
-				ingEnabled := true
-				ns.Spec.Expose.Ingress.Enabled = &ingEnabled
+				ns.Spec.Router.IngressClass = ptr.To("nginx")
 				ns.Spec.Metrics.Enabled = &trueVal
 			},
 			wantErrs: 3,
@@ -1107,7 +1096,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			// Ensure nested structs are initialised to avoid nil panics when we set sub-fields.
 			ns.Spec.Scale = appsv1alpha1.Autoscaling{}
 			ns.Spec.Expose = appsv1alpha1.Expose{}
-			ns.Spec.Expose.Ingress = appsv1alpha1.Ingress{}
+			ns.Spec.Router = appsv1alpha1.Router{}
 			ns.Spec.Metrics = appsv1alpha1.Metrics{}
 
 			tc.modify(ns)

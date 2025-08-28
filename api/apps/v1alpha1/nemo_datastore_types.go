@@ -71,7 +71,8 @@ type NemoDatastoreSpec struct {
 	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
-	Expose  ExposeV1    `json:"expose,omitempty"`
+	Expose  Expose      `json:"expose,omitempty"`
+	Router  Router      `json:"router,omitempty"`
 	Scale   Autoscaling `json:"scale,omitempty"`
 	Metrics Metrics     `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
@@ -765,20 +766,20 @@ func (n *NemoDatastore) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NemoDatastore deployment.
 func (n *NemoDatastore) IsIngressEnabled() bool {
-	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
+	return n.Spec.Router.IngressClass != nil && *n.Spec.Router.IngressClass != ""
 }
 
 func (n *NemoDatastore) IsHTTPRouteEnabled() bool {
-	return n.Spec.Expose.HTTPRoute.Enabled != nil && *n.Spec.Expose.HTTPRoute.Enabled
+	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.Name != "" && n.Spec.Router.Gateway.Namespace != ""
 }
 
 // GetIngressSpec returns the Ingress spec NemoDatastore deployment.
 func (n *NemoDatastore) GetIngressSpec() networkingv1.IngressSpec {
-	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	return n.Spec.Router.GenerateIngressSpec(n.GetName())
 }
 
 func (n *NemoDatastore) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
-	return n.Spec.Expose.HTTPRoute.GenerateGatewayHTTPRouteSpec(n.GetName())
+	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetName())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoDatastore deployment.
@@ -1094,8 +1095,8 @@ func (n *NemoDatastore) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 func (n *NemoDatastore) GetIngressAnnotations() map[string]string {
 	NemoDatastoreAnnotations := n.GetNemoDatastoreAnnotations()
 
-	if n.Spec.Expose.Ingress.Annotations != nil {
-		return utils.MergeMaps(NemoDatastoreAnnotations, n.Spec.Expose.Ingress.Annotations)
+	if n.Spec.Router.Annotations != nil {
+		return utils.MergeMaps(NemoDatastoreAnnotations, n.Spec.Router.Annotations)
 	}
 	return NemoDatastoreAnnotations
 }
@@ -1103,8 +1104,8 @@ func (n *NemoDatastore) GetIngressAnnotations() map[string]string {
 func (n *NemoDatastore) GetHTTPRouteAnnotations() map[string]string {
 	annotations := n.GetNemoDatastoreAnnotations()
 
-	if n.Spec.Expose.HTTPRoute.Annotations != nil {
-		return utils.MergeMaps(annotations, n.Spec.Expose.HTTPRoute.Annotations)
+	if n.Spec.Router.Annotations != nil {
+		return utils.MergeMaps(annotations, n.Spec.Router.Annotations)
 	}
 	return annotations
 }
