@@ -312,6 +312,14 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		nimServiceBuilder = nimServiceBuilder.Owns(&lwsv1.LeaderWorkerSet{})
 	}
 
+	resourceClaimTemplateCRDExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaimtemplates"))
+	if err != nil {
+		return err
+	}
+	if resourceClaimTemplateCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Owns(&resourcev1beta2.ResourceClaimTemplate{})
+	}
+
 	isvcCRDExists, err := k8sutil.CRDExists(r.discoveryClient, kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"))
 	if err != nil {
 		return err

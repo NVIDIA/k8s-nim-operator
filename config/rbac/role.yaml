@@ -134,8 +134,10 @@ rules:
   - watch
 - apiGroups:
   - batch
+  - batch.volcano.sh
   resources:
   - jobs
+  - jobs/status
   verbs:
   - create
   - delete
@@ -143,15 +145,6 @@ rules:
   - list
   - patch
   - update
-  - watch
-- apiGroups:
-  - batch.volcano.sh
-  resources:
-  - jobs
-  - jobs/status
-  verbs:
-  - get
-  - list
   - watch
 - apiGroups:
   - config.openshift.io
