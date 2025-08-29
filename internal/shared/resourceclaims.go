@@ -332,17 +332,24 @@ func GetGPUDeviceCountForClaimCreationSpec(ctx context.Context, client client.Cl
 func getGPUCountFromDeviceRequests(ctx context.Context, client client.Client, requests []resourcev1beta2.DeviceRequest) (int, error) {
 
 	for _, req := range requests {
-		if req.Exactly.DeviceClassName == "" {
-			continue
-		}
 
-		isGPU, err := isNVIDIAGPU(ctx, client, req.Exactly.DeviceClassName)
-		if err != nil {
-			return 0, fmt.Errorf("failed to check if device class %s is a GPU: %w", req.Exactly.DeviceClassName, err)
-		}
+		if len(req.FirstAvailable) > 0 {
+			isGPU, err := isNVIDIAGPU(ctx, client, req.FirstAvailable[0].DeviceClassName)
+			if err != nil {
+				return 0, fmt.Errorf("failed to check if device class %s is a GPU: %w", req.FirstAvailable[0].DeviceClassName, err)
+			}
+			if isGPU {
+				return int(req.FirstAvailable[0].Count), nil
+			}
+		} else {
+			isGPU, err := isNVIDIAGPU(ctx, client, req.Exactly.DeviceClassName)
+			if err != nil {
+				return 0, fmt.Errorf("failed to check if device class %s is a GPU: %w", req.Exactly.DeviceClassName, err)
+			}
 
-		if isGPU {
-			return int(req.Exactly.Count), nil
+			if isGPU {
+				return int(req.Exactly.Count), nil
+			}
 		}
 	}
 
