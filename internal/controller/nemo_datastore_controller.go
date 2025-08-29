@@ -251,7 +251,7 @@ func (r *NemoDatastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if ok {
 
 						// Handle case where object is marked for deletion
-						if !newNemoDatastore.ObjectMeta.DeletionTimestamp.IsZero() {
+						if !newNemoDatastore.DeletionTimestamp.IsZero() {
 							return true
 						}
 

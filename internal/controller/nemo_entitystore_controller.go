@@ -249,7 +249,7 @@ func (r *NemoEntitystoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					newNemoEntitystore, ok := e.ObjectNew.(*appsv1alpha1.NemoEntitystore)
 					if ok {
 						// Handle case where object is marked for deletion
-						if !newNemoEntitystore.ObjectMeta.DeletionTimestamp.IsZero() {
+						if !newNemoEntitystore.DeletionTimestamp.IsZero() {
 							return true
 						}
 
