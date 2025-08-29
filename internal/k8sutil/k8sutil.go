@@ -34,7 +34,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -379,4 +381,34 @@ func NormalizeQualifiedName(name string, defaultDomain string) string {
 		return fmt.Sprintf("%s/%s", defaultDomain, name)
 	}
 	return name
+}
+
+func ControllerCallbackIfCRDExists(discoveryClient discovery.DiscoveryInterface,
+	ctrlBuilder *builder.Builder,
+	gvr schema.GroupVersionResource,
+	cb func(builder *builder.Builder) *builder.Builder) (*builder.Builder, error) {
+
+	exists, err := CRDExists(discoveryClient, gvr)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return cb(ctrlBuilder), nil
+	}
+	return ctrlBuilder, nil
+}
+
+func ControllerOwnsIfCRDExists(discoveryClient discovery.DiscoveryInterface,
+	ctrlBuilder *builder.Builder,
+	gvr schema.GroupVersionResource,
+	object client.Object) (*builder.Builder, error) {
+
+	return ControllerCallbackIfCRDExists(
+		discoveryClient,
+		ctrlBuilder,
+		gvr,
+		func(builder *builder.Builder) *builder.Builder {
+			return builder.Owns(object)
+		},
+	)
 }
