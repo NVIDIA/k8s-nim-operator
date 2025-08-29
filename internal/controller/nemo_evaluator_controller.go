@@ -42,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -61,7 +60,6 @@ type NemoEvaluatorReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
-	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
 	recorder         record.EventRecorder
@@ -72,14 +70,13 @@ type NemoEvaluatorReconciler struct {
 var _ shared.Reconciler = &NemoEvaluatorReconciler{}
 
 // NemoEvaluatorReconciler creates a new reconciler for NemoEvaluator with the given platform.
-func NewNemoEvaluatorReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NemoEvaluatorReconciler {
+func NewNemoEvaluatorReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoEvaluatorReconciler {
 	return &NemoEvaluatorReconciler{
-		Client:          client,
-		scheme:          scheme,
-		updater:         updater,
-		discoveryClient: discoveryClient,
-		renderer:        renderer,
-		log:             log,
+		Client:   client,
+		scheme:   scheme,
+		updater:  updater,
+		renderer: renderer,
+		log:      log,
 	}
 }
 
@@ -98,7 +95,6 @@ func NewNemoEvaluatorReconciler(client client.Client, scheme *runtime.Scheme, up
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalars,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 
@@ -233,7 +229,7 @@ func (r *NemoEvaluatorReconciler) GetOrchestratorType(ctx context.Context) (k8su
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nemo-evaluator-service-controller")
-	builder := ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoEvaluator{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -250,7 +246,7 @@ func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					newNemoEvaluator, ok := e.ObjectNew.(*appsv1alpha1.NemoEvaluator)
 					if ok {
 						// Handle case where object is marked for deletion
-						if !newNemoEvaluator.DeletionTimestamp.IsZero() {
+						if !newNemoEvaluator.ObjectMeta.DeletionTimestamp.IsZero() {
 							return true
 						}
 
@@ -261,18 +257,8 @@ func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				// For other types we watch, reconcile them
 				return true
 			},
-		})
-
-	builder, err := k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		builder,
-		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
-		&gatewayv1.HTTPRoute{},
-	)
-	if err != nil {
-		return err
-	}
-	return builder.Complete(r)
+		}).
+		Complete(r)
 }
 
 func (r *NemoEvaluatorReconciler) refreshMetrics(ctx context.Context) {
@@ -343,21 +329,6 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, ne
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Sync HTTPRoute
-	if nemoEvaluator.IsHTTPRouteEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &gatewayv1.HTTPRoute{}, func() (client.Object, error) {
-			return renderer.HTTPRoute(nemoEvaluator.GetHTTPRouteParams())
-		}, "httproute", conditions.ReasonHTTPRouteFailed)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
 		if err != nil && !errors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}

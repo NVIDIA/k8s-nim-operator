@@ -36,10 +36,10 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
+
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 )
 
 // TODO: Move constants to a separate file and move the UpdateObject functions to k8sutil package.
@@ -349,18 +349,9 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 		return updateLeaderWorkerSet(castedObj, desired.(*lwsv1.LeaderWorkerSet)) //nolint:forcetypeassert
 	case *kservev1beta1.InferenceService:
 		return updateInferenceService(castedObj, desired.(*kservev1beta1.InferenceService)) //nolint:forcetypeassert
-	case *gatewayv1.HTTPRoute:
-		return updateHTTPRoute(castedObj, desired.(*gatewayv1.HTTPRoute)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
-}
-
-func updateHTTPRoute(obj, desired *gatewayv1.HTTPRoute) *gatewayv1.HTTPRoute {
-	obj.SetAnnotations(desired.GetAnnotations())
-	obj.SetLabels(desired.GetLabels())
-	obj.Spec = *desired.Spec.DeepCopy()
-	return obj
 }
 
 func updateLeaderWorkerSet(obj, desired *lwsv1.LeaderWorkerSet) *lwsv1.LeaderWorkerSet {

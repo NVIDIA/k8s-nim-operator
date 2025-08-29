@@ -42,7 +42,6 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -107,7 +106,6 @@ var _ = Describe("NemoEntitystore Controller", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(networkingv1.AddToScheme(scheme)).To(Succeed())
 		Expect(rbacv1.AddToScheme(scheme)).To(Succeed())
-		Expect(gatewayv1.Install(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NemoEntitystore{}).
