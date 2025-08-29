@@ -420,8 +420,8 @@ func validateGPURequirements(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.P
 
 	gpuResourceName := corev1.ResourceName("nvidia.com/gpu")
 
-	// Check if GPU requests or limits are specified
-	if spec.Resources == nil {
+	// Check if GPU requests or limits are specified or DRA resources are specified
+	if spec.Resources == nil && len(spec.DRAResources) == 0 {
 		errList = append(errList, field.Required(fldPath.Child("resources"), "GPU resources must be specified for MultiNode deployments"))
 		return errList
 	}
