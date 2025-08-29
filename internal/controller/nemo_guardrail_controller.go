@@ -250,7 +250,7 @@ func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					newNemoGuardrail, ok := e.ObjectNew.(*appsv1alpha1.NemoGuardrail)
 					if ok {
 						// Handle case where object is marked for deletion
-						if !newNemoGuardrail.ObjectMeta.DeletionTimestamp.IsZero() {
+						if !newNemoGuardrail.DeletionTimestamp.IsZero() {
 							return true
 						}
 

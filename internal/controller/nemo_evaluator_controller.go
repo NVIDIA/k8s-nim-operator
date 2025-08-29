@@ -250,7 +250,7 @@ func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					newNemoEvaluator, ok := e.ObjectNew.(*appsv1alpha1.NemoEvaluator)
 					if ok {
 						// Handle case where object is marked for deletion
-						if !newNemoEvaluator.ObjectMeta.DeletionTimestamp.IsZero() {
+						if !newNemoEvaluator.DeletionTimestamp.IsZero() {
 							return true
 						}
 
