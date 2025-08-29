@@ -47,8 +47,6 @@ const (
 	ReasonServiceFailed = "ServiceFailed"
 	// ReasonIngressFailed indicates that the creation of ingress has failed.
 	ReasonIngressFailed = "IngressFailed"
-	// ReasonHTTPRouteFailed indicates that the creation of httproute has failed.
-	ReasonHTTPRouteFailed = "HTTPRouteFailed"
 	// ReasonHPAFailed indicates that the creation of hpa has failed.
 	ReasonHPAFailed = "HPAFailed"
 	// ReasonSCCFailed indicates that the creation of scc has failed.

@@ -42,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -61,7 +60,6 @@ type NemoGuardrailReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
-	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
 	recorder         record.EventRecorder
@@ -72,14 +70,13 @@ type NemoGuardrailReconciler struct {
 var _ shared.Reconciler = &NemoGuardrailReconciler{}
 
 // NewNemoGuardrailReconciler creates a new reconciler for NemoGuardrail with the given platform.
-func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NemoGuardrailReconciler {
+func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoGuardrailReconciler {
 	return &NemoGuardrailReconciler{
-		Client:          client,
-		scheme:          scheme,
-		updater:         updater,
-		discoveryClient: discoveryClient,
-		renderer:        renderer,
-		log:             log,
+		Client:   client,
+		scheme:   scheme,
+		updater:  updater,
+		renderer: renderer,
+		log:      log,
 	}
 }
 
@@ -233,7 +230,7 @@ func (r *NemoGuardrailReconciler) GetOrchestratorType(ctx context.Context) (k8su
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nemo-guardrail-service-controller")
-	builder := ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoGuardrail{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -250,7 +247,7 @@ func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					newNemoGuardrail, ok := e.ObjectNew.(*appsv1alpha1.NemoGuardrail)
 					if ok {
 						// Handle case where object is marked for deletion
-						if !newNemoGuardrail.DeletionTimestamp.IsZero() {
+						if !newNemoGuardrail.ObjectMeta.DeletionTimestamp.IsZero() {
 							return true
 						}
 
@@ -261,17 +258,8 @@ func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				// For other types we watch, reconcile them
 				return true
 			},
-		})
-	builder, err := k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		builder,
-		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
-		&gatewayv1.HTTPRoute{},
-	)
-	if err != nil {
-		return err
-	}
-	return builder.Complete(r)
+		}).
+		Complete(r)
 }
 
 func (r *NemoGuardrailReconciler) refreshMetrics(ctx context.Context) {
@@ -349,21 +337,6 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Sync HTTPRoute
-	if nemoGuardrail.IsHTTPRouteEnabled() {
-		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &gatewayv1.HTTPRoute{}, func() (client.Object, error) {
-			return renderer.HTTPRoute(nemoGuardrail.GetHTTPRouteParams())
-		}, "httproute", conditions.ReasonHTTPRouteFailed)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
 		if err != nil && !errors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}

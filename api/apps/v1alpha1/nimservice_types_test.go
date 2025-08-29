@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // TestGetVolumes tests the GetVolumes function.
@@ -114,91 +113,5 @@ func TestGetVolumes(t *testing.T) {
 			}
 		})
 	}
-}
 
-func TestHTTpRoute(t *testing.T) {
-	enabled := true
-	prefixTypeMatch := gatewayv1.PathMatchPathPrefix
-	root := "/"
-	var port gatewayv1.PortNumber = DefaultAPIPort
-
-	tests := []struct {
-		name          string
-		nimSpec       *HTTPRoute
-		desiredGWSpec gatewayv1.HTTPRouteSpec
-	}{
-		{
-			name: "should return empty gatewayv1.HTTPRouteSpec if HTTPRouteSpec is nil",
-			nimSpec: &HTTPRoute{
-				Enabled: &enabled,
-				Spec:    nil,
-			},
-			desiredGWSpec: gatewayv1.HTTPRouteSpec{},
-		},
-		{
-			name: "should correctly translate to gatewayv1.HTTPRouteSpec",
-			nimSpec: &HTTPRoute{
-				Enabled: &enabled,
-				Spec: &HTTPRouteSpec{
-					CommonRouteSpec: gatewayv1.CommonRouteSpec{
-						ParentRefs: []gatewayv1.ParentReference{
-							{
-								Name: "istio-gateway",
-							},
-						},
-					},
-					Host: "foobar.nim",
-					Paths: []HTTPPathMatch{
-						{
-							Type:  &prefixTypeMatch,
-							Value: &root,
-						},
-					},
-				},
-			},
-			desiredGWSpec: gatewayv1.HTTPRouteSpec{
-				CommonRouteSpec: gatewayv1.CommonRouteSpec{
-					ParentRefs: []gatewayv1.ParentReference{
-						{
-							Name: "istio-gateway",
-						},
-					},
-				},
-				Hostnames: []gatewayv1.Hostname{
-					"foobar.nim",
-				},
-				Rules: []gatewayv1.HTTPRouteRule{
-					{
-						Matches: []gatewayv1.HTTPRouteMatch{
-							{
-								Path: &gatewayv1.HTTPPathMatch{
-									Type:  &prefixTypeMatch,
-									Value: &root,
-								},
-							},
-						},
-						BackendRefs: []gatewayv1.HTTPBackendRef{
-							{
-								BackendRef: gatewayv1.BackendRef{
-									BackendObjectReference: gatewayv1.BackendObjectReference{
-										Name: "test",
-										Port: &port,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gwSpec := tt.nimSpec.GenerateGatewayHTTPRouteSpec("test")
-			if !reflect.DeepEqual(gwSpec, tt.desiredGWSpec) {
-				t.Errorf("GenerateGatewayHTTPRouteSpec() = %+v, want %+v", gwSpec, tt.desiredGWSpec)
-			}
-		})
-	}
 }

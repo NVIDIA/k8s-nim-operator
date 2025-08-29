@@ -33,9 +33,6 @@ import (
 const (
 	FlagSetByCobraAnnotation     = "cobra_annotation_flag_set_by_cobra"
 	CommandDisplayNameAnnotation = "cobra_annotation_command_display_name"
-
-	helpFlagName    = "help"
-	helpCommandName = "help"
 )
 
 // FParseErrWhitelist configures Flag parse errors to be ignored
@@ -83,11 +80,11 @@ type Command struct {
 	Example string
 
 	// ValidArgs is list of all valid non-flag arguments that are accepted in shell completions
-	ValidArgs []Completion
+	ValidArgs []string
 	// ValidArgsFunction is an optional function that provides valid non-flag arguments for shell completion.
 	// It is a dynamic version of using ValidArgs.
 	// Only one of ValidArgs and ValidArgsFunction can be used for a command.
-	ValidArgsFunction CompletionFunc
+	ValidArgsFunction func(cmd *Command, args []string, toComplete string) ([]string, ShellCompDirective)
 
 	// Expected arguments
 	Args PositionalArgs
@@ -171,12 +168,12 @@ type Command struct {
 	// usageFunc is usage func defined by user.
 	usageFunc func(*Command) error
 	// usageTemplate is usage template defined by user.
-	usageTemplate *tmplFunc
+	usageTemplate string
 	// flagErrorFunc is func defined by user and it's called when the parsing of
 	// flags returns an error.
 	flagErrorFunc func(*Command, error) error
 	// helpTemplate is help template defined by user.
-	helpTemplate *tmplFunc
+	helpTemplate string
 	// helpFunc is help func defined by user.
 	helpFunc func(*Command, []string)
 	// helpCommand is command with usage 'help'. If it's not defined by user,
@@ -189,7 +186,7 @@ type Command struct {
 	completionCommandGroupID string
 
 	// versionTemplate is the version template defined by user.
-	versionTemplate *tmplFunc
+	versionTemplate string
 
 	// errPrefix is the error message prefix defined by user.
 	errPrefix string
@@ -284,7 +281,6 @@ func (c *Command) SetArgs(a []string) {
 
 // SetOutput sets the destination for usage and error messages.
 // If output is nil, os.Stderr is used.
-//
 // Deprecated: Use SetOut and/or SetErr instead
 func (c *Command) SetOutput(output io.Writer) {
 	c.outWriter = output
@@ -316,11 +312,7 @@ func (c *Command) SetUsageFunc(f func(*Command) error) {
 
 // SetUsageTemplate sets usage template. Can be defined by Application.
 func (c *Command) SetUsageTemplate(s string) {
-	if s == "" {
-		c.usageTemplate = nil
-		return
-	}
-	c.usageTemplate = tmpl(s)
+	c.usageTemplate = s
 }
 
 // SetFlagErrorFunc sets a function to generate an error when flag parsing
@@ -356,20 +348,12 @@ func (c *Command) SetCompletionCommandGroupID(groupID string) {
 
 // SetHelpTemplate sets help template to be used. Application can use it to set custom template.
 func (c *Command) SetHelpTemplate(s string) {
-	if s == "" {
-		c.helpTemplate = nil
-		return
-	}
-	c.helpTemplate = tmpl(s)
+	c.helpTemplate = s
 }
 
 // SetVersionTemplate sets version template to be used. Application can use it to set custom template.
 func (c *Command) SetVersionTemplate(s string) {
-	if s == "" {
-		c.versionTemplate = nil
-		return
-	}
-	c.versionTemplate = tmpl(s)
+	c.versionTemplate = s
 }
 
 // SetErrPrefix sets error message prefix to be used. Application can use it to set custom prefix.
@@ -450,26 +434,12 @@ func (c *Command) UsageFunc() (f func(*Command) error) {
 	}
 	return func(c *Command) error {
 		c.mergePersistentFlags()
-		fn := c.getUsageTemplateFunc()
-		err := fn(c.OutOrStderr(), c)
+		err := tmpl(c.OutOrStderr(), c.UsageTemplate(), c)
 		if err != nil {
 			c.PrintErrln(err)
 		}
 		return err
 	}
-}
-
-// getUsageTemplateFunc returns the usage template function for the command
-// going up the command tree if necessary.
-func (c *Command) getUsageTemplateFunc() func(w io.Writer, data interface{}) error {
-	if c.usageTemplate != nil {
-		return c.usageTemplate.fn
-	}
-
-	if c.HasParent() {
-		return c.parent.getUsageTemplateFunc()
-	}
-	return defaultUsageFunc
 }
 
 // Usage puts out the usage for the command.
@@ -490,28 +460,13 @@ func (c *Command) HelpFunc() func(*Command, []string) {
 	}
 	return func(c *Command, a []string) {
 		c.mergePersistentFlags()
-		fn := c.getHelpTemplateFunc()
 		// The help should be sent to stdout
 		// See https://github.com/spf13/cobra/issues/1002
-		err := fn(c.OutOrStdout(), c)
+		err := tmpl(c.OutOrStdout(), c.HelpTemplate(), c)
 		if err != nil {
 			c.PrintErrln(err)
 		}
 	}
-}
-
-// getHelpTemplateFunc returns the help template function for the command
-// going up the command tree if necessary.
-func (c *Command) getHelpTemplateFunc() func(w io.Writer, data interface{}) error {
-	if c.helpTemplate != nil {
-		return c.helpTemplate.fn
-	}
-
-	if c.HasParent() {
-		return c.parent.getHelpTemplateFunc()
-	}
-
-	return defaultHelpFunc
 }
 
 // Help puts out the help for the command.
@@ -588,55 +543,71 @@ func (c *Command) NamePadding() int {
 }
 
 // UsageTemplate returns usage template for the command.
-// This function is kept for backwards-compatibility reasons.
 func (c *Command) UsageTemplate() string {
-	if c.usageTemplate != nil {
-		return c.usageTemplate.tmpl
+	if c.usageTemplate != "" {
+		return c.usageTemplate
 	}
 
 	if c.HasParent() {
 		return c.parent.UsageTemplate()
 	}
-	return defaultUsageTemplate
+	return `Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
+
+Aliases:
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
+
+Examples:
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}{{$cmds := .Commands}}{{if eq (len .Groups) 0}}
+
+Available Commands:{{range $cmds}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{else}}{{range $group := .Groups}}
+
+{{.Title}}{{range $cmds}}{{if (and (eq .GroupID $group.ID) (or .IsAvailableCommand (eq .Name "help")))}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if not .AllChildCommandsHaveGroup}}
+
+Additional Commands:{{range $cmds}}{{if (and (eq .GroupID "") (or .IsAvailableCommand (eq .Name "help")))}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+
+Flags:
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+Global Flags:
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
+
+Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
 }
 
 // HelpTemplate return help template for the command.
-// This function is kept for backwards-compatibility reasons.
 func (c *Command) HelpTemplate() string {
-	if c.helpTemplate != nil {
-		return c.helpTemplate.tmpl
+	if c.helpTemplate != "" {
+		return c.helpTemplate
 	}
 
 	if c.HasParent() {
 		return c.parent.HelpTemplate()
 	}
-	return defaultHelpTemplate
+	return `{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
+
+{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 }
 
 // VersionTemplate return version template for the command.
-// This function is kept for backwards-compatibility reasons.
 func (c *Command) VersionTemplate() string {
-	if c.versionTemplate != nil {
-		return c.versionTemplate.tmpl
+	if c.versionTemplate != "" {
+		return c.versionTemplate
 	}
 
 	if c.HasParent() {
 		return c.parent.VersionTemplate()
 	}
-	return defaultVersionTemplate
-}
-
-// getVersionTemplateFunc returns the version template function for the command
-// going up the command tree if necessary.
-func (c *Command) getVersionTemplateFunc() func(w io.Writer, data interface{}) error {
-	if c.versionTemplate != nil {
-		return c.versionTemplate.fn
-	}
-
-	if c.HasParent() {
-		return c.parent.getVersionTemplateFunc()
-	}
-	return defaultVersionFunc
+	return `{{with .Name}}{{printf "%s " .}}{{end}}{{printf "version %s" .Version}}
+`
 }
 
 // ErrPrefix return error message prefix for the command
@@ -923,7 +894,7 @@ func (c *Command) execute(a []string) (err error) {
 
 	// If help is called, regardless of other flags, return we want help.
 	// Also say we need help if the command isn't runnable.
-	helpVal, err := c.Flags().GetBool(helpFlagName)
+	helpVal, err := c.Flags().GetBool("help")
 	if err != nil {
 		// should be impossible to get here as we always declare a help
 		// flag in InitDefaultHelpFlag()
@@ -943,8 +914,7 @@ func (c *Command) execute(a []string) (err error) {
 			return err
 		}
 		if versionVal {
-			fn := c.getVersionTemplateFunc()
-			err := fn(c.OutOrStdout(), c)
+			err := tmpl(c.OutOrStdout(), c.VersionTemplate(), c)
 			if err != nil {
 				c.Println(err)
 			}
@@ -1098,6 +1068,12 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 
 	// initialize help at the last point to allow for user overriding
 	c.InitDefaultHelpCmd()
+	// initialize completion at the last point to allow for user overriding
+	c.InitDefaultCompletionCmd()
+
+	// Now that all commands have been created, let's make sure all groups
+	// are properly created also
+	c.checkCommandGroups()
 
 	args := c.args
 
@@ -1106,15 +1082,8 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 		args = os.Args[1:]
 	}
 
-	// initialize the __complete command to be used for shell completion
+	// initialize the hidden command to be used for shell completion
 	c.initCompleteCmd(args)
-
-	// initialize the default completion command
-	c.InitDefaultCompletionCmd(args...)
-
-	// Now that all commands have been created, let's make sure all groups
-	// are properly created also
-	c.checkCommandGroups()
 
 	var flags []string
 	if c.TraverseChildren {
@@ -1218,16 +1187,16 @@ func (c *Command) checkCommandGroups() {
 // If c already has help flag, it will do nothing.
 func (c *Command) InitDefaultHelpFlag() {
 	c.mergePersistentFlags()
-	if c.Flags().Lookup(helpFlagName) == nil {
+	if c.Flags().Lookup("help") == nil {
 		usage := "help for "
-		name := c.DisplayName()
+		name := c.displayName()
 		if name == "" {
 			usage += "this command"
 		} else {
 			usage += name
 		}
-		c.Flags().BoolP(helpFlagName, "h", false, usage)
-		_ = c.Flags().SetAnnotation(helpFlagName, FlagSetByCobraAnnotation, []string{"true"})
+		c.Flags().BoolP("help", "h", false, usage)
+		_ = c.Flags().SetAnnotation("help", FlagSetByCobraAnnotation, []string{"true"})
 	}
 }
 
@@ -1246,7 +1215,7 @@ func (c *Command) InitDefaultVersionFlag() {
 		if c.Name() == "" {
 			usage += "this command"
 		} else {
-			usage += c.DisplayName()
+			usage += c.Name()
 		}
 		if c.Flags().ShorthandLookup("v") == nil {
 			c.Flags().BoolP("version", "v", false, usage)
@@ -1270,9 +1239,9 @@ func (c *Command) InitDefaultHelpCmd() {
 			Use:   "help [command]",
 			Short: "Help about any command",
 			Long: `Help provides help for any command in the application.
-Simply type ` + c.DisplayName() + ` help [path to command] for full details.`,
-			ValidArgsFunction: func(c *Command, args []string, toComplete string) ([]Completion, ShellCompDirective) {
-				var completions []Completion
+Simply type ` + c.displayName() + ` help [path to command] for full details.`,
+			ValidArgsFunction: func(c *Command, args []string, toComplete string) ([]string, ShellCompDirective) {
+				var completions []string
 				cmd, _, e := c.Root().Find(args)
 				if e != nil {
 					return nil, ShellCompDirectiveNoFileComp
@@ -1284,7 +1253,7 @@ Simply type ` + c.DisplayName() + ` help [path to command] for full details.`,
 				for _, subCmd := range cmd.Commands() {
 					if subCmd.IsAvailableCommand() || subCmd == cmd.helpCommand {
 						if strings.HasPrefix(subCmd.Name(), toComplete) {
-							completions = append(completions, CompletionWithDesc(subCmd.Name(), subCmd.Short))
+							completions = append(completions, fmt.Sprintf("%s\t%s", subCmd.Name(), subCmd.Short))
 						}
 					}
 				}
@@ -1461,12 +1430,10 @@ func (c *Command) CommandPath() string {
 	if c.HasParent() {
 		return c.Parent().CommandPath() + " " + c.Name()
 	}
-	return c.DisplayName()
+	return c.displayName()
 }
 
-// DisplayName returns the name to display in help text. Returns command Name()
-// If CommandDisplayNameAnnoation is not set
-func (c *Command) DisplayName() string {
+func (c *Command) displayName() string {
 	if displayName, ok := c.Annotations[CommandDisplayNameAnnotation]; ok {
 		return displayName
 	}
@@ -1476,7 +1443,7 @@ func (c *Command) DisplayName() string {
 // UseLine puts out the full usage for a given command (including parents).
 func (c *Command) UseLine() string {
 	var useline string
-	use := strings.Replace(c.Use, c.Name(), c.DisplayName(), 1)
+	use := strings.Replace(c.Use, c.Name(), c.displayName(), 1)
 	if c.HasParent() {
 		useline = c.parent.CommandPath() + " " + use
 	} else {
@@ -1682,7 +1649,7 @@ func (c *Command) GlobalNormalizationFunc() func(f *flag.FlagSet, name string) f
 // to this command (local and persistent declared here and by all parents).
 func (c *Command) Flags() *flag.FlagSet {
 	if c.flags == nil {
-		c.flags = flag.NewFlagSet(c.DisplayName(), flag.ContinueOnError)
+		c.flags = flag.NewFlagSet(c.displayName(), flag.ContinueOnError)
 		if c.flagErrorBuf == nil {
 			c.flagErrorBuf = new(bytes.Buffer)
 		}
@@ -1697,7 +1664,7 @@ func (c *Command) Flags() *flag.FlagSet {
 func (c *Command) LocalNonPersistentFlags() *flag.FlagSet {
 	persistentFlags := c.PersistentFlags()
 
-	out := flag.NewFlagSet(c.DisplayName(), flag.ContinueOnError)
+	out := flag.NewFlagSet(c.displayName(), flag.ContinueOnError)
 	c.LocalFlags().VisitAll(func(f *flag.Flag) {
 		if persistentFlags.Lookup(f.Name) == nil {
 			out.AddFlag(f)
@@ -1712,7 +1679,7 @@ func (c *Command) LocalFlags() *flag.FlagSet {
 	c.mergePersistentFlags()
 
 	if c.lflags == nil {
-		c.lflags = flag.NewFlagSet(c.DisplayName(), flag.ContinueOnError)
+		c.lflags = flag.NewFlagSet(c.displayName(), flag.ContinueOnError)
 		if c.flagErrorBuf == nil {
 			c.flagErrorBuf = new(bytes.Buffer)
 		}
@@ -1740,7 +1707,7 @@ func (c *Command) InheritedFlags() *flag.FlagSet {
 	c.mergePersistentFlags()
 
 	if c.iflags == nil {
-		c.iflags = flag.NewFlagSet(c.DisplayName(), flag.ContinueOnError)
+		c.iflags = flag.NewFlagSet(c.displayName(), flag.ContinueOnError)
 		if c.flagErrorBuf == nil {
 			c.flagErrorBuf = new(bytes.Buffer)
 		}
@@ -1769,7 +1736,7 @@ func (c *Command) NonInheritedFlags() *flag.FlagSet {
 // PersistentFlags returns the persistent FlagSet specifically set in the current command.
 func (c *Command) PersistentFlags() *flag.FlagSet {
 	if c.pflags == nil {
-		c.pflags = flag.NewFlagSet(c.DisplayName(), flag.ContinueOnError)
+		c.pflags = flag.NewFlagSet(c.displayName(), flag.ContinueOnError)
 		if c.flagErrorBuf == nil {
 			c.flagErrorBuf = new(bytes.Buffer)
 		}
@@ -1782,9 +1749,9 @@ func (c *Command) PersistentFlags() *flag.FlagSet {
 func (c *Command) ResetFlags() {
 	c.flagErrorBuf = new(bytes.Buffer)
 	c.flagErrorBuf.Reset()
-	c.flags = flag.NewFlagSet(c.DisplayName(), flag.ContinueOnError)
+	c.flags = flag.NewFlagSet(c.displayName(), flag.ContinueOnError)
 	c.flags.SetOutput(c.flagErrorBuf)
-	c.pflags = flag.NewFlagSet(c.DisplayName(), flag.ContinueOnError)
+	c.pflags = flag.NewFlagSet(c.displayName(), flag.ContinueOnError)
 	c.pflags.SetOutput(c.flagErrorBuf)
 
 	c.lflags = nil
@@ -1901,7 +1868,7 @@ func (c *Command) mergePersistentFlags() {
 // If c.parentsPflags == nil, it makes new.
 func (c *Command) updateParentsPflags() {
 	if c.parentsPflags == nil {
-		c.parentsPflags = flag.NewFlagSet(c.DisplayName(), flag.ContinueOnError)
+		c.parentsPflags = flag.NewFlagSet(c.displayName(), flag.ContinueOnError)
 		c.parentsPflags.SetOutput(c.flagErrorBuf)
 		c.parentsPflags.SortFlags = false
 	}
@@ -1926,142 +1893,4 @@ func commandNameMatches(s string, t string) bool {
 	}
 
 	return s == t
-}
-
-// tmplFunc holds a template and a function that will execute said template.
-type tmplFunc struct {
-	tmpl string
-	fn   func(io.Writer, interface{}) error
-}
-
-var defaultUsageTemplate = `Usage:{{if .Runnable}}
-  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
-  {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
-
-Aliases:
-  {{.NameAndAliases}}{{end}}{{if .HasExample}}
-
-Examples:
-{{.Example}}{{end}}{{if .HasAvailableSubCommands}}{{$cmds := .Commands}}{{if eq (len .Groups) 0}}
-
-Available Commands:{{range $cmds}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{else}}{{range $group := .Groups}}
-
-{{.Title}}{{range $cmds}}{{if (and (eq .GroupID $group.ID) (or .IsAvailableCommand (eq .Name "help")))}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if not .AllChildCommandsHaveGroup}}
-
-Additional Commands:{{range $cmds}}{{if (and (eq .GroupID "") (or .IsAvailableCommand (eq .Name "help")))}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
-
-Flags:
-{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
-
-Global Flags:
-{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
-
-Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
-  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
-
-Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
-`
-
-// defaultUsageFunc is equivalent to executing defaultUsageTemplate. The two should be changed in sync.
-func defaultUsageFunc(w io.Writer, in interface{}) error {
-	c := in.(*Command)
-	fmt.Fprint(w, "Usage:")
-	if c.Runnable() {
-		fmt.Fprintf(w, "\n  %s", c.UseLine())
-	}
-	if c.HasAvailableSubCommands() {
-		fmt.Fprintf(w, "\n  %s [command]", c.CommandPath())
-	}
-	if len(c.Aliases) > 0 {
-		fmt.Fprintf(w, "\n\nAliases:\n")
-		fmt.Fprintf(w, "  %s", c.NameAndAliases())
-	}
-	if c.HasExample() {
-		fmt.Fprintf(w, "\n\nExamples:\n")
-		fmt.Fprintf(w, "%s", c.Example)
-	}
-	if c.HasAvailableSubCommands() {
-		cmds := c.Commands()
-		if len(c.Groups()) == 0 {
-			fmt.Fprintf(w, "\n\nAvailable Commands:")
-			for _, subcmd := range cmds {
-				if subcmd.IsAvailableCommand() || subcmd.Name() == helpCommandName {
-					fmt.Fprintf(w, "\n  %s %s", rpad(subcmd.Name(), subcmd.NamePadding()), subcmd.Short)
-				}
-			}
-		} else {
-			for _, group := range c.Groups() {
-				fmt.Fprintf(w, "\n\n%s", group.Title)
-				for _, subcmd := range cmds {
-					if subcmd.GroupID == group.ID && (subcmd.IsAvailableCommand() || subcmd.Name() == helpCommandName) {
-						fmt.Fprintf(w, "\n  %s %s", rpad(subcmd.Name(), subcmd.NamePadding()), subcmd.Short)
-					}
-				}
-			}
-			if !c.AllChildCommandsHaveGroup() {
-				fmt.Fprintf(w, "\n\nAdditional Commands:")
-				for _, subcmd := range cmds {
-					if subcmd.GroupID == "" && (subcmd.IsAvailableCommand() || subcmd.Name() == helpCommandName) {
-						fmt.Fprintf(w, "\n  %s %s", rpad(subcmd.Name(), subcmd.NamePadding()), subcmd.Short)
-					}
-				}
-			}
-		}
-	}
-	if c.HasAvailableLocalFlags() {
-		fmt.Fprintf(w, "\n\nFlags:\n")
-		fmt.Fprint(w, trimRightSpace(c.LocalFlags().FlagUsages()))
-	}
-	if c.HasAvailableInheritedFlags() {
-		fmt.Fprintf(w, "\n\nGlobal Flags:\n")
-		fmt.Fprint(w, trimRightSpace(c.InheritedFlags().FlagUsages()))
-	}
-	if c.HasHelpSubCommands() {
-		fmt.Fprintf(w, "\n\nAdditional help topcis:")
-		for _, subcmd := range c.Commands() {
-			if subcmd.IsAdditionalHelpTopicCommand() {
-				fmt.Fprintf(w, "\n  %s %s", rpad(subcmd.CommandPath(), subcmd.CommandPathPadding()), subcmd.Short)
-			}
-		}
-	}
-	if c.HasAvailableSubCommands() {
-		fmt.Fprintf(w, "\n\nUse \"%s [command] --help\" for more information about a command.", c.CommandPath())
-	}
-	fmt.Fprintln(w)
-	return nil
-}
-
-var defaultHelpTemplate = `{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
-
-{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
-
-// defaultHelpFunc is equivalent to executing defaultHelpTemplate. The two should be changed in sync.
-func defaultHelpFunc(w io.Writer, in interface{}) error {
-	c := in.(*Command)
-	usage := c.Long
-	if usage == "" {
-		usage = c.Short
-	}
-	usage = trimRightSpace(usage)
-	if usage != "" {
-		fmt.Fprintln(w, usage)
-		fmt.Fprintln(w)
-	}
-	if c.Runnable() || c.HasSubCommands() {
-		fmt.Fprint(w, c.UsageString())
-	}
-	return nil
-}
-
-var defaultVersionTemplate = `{{with .DisplayName}}{{printf "%s " .}}{{end}}{{printf "version %s" .Version}}
-`
-
-// defaultVersionFunc is equivalent to executing defaultVersionTemplate. The two should be changed in sync.
-func defaultVersionFunc(w io.Writer, in interface{}) error {
-	c := in.(*Command)
-	_, err := fmt.Fprintf(w, "%s version %s\n", c.DisplayName(), c.Version)
-	return err
 }

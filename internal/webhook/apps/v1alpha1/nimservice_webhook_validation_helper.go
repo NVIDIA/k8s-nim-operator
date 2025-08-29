@@ -359,12 +359,6 @@ func validateExposeConfiguration(expose *appsv1alpha1.Expose, fldPath *field.Pat
 			errList = append(errList, field.Required(fldPath.Child("spec"), fmt.Sprintf("must be defined if %s is true", fldPath.Child("enabled"))))
 		}
 	}
-
-	if expose.HTTPRoute.Enabled != nil && *expose.HTTPRoute.Enabled {
-		if reflect.DeepEqual(expose.HTTPRoute.Spec, appsv1alpha1.HTTPRouteSpec{}) {
-			errList = append(errList, field.Required(fldPath.Child("spec"), fmt.Sprintf("must be defined if %s is true", fldPath.Child("enabled"))))
-		}
-	}
 	return errList
 }
 
