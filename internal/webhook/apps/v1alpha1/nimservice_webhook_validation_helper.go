@@ -419,32 +419,36 @@ func validateGPURequirements(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.P
 		return errList
 	}
 
-	// At least one of requests or limits must be specified
-	_, hasRequests := spec.Resources.Requests[gpuResourceName]
-	_, hasLimits := spec.Resources.Limits[gpuResourceName]
+	if spec.Resources != nil {
+		// At least one of requests or limits must be specified
+		_, hasRequests := spec.Resources.Requests[gpuResourceName]
+		_, hasLimits := spec.Resources.Limits[gpuResourceName]
 
-	if !hasRequests && !hasLimits {
-		errList = append(errList, field.Required(fldPath.Child("resources"), "Either GPU requests or limits must be specified for MultiNode deployments"))
+		if !hasRequests && !hasLimits {
+			errList = append(errList, field.Required(fldPath.Child("resources"), "Either GPU requests or limits must be specified for MultiNode deployments"))
+			return errList
+		}
+
+		// Validate GPU requests if specified
+		if hasRequests {
+			gpuRequests := spec.Resources.Requests[gpuResourceName]
+			if gpuRequests.IsZero() || gpuRequests.Value() <= 0 {
+				errList = append(errList, field.Invalid(fldPath.Child("requests").Child("nvidia.com/gpu"), gpuRequests.String(), "must be greater than 0"))
+			}
+		}
+
+		// Validate GPU limits if specified
+		if hasLimits {
+			gpuLimits := spec.Resources.Limits[gpuResourceName]
+			if gpuLimits.IsZero() || gpuLimits.Value() <= 0 {
+				errList = append(errList, field.Invalid(fldPath.Child("limits").Child("nvidia.com/gpu"), gpuLimits.String(), "must be greater than 0"))
+			}
+		}
+
 		return errList
 	}
-
-	// Validate GPU requests if specified
-	if hasRequests {
-		gpuRequests := spec.Resources.Requests[gpuResourceName]
-		if gpuRequests.IsZero() || gpuRequests.Value() <= 0 {
-			errList = append(errList, field.Invalid(fldPath.Child("requests").Child("nvidia.com/gpu"), gpuRequests.String(), "must be greater than 0"))
-		}
-	}
-
-	// Validate GPU limits if specified
-	if hasLimits {
-		gpuLimits := spec.Resources.Limits[gpuResourceName]
-		if gpuLimits.IsZero() || gpuLimits.Value() <= 0 {
-			errList = append(errList, field.Invalid(fldPath.Child("limits").Child("nvidia.com/gpu"), gpuLimits.String(), "must be greater than 0"))
-		}
-	}
-
 	return errList
+
 }
 
 // validateKServeonfiguration implements required KServe validations.
