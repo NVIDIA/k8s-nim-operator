@@ -953,7 +953,7 @@ func TestValidateResourcesConfiguration(t *testing.T) {
 func TestValidateMultiNodeImmutability(t *testing.T) {
 	fld := field.NewPath("spec").Child("multiNode")
 	old := baseNIMService()
-	old.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 1}
+	old.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{PipelineParallelism: 1}
 
 	cases := []struct {
 		name     string
@@ -962,12 +962,12 @@ func TestValidateMultiNodeImmutability(t *testing.T) {
 	}{
 		{"unchanged", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
-			n.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 1}
+			n.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{PipelineParallelism: 1}
 			return n
 		}(), 0},
 		{"changed", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
-			n.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 2}
+			n.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{PipelineParallelism: 2}
 			return n
 		}(), 1},
 	}
@@ -1087,7 +1087,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				ns.Spec.Annotations = map[string]string{"serving.kserve.org/deploymentMode": "RawDeployment"}
 				ns.Spec.Scale.Enabled = &trueVal // should be fine
-				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 1}
+				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{PipelineParallelism: 1}
 			},
 			wantErrs: 1, // only multiNode should trigger
 		},
@@ -1095,7 +1095,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			name: "kserve – multidnode alone",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Size: 2}
+				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{PipelineParallelism: 2}
 			},
 			wantErrs: 1,
 		},

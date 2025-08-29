@@ -1314,10 +1314,10 @@ spec:
                               required:
                               - mpiStartTimeout
                               type: object
-                            size:
+                            pipelineParallelism:
                               default: 1
-                              description: Size specifies the number of pods to create
-                                for the multi-node NIMService.
+                              description: PipelineParallelism specifies the number
+                                of pods to create for the multi-node NIMService.
                               minimum: 1
                               type: integer
                           type: object
