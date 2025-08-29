@@ -265,7 +265,7 @@ func (r *NemoCustomizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					newNemoCustomizer, ok := e.ObjectNew.(*appsv1alpha1.NemoCustomizer)
 					if ok {
 						// Handle case where object is marked for deletion
-						if !newNemoCustomizer.ObjectMeta.DeletionTimestamp.IsZero() {
+						if !newNemoCustomizer.DeletionTimestamp.IsZero() {
 							return true
 						}
 
