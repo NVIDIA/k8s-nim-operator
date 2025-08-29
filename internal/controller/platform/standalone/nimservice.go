@@ -375,8 +375,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			Value: modelProfile,
 		}}
 
-		// Only assign GPU resources if the NIMCache is for optimized NIM
-		if nimCache.IsOptimizedNIM() {
+		// Only assign GPU resources if the NIMCache is for optimized NIM and the NIMService is not a multi-node NIMService
+		if nimCache.IsOptimizedNIM() && nimService.Spec.MultiNode == nil {
 			// Retrieve and set profile details from NIMCache
 			profile, err = r.getNIMCacheProfile(ctx, nimService, modelProfile)
 			if err != nil {
