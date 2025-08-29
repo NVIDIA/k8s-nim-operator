@@ -78,13 +78,6 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	errList = append(errList, validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)...)
 	errList = append(errList, validateKServeConfiguration(spec, fldPath)...)
 
-	// Validate MultiNode configuration
-	if spec.MultiNode != nil {
-		if spec.Resources != nil && spec.Resources.Limits != nil {
-			errList = append(errList, field.Invalid(fldPath.Child("multiNode").Child("size"), spec.MultiNode.Size, "must be > 0"))
-		}
-	}
-
 	return errList
 }
 
