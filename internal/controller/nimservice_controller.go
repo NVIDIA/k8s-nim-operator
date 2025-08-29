@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 
 	"github.com/go-logr/logr"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
@@ -133,21 +132,6 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	logger.Info("Reconciling", "NIMService", nimService.Name)
-
-	if nimService.Spec.MultiNode != nil {
-		if nimService.Annotations == nil {
-			nimService.Annotations = map[string]string{}
-		}
-		if _, ok := nimService.Annotations[utils.GPUCountPerPodAnnotationKey]; !ok {
-			gpuCountPerPod, err := shared.GetGPUCountPerPod(ctx, r.GetClient(), nimService)
-			if err != nil {
-				logger.Error(err, "failed to get GPU count per pod for multi-node NIMService", "name", nimService.Name)
-				return ctrl.Result{}, err
-			}
-			logger.Info("GPU count per pod", "count", gpuCountPerPod)
-			nimService.Annotations[utils.GPUCountPerPodAnnotationKey] = strconv.Itoa(gpuCountPerPod)
-		}
-	}
 
 	// Get platform implementation based on NIMService's platform field
 	platformImpl, err := platform.GetInferencePlatform(nimService.Spec.InferencePlatform)

@@ -18,11 +18,13 @@ package shared
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"strconv"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 // GetGPUCountPerPod returns the number of GPUs per pod for the NIMService.
@@ -30,13 +32,13 @@ func GetGPUCountPerPod(ctx context.Context, client client.Client, nimService *ap
 
 	if len(nimService.Spec.DRAResources) == 0 {
 		if nimService.Spec.Resources == nil {
-			return 0, errors.New("GPU resource not specified for multi-node NIMService")
+			return 0, fmt.Errorf("GPU resource not specified for NIMService %s in namespace %s", nimService.GetName(), nimService.GetNamespace())
 		}
 		gpuQuantity, ok := nimService.Spec.Resources.Requests["nvidia.com/gpu"]
 		if !ok {
 			gpuQuantity, ok = nimService.Spec.Resources.Limits["nvidia.com/gpu"]
 			if !ok {
-				return 0, errors.New("GPU resource requests/limits not specified for multi-node NIMService")
+				return 0, fmt.Errorf("GPU resource requests/limits not specified for NIMService %s in namespace %s", nimService.GetName(), nimService.GetNamespace())
 			}
 		}
 		return int(gpuQuantity.Value()), nil
@@ -47,4 +49,19 @@ func GetGPUCountPerPod(ctx context.Context, client client.Client, nimService *ap
 		}
 		return gpuCount, nil
 	}
+}
+
+func CreateGPUCountPerPodAnnotation(ctx context.Context, client client.Client, nimService *appsv1alpha1.NIMService) error {
+
+	if nimService.Annotations == nil {
+		nimService.Annotations = map[string]string{}
+	}
+	if _, ok := nimService.Annotations[utils.GPUCountPerPodAnnotationKey]; !ok {
+		gpuCountPerPod, err := GetGPUCountPerPod(ctx, client, nimService)
+		if err != nil {
+			return err
+		}
+		nimService.Annotations[utils.GPUCountPerPodAnnotationKey] = strconv.Itoa(gpuCountPerPod)
+	}
+	return nil
 }

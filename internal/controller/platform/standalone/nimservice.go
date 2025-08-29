@@ -184,6 +184,14 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	// Get generic name for all resources
 	namespacedName := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
 
+	if nimService.Spec.MultiNode != nil {
+		err = shared.CreateGPUCountPerPodAnnotation(ctx, r.Client, nimService)
+		if err != nil {
+			logger.Error(err, "failed to create GPU count per pod annotation for multi-node NIMService", "name", nimService.Name)
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Validations.
 	isValid, msg, err := r.validateDRAResources(ctx, nimService)
 	if err != nil {
