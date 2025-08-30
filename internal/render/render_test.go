@@ -33,8 +33,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 )
@@ -500,45 +498,6 @@ var _ = Describe("K8s Resources Rendering", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ingress.Name).To(Equal("test-ingress"))
 			Expect(ingress.Namespace).To(Equal("default"))
-		})
-
-		It("should render HTTPRoute template correctly", func() {
-			params := types.HTTPRouteParams{
-				Enabled:   true,
-				Name:      "test-httproute",
-				Namespace: "default",
-				Spec: gatewayv1.HTTPRouteSpec{
-					CommonRouteSpec: gatewayv1.CommonRouteSpec{
-						ParentRefs: []gatewayv1.ParentReference{},
-					},
-					Hostnames: []gatewayv1.Hostname{
-						"host.name",
-					},
-					Rules: []gatewayv1.HTTPRouteRule{
-						{
-							Matches: []gatewayv1.HTTPRouteMatch{
-								{
-									Path: &gatewayv1.HTTPPathMatch{},
-								},
-							},
-							BackendRefs: []gatewayv1.HTTPBackendRef{
-								{
-									BackendRef: gatewayv1.BackendRef{
-										BackendObjectReference: gatewayv1.BackendObjectReference{
-											Name: "foobar-service",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			}
-			r := render.NewRenderer(templatesDir)
-			httpRoute, err := r.HTTPRoute(&params)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(httpRoute.Name).To(Equal("test-httproute"))
-			Expect(httpRoute.Namespace).To(Equal("default"))
 		})
 
 		It("should render HPA template correctly", func() {

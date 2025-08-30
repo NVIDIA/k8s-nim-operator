@@ -65,7 +65,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func sortEnvVars(envVars []corev1.EnvVar) {
@@ -148,7 +147,6 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(kservev1beta1.AddToScheme(scheme)).To(Succeed())
-		Expect(gatewayv1.Install(scheme)).To(Succeed())
 		Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).

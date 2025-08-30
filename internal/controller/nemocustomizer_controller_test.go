@@ -44,7 +44,6 @@ import (
 	crClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/yaml"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -86,7 +85,6 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(batchv1.AddToScheme(scheme)).To(Succeed())
-		Expect(gatewayv1.Install(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NemoCustomizer{}).

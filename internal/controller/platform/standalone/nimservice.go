@@ -44,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -247,21 +246,6 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !k8serrors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Sync HTTPRoute
-	if nimService.IsHTTPRouteEnabled() {
-		err = r.renderAndSyncResource(ctx, nimService, &renderer, &gatewayv1.HTTPRoute{}, func() (client.Object, error) {
-			return renderer.HTTPRoute(nimService.GetHTTPRouteParams())
-		}, "httproute", conditions.ReasonHTTPRouteFailed)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}

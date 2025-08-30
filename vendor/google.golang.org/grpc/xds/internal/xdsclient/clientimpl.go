@@ -113,7 +113,19 @@ func init() {
 	internal.TriggerXDSResourceNotFoundForTesting = triggerXDSResourceNotFoundForTesting
 	xdsclientinternal.ResourceWatchStateForTesting = resourceWatchStateForTesting
 
-	DefaultPool = &Pool{clients: make(map[string]*clientRefCounted)}
+	// DefaultPool is initialized with bootstrap configuration from one of the
+	// supported environment variables. If the environment variables are not
+	// set, then fallback bootstrap configuration should be set before
+	// attempting to create an xDS client, else xDS client creation will fail.
+	config, err := bootstrap.GetConfiguration()
+	if err != nil {
+		if logger.V(2) {
+			logger.Infof("Failed to read xDS bootstrap config from env vars:  %v", err)
+		}
+		DefaultPool = &Pool{clients: make(map[string]*clientRefCounted)}
+		return
+	}
+	DefaultPool = &Pool{clients: make(map[string]*clientRefCounted), config: config}
 }
 
 // newClientImpl returns a new xdsClient with the given config.

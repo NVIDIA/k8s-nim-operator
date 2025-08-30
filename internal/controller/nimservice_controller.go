@@ -42,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -103,7 +102,6 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 // +kubebuilder:rbac:groups=leaderworkerset.x-k8s.io,resources=leaderworkersets,verbs=get;list;watch;create;update;patch;delete
@@ -305,59 +303,40 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		)
 
-	nimServiceBuilder, err = k8sutil.ControllerCallbackIfCRDExists(r.discoveryClient,
-		nimServiceBuilder,
-		resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"),
-		func(bd *builder.Builder) *builder.Builder {
-			return bd.Watches(
-				&resourcev1beta2.ResourceClaim{},
-				handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
-				builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-			)
-		},
-	)
+	resourceClaimCRDExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
 	if err != nil {
 		return err
 	}
+	if resourceClaimCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Watches(
+			&resourcev1beta2.ResourceClaim{},
+			handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		)
+	}
 
-	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		nimServiceBuilder,
-		resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaimtemplates"),
-		&resourcev1beta2.ResourceClaimTemplate{},
-	)
+	lwsCRDExists, err := k8sutil.CRDExists(r.discoveryClient, lwsv1.SchemeGroupVersion.WithResource("leaderworkersets"))
 	if err != nil {
 		return err
 	}
+	if lwsCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Owns(&lwsv1.LeaderWorkerSet{})
+	}
 
-	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		nimServiceBuilder,
-		lwsv1.SchemeGroupVersion.WithResource("leaderworkersets"),
-		&lwsv1.LeaderWorkerSet{},
-	)
+	resourceClaimTemplateCRDExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaimtemplates"))
 	if err != nil {
 		return err
 	}
+	if resourceClaimTemplateCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Owns(&resourcev1beta2.ResourceClaimTemplate{})
+	}
 
-	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		nimServiceBuilder,
-		kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"),
-		&kservev1beta1.InferenceService{},
-	)
+	isvcCRDExists, err := k8sutil.CRDExists(r.discoveryClient, kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"))
 	if err != nil {
 		return err
 	}
-
-	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		nimServiceBuilder,
-		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
-		&gatewayv1.HTTPRoute{},
-	)
-	if err != nil {
-		return err
+	if isvcCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Owns(&kservev1beta1.InferenceService{})
 	}
 
 	return nimServiceBuilder.Complete(r)
