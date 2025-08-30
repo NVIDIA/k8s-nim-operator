@@ -587,6 +587,27 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 		Context("spec reconciliation with DRAResources", func() {
 			It("should request resource claims", func() {
+
+				resourceClaim := &resourcev1beta2.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-resource-claim",
+						Namespace: "default",
+					},
+					Spec: resourcev1beta2.ResourceClaimSpec{
+						Devices: resourcev1beta2.DeviceClaim{
+							Requests: []resourcev1beta2.DeviceRequest{
+								{
+									Name: "test-gpu",
+									Exactly: &resourcev1beta2.ExactDeviceRequest{
+										DeviceClassName: "gpu.nvidia.com",
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(client.Create(context.TODO(), resourceClaim)).To(Succeed())
+
 				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
 					{
 						ResourceClaimName: ptr.To("test-resource-claim"),
@@ -613,6 +634,29 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			})
 
 			It("should request resource claims templates", func() {
+
+				resourceClaimTemplate := &resourcev1beta2.ResourceClaimTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-resource-claim-template",
+						Namespace: "default",
+					},
+					Spec: resourcev1beta2.ResourceClaimTemplateSpec{
+						Spec: resourcev1beta2.ResourceClaimSpec{
+							Devices: resourcev1beta2.DeviceClaim{
+								Requests: []resourcev1beta2.DeviceRequest{
+									{
+										Name: "test-gpu",
+										Exactly: &resourcev1beta2.ExactDeviceRequest{
+											DeviceClassName: "gpu.nvidia.com",
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(client.Create(context.TODO(), resourceClaimTemplate)).To(Succeed())
+
 				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
 					{
 						ResourceClaimTemplateName: ptr.To("test-resource-claim-template"),
@@ -639,6 +683,27 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			})
 
 			It("should only contain the requests from the resource claims", func() {
+
+				resourceClaim := &resourcev1beta2.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-resource-claim",
+						Namespace: "default",
+					},
+					Spec: resourcev1beta2.ResourceClaimSpec{
+						Devices: resourcev1beta2.DeviceClaim{
+							Requests: []resourcev1beta2.DeviceRequest{
+								{
+									Name: "test-gpu",
+									Exactly: &resourcev1beta2.ExactDeviceRequest{
+										DeviceClassName: "gpu.nvidia.com",
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(client.Create(context.TODO(), resourceClaim)).To(Succeed())
+
 				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
 					{
 						ResourceClaimName: ptr.To("test-resource-claim"),
@@ -1104,14 +1169,21 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-nimservice",
 					Namespace: "default",
+					Annotations: map[string]string{
+						utils.GPUCountPerPodAnnotationKey: "8",
+					},
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
+						},
+					},
 					Expose: appsv1alpha1.Expose{
 						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
-						Size:       2,
-						GPUSPerPod: 8,
+						PipelineParallelism: 2,
 					},
 				},
 			}
@@ -1119,6 +1191,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			leaderEnv := utils.SortKeys(nimService.GetLWSLeaderEnv())
 			workerEnv := utils.SortKeys(nimService.GetLWSWorkerEnv())
 
+			fmt.Println("leaderEnv", leaderEnv)
 			Expect(reflect.DeepEqual(leaderEnv, []corev1.EnvVar{
 				{
 					Name:  "NIM_CACHE_PATH",
@@ -1931,9 +2004,13 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123)},
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
-						BackendType: appsv1alpha1.NIMBackendTypeLWS,
-						Size:        2,
-						GPUSPerPod:  2,
+						BackendType:         appsv1alpha1.NIMBackendTypeLWS,
+						PipelineParallelism: 2,
+					},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("2"),
+						},
 					},
 				},
 			}
@@ -2154,9 +2231,13 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123)},
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
-						BackendType: appsv1alpha1.NIMBackendTypeLWS,
-						Size:        2,
-						GPUSPerPod:  2,
+						BackendType:         appsv1alpha1.NIMBackendTypeLWS,
+						PipelineParallelism: 2,
+					},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("2"),
+						},
 					},
 				},
 			}
@@ -2438,23 +2519,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
 			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("1")))
-		})
-
-		It("should assign GPU resource equal to multiNode.GPUSPerPod in multi-node deployment", func() {
-			nimService.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{
-				GPUSPerPod: 2,
-			}
-			profile := &appsv1alpha1.NIMProfile{
-				Name:   "test-profile",
-				Config: map[string]string{"tp": "4"},
-			}
-
-			resources, err := reconciler.addGPUResources(context.TODO(), nimService, profile)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resources).ToNot(BeNil())
-
-			Expect(resources.Requests).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("2")))
-			Expect(resources.Limits).To(HaveKeyWithValue(corev1.ResourceName("nvidia.com/gpu"), resource.MustParse("2")))
 		})
 
 		It("should return an error if tensor parallelism cannot be parsed", func() {

@@ -111,6 +111,15 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	}()
 
+	logger := r.log
+	if nimService.Spec.MultiNode != nil {
+		err = shared.CreateGPUCountPerPodAnnotation(ctx, r.Client, nimService)
+		if err != nil {
+			logger.Error(err, "failed to create GPU count per pod annotation for multi-node NIMService", "name", nimService.Name)
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Validations.
 	isValid, msg, err := r.validateDRAResources(ctx, nimService)
 	if err != nil {
@@ -421,8 +430,8 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 			},
 		}
 
-		// Only assign GPU resources if the NIMCache is for optimized NIM
-		if nimCache.IsOptimizedNIM() {
+		// Only assign GPU resources if the NIMCache is for optimized NIM and the NIMService is not a multi-node NIMService
+		if nimCache.IsOptimizedNIM() && nimService.Spec.MultiNode == nil {
 			// Retrieve and set profile details from NIMCache
 			var err error
 			profile, err = r.getNIMCacheProfile(ctx, nimService, modelProfile)
@@ -575,28 +584,18 @@ func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *
 
 	gpuQuantity := apiResource.MustParse("1")
 	var err error
-	// if deployed as multi-node, use the GPU per worker value to assign GPU resources to each worker
-	// TODO auto determine base on tp*pp/(.spec.multiNode.size)
-	if nimService.Spec.MultiNode != nil {
-		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", nimService.Spec.MultiNode.GPUSPerPod))
+	// If no user-provided GPU resource is found, proceed with auto-assignment
+	// Get tensorParallelism from the profile
+	tensorParallelism, err := utils.GetTensorParallelismByProfileTags(profile.Config)
+	if err != nil {
+		logger.Error(err, "Missing nvidia.com/gpu resource request/limit and unable to retrieve tensorParallelism for NIM profile")
+		return nil, err
+	}
+	if tensorParallelism != "" {
+		gpuQuantity, err = apiResource.ParseQuantity(tensorParallelism)
 		if err != nil {
-			logger.Error(err, "Failed to parse GPU per worker value")
+			logger.Error(err, "Failed to parse tensorParallelism")
 			return nil, err
-		}
-	} else {
-		// If no user-provided GPU resource is found, proceed with auto-assignment
-		// Get tensorParallelism from the profile
-		tensorParallelism, err := utils.GetTensorParallelismByProfileTags(profile.Config)
-		if err != nil {
-			logger.Error(err, "Failed to retrieve tensorParallelism")
-			return nil, err
-		}
-		if tensorParallelism != "" {
-			gpuQuantity, err = apiResource.ParseQuantity(tensorParallelism)
-			if err != nil {
-				logger.Error(err, "Failed to parse tensorParallelism")
-				return nil, err
-			}
 		}
 	}
 

@@ -74,7 +74,7 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	errList = append(errList, validateExposeConfiguration(&spec.Expose, fldPath.Child("expose").Child("ingress"))...)
 	errList = append(errList, validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))...)
 	errList = append(errList, validateScaleConfiguration(&spec.Scale, fldPath.Child("scale"))...)
-	errList = append(errList, validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))...)
+	errList = append(errList, validateResourcesConfiguration(spec, fldPath)...)
 	errList = append(errList, validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)...)
 	errList = append(errList, validateKServeConfiguration(spec, fldPath)...)
 
@@ -385,14 +385,64 @@ func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, fldPath *field.
 }
 
 // Spec.Resources.Claims must be empty.
-func validateResourcesConfiguration(resources *corev1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
+func validateResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
-	if resources != nil {
-		if resources.Claims != nil || len(resources.Claims) != 0 {
-			errList = append(errList, field.Forbidden(fldPath.Child("claims"), "must be empty"))
+
+	// Validate that Claims must be empty
+	if spec.Resources != nil && len(spec.Resources.Claims) > 0 {
+		errList = append(errList, field.Forbidden(fldPath.Child("claims"), "must be empty"))
+	}
+
+	// Validate GPU requirements when MultiNode is enabled
+	if spec.MultiNode != nil {
+		errList = append(errList, validateGPURequirements(spec, fldPath)...)
+	}
+
+	return errList
+}
+
+// validateGPURequirements ensures that GPU resources are properly configured for MultiNode deployments.
+func validateGPURequirements(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+
+	gpuResourceName := corev1.ResourceName("nvidia.com/gpu")
+
+	// Check if GPU requests or limits are specified or DRA resources are specified
+	if spec.Resources == nil && len(spec.DRAResources) == 0 {
+		errList = append(errList, field.Required(fldPath.Child("resources"), "GPU resources must be specified for MultiNode deployments"))
+		return errList
+	}
+
+	if spec.Resources != nil {
+		// At least one of requests or limits must be specified
+		_, hasRequests := spec.Resources.Requests[gpuResourceName]
+		_, hasLimits := spec.Resources.Limits[gpuResourceName]
+
+		if !hasRequests && !hasLimits {
+			errList = append(errList, field.Required(fldPath.Child("resources"), "Either GPU requests or limits must be specified for MultiNode deployments"))
+			return errList
 		}
+
+		// Validate GPU requests if specified
+		if hasRequests {
+			gpuRequests := spec.Resources.Requests[gpuResourceName]
+			if gpuRequests.IsZero() || gpuRequests.Value() <= 0 {
+				errList = append(errList, field.Invalid(fldPath.Child("requests").Child("nvidia.com/gpu"), gpuRequests.String(), "must be greater than 0"))
+			}
+		}
+
+		// Validate GPU limits if specified
+		if hasLimits {
+			gpuLimits := spec.Resources.Limits[gpuResourceName]
+			if gpuLimits.IsZero() || gpuLimits.Value() <= 0 {
+				errList = append(errList, field.Invalid(fldPath.Child("limits").Child("nvidia.com/gpu"), gpuLimits.String(), "must be greater than 0"))
+			}
+		}
+
+		return errList
 	}
 	return errList
+
 }
 
 // validateKServeonfiguration implements required KServe validations.

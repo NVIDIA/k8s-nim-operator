@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strconv"
 
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -140,13 +141,9 @@ type NimServiceMultiNodeConfig struct {
 	BackendType NIMBackendType `json:"backendType,omitempty"`
 
 	// +kubebuilder:default:=1
-	// Size specifies the number of pods to create for the multi-node NIMService.
+	// PipelineParallelism specifies the number of pods to create for the multi-node NIMService.
 	// +kubebuilder:validation:Minimum=1
-	Size int `json:"size,omitempty"`
-
-	// +kubebuilder:default:=1
-	// GPUSPerPod specifies the number of GPUs for each instance. In most cases, this should match `resources.limits.nvidia.com/gpu`.
-	GPUSPerPod int `json:"gpusPerPod,omitempty"`
+	PipelineParallelism int `json:"pipelineParallelism,omitempty"`
 
 	// MPI config for NIMService using LeaderWorkerSet
 	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
@@ -224,6 +221,20 @@ type NIMServiceStorage struct {
 // GetLWSName returns the name to be used for the LeaderWorkerSet based on the custom spec.
 func (n *NIMService) GetLWSName() string {
 	return fmt.Sprintf("%s-lws", n.GetName())
+}
+
+// GetGPUCountPerPod returns the number of GPUs per pod for the NIMService.
+func (n *NIMService) GetGPUCountPerPod() int {
+	gpuQuantity, ok := n.Annotations[utils.GPUCountPerPodAnnotationKey]
+	if !ok {
+		// return 0 if annotation is not present
+		return 0
+	}
+	count, err := strconv.Atoi(gpuQuantity)
+	if err != nil {
+		return 0
+	}
+	return count
 }
 
 // GetPVCName returns the name to be used for the PVC based on the custom spec
@@ -327,7 +338,7 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_NUM_COMPUTE_NODES",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
+			Value: fmt.Sprintf("%d", n.Spec.MultiNode.PipelineParallelism),
 		},
 		{
 			Name:  "NIM_MULTI_NODE",
@@ -335,11 +346,11 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_TENSOR_PARALLEL_SIZE",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.GPUSPerPod),
+			Value: fmt.Sprintf("%d", n.GetGPUCountPerPod()),
 		},
 		{
 			Name:  "NIM_PIPELINE_PARALLEL_SIZE",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
+			Value: fmt.Sprintf("%d", n.Spec.MultiNode.PipelineParallelism),
 		},
 		{
 			Name: "NIM_NODE_RANK",
@@ -376,7 +387,7 @@ func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "GPUS_PER_NODE",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.GPUSPerPod),
+			Value: fmt.Sprintf("%d", n.GetGPUCountPerPod()),
 		},
 		{
 			Name:  "CLUSTER_START_TIMEOUT",
@@ -904,7 +915,7 @@ func (n *NIMService) GetLWSSize() int {
 	if n.Spec.MultiNode == nil {
 		return 0
 	}
-	return n.Spec.MultiNode.Size
+	return n.Spec.MultiNode.PipelineParallelism
 }
 
 // GetDeploymentKind returns the kind of deployment for NIMService.
@@ -1189,10 +1200,10 @@ func (n *NIMService) generateMPIConfigData() map[string]string {
 	// Construct ConfigMap data
 	data := make(map[string]string)
 	for i := 0; i < n.Spec.Replicas; i++ {
-		hostfile := fmt.Sprintf("localhost slots=%d\n", n.Spec.MultiNode.GPUSPerPod)
-		for j := 1; j < n.Spec.MultiNode.Size; j++ {
+		hostfile := fmt.Sprintf("localhost slots=%d\n", n.GetGPUCountPerPod())
+		for j := 1; j < n.Spec.MultiNode.PipelineParallelism; j++ {
 			workerHostname := fmt.Sprintf("%s-%d-%d.%s.%s.svc slots=%d",
-				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.Spec.MultiNode.GPUSPerPod)
+				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.GetGPUCountPerPod())
 			hostfile += workerHostname + "\n"
 		}
 		dataKey := fmt.Sprintf("hostfile-%d", i)
