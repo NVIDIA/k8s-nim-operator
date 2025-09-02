@@ -1184,7 +1184,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
 						Parallelism: appsv1alpha1.Parallelism{
-							PipelineParallelism: 2,
+							PP: 2,
 						},
 					},
 				},
@@ -2008,7 +2008,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
 						BackendType: appsv1alpha1.NIMBackendTypeLWS,
 						Parallelism: appsv1alpha1.Parallelism{
-							PipelineParallelism: 2,
+							PP: 2,
 						},
 					},
 					Resources: &corev1.ResourceRequirements{
@@ -2237,7 +2237,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
 						BackendType: appsv1alpha1.NIMBackendTypeLWS,
 						Parallelism: appsv1alpha1.Parallelism{
-							PipelineParallelism: 2,
+							PP: 2,
 						},
 					},
 					Resources: &corev1.ResourceRequirements{
