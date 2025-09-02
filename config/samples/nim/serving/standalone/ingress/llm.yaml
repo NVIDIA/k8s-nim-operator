@@ -1,8 +1,9 @@
 ---
+# NIM Cache for LLM specific NIM
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  name: meta-llama3-2-1b-instruct
+  name: meta-llama-3-2-1b-instruct
 spec:
   source:
     ngc:
@@ -20,11 +21,11 @@ spec:
       volumeAccessMode: ReadWriteOnce
 
 ---
-# NIM service with DRA resource auto-created with attribute and capacity selectors
+# NIM Service for LLM specific NIM with Autoscaling
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: meta-llama3-8b-instruct
+  name: meta-llama-3-2-1b-instruct
 spec:
   image:
     repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
@@ -35,25 +36,28 @@ spec:
   authSecret: ngc-api-secret
   storage:
     nimCache:
-      name: meta-llama3-8b-instruct
+      name: meta-llama-3-2-1b-instruct
       profile: ''
   replicas: 1
-  draResources:
-  - claimCreationSpec:
-      devices:
-      - name: gpu
-        deviceClassName: gpu.nvidia.com
-        driverName: gpu.nvidia.com
-        attributeSelectors:
-        - key: architecture
-          op: Equal
-          value:
-            stringValue: Ampere
-        capacitySelectors:
-        - key: memory
-          op: GreaterThanOrEqual
-          value: 40Gi
+  resources:
+    limits:
+      nvidia.com/gpu: 1
   expose:
     service:
       type: ClusterIP
       port: 8000
+    ingress:
+      enabled: true
+      spec:
+        ingressClassName: nginx
+        rules:
+          - host: demo.nvidia.example.com
+            http:
+              paths:
+              - backend:
+                  service:
+                    name: meta-llama-3-2-1b-instruct
+                    port:
+                      number: 8000
+                path: /v1/chat/completions
+                pathType: Prefix
