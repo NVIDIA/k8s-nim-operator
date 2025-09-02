@@ -16,6 +16,12 @@ spec:
   env:
     - name: NIM_PEFT_SOURCE
       value: "/model-store/<lora-directory>" # Update with the absolute <lora-directory> path inside the PVC
+    - name: NIM_PEFT_REFRESH_INTERVAL
+      value: "180"
+    - name: NIM_MAX_CPU_LORAS
+      value: "16"
+    - name: NIM_MAX_GPU_LORAS
+      value: "8"
   storage:
     pvc: # Pre-created PVC with downloaded loras
       name: meta-llama-3-2-1b-instruct
