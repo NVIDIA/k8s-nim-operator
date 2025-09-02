@@ -141,7 +141,7 @@ type NimServiceMultiNodeConfig struct {
 	BackendType NIMBackendType `json:"backendType,omitempty"`
 
 	// Parallelism specifies the parallelism strategy for the multi-node NIMService.
-	Parallelism Parallelism `json:"parallelism,omitempty"`
+	Parallelism *ParallelismSpec `json:"parallelism,omitempty"`
 
 	// MPI config for NIMService using LeaderWorkerSet
 	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
@@ -153,11 +153,11 @@ type MultiNodeMPIConfig struct {
 	MPIStartTimeout int `json:"mpiStartTimeout"`
 }
 
-type Parallelism struct {
+type ParallelismSpec struct {
 	// +kubebuilder:default:=1
-	// PP specifies the number of pods to create for the multi-node NIMService.
+	// Pipeline specifies pipeline parallelism size for the multi-node NIMService.
 	// +kubebuilder:validation:Minimum=1
-	PP int `json:"pp,omitempty"`
+	Pipeline *int32 `json:"pipeline,omitempty"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume.
@@ -343,7 +343,7 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_NUM_COMPUTE_NODES",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Parallelism.PP),
+			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Pipeline),
 		},
 		{
 			Name:  "NIM_MULTI_NODE",
@@ -355,7 +355,7 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_PIPELINE_PARALLEL_SIZE",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Parallelism.PP),
+			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Pipeline),
 		},
 		{
 			Name: "NIM_NODE_RANK",
@@ -920,7 +920,7 @@ func (n *NIMService) GetLWSSize() int {
 	if n.Spec.MultiNode == nil {
 		return 0
 	}
-	return n.Spec.MultiNode.Parallelism.PP
+	return int(*n.Spec.MultiNode.Parallelism.Pipeline)
 }
 
 // GetDeploymentKind returns the kind of deployment for NIMService.
@@ -1206,7 +1206,7 @@ func (n *NIMService) generateMPIConfigData() map[string]string {
 	data := make(map[string]string)
 	for i := 0; i < n.Spec.Replicas; i++ {
 		hostfile := fmt.Sprintf("localhost slots=%d\n", n.GetGPUCountPerPod())
-		for j := 1; j < n.Spec.MultiNode.Parallelism.PP; j++ {
+		for j := 1; j < int(*n.Spec.MultiNode.Parallelism.Pipeline); j++ {
 			workerHostname := fmt.Sprintf("%s-%d-%d.%s.%s.svc slots=%d",
 				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.GetGPUCountPerPod())
 			hostfile += workerHostname + "\n"

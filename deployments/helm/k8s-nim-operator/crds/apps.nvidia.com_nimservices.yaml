@@ -980,10 +980,11 @@ spec:
                     description: Parallelism specifies the parallelism strategy for
                       the multi-node NIMService.
                     properties:
-                      pp:
+                      pipeline:
                         default: 1
-                        description: PP specifies the number of pods to create for
-                          the multi-node NIMService.
+                        description: Pipeline specifies pipeline parallelism size
+                          for the multi-node NIMService.
+                        format: int32
                         minimum: 1
                         type: integer
                     type: object
