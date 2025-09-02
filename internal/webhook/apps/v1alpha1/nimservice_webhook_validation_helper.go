@@ -413,7 +413,7 @@ func validateGPURequirements(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.P
 		return errList
 	}
 
-	if spec.Resources != nil {
+	if spec.Resources != nil && len(spec.DRAResources) == 0 {
 		// At least one of requests or limits must be specified
 		_, hasRequests := spec.Resources.Requests[gpuResourceName]
 		_, hasLimits := spec.Resources.Limits[gpuResourceName]

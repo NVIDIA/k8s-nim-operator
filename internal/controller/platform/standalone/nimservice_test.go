@@ -1183,7 +1183,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
-						PipelineParallelism: 2,
+						Parallelism: appsv1alpha1.Parallelism{
+							PipelineParallelism: 2,
+						},
 					},
 				},
 			}
@@ -2004,8 +2006,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123)},
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
-						BackendType:         appsv1alpha1.NIMBackendTypeLWS,
-						PipelineParallelism: 2,
+						BackendType: appsv1alpha1.NIMBackendTypeLWS,
+						Parallelism: appsv1alpha1.Parallelism{
+							PipelineParallelism: 2,
+						},
 					},
 					Resources: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
@@ -2231,8 +2235,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123)},
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
-						BackendType:         appsv1alpha1.NIMBackendTypeLWS,
-						PipelineParallelism: 2,
+						BackendType: appsv1alpha1.NIMBackendTypeLWS,
+						Parallelism: appsv1alpha1.Parallelism{
+							PipelineParallelism: 2,
+						},
 					},
 					Resources: &corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
