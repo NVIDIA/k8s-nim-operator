@@ -2,6 +2,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMPipeline
 metadata:
   name: rag-pipeline
+  namespace: nim-service
 spec:
   services:
     - name: meta-llama3-8b-instruct

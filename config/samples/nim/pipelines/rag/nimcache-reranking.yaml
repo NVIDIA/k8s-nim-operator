@@ -3,6 +3,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: nv-rerankqa-1b-v2
+  namespace: nim-service
 spec:
   source:
     ngc:

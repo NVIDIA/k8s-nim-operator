@@ -3,6 +3,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: deepseek-r1-nimcache
+  namespace: nim-service
 spec:
   source:
     ngc:
@@ -22,6 +23,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
   name: deepseek-r1
+  namespace: nim-service
 spec:
   annotations:
     k8s.v1.cni.cncf.io/networks: example-ipoibnetwork   # configured by NVIDIA Network Operator
@@ -91,7 +93,7 @@ spec:
       type: ClusterIP
       port: 8000
   multiNode:
-    size: 2
-    gpusPerPod: 8
+    parallelism:
+      pp: 2
     mpi:
       mpiStartTimeout: 6000

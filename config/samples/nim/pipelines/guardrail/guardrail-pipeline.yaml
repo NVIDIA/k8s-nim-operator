@@ -2,6 +2,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMPipeline
 metadata:
   name: guardrail-pipeline
+  namespace: nim-service
 spec:
   services:
     - name: content-safety-guard

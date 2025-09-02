@@ -4,6 +4,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: nim-cache-multi-llm
+  namespace: nim-service
 spec:
   source:
     hf:
@@ -26,6 +27,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
   name: nim-service-multi-llm
+  namespace: nim-service
 spec:
   inferencePlatform: kserve
   annotations:

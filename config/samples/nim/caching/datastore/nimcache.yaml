@@ -2,6 +2,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: meta-llama3-1b-instruct
+  namespace: nim-service
 spec:
   source:
     dataStore:
