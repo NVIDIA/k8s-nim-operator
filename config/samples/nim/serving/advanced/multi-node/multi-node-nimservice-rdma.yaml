@@ -1,0 +1,97 @@
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: deepseek-r1-nimcache
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/deepseek-ai/deepseek-r1:1.7.3
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+  storage:
+    pvc:
+      create: true
+      storageClass: "nfs-storage"
+      size: "100Gi"
+      volumeAccessMode: ReadWriteMany
+
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: deepseek-r1
+spec:
+  annotations:
+    k8s.v1.cni.cncf.io/networks: example-ipoibnetwork   # configured by NVIDIA Network Operator
+  env:
+  - name: NCCL_DEBUG
+    value: "WARN"
+  - name: "NCCL_NET"
+    value: "Socket"
+  - name: NIM_USE_SGLANG
+    value: "1"
+  - name: HF_HOME
+    value: /model-store/huggingface/hub
+  - name: NUMBA_CACHE_DIR
+    value: /tmp/numba
+  - name: UCX_TLS
+    value: ib,tcp,shm
+  - name: UCC_TLS
+    value: ucp
+  - name: UCC_CONFIG_FILE
+    value: " "
+  - name: GLOO_SOCKET_IFNAME
+    value: eth0
+  - name: NCCL_SOCKET_IFNAME
+    value: net1
+  - name: NIM_TRUST_CUSTOM_CODE
+    value: "1"
+  readinessProbe:
+    probe:
+      failureThreshold: 3
+      httpGet:
+        path: "/v1/health/ready"
+        port: "api"
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+  startupProbe:
+    probe:
+      failureThreshold: 100
+      httpGet:
+        path: "/v1/health/ready"
+        port: "api"
+      initialDelaySeconds: 900
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+  image:
+    repository: nvcr.io/nim/deepseek-ai/deepseek-r1
+    tag: "1.7.3"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: deepseek-r1-nimcache
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 8
+      rdma/rdma_shared_device_a: 1    # configured through NICClusterPolicy using NVIDIA Network Operator
+    requests:
+      nvidia.com/gpu: 8
+      rdma/rdma_shared_device_a: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  multiNode:
+    size: 2
+    gpusPerPod: 8
+    mpi:
+      mpiStartTimeout: 6000

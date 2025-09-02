@@ -1,0 +1,72 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMPipeline
+metadata:
+  name: guardrail-pipeline
+spec:
+  services:
+    - name: content-safety-guard
+      enabled: true
+      spec:
+        image:
+          repository: nvcr.io/nim/nvidia/llama-3.1-nemoguard-8b-content-safety
+          tag: 1.0.0
+          pullPolicy: IfNotPresent
+          pullSecrets:
+          - ngc-secret
+        authSecret: ngc-api-secret
+        storage:
+          nimCache:
+            name: content-safety-cache
+            profile: ''
+        replicas: 1
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        expose:
+          service:
+            type: ClusterIP
+            port: 8000
+    - name: topic-control-guard
+      enabled: true
+      spec:
+        image:
+          repository: nvcr.io/nim/nvidia/llama-3.1-nemoguard-8b-topic-control
+          tag: 1.0.0
+          pullPolicy: IfNotPresent
+          pullSecrets:
+          - ngc-secret
+        authSecret: ngc-api-secret
+        storage:
+          nimCache:
+            name: topic-control-cache
+            profile: ''
+        replicas: 1
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        expose:
+          service:
+            type: ClusterIP
+            port: 8000
+    - name: jailbreak-detect-guard
+      enabled: true
+      spec:
+        image:
+          repository: nvcr.io/nim/nvidia/nemoguard-jailbreak-detect
+          tag: 1.0.0
+          pullPolicy: IfNotPresent
+          pullSecrets:
+          - ngc-secret
+        authSecret: ngc-api-secret
+        storage:
+          nimCache:
+            name: jailbreak-detect-cache
+            profile: ''
+        replicas: 1
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        expose:
+          service:
+            type: ClusterIP
+            port: 8000
