@@ -17,5 +17,5 @@ spec:
       create: true
       storageClass: ""
       size: "50Gi"
-      volumeAccessMode: ReadWriteMany
+      volumeAccessMode: ReadWriteOnce
   resources: {}

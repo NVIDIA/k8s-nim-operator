@@ -9,20 +9,21 @@ spec:
   source:
     hf:
       endpoint: "https://huggingface.co"
-      namespace: "nvidia"
+      namespace: "meta-llama"
       authSecret: hf-api-secret
       modelPuller: nvcr.io/nim/nvidia/llm-nim:1.12
       pullSecret: ngc-secret
-      modelName: "Llama-3.1-Nemotron-Nano-8B-v1"
+      modelName: "Llama-3.2-1B-Instruct"
   storage:
     pvc:
       create: true
-      storageClass: local-path
+      storageClass: ''
       size: "50Gi"
       volumeAccessMode: ReadWriteOnce
 
 ---
 # NIM Service with Multi-LLM NIM with Autoscaling
+# NOTE: Prometheus should be deployed as a pre-requisite
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:

@@ -23,6 +23,7 @@ spec:
 
 ---
 # NIM Service for LLM specific NIM with Autoscaling
+# NOTE: Ingress controller (e.g. nginx) should be deployed as a pre-requisite
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:

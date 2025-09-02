@@ -7,18 +7,18 @@ metadata:
 spec:
   env:
     - name: NIM_REPOSITORY_OVERRIDE
-      value: "jfrog://<server-name>:<port>/"
+      value: "https://<server-name>:<port>/"
   source:
     ngc:
       modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8
       pullSecret: ngc-secret
-      authSecret: jfrog-api-secret
+      authSecret: https-api-secret
       model:
         engine: "tensorrt"
         tensorParallelism: "1"
   storage:
     pvc:
       create: true
-      storageClass: "local-path"
+      storageClass: ''
       size: "50Gi"
       volumeAccessMode: ReadWriteOnce

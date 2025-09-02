@@ -18,7 +18,7 @@ spec:
       create: true
       storageClass: ''
       size: 10Gi
-      volumeAccessMode: ReadWriteMany
+      volumeAccessMode: ReadWriteOnce
   replicas: 1
   resources:
     limits:
