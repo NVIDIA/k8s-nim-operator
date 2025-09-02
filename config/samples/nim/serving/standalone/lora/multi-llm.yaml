@@ -6,7 +6,6 @@ metadata:
   name: meta-llama-3-2-1b-instruct
   namespace: nim-service
 spec:
-  inferencePlatform: standalone
   image:
     repository: nvcr.io/nim/nvidia/llm-nim
     tag: "1.12"
