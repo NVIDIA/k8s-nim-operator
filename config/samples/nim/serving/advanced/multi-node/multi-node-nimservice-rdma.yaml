@@ -14,7 +14,7 @@ spec:
   storage:
     pvc:
       create: true
-      storageClass: "nfs-storage"
+      storageClass: '' # set to the storage class that supports RWX volumes
       size: "100Gi"
       volumeAccessMode: ReadWriteMany
 

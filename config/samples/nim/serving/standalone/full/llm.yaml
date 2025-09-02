@@ -23,6 +23,7 @@ spec:
 
 ---
 # Complete NIM Service for LLM specific NIM
+# NOTE: Ingress controller (e.g. nginx) and Prometheus should be deployed as a pre-requisite
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:

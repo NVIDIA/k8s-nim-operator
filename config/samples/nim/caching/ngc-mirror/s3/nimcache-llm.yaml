@@ -23,6 +23,6 @@ spec:
   storage:
     pvc:
       create: true
-      storageClass: "local-path"
+      storageClass: ''
       size: "50Gi"
       volumeAccessMode: ReadWriteOnce
