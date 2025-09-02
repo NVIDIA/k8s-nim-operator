@@ -1,0 +1,18 @@
+# NIM Cache with Multi-LLM NIM from NGC
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: nim-cache-multi-llm
+spec:
+  source:
+      ngc:      
+        authSecret: ngc-api-secret
+        modelPuller: nvcr.io/nim/nvidia/llm-nim:1.11.0
+        pullSecret: ngc-secret
+        modelEndpoint: ngc://nvidia/nemo/llama-3_2-1b-instruct:2.0
+  storage:
+    pvc:
+      create: true
+      storageClass: local-path
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce

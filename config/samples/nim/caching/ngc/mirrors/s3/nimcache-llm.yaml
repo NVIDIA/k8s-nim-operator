@@ -1,0 +1,27 @@
+# LLM NIM Cache with Mirrored Local Model Registry
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: meta-llama3-2-1b-instruct
+spec:
+  env:
+    - name: NIM_REPOSITORY_OVERRIDE
+      value: "s3://nim_bucket/"
+    - name: AWS_PROFILE
+      value: "default"
+    - name: AWS_REGION
+      value: "us-east-1"
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8
+      pullSecret: ngc-secret
+      authSecret: aws-api-secret
+      model:
+        engine: "tensorrt"
+        tensorParallelism: "1"
+  storage:
+    pvc:
+      create: true
+      storageClass: "local-path"
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
