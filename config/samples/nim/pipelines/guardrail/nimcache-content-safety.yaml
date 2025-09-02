@@ -3,6 +3,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: content-safety-cache
+  namespace: nim-service
 spec:
   source:
     ngc:

@@ -3,6 +3,7 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: meta-llama3-2-1b-instruct
+  namespace: nim-service
 spec:
   source:
     ngc:
@@ -24,7 +25,8 @@ spec:
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: meta-llama3-8b-instruct
+  name: meta-llama3-2-1b-instruct
+  namespace: nim-service
 spec:
   image:
     repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
@@ -35,7 +37,7 @@ spec:
   authSecret: ngc-api-secret
   storage:
     nimCache:
-      name: meta-llama3-8b-instruct
+      name: meta-llama3-2-1b-instruct
       profile: ''
   replicas: 1
   draResources:
