@@ -1,0 +1,85 @@
+---
+# NIM Cache for LLM specific NIM
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: meta-llama-3-2-1b-instruct
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: tensorrt_llm
+        tensorParallelism: "1"
+  storage:
+    pvc:
+      create: true
+      storageClass: ""
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+
+---
+# Complete NIM Service for LLM specific NIM
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-3-2-1b-instruct
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
+    tag: "1.8"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama-3-2-1b-instruct
+      profile: ''
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+    ingress:
+      enabled: true
+      spec:
+        ingressClassName: nginx
+        rules:
+          - host: demo.nvidia.example.com
+            http:
+              paths:
+              - backend:
+                  service:
+                    name: meta-llama-3-2-1b-instruct
+                    port:
+                      number: 8000
+                path: /v1/chat/completions
+                pathType: Prefix
+  metrics:
+    enabled: true
+    serviceMonitor:
+      additionalLabels:
+        release: kube-prometheus-stack
+  scale:
+    enabled: true
+    hpa:
+      maxReplicas: 2
+      minReplicas: 1
+      metrics:
+      - type: Object
+        object:
+          metric:
+            name: gpu_cache_usage_perc
+          describedObject:
+            apiVersion: v1
+            kind: Service
+            name: meta-llama-3-2-1b-instruct
+          target:
+            type: Value
+            value: "0.5"

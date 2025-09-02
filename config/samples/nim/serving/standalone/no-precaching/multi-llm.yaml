@@ -1,0 +1,37 @@
+---
+# NIM Service with Multi-LLM NIM with Autoscaling
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-3-2-1b-instruct
+  namespace: nim-service
+spec:
+  inferencePlatform: standalone
+  image:
+    repository: nvcr.io/nim/nvidia/llm-nim
+    tag: "1.12"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    pvc:
+      create: true
+      storageClass: ''
+      size: 10Gi
+      volumeAccessMode: ReadWriteMany
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      cpu: "12"
+      memory: 32Gi
+    requests:
+      nvidia.com/gpu: 1
+      cpu: "4"
+      memory: 6Gi
+  replicas: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+
