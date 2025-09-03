@@ -139,17 +139,21 @@ type NimServiceMultiNodeConfig struct {
 	// BackendType specifies the backend type for the multi-node NIMService. Currently only LWS is supported.
 	BackendType NIMBackendType `json:"backendType,omitempty"`
 
-	// +kubebuilder:default:=1
-	// Size specifies the number of pods to create for the multi-node NIMService.
-	// +kubebuilder:validation:Minimum=1
-	Size int `json:"size,omitempty"`
-
-	// +kubebuilder:default:=1
-	// GPUSPerPod specifies the number of GPUs for each instance. In most cases, this should match `resources.limits.nvidia.com/gpu`.
-	GPUSPerPod int `json:"gpusPerPod,omitempty"`
+	// Parallelism specifies the parallelism strategy for the multi-node NIMService.
+	Parallelism *ParallelismSpec `json:"parallelism"`
 
 	// MPI config for NIMService using LeaderWorkerSet
 	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
+}
+
+type ParallelismSpec struct {
+	// Pipeline specifies pipeline parallelism size for the multi-node NIMService.
+	// +kubebuilder:validation:Minimum=1
+	Pipeline *uint32 `json:"pipeline,omitempty"`
+
+	// Tensor specifies tensor parallelism size for the multi-node NIMService.
+	// +kubebuilder:validation:Minimum=1
+	Tensor *uint32 `json:"tensor,omitempty"`
 }
 
 type MultiNodeMPIConfig struct {
@@ -327,7 +331,7 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_NUM_COMPUTE_NODES",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
+			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Pipeline),
 		},
 		{
 			Name:  "NIM_MULTI_NODE",
@@ -335,11 +339,11 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_TENSOR_PARALLEL_SIZE",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.GPUSPerPod),
+			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Tensor),
 		},
 		{
 			Name:  "NIM_PIPELINE_PARALLEL_SIZE",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.Size),
+			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Pipeline),
 		},
 		{
 			Name: "NIM_NODE_RANK",
@@ -376,7 +380,7 @@ func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "GPUS_PER_NODE",
-			Value: fmt.Sprintf("%d", n.Spec.MultiNode.GPUSPerPod),
+			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Tensor),
 		},
 		{
 			Name:  "CLUSTER_START_TIMEOUT",
@@ -904,7 +908,7 @@ func (n *NIMService) GetLWSSize() int {
 	if n.Spec.MultiNode == nil {
 		return 0
 	}
-	return n.Spec.MultiNode.Size
+	return int(*n.Spec.MultiNode.Parallelism.Pipeline)
 }
 
 // GetDeploymentKind returns the kind of deployment for NIMService.
@@ -1189,10 +1193,10 @@ func (n *NIMService) generateMPIConfigData() map[string]string {
 	// Construct ConfigMap data
 	data := make(map[string]string)
 	for i := 0; i < n.Spec.Replicas; i++ {
-		hostfile := fmt.Sprintf("localhost slots=%d\n", n.Spec.MultiNode.GPUSPerPod)
-		for j := 1; j < n.Spec.MultiNode.Size; j++ {
+		hostfile := fmt.Sprintf("localhost slots=%d\n", *n.Spec.MultiNode.Parallelism.Tensor)
+		for j := 1; j < int(*n.Spec.MultiNode.Parallelism.Pipeline); j++ {
 			workerHostname := fmt.Sprintf("%s-%d-%d.%s.%s.svc slots=%d",
-				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.Spec.MultiNode.GPUSPerPod)
+				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), *n.Spec.MultiNode.Parallelism.Tensor)
 			hostfile += workerHostname + "\n"
 		}
 		dataKey := fmt.Sprintf("hostfile-%d", i)
