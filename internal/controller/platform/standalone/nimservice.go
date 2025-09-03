@@ -1008,7 +1008,7 @@ func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *
 	// if deployed as multi-node, use the GPU per worker value to assign GPU resources to each worker
 	// TODO auto determine base on tp*pp/(.spec.multiNode.size)
 	if nimService.Spec.MultiNode != nil {
-		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", nimService.Spec.MultiNode.GPUSPerPod))
+		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", *nimService.Spec.MultiNode.Parallelism.Tensor))
 		if err != nil {
 			logger.Error(err, "Failed to parse GPU per worker value")
 			return nil, err

@@ -1110,8 +1110,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
-						Size:       2,
-						GPUSPerPod: 8,
+						Parallelism: &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(8)), Pipeline: ptr.To(uint32(2))},
 					},
 				},
 			}
@@ -1932,8 +1931,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
 						BackendType: appsv1alpha1.NIMBackendTypeLWS,
-						Size:        2,
-						GPUSPerPod:  2,
+						Parallelism: &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(2)), Pipeline: ptr.To(uint32(2))},
 					},
 				},
 			}
@@ -2155,8 +2153,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
 						BackendType: appsv1alpha1.NIMBackendTypeLWS,
-						Size:        2,
-						GPUSPerPod:  2,
+						Parallelism: &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(2)), Pipeline: ptr.To(uint32(2))},
 					},
 				},
 			}
@@ -2442,7 +2439,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 		It("should assign GPU resource equal to multiNode.GPUSPerPod in multi-node deployment", func() {
 			nimService.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{
-				GPUSPerPod: 2,
+				Parallelism: &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(2))},
 			}
 			profile := &appsv1alpha1.NIMProfile{
 				Name:   "test-profile",
