@@ -1,5 +1,5 @@
 ---
-# Pre-create a resource claim template
+# Create a ResourceClaimTemplate for GPU allocation
 apiVersion: resource.k8s.io/v1beta2
 kind: ResourceClaimTemplate
 metadata:
@@ -16,6 +16,7 @@ spec:
         name: gpu
 
 ---
+# NIM Cache with LLM-Specific NIM from NGC
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
