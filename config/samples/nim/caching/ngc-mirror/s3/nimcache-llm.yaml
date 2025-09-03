@@ -14,7 +14,7 @@ spec:
       value: "us-east-1"
   source:
     ngc:
-      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8
+      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.12.0
       pullSecret: ngc-secret
       authSecret: aws-api-secret
       model:

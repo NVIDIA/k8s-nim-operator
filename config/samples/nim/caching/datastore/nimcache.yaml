@@ -1,3 +1,4 @@
+# Caching NIM from the NeMo Datastore service
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:

@@ -10,7 +10,7 @@ spec:
       value: "jfrog://<server-name>:<port>/"
   source:
     ngc:
-      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8
+      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.12.0
       pullSecret: ngc-secret
       authSecret: jfrog-api-secret
       model:
