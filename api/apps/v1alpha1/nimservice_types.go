@@ -331,7 +331,7 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_NUM_COMPUTE_NODES",
-			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Pipeline),
+			Value: fmt.Sprintf("%d", n.GetMultiNodePipelineParallelism()),
 		},
 		{
 			Name:  "NIM_MULTI_NODE",
@@ -339,11 +339,11 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "NIM_TENSOR_PARALLEL_SIZE",
-			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Tensor),
+			Value: fmt.Sprintf("%d", n.GetMultiNodeTensorParallelism()),
 		},
 		{
 			Name:  "NIM_PIPELINE_PARALLEL_SIZE",
-			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Pipeline),
+			Value: fmt.Sprintf("%d", n.GetMultiNodePipelineParallelism()),
 		},
 		{
 			Name: "NIM_NODE_RANK",
@@ -380,7 +380,7 @@ func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  "GPUS_PER_NODE",
-			Value: fmt.Sprintf("%d", *n.Spec.MultiNode.Parallelism.Tensor),
+			Value: fmt.Sprintf("%d", n.GetMultiNodeTensorParallelism()),
 		},
 		{
 			Name:  "CLUSTER_START_TIMEOUT",
@@ -908,7 +908,7 @@ func (n *NIMService) GetLWSSize() int {
 	if n.Spec.MultiNode == nil {
 		return 0
 	}
-	return int(*n.Spec.MultiNode.Parallelism.Pipeline)
+	return int(n.GetMultiNodePipelineParallelism())
 }
 
 // GetDeploymentKind returns the kind of deployment for NIMService.
@@ -1193,10 +1193,10 @@ func (n *NIMService) generateMPIConfigData() map[string]string {
 	// Construct ConfigMap data
 	data := make(map[string]string)
 	for i := 0; i < n.Spec.Replicas; i++ {
-		hostfile := fmt.Sprintf("localhost slots=%d\n", *n.Spec.MultiNode.Parallelism.Tensor)
-		for j := 1; j < int(*n.Spec.MultiNode.Parallelism.Pipeline); j++ {
+		hostfile := fmt.Sprintf("localhost slots=%d\n", n.GetMultiNodeTensorParallelism())
+		for j := 1; j < int(n.GetMultiNodePipelineParallelism()); j++ {
 			workerHostname := fmt.Sprintf("%s-%d-%d.%s.%s.svc slots=%d",
-				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), *n.Spec.MultiNode.Parallelism.Tensor)
+				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.GetMultiNodeTensorParallelism())
 			hostfile += workerHostname + "\n"
 		}
 		dataKey := fmt.Sprintf("hostfile-%d", i)
@@ -1756,6 +1756,20 @@ func (n *NIMService) GetInferenceServiceHPAParams() (*int32, int32, string, stri
 	}
 
 	return minReplicas, maxReplicas, metric, metricType, target
+}
+
+func (n *NIMService) GetMultiNodeTensorParallelism() uint32 {
+	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Tensor != nil {
+		return *n.Spec.MultiNode.Parallelism.Tensor
+	}
+	return 0
+}
+
+func (n *NIMService) GetMultiNodePipelineParallelism() uint32 {
+	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Tensor != nil {
+		return *n.Spec.MultiNode.Parallelism.Pipeline
+	}
+	return 0
 }
 
 func init() {
