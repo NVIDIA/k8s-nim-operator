@@ -1744,7 +1744,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 		It("should assign GPU resource equal to multiNode.GPUSPerPod in multi-node deployment", func() {
 			nimService.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{
-				GPUSPerPod: 2,
+				Parallelism: &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(2))},
 			}
 			profile := &appsv1alpha1.NIMProfile{
 				Name:   "test-profile",
