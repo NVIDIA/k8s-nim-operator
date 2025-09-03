@@ -94,6 +94,7 @@ spec:
       port: 8000
   multiNode:
     parallelism:
-      pp: 2
+      pipeline: 2
+      tensor: 8
     mpi:
       mpiStartTimeout: 6000
