@@ -1,4 +1,5 @@
 ---
+# NIM Cache with LLM-Specific NIM from NGC
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
@@ -19,6 +20,7 @@ spec:
       volumeAccessMode: ReadWriteMany
 
 ---
+# NIM service with multi-node deployment enabled without RDMA
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
