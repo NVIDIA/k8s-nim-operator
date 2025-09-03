@@ -22,7 +22,7 @@ spec:
       volumeAccessMode: ReadWriteOnce
 
 ---
-# NIM service with DRA resource auto-created with CEL expressions
+# NIM Service with DRA resource auto-created with CEL expressions
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:

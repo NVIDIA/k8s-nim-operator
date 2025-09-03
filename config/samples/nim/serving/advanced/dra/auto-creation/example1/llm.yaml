@@ -22,7 +22,7 @@ spec:
       volumeAccessMode: ReadWriteOnce
 
 ---
-# NIM service with DRA resource auto-created with attribute and capacity selectors
+# NIM Service with DRA resource auto-created with attribute and capacity selectors
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:

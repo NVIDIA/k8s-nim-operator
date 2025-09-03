@@ -20,7 +20,7 @@ spec:
       volumeAccessMode: ReadWriteMany
 
 ---
-# NIM service with multi-node deployment enabled without RDMA
+# NIM Service with multi-node deployment enabled without RDMA
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:

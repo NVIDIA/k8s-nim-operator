@@ -1,5 +1,5 @@
 ---
-# NIM Service with Multi-LLM NIM with Autoscaling
+# NIM Service with Multi-LLM NIM with model not pre-cached
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
