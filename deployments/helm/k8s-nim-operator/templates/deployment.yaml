@@ -51,8 +51,21 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          - name: OPERATOR_NAME_PREFIX
+            value: {{ include "k8s-nim-operator.fullname" . }}
           - name: ENABLE_WEBHOOKS
             value: "{{ .Values.operator.admissionController.enabled }}"
+          - name: TLS_MODE
+            value: "{{ .Values.operator.admissionController.tls.mode }}"
+          - name: TLS_SECRET
+            value: "{{ .Values.operator.admissionController.tls.secret.name }}"
+          - name: TLS_CA
+          {{- if and (eq .Values.operator.admissionController.tls.mode "secret") (.Values.operator.admissionController.tls.secret.caBundle) }}
+            value: |-
+{{ .Values.operator.admissionController.tls.secret.caBundle | nindent 14 }}
+          {{- else }}
+            value: ""
+          {{- end }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -79,8 +92,12 @@ spec:
       volumes:
         - name: cert
           secret:
-            secretName: {{ include "k8s-nim-operator.fullname" . }}-webhook-server-cert
-            defaultMode: 420
+            secretName: {{- if eq .Values.operator.admissionController.tls.mode "secret" }}
+              {{ .Values.operator.admissionController.tls.secret.name }}
+            {{- else }}
+              {{ include "k8s-nim-operator.fullname" . }}-webhook-server-cert
+            {{- end }}
+            defaultMode: 420      
       {{- end }}
     {{- with .Values.operator.nodeSelector }}
       nodeSelector:

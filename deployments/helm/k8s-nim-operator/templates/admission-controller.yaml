@@ -19,7 +19,9 @@ spec:
     app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 ---
-{{- if .Values.operator.admissionController.enabled }}
+{{ if and .Values.operator.admissionController.enabled (eq .Values.operator.admissionController.tls.mode "cert-manager") }}
+{{ $issuerType := default "selfsigned" .Values.operator.admissionController.tls.certManager.issuerType -}}
+{{ $issuerName := .Values.operator.admissionController.tls.certManager.issuerName -}}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -32,13 +34,16 @@ spec:
   dnsNames:
     - {{ include "k8s-nim-operator.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc
     - {{ include "k8s-nim-operator.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc.cluster.local
+    {{- range .Values.operator.admissionController.tls.certManager.dnsNames }}
+    - {{ . }}
+    {{- end }}
   issuerRef:
-    kind: Issuer
-    name: {{ include "k8s-nim-operator.fullname" . }}-selfsigned-issuer
+    kind: {{- if eq (lower $issuerType) "clusterissuer" }} ClusterIssuer {{- else }} Issuer {{- end }}
+    name: {{- if eq (lower $issuerType) "selfsigned" }} {{ include "k8s-nim-operator.fullname" . }}-selfsigned-issuer {{- else }} {{ required "operator.admissionController.tls.certManager.issuerName is required when issuerType is 'issuer' or 'clusterissuer'" $issuerName }} {{- end }}
   secretName: {{ include "k8s-nim-operator.fullname" . }}-webhook-server-cert
 {{- end }}
 ---
-{{- if .Values.operator.admissionController.enabled }}
+{{ if and .Values.operator.admissionController.enabled (eq .Values.operator.admissionController.tls.mode "cert-manager") (eq (lower (default "selfsigned" .Values.operator.admissionController.tls.certManager.issuerType)) "selfsigned") }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
@@ -50,44 +55,3 @@ metadata:
 spec:
   selfSigned: {}
 {{- end}}
----
-{{- if .Values.operator.admissionController.enabled }}
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
-metadata:
-  name: {{ include "k8s-nim-operator.fullname" . }}-validating-webhook-configuration
-  annotations:
-    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "k8s-nim-operator.fullname" . }}-serving-cert
-  labels:
-    app.kubernetes.io/name: k8s-nim-operator
-    app.kubernetes.io/managed-by: helm
-webhooks:
-  - name: vnimcache-v1alpha1.kb.io
-    admissionReviewVersions: ["v1"]
-    clientConfig:
-      service:
-        name: {{ include "k8s-nim-operator.fullname" . }}-webhook-service
-        namespace: {{ .Release.Namespace }}
-        path: /validate-apps-nvidia-com-v1alpha1-nimcache
-    failurePolicy: Fail
-    rules:
-      - apiGroups: ["apps.nvidia.com"]
-        apiVersions: ["v1alpha1"]
-        operations: ["CREATE", "UPDATE"]
-        resources: ["nimcaches"]
-    sideEffects: None
-  - name: vnimservice-v1alpha1.kb.io
-    admissionReviewVersions: ["v1"]
-    clientConfig:
-      service:
-        name: {{ include "k8s-nim-operator.fullname" . }}-webhook-service
-        namespace: {{ .Release.Namespace }}
-        path: /validate-apps-nvidia-com-v1alpha1-nimservice
-    failurePolicy: Fail
-    rules:
-      - apiGroups: ["apps.nvidia.com"]
-        apiVersions: ["v1alpha1"]
-        operations: ["CREATE", "UPDATE"]
-        resources: ["nimservices"]
-    sideEffects: None
-{{- end }}
