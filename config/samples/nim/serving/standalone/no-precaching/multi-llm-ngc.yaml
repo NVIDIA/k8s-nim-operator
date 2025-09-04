@@ -1,9 +1,9 @@
 ---
-# NIM Service with Multi-LLM NIM with Autoscaling
+# NIM Service with Multi-LLM NIM with model not pre-cached
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: meta-llama-3-2-1b-instruct
+  name: meta-llama-3-8b-instruct
   namespace: nim-service
 spec:
   image:
@@ -15,7 +15,7 @@ spec:
   authSecret: ngc-api-secret
   env:
     - name: NIM_MODEL_NAME
-      value: nvidia/nemo/llama-3_2-1b-instruct
+      value: 'ngc://nvidian/nim-llm-dev/meta-llama3-8b-instruct:hf'
   storage:
     pvc:
       create: true
