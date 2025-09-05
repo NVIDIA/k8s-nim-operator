@@ -74,6 +74,10 @@ func validateNGCSource(ngcSource *appsv1alpha1.NGCSource, fldPath *field.Path) f
 func validateModel(model *appsv1alpha1.ModelSpec, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
 
+	if model == nil {
+		return errList
+	}
+
 	// If Model.Profiles is not empty, ensure all other Model fields are empty. If Model.Profiles contains "all", length must be 1
 	if len(model.Profiles) > 0 {
 

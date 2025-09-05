@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -34,6 +35,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -43,7 +45,9 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/config"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	webhookappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/internal/webhook/apps/v1alpha1"
 	// +kubebuilder:scaffold:imports
@@ -256,27 +260,33 @@ func main() {
 
 	// nolint:goconst
 	// Parse ENABLE_WEBHOOKS environment variable once as a boolean.
-	var enableWebhooks bool
 	if val, ok := os.LookupEnv("ENABLE_WEBHOOKS"); ok {
 		var err error
-		enableWebhooks, err = strconv.ParseBool(val)
+		config.EnableWebhooks, err = strconv.ParseBool(val)
 		if err != nil {
 			setupLog.Error(err, "invalid value for ENABLE_WEBHOOKS, expected boolean")
 			os.Exit(1)
 		}
 	}
-
-	if enableWebhooks {
-		if err := webhookappsv1alpha1.SetupNIMCacheWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "NIMCache")
-			os.Exit(1)
+	if val, ok := os.LookupEnv("TLS_MODE"); ok {
+		if val != "cert-manager" && val != "secret" {
+			setupLog.Error(err, "invalid value for TLS_MODE, expected 'cert-manager' or 'secret")
 		}
-
-		if err := webhookappsv1alpha1.SetupNIMServiceWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "NIMService")
-			os.Exit(1)
-		}
+		config.TLSMode = val
 	}
+	if val, ok := os.LookupEnv("TLS_SECRET"); ok {
+		config.TLSSecret = val
+	}
+	if val, ok := os.LookupEnv("TLS_CA"); ok {
+		config.TLSCA = []byte(val)
+	}
+	if val, ok := os.LookupEnv("OPERATOR_NAME_PREFIX"); ok {
+		config.OperatorNamePrefix = val
+	}
+	if val, ok := os.LookupEnv("OPERATOR_NAMESPACE"); ok {
+		config.OperatorNamespace = val
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -286,6 +296,44 @@ func main() {
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
+	}
+
+	cfg := ctrl.GetConfigOrDie()
+	liveClient, err := crclient.New(cfg, crclient.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to construct live client")
+		os.Exit(1)
+	}
+	ctx := context.Background()
+	orch, err := k8sutil.GetOrchestratorType(ctx, liveClient) // uses direct REST calls
+	if err != nil {
+		setupLog.Error(err, "failed to detect orchestrator type")
+		os.Exit(1)
+	}
+	config.OrchestratorType = orch
+	setupLog.Info("detected orchestrator", "type", orch)
+
+	if config.EnableWebhooks {
+		if err := webhookappsv1alpha1.SetupNIMCacheWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "NIMCache")
+			os.Exit(1)
+		}
+
+		if err := webhookappsv1alpha1.SetupNIMServiceWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "NIMService")
+			os.Exit(1)
+		}
+		// Set up cluster-level ValidatingWebhookConfiguration.
+		if err := webhookappsv1alpha1.EnsureValidatingWebhook(
+			context.TODO(),
+			mgr.GetAPIReader(), // uncached reads
+			mgr.GetClient(),    // writes go through the normal client
+			config.OperatorNamespace,
+			config.OperatorNamePrefix,
+		); err != nil {
+			setupLog.Error(err, "unable to ensure ValidatingWebhookConfiguration")
+			os.Exit(1)
+		}
 	}
 
 	setupLog.Info("starting manager")
