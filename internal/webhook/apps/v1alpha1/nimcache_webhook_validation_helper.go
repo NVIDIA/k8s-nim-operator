@@ -74,7 +74,7 @@ func validateModel(model *appsv1alpha1.ModelSpec, fldPath *field.Path) (admissio
 	warnList := admission.Warnings{}
 
 	if model == nil {
-		return errList
+		return warnList, errList
 	}
 
 	// If Model.Profiles is not empty, ensure all other Model fields are empty. If Model.Profiles contains "all", length must be 1

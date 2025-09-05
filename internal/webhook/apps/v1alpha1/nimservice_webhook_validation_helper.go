@@ -103,6 +103,32 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
+	w, err = validateExposeConfiguration(&spec.Expose, fldPath.Child("expose"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateRedundantIngressConfiguration(spec, fldPath)
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	return warningList, errList
+}
+
+func validateRedundantIngressConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
+	errList := field.ErrorList{}
+	if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled && spec.Router.IngressClass != nil && *spec.Router.IngressClass != "" { //nolint:staticcheck
+		errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress"), fmt.Sprintf("%s is deprecated. Omit the field if you use .spec.router instead", fldPath.Child("expose").Child("ingress"))))
+	}
+	return warningList, errList
+}
+
+func validateExposeConfiguration(expose *appsv1alpha1.Expose, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
+	errList := field.ErrorList{}
+	if expose.Ingress.Enabled != nil && *expose.Ingress.Enabled {
+		warningList = append(warningList, ".spec.expose.ingress is deprecated, use .spec.router instead.")
+	}
 	return warningList, errList
 }
 
@@ -462,10 +488,17 @@ func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *fie
 			errList = append(errList, field.Forbidden(fldPath.Child("scale").Child("enabled"), fmt.Sprintf("%s (autoscaling) cannot be set when KServe runs in serverless mode", fldPath.Child("scale"))))
 		}
 
-		// Spec.Expose.Ingress cannot be set.
+		// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+		if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled { //nolint:staticcheck
+			errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("expose").Child("ingress").Child("enabled"))))
+		}
+
+		// Spec.Router.Ingress cannot be set.
 		if spec.Router.IngressClass != nil && *spec.Router.IngressClass != "" {
 			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingressClass"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("ingressClass"))))
 		}
+
+		// Spec.Router.Gateway cannot be set.
 
 		if spec.Router.Gateway != nil {
 			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("gateway"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("gateway"))))
