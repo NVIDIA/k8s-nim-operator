@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -59,6 +60,7 @@ type NemoEntitystoreReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
+	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
 	recorder         record.EventRecorder
@@ -69,13 +71,14 @@ type NemoEntitystoreReconciler struct {
 var _ shared.Reconciler = &NemoEntitystoreReconciler{}
 
 // NewNemoEntitystoreReconciler creates a new reconciler for NemoEntitystore with the given platform.
-func NewNemoEntitystoreReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoEntitystoreReconciler {
+func NewNemoEntitystoreReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NemoEntitystoreReconciler {
 	return &NemoEntitystoreReconciler{
-		Client:   client,
-		scheme:   scheme,
-		updater:  updater,
-		renderer: renderer,
-		log:      log,
+		Client:          client,
+		scheme:          scheme,
+		updater:         updater,
+		discoveryClient: discoveryClient,
+		renderer:        renderer,
+		log:             log,
 	}
 }
 
@@ -94,6 +97,7 @@ func NewNemoEntitystoreReconciler(client client.Client, scheme *runtime.Scheme, 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalars,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 
@@ -228,7 +232,7 @@ func (r *NemoEntitystoreReconciler) GetOrchestratorType(ctx context.Context) (k8
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoEntitystoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nemo-entitystore-service-controller")
-	return ctrl.NewControllerManagedBy(mgr).
+	bd := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoEntitystore{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -245,7 +249,7 @@ func (r *NemoEntitystoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					newNemoEntitystore, ok := e.ObjectNew.(*appsv1alpha1.NemoEntitystore)
 					if ok {
 						// Handle case where object is marked for deletion
-						if !newNemoEntitystore.ObjectMeta.DeletionTimestamp.IsZero() {
+						if !newNemoEntitystore.DeletionTimestamp.IsZero() {
 							return true
 						}
 
@@ -256,8 +260,19 @@ func (r *NemoEntitystoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				// For other types we watch, reconcile them
 				return true
 			},
-		}).
-		Complete(r)
+		})
+
+	bd, err := k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		bd,
+		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		&gatewayv1.HTTPRoute{},
+	)
+	if err != nil {
+		return err
+	}
+
+	return bd.Complete(r)
 }
 
 func (r *NemoEntitystoreReconciler) refreshMetrics(ctx context.Context) {
@@ -330,6 +345,21 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
+		if err != nil && !errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Sync HTTPRoute
+	if nemoEntitystore.IsHTTPRouteEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoEntitystore, &renderer, &gatewayv1.HTTPRoute{}, func() (client.Object, error) {
+			return renderer.HTTPRoute(nemoEntitystore.GetHTTPRouteParams())
+		}, "httproute", conditions.ReasonHTTPRouteFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
 		if err != nil && !errors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
