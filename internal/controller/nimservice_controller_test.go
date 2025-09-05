@@ -55,7 +55,7 @@ var _ = Describe("NIMService Controller", func() {
 		Expect(batchv1.AddToScheme(scheme)).To(Succeed())
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
-		Expect(gatewayv1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.Install(scheme)).To(Succeed())
 
 		testClient = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).

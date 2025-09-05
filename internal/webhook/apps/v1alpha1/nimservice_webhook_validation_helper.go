@@ -103,13 +103,17 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
+	w, err = validateExposeConfiguration(&spec.Expose, fldPath.Child("expose"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
 	return warningList, errList
 }
 
 func validateExposeConfiguration(expose *appsv1alpha1.Expose, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
-	if expose.Ingress.Enabled != nil && *expose.Ingress.Enabled {
+	if expose.Ingress.Enabled != nil && *expose.Ingress.Enabled { //nolint:staticcheck
 		warningList = append(warningList, ".spec.expose.ingress is deprecated, use .spec.router instead.")
 	}
 	return warningList, errList
