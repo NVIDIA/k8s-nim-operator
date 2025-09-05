@@ -42,9 +42,7 @@ const (
 type Expose struct {
 	Service Service `json:"service,omitempty"`
 	// Deprecated: Use .spec.router instead.
-	// Ingress Ingress `json:"ingress,omitempty"`
-	// Deprecated: Use .spec.router instead.
-	// HTTPRoute HTTPRoute `json:"httpRoute,omitempty"`
+	Ingress Ingress `json:"ingress,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingressClass))", message="ingressClass and gateway cannot be specified together"
@@ -146,41 +144,6 @@ type Ingress struct {
 	Enabled     *bool                    `json:"enabled,omitempty"`
 	Annotations map[string]string        `json:"annotations,omitempty"`
 	Spec        networkingv1.IngressSpec `json:"spec,omitempty"`
-}
-
-// HTTPRoute defines attributes to HTTPRoute in Gateway API.
-type HTTPRoute struct {
-	Enabled     *bool             `json:"enabled,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Spec        *HTTPRouteSpec    `json:"spec,omitempty"`
-}
-
-type HTTPRouteSpec struct {
-	gatewayv1.CommonRouteSpec `json:",inline"`
-	Host                      gatewayv1.Hostname `json:"host,omitempty"`
-	Paths                     []HTTPPathMatch    `json:"paths,omitempty"`
-}
-
-type HTTPPathMatch struct {
-	// Type specifies how to match against the path Value.
-	// +optional
-	// +kubebuilder:default=PathPrefix
-	Type *gatewayv1.PathMatchType `json:"type,omitempty"`
-
-	// Value of the HTTP path to match against.
-	// +optional
-	// +kubebuilder:default="/"
-	// +kubebuilder:validation:MaxLength=1024
-	Value *string `json:"value,omitempty"`
-}
-
-// IngressV1 defines attributes for ingress
-//
-// +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
-type IngressV1 struct {
-	Enabled     *bool             `json:"enabled,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Spec        *IngressSpec      `json:"spec,omitempty"`
 }
 
 // ResourceRequirements defines the resources required for a container.
