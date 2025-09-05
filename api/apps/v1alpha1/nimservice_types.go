@@ -90,6 +90,7 @@ const (
 
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router.ingressClass))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingressClass."
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
@@ -942,11 +943,15 @@ func (n *NIMService) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NIMService deployment.
 func (n *NIMService) IsIngressEnabled() bool {
-	return n.Spec.Router.IngressClass != nil && *n.Spec.Router.IngressClass != ""
+	return (n.Spec.Router.IngressClass != nil && *n.Spec.Router.IngressClass != "") || (n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled)
 }
 
 // GetIngressSpec returns the Ingress spec NIMService deployment.
 func (n *NIMService) GetIngressSpec() networkingv1.IngressSpec {
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
+		return n.Spec.Expose.GenerateIngressSpec(n.GetName())
+	}
 	return n.Spec.Router.GenerateIngressSpec(n.GetName())
 }
 

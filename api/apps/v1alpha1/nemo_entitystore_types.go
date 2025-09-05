@@ -59,6 +59,7 @@ const (
 )
 
 // NemoEntitystoreSpec defines the desired state of NemoEntitystore.
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router.ingressClass))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingressClass."
 type NemoEntitystoreSpec struct {
 	Image        Image                        `json:"image"`
 	Command      []string                     `json:"command,omitempty"`
@@ -72,7 +73,7 @@ type NemoEntitystoreSpec struct {
 	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
-	Expose  Expose      `json:"expose,omitempty"`
+	Expose  ExposeV1    `json:"expose,omitempty"`
 	Router  Router      `json:"router,omitempty"`
 	Scale   Autoscaling `json:"scale,omitempty"`
 	Metrics Metrics     `json:"metrics,omitempty"`
@@ -393,11 +394,16 @@ func (n *NemoEntitystore) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NemoEntitystore deployment.
 func (n *NemoEntitystore) IsIngressEnabled() bool {
-	return n.Spec.Router.IngressClass != nil && *n.Spec.Router.IngressClass != ""
+	return (n.Spec.Router.IngressClass != nil && *n.Spec.Router.IngressClass != "") ||
+		(n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled) // TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
 }
 
 // GetIngressSpec returns the Ingress spec NemoEntitystore deployment.
 func (n *NemoEntitystore) GetIngressSpec() networkingv1.IngressSpec {
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
+		return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	}
 	return n.Spec.Router.GenerateIngressSpec(n.GetName())
 }
 
@@ -729,6 +735,10 @@ func (n *NemoEntitystore) GetServiceMonitorParams() *rendertypes.ServiceMonitorP
 func (n *NemoEntitystore) GetIngressAnnotations() map[string]string {
 	NemoEntitystoreAnnotations := n.GetNemoEntitystoreAnnotations()
 
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
+		return utils.MergeMaps(NemoEntitystoreAnnotations, n.Spec.Expose.Ingress.Annotations)
+	}
 	if n.Spec.Router.Annotations != nil {
 		return utils.MergeMaps(NemoEntitystoreAnnotations, n.Spec.Router.Annotations)
 	}

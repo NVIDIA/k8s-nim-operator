@@ -42,9 +42,7 @@ const (
 type Expose struct {
 	Service Service `json:"service,omitempty"`
 	// Deprecated: Use .spec.router instead.
-	// Ingress Ingress `json:"ingress,omitempty"`
-	// Deprecated: Use .spec.router instead.
-	// HTTPRoute HTTPRoute `json:"httpRoute,omitempty"`
+	Ingress Ingress `json:"ingress,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingressClass))", message="ingressClass and gateway cannot be specified together"
@@ -76,6 +74,12 @@ type Gateway struct {
 	Name string `json:"name"`
 }
 
+// ExposeV1 defines attributes to expose the service.
+type ExposeV1 struct {
+	Service Service   `json:"service,omitempty"`
+	Ingress IngressV1 `json:"ingress,omitempty"`
+}
+
 // Service defines attributes to create a service.
 type Service struct {
 	Type corev1.ServiceType `json:"type,omitempty"`
@@ -100,6 +104,15 @@ type Service struct {
 	// +kubebuilder:validation:Maximum=65535
 	MetricsPort *int32            `json:"metricsPort,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// IngressV1 defines attributes for ingress
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
+type IngressV1 struct {
+	Enabled     *bool             `json:"enabled,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Spec        *IngressSpec      `json:"spec,omitempty"`
 }
 
 // Metrics defines attributes to setup metrics collection.
@@ -148,41 +161,6 @@ type Ingress struct {
 	Spec        networkingv1.IngressSpec `json:"spec,omitempty"`
 }
 
-// HTTPRoute defines attributes to HTTPRoute in Gateway API.
-type HTTPRoute struct {
-	Enabled     *bool             `json:"enabled,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Spec        *HTTPRouteSpec    `json:"spec,omitempty"`
-}
-
-type HTTPRouteSpec struct {
-	gatewayv1.CommonRouteSpec `json:",inline"`
-	Host                      gatewayv1.Hostname `json:"host,omitempty"`
-	Paths                     []HTTPPathMatch    `json:"paths,omitempty"`
-}
-
-type HTTPPathMatch struct {
-	// Type specifies how to match against the path Value.
-	// +optional
-	// +kubebuilder:default=PathPrefix
-	Type *gatewayv1.PathMatchType `json:"type,omitempty"`
-
-	// Value of the HTTP path to match against.
-	// +optional
-	// +kubebuilder:default="/"
-	// +kubebuilder:validation:MaxLength=1024
-	Value *string `json:"value,omitempty"`
-}
-
-// IngressV1 defines attributes for ingress
-//
-// +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
-type IngressV1 struct {
-	Enabled     *bool             `json:"enabled,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Spec        *IngressSpec      `json:"spec,omitempty"`
-}
-
 // ResourceRequirements defines the resources required for a container.
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
@@ -195,6 +173,48 @@ type ResourceRequirements struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
 	Requests corev1.ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+}
+
+func (i *IngressV1) GenerateNetworkingV1IngressSpec(name string) networkingv1.IngressSpec {
+	if i.Spec == nil {
+		return networkingv1.IngressSpec{}
+	}
+
+	ingressSpec := networkingv1.IngressSpec{
+		IngressClassName: &i.Spec.IngressClassName,
+		Rules: []networkingv1.IngressRule{
+			{
+				Host: i.Spec.Host,
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{},
+				},
+			},
+		},
+	}
+
+	svcBackend := networkingv1.IngressBackend{
+		Service: &networkingv1.IngressServiceBackend{
+			Name: name,
+			Port: networkingv1.ServiceBackendPort{
+				Name: DefaultNamedPortAPI,
+			},
+		},
+	}
+	if len(i.Spec.Paths) == 0 {
+		ingressSpec.Rules[0].HTTP.Paths = append(ingressSpec.Rules[0].HTTP.Paths, networkingv1.HTTPIngressPath{
+			Path:     "/",
+			PathType: ptr.To(networkingv1.PathTypePrefix),
+			Backend:  svcBackend,
+		})
+	}
+	for _, path := range i.Spec.Paths {
+		ingressSpec.Rules[0].HTTP.Paths = append(ingressSpec.Rules[0].HTTP.Paths, networkingv1.HTTPIngressPath{
+			Path:     path.Path,
+			PathType: path.PathType,
+			Backend:  svcBackend,
+		})
+	}
+	return ingressSpec
 }
 
 func (r *Router) GenerateGatewayHTTPRouteSpec(name string) gatewayv1.HTTPRouteSpec {
@@ -272,6 +292,13 @@ func (r *Router) GenerateIngressSpec(name string) networkingv1.IngressSpec {
 			},
 		},
 	}
+}
+
+func (r *Expose) GenerateIngressSpec(name string) networkingv1.IngressSpec {
+	if r.Ingress.Enabled == nil || !*r.Ingress.Enabled {
+		return networkingv1.IngressSpec{}
+	}
+	return r.Ingress.Spec
 }
 
 type IngressSpec struct {
