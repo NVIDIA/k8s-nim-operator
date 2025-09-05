@@ -148,7 +148,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(lwsv1.AddToScheme(scheme)).To(Succeed())
 		Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
-		Expect(gatewayv1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.Install(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
