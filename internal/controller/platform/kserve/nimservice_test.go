@@ -28,6 +28,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -529,7 +530,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{Requeue: false, RequeueAfter: 5 * time.Second}))
 
 			// Role should be created
 			role := &rbacv1.Role{}
@@ -814,7 +815,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{Requeue: false, RequeueAfter: 5 * time.Second}))
 
 			isvc := &kservev1beta1.InferenceService{}
 			err = client.Get(context.TODO(), namespacedName, isvc)
@@ -841,7 +842,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err = reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{Requeue: false, RequeueAfter: 5 * time.Second}))
 
 			err = client.Get(context.TODO(), namespacedName, isvc)
 			Expect(err).NotTo(HaveOccurred())
@@ -1261,7 +1262,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{Requeue: false, RequeueAfter: 5 * time.Second}))
 
 			// InferenceService should be created
 			isvc := &kservev1beta1.InferenceService{}
@@ -1394,7 +1395,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{Requeue: false, RequeueAfter: 5 * time.Second}))
 
 			// InferenceService should be created
 			isvc := &kservev1beta1.InferenceService{}
@@ -1509,7 +1510,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{Requeue: false, RequeueAfter: 5 * time.Second}))
 
 			// InferenceService should be created
 			isvc := &kservev1beta1.InferenceService{}
@@ -1788,7 +1789,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{Requeue: false, RequeueAfter: 5 * time.Second}))
 
 			// InferenceService should be created
 			isvc := &kservev1beta1.InferenceService{}
