@@ -90,7 +90,7 @@ const (
 
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
-// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router.ingressClass))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingressClass."
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingress."
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
@@ -943,7 +943,7 @@ func (n *NIMService) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NIMService deployment.
 func (n *NIMService) IsIngressEnabled() bool {
-	return (n.Spec.Router.IngressClass != nil && *n.Spec.Router.IngressClass != "") || (n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled)
+	return (n.Spec.Router.Ingress != nil && n.Spec.Router.Ingress.IngressClass != "") || (n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled)
 }
 
 // GetIngressSpec returns the Ingress spec NIMService deployment.
@@ -952,15 +952,15 @@ func (n *NIMService) GetIngressSpec() networkingv1.IngressSpec {
 	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return n.Spec.Expose.GenerateIngressSpec(n.GetName())
 	}
-	return n.Spec.Router.GenerateIngressSpec(n.GetName())
+	return n.Spec.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
 }
 
 func (n *NIMService) IsHTTPRouteEnabled() bool {
-	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.Name != "" && n.Spec.Router.Gateway.Namespace != ""
+	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.HTTPRoutesEnabled
 }
 
 func (n *NIMService) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
-	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetName())
+	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NIMService deployment.
@@ -1331,7 +1331,7 @@ func (n *NIMService) GetIngressParams() *rendertypes.IngressParams {
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
-	params.Annotations = n.GetRouterAnnotations()
+	params.Annotations = n.GetIngressAnnotations()
 	params.Spec = n.GetIngressSpec()
 	return params
 }
@@ -1474,6 +1474,19 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 func (n *NIMService) GetRouterAnnotations() map[string]string {
 	nimServiceAnnotations := n.GetNIMServiceAnnotations()
 
+	if n.Spec.Router.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Router.Annotations)
+	}
+	return nimServiceAnnotations
+}
+
+func (n *NIMService) GetIngressAnnotations() map[string]string {
+	nimServiceAnnotations := n.GetNIMServiceAnnotations()
+
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Ingress.Annotations)
+	}
 	if n.Spec.Router.Annotations != nil {
 		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Router.Annotations)
 	}

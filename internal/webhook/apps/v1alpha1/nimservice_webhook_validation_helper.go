@@ -117,7 +117,7 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 func validateRedundantIngressConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
-	if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled && spec.Router.IngressClass != nil && *spec.Router.IngressClass != "" { //nolint:staticcheck
+	if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled && spec.Router.Ingress != nil { //nolint:staticcheck
 		errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress"), fmt.Sprintf("%s is deprecated. Omit the field if you use .spec.router instead", fldPath.Child("expose").Child("ingress"))))
 	}
 	return warningList, errList
@@ -439,7 +439,7 @@ func validateRouterConfiguration(router *appsv1alpha1.Router, fldPath *field.Pat
 	if router.HostDomainName == "" {
 		errList = append(errList, field.Required(fldPath.Child("hostDomainName"), "is required"))
 	}
-	if router.IngressClass != nil && router.Gateway != nil {
+	if router.Ingress != nil && router.Gateway != nil {
 		errList = append(errList, field.Forbidden(fldPath, "ingressClass and gateway cannot be specified together"))
 	}
 	return warningList, errList
@@ -494,12 +494,11 @@ func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *fie
 		}
 
 		// Spec.Router.Ingress cannot be set.
-		if spec.Router.IngressClass != nil && *spec.Router.IngressClass != "" {
-			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingressClass"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("ingressClass"))))
+		if spec.Router.Ingress != nil {
+			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingress"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("ingress"))))
 		}
 
 		// Spec.Router.Gateway cannot be set.
-
 		if spec.Router.Gateway != nil {
 			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("gateway"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("gateway"))))
 		}

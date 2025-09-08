@@ -265,7 +265,9 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
 				},
 				Router: appsv1alpha1.Router{
-					IngressClass: ptr.To("nginx"),
+					Ingress: &appsv1alpha1.RouterIngress{
+						IngressClass: "nginx",
+					},
 				},
 				Scale: appsv1alpha1.Autoscaling{
 					Enabled:     ptr.To[bool](true),
@@ -836,7 +838,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Get(context.TODO(), namespacedName, nimService)
 			Expect(err).NotTo(HaveOccurred())
 			nimService.Spec.Scale.Enabled = ptr.To(false)
-			nimService.Spec.Router.IngressClass = nil
+			nimService.Spec.Router.Ingress = nil
 			err = client.Update(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
 

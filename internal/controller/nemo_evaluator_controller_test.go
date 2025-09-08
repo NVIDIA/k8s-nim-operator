@@ -139,7 +139,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 						Effect:   corev1.TaintEffectNoSchedule,
 					},
 				},
-				Expose: appsv1alpha1.Expose{
+				Expose: appsv1alpha1.ExposeV1{
 					Service: appsv1alpha1.Service{
 						Type: corev1.ServiceTypeClusterIP,
 						Port: ptr.To[int32](8000),
@@ -149,7 +149,9 @@ var _ = Describe("NemoEvaluator Controller", func() {
 					},
 				},
 				Router: appsv1alpha1.Router{
-					IngressClass: ptr.To("nginx"),
+					Ingress: &appsv1alpha1.RouterIngress{
+						IngressClass: "nginx",
+					},
 					Annotations: map[string]string{
 						"annotation-key-specific": "ingress",
 					},
@@ -487,7 +489,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 			err = client.Get(context.TODO(), namespacedName, nemoEvaluator)
 			Expect(err).NotTo(HaveOccurred())
 			nemoEvaluator.Spec.Scale.Enabled = ptr.To[bool](false)
-			nemoEvaluator.Spec.Router.IngressClass = nil
+			nemoEvaluator.Spec.Router.Ingress = nil
 			err = client.Update(context.TODO(), nemoEvaluator)
 			Expect(err).NotTo(HaveOccurred())
 

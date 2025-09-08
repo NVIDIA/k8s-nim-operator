@@ -58,7 +58,7 @@ const (
 )
 
 // NemoDatastoreSpec defines the desired state of NemoDatastore.
-// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router.ingressClass))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingressClass."
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingress."
 type NemoDatastoreSpec struct {
 	Image        Image                        `json:"image"`
 	Command      []string                     `json:"command,omitempty"`
@@ -767,12 +767,12 @@ func (n *NemoDatastore) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NemoDatastore deployment.
 func (n *NemoDatastore) IsIngressEnabled() bool {
-	return (n.Spec.Router.IngressClass != nil && *n.Spec.Router.IngressClass != "") ||
+	return (n.Spec.Router.Ingress != nil && n.Spec.Router.Ingress.IngressClass != "") ||
 		(n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled) // TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
 }
 
 func (n *NemoDatastore) IsHTTPRouteEnabled() bool {
-	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.Name != "" && n.Spec.Router.Gateway.Namespace != ""
+	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.HTTPRoutesEnabled
 }
 
 // GetIngressSpec returns the Ingress spec NemoDatastore deployment.
@@ -781,11 +781,11 @@ func (n *NemoDatastore) GetIngressSpec() networkingv1.IngressSpec {
 	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
 	}
-	return n.Spec.Router.GenerateIngressSpec(n.GetName())
+	return n.Spec.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
 }
 
 func (n *NemoDatastore) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
-	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetName())
+	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoDatastore deployment.

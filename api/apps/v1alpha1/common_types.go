@@ -45,11 +45,11 @@ type Expose struct {
 	Ingress Ingress `json:"ingress,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingressClass))", message="ingressClass and gateway cannot be specified together"
+// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingress))", message="ingress and gateway cannot be specified together"
 type Router struct {
 	// HostDomainName is the domain name of the hostname matched by the router.
-	// The hostname is constructed as "<nimServiceName>.<hostDomainName>", where the <nimServiceName> a subdomain of the matched hostname.
-	// eg. example.com for "<nimServiceName>.example.com"
+	// The hostname is constructed as "<nimServiceName>.<namespace>.<hostDomainName>", where the <nimServiceName> a subdomain of the matched hostname.
+	// eg. example.com for "<nimServiceName>.<namespace>.example.com"
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern=`^(([a-z0-9][a-z0-9\-]*[a-z0-9])|[a-z0-9]+\.)*([a-z]+|xn\-\-[a-z0-9]+)\.?$`
@@ -58,11 +58,20 @@ type Router struct {
 	// Annotations for the router, e.g. for ingress class or gateway
 	Annotations map[string]string `json:"annotations,omitempty"`
 
-	// IngressClass is the class of the ingress controller to use for the created ingress.
-	IngressClass *string `json:"ingressClass,omitempty"`
+	// Ingress is the ingress controller to use for the created ingress.
+	Ingress *RouterIngress `json:"ingress,omitempty"`
 
 	// Gateway is the gateway to use for the created HTTPRoute.
 	Gateway *Gateway `json:"gateway,omitempty"`
+}
+
+type RouterIngress struct {
+	// +kubebuilder:validation:MinLength=1
+	// IngressClass is the ingress class to use for the created ingress.
+	IngressClass string `json:"ingressClass"`
+
+	// TLSSecretName is the name of the secret containing the TLS certificate and key.
+	TLSSecretName string `json:"tlsSecretName,omitempty"`
 }
 
 type Gateway struct {
@@ -72,9 +81,13 @@ type Gateway struct {
 	// +kubebuilder:validation:MinLength=1
 	// Name of the gateway
 	Name string `json:"name"`
+
+	// +kubebuilder:default:=true
+	// HTTPRoutesEnabled is a flag to enable HTTPRoutes for the created gateway.
+	HTTPRoutesEnabled bool `json:"httpRoutesEnabled,omitempty"`
 }
 
-// ExposeV1 defines attributes to expose the service.
+// DEPRECATED ExposeV1 defines attributes to expose the service.
 type ExposeV1 struct {
 	Service Service   `json:"service,omitempty"`
 	Ingress IngressV1 `json:"ingress,omitempty"`
@@ -106,8 +119,8 @@ type Service struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
+// Deprecated: Use .spec.router.ingress instead.
 // IngressV1 defines attributes for ingress
-//
 // +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
 type IngressV1 struct {
 	Enabled     *bool             `json:"enabled,omitempty"`
@@ -217,8 +230,8 @@ func (i *IngressV1) GenerateNetworkingV1IngressSpec(name string) networkingv1.In
 	return ingressSpec
 }
 
-func (r *Router) GenerateGatewayHTTPRouteSpec(name string) gatewayv1.HTTPRouteSpec {
-	if r.Gateway == nil {
+func (r *Router) GenerateGatewayHTTPRouteSpec(namespace, name string, port int32) gatewayv1.HTTPRouteSpec {
+	if r.Gateway == nil || !r.Gateway.HTTPRoutesEnabled {
 		return gatewayv1.HTTPRouteSpec{}
 	}
 
@@ -231,7 +244,7 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(name string) gatewayv1.HTTPRouteSp
 				},
 			},
 		},
-		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(r.getHostname(name))},
+		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(r.getHostname(namespace, name))},
 		Rules: []gatewayv1.HTTPRouteRule{
 			{
 				BackendRefs: []gatewayv1.HTTPBackendRef{
@@ -239,7 +252,7 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(name string) gatewayv1.HTTPRouteSp
 						BackendRef: gatewayv1.BackendRef{
 							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: gatewayv1.ObjectName(name),
-								Port: ptr.To(gatewayv1.PortNumber(DefaultAPIPort)),
+								Port: ptr.To(gatewayv1.PortNumber(port)),
 							},
 						},
 					},
@@ -257,20 +270,20 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(name string) gatewayv1.HTTPRouteSp
 	}
 }
 
-func (r *Router) getHostname(name string) string {
-	return fmt.Sprintf("%s.%s", name, r.HostDomainName)
+func (r *Router) getHostname(namespace, name string) string {
+	return fmt.Sprintf("%s.%s.%s", name, namespace, r.HostDomainName)
 }
 
-func (r *Router) GenerateIngressSpec(name string) networkingv1.IngressSpec {
-	if r.IngressClass == nil {
+func (r *Router) GenerateIngressSpec(namespace, name string) networkingv1.IngressSpec {
+	if r.Ingress == nil {
 		return networkingv1.IngressSpec{}
 	}
 
-	return networkingv1.IngressSpec{
-		IngressClassName: r.IngressClass,
+	ingressSpec := networkingv1.IngressSpec{
+		IngressClassName: ptr.To(r.Ingress.IngressClass),
 		Rules: []networkingv1.IngressRule{
 			{
-				Host: r.getHostname(name),
+				Host: r.getHostname(namespace, name),
 				IngressRuleValue: networkingv1.IngressRuleValue{
 					HTTP: &networkingv1.HTTPIngressRuleValue{
 						Paths: []networkingv1.HTTPIngressPath{
@@ -292,6 +305,16 @@ func (r *Router) GenerateIngressSpec(name string) networkingv1.IngressSpec {
 			},
 		},
 	}
+
+	if r.Ingress.TLSSecretName != "" {
+		ingressSpec.TLS = []networkingv1.IngressTLS{
+			{
+				Hosts:      []string{r.getHostname(namespace, name)},
+				SecretName: r.Ingress.TLSSecretName,
+			},
+		}
+	}
+	return ingressSpec
 }
 
 func (r *Expose) GenerateIngressSpec(name string) networkingv1.IngressSpec {
