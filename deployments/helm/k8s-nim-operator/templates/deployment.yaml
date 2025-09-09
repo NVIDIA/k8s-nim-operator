@@ -79,7 +79,11 @@ spec:
       volumes:
         - name: cert
           secret:
+            {{- if eq .Values.operator.admissionController.tls.mode "cert-manager" }}
             secretName: {{ include "k8s-nim-operator.fullname" . }}-webhook-server-cert
+            {{- else }}
+            secretName: {{ required "operator.admissionController.tls.secret.name is required when tls.mode is 'secret'" .Values.operator.admissionController.tls.secret.name }}
+            {{- end }}
             defaultMode: 420
       {{- end }}
     {{- with .Values.operator.nodeSelector }}
