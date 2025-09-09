@@ -82,17 +82,6 @@ func (v *NIMCacheCustomValidator) ValidateCreate(_ context.Context, obj runtime.
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NIMCache.
 // Check immutable fields haven't changed, validate transitions between states, ensure updates don't break existing functionality.
 func (v *NIMCacheCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	nimcache, ok := newObj.(*appsv1alpha1.NIMCache)
-	if !ok {
-		return nil, fmt.Errorf("expected a NIMCache object for the newObj but got %T", newObj)
-	}
-	nimcachelog.V(4).Info("Validation for NIMCache upon update", "name", nimcache.GetName())
-
-	fldPath := field.NewPath("nimcache").Child("spec")
-
-	// Begin by validating the new spec structurally.
-	warningList, errList := validateNIMCacheSpec(&nimcache.Spec, fldPath)
-
 	oldNIMCache, ok := oldObj.(*appsv1alpha1.NIMCache)
 	if !ok {
 		return nil, fmt.Errorf("expected a NIMCache object for oldObj but got %T", oldObj)
@@ -101,6 +90,12 @@ func (v *NIMCacheCustomValidator) ValidateUpdate(_ context.Context, oldObj, newO
 	if !ok {
 		return nil, fmt.Errorf("expected a NIMCache object for newObj but got %T", newObj)
 	}
+	nimcachelog.V(4).Info("Validation for NIMCache upon update", "name", newNIMCache.GetName())
+
+	fldPath := field.NewPath("nimcache").Child("spec")
+
+	// Begin by validating the new spec structurally.
+	warningList, errList := validateNIMCacheSpec(&newNIMCache.Spec, fldPath)
 
 	// Append immutability errors after structural checks.
 	wList, eList := validateImmutableNIMCacheSpec(oldNIMCache, newNIMCache, field.NewPath("nimcache"))
