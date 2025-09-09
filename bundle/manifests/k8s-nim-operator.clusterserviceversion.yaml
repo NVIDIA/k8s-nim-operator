@@ -1,7 +1,7 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  name: nim-operator-certified.v0.0.0-main
+  name: nim-operator-certified.v3.0.0
   namespace: placeholder
   labels:
     operatorframework.io/arch.amd64: supported
@@ -485,10 +485,10 @@ metadata:
     k8sMinVersion: 1.26.0
     categories: AI/Machine Learning
     certified: 'true'
-    createdAt: 'Tue Apr 29 21:14:50 PDT 2025'
+    createdAt: 'Tue Sep  9 12:58:18 PDT 2025'
     description: >-
       An Operator for deployment and maintenance of NVIDIA NIMs and NeMo microservices in a Kubernetes environment
-    containerImage: 'ghcr.io/nvidia/k8s-nim-operator:main'
+    containerImage: 'ghcr.io/nvidia/k8s-nim-operator:release-3.0'
     support: NVIDIA
     capabilities: Basic Install
     repository: github.com/NVIDIA/k8s-nim-operator
@@ -526,8 +526,8 @@ spec:
     * NeMo Entity Store
 
   maturity: stable
-  version: 0.0.0-main
-  replaces: 'nim-operator-certified.v2.0.1'
+  version: 3.0.0
+  replaces: 'nim-operator-certified.v2.0.2'
   skips: []
   minKubeVersion: 1.26.0
   keywords: []
@@ -1401,7 +1401,7 @@ spec:
                             fieldPath: metadata.namespace
                       - name: ENABLE_WEBHOOKS
                         value: "true"
-                    image: 'ghcr.io/nvidia/k8s-nim-operator:main'
+                    image: 'ghcr.io/nvidia/k8s-nim-operator:release-3.0'
                     imagePullPolicy: Always
                     livenessProbe:
                       failureThreshold: 3
