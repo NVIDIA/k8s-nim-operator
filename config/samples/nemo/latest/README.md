@@ -4,7 +4,7 @@ These CRs are designed to deploy NeMo microservices using the NIM Operator.
 
 ## Compatible NIM Operator Version
 
-- **NIM Operator v2.0.2**
+- **NIM Operator v3.0.0**
 
 > Using these CRs with any other version may lead to validation or runtime errors.
 
