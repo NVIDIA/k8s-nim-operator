@@ -56,8 +56,26 @@ operator:
   admissionController:
     # Enable the admission controller. 
     # Note: cert-manager must be installed beforehand, as it is required to generate the TLS certificates.
-    enabled: false
-
+    enabled: true    # TLS certificate configuration
+    tls:
+      # Certificate management mode: "cert-manager" or "secret"
+      # - "cert-manager": Use cert-manager to automatically generate and manage certificates
+      # - "secret": Use a user-provided secret containing tls.crt and tls.key
+      mode: "cert-manager"
+      certManager:
+        # Issuer type: "selfsigned", "clusterissuer", or "issuer"
+        issuerType: "selfsigned"
+        # Issuer name (required when issuerType is "clusterissuer" or "issuer")
+        issuerName: ""
+        # Additional DNS names for the certificate
+        dnsNames: []
+      secret:
+        # Name of the secret containing tls.crt and tls.key
+        name: ""
+        # Base64-encoded CA certificate bundle for validating the webhook's TLS certificate (base64 encoded)
+        # Required when using secret mode.
+        # Note: Only include intermediate CA certificates, not root CA certificates
+        caBundle:
 metricsService:
   ports:
   - name: metrics
