@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -57,6 +58,7 @@ const (
 )
 
 // NemoGuardrailSpec defines the desired state of NemoGuardrail.
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingress."
 type NemoGuardrailSpec struct {
 	Image       Image           `json:"image"`
 	Command     []string        `json:"command,omitempty"`
@@ -74,6 +76,7 @@ type NemoGuardrailSpec struct {
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
 	Expose  ExposeV1    `json:"expose,omitempty"`
+	Router  Router      `json:"router,omitempty"`
 	Scale   Autoscaling `json:"scale,omitempty"`
 	Metrics Metrics     `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
@@ -538,12 +541,25 @@ func (n *NemoGuardrail) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NemoGuardrail deployment.
 func (n *NemoGuardrail) IsIngressEnabled() bool {
-	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
+	return (n.Spec.Router.Ingress != nil && n.Spec.Router.Ingress.IngressClass != "") ||
+		(n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled) // TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
 }
 
 // GetIngressSpec returns the Ingress spec NemoGuardrail deployment.
 func (n *NemoGuardrail) GetIngressSpec() networkingv1.IngressSpec {
-	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
+		return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	}
+	return n.Spec.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
+}
+
+func (n *NemoGuardrail) IsHTTPRouteEnabled() bool {
+	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.HTTPRoutesEnabled
+}
+
+func (n *NemoGuardrail) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
+	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoGuardrail deployment.
@@ -741,6 +757,20 @@ func (n *NemoGuardrail) GetIngressParams() *rendertypes.IngressParams {
 	return params
 }
 
+// GetHTTPRouteParams returns params to render HTTPRoute from templates.
+func (n *NemoGuardrail) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
+	params := &rendertypes.HTTPRouteParams{}
+	params.Enabled = n.IsHTTPRouteEnabled()
+
+	// Set metadata
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetHTTPRouteAnnotations()
+	params.Spec = n.GetHTTPRouteSpec()
+	return params
+}
+
 // GetRoleParams returns params to render Role from templates.
 func (n *NemoGuardrail) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
@@ -842,11 +872,24 @@ func (n *NemoGuardrail) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 	return params
 }
 
+func (n *NemoGuardrail) GetHTTPRouteAnnotations() map[string]string {
+	annotations := n.GetNemoGuardrailAnnotations()
+
+	if n.Spec.Router.Annotations != nil {
+		return utils.MergeMaps(annotations, n.Spec.Router.Annotations)
+	}
+	return annotations
+}
+
 func (n *NemoGuardrail) GetIngressAnnotations() map[string]string {
 	NemoGuardrailAnnotations := n.GetNemoGuardrailAnnotations()
 
-	if n.Spec.Expose.Ingress.Annotations != nil {
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Expose.Ingress.Annotations)
+	}
+	if n.Spec.Router.Annotations != nil {
+		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Router.Annotations)
 	}
 	return NemoGuardrailAnnotations
 }

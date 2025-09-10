@@ -1345,6 +1345,18 @@ spec:
               - watch
               - create
               - delete
+            - apiGroups:
+              - gateway.networking.k8s.io
+              resources:
+              - httproutes
+              verbs:
+              - create
+              - delete
+              - get
+              - list
+              - patch
+              - update
+              - watch
       deployments:
         - name: k8s-nim-operator
           spec:
