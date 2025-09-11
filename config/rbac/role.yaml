@@ -158,6 +158,7 @@ rules:
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
+  - grpcroutes
   - httproutes
   verbs:
   - create

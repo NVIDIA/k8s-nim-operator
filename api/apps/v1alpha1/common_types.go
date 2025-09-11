@@ -30,6 +30,8 @@ import (
 const (
 	// DefaultAPIPort is the default api port.
 	DefaultAPIPort = 8000
+	// DefaultGRPCPort is the default grpc port.
+	DefaultGRPCPort = 50051
 	// DefaultNamedPortAPI is the default name for api port.
 	DefaultNamedPortAPI = "api"
 	// DefaultNamedPortGRPC is the default name for grpc port.
@@ -85,6 +87,10 @@ type Gateway struct {
 	// +kubebuilder:default:=true
 	// HTTPRoutesEnabled is a flag to enable HTTPRoutes for the created gateway.
 	HTTPRoutesEnabled bool `json:"httpRoutesEnabled,omitempty"`
+
+	// +kubebuilder:default:=false
+	// GRPCRoutesEnabled is a flag to enable GRPCRoutes for the created gateway.
+	GRPCRoutesEnabled bool `json:"grpcRoutesEnabled,omitempty"`
 }
 
 // DEPRECATED ExposeV1 defines attributes to expose the service.
@@ -264,6 +270,38 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(namespace, name string, port int32
 						Path: &gatewayv1.HTTPPathMatch{
 							Type:  ptr.To(gatewayv1.PathMatchPathPrefix),
 							Value: ptr.To("/"),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (r *Router) GenerateGatewayGRPCRouteSpec(namespace, name string, port int32) gatewayv1.GRPCRouteSpec {
+	if r.Gateway == nil || !r.Gateway.GRPCRoutesEnabled {
+		return gatewayv1.GRPCRouteSpec{}
+	}
+
+	return gatewayv1.GRPCRouteSpec{
+		CommonRouteSpec: gatewayv1.CommonRouteSpec{
+			ParentRefs: []gatewayv1.ParentReference{
+				{
+					Name:      gatewayv1.ObjectName(r.Gateway.Name),
+					Namespace: ptr.To(gatewayv1.Namespace(r.Gateway.Namespace)),
+				},
+			},
+		},
+		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(r.getHostname(namespace, name))},
+		Rules: []gatewayv1.GRPCRouteRule{
+			{
+				BackendRefs: []gatewayv1.GRPCBackendRef{
+					{
+						BackendRef: gatewayv1.BackendRef{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
+								Name: gatewayv1.ObjectName(name),
+								Port: ptr.To(gatewayv1.PortNumber(port)),
+							},
 						},
 					},
 				},

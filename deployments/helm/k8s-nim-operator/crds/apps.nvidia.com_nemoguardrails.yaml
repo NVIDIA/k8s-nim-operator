@@ -1858,6 +1858,11 @@ spec:
                   gateway:
                     description: Gateway is the gateway to use for the created HTTPRoute.
                     properties:
+                      grpcRoutesEnabled:
+                        default: false
+                        description: GRPCRoutesEnabled is a flag to enable GRPCRoutes
+                          for the created gateway.
+                        type: boolean
                       httpRoutesEnabled:
                         default: true
                         description: HTTPRoutesEnabled is a flag to enable HTTPRoutes

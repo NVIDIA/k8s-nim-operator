@@ -76,6 +76,7 @@ type Renderer interface {
 	SCC(params *types.SCCParams) (*securityv1.SecurityContextConstraints, error)
 	Ingress(params *types.IngressParams) (*networkingv1.Ingress, error)
 	HTTPRoute(params *types.HTTPRouteParams) (*gatewayv1.HTTPRoute, error)
+	GRPCRoute(params *types.GRPCRouteParams) (*gatewayv1.GRPCRoute, error)
 	HPA(params *types.HPAParams) (*autoscalingv2.HorizontalPodAutoscaler, error)
 	ServiceMonitor(params *types.ServiceMonitorParams) (*monitoringv1.ServiceMonitor, error)
 	ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error)
@@ -360,6 +361,23 @@ func (r *textTemplateRenderer) HTTPRoute(params *types.HTTPRouteParams) (*gatewa
 		return nil, fmt.Errorf("error converting unstructured object to HTTPRoute: %w", err)
 	}
 	return httpRoute, nil
+}
+
+// GRPCRoute renders a GRPCRoute spec with the given templating data.
+func (r *textTemplateRenderer) GRPCRoute(params *types.GRPCRouteParams) (*gatewayv1.GRPCRoute, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "grpcroute.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	grpcRoute := &gatewayv1.GRPCRoute{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, grpcRoute)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to GRPCRoute: %w", err)
+	}
+	return grpcRoute, nil
 }
 
 // Ingress renders an Ingress spec with the given templating data.
