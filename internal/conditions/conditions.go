@@ -49,6 +49,8 @@ const (
 	ReasonIngressFailed = "IngressFailed"
 	// ReasonHTTPRouteFailed indicates that the creation of httproute has failed.
 	ReasonHTTPRouteFailed = "HTTPRouteFailed"
+	// ReasonGRPCRouteFailed indicates that the creation of grpcroute has failed.
+	ReasonGRPCRouteFailed = "GRPCRouteFailed"
 	// ReasonHPAFailed indicates that the creation of hpa has failed.
 	ReasonHPAFailed = "HPAFailed"
 	// ReasonSCCFailed indicates that the creation of scc has failed.

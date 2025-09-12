@@ -259,6 +259,16 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	}
 
+	// sync GRPCRoute
+	if nimService.IsGRPCRouteEnabled() {
+		err = r.renderAndSyncResource(ctx, nimService, &renderer, &gatewayv1.GRPCRoute{}, func() (client.Object, error) {
+			return renderer.GRPCRoute(nimService.GetGRPCRouteParams())
+		}, "grpcroute", conditions.ReasonGRPCRouteFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Sync HPA
 	if nimService.IsAutoScalingEnabled() {
 		err = r.renderAndSyncResource(ctx, nimService, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {

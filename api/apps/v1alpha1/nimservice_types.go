@@ -963,6 +963,14 @@ func (n *NIMService) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
 	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
 }
 
+func (n *NIMService) IsGRPCRouteEnabled() bool {
+	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.GRPCRoutesEnabled
+}
+
+func (n *NIMService) GetGRPCRouteSpec() gatewayv1.GRPCRouteSpec {
+	return n.Spec.Router.GenerateGatewayGRPCRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
+}
+
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NIMService deployment.
 func (n *NIMService) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
@@ -1347,6 +1355,16 @@ func (n *NIMService) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetRouterAnnotations()
 	params.Spec = n.GetHTTPRouteSpec()
+	return params
+}
+
+func (n *NIMService) GetGRPCRouteParams() *rendertypes.GRPCRouteParams {
+	params := &rendertypes.GRPCRouteParams{}
+	params.Enabled = n.IsGRPCRouteEnabled()
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Spec = n.GetGRPCRouteSpec()
 	return params
 }
 
