@@ -95,30 +95,17 @@ func (v *NIMServiceCustomValidator) ValidateCreate(_ context.Context, obj runtim
 	fldPath := field.NewPath("nimservice").Child("spec")
 
 	// Perform comprehensive spec validation via helper.
-	errList := validateNIMServiceSpec(&nimservice.Spec, fldPath, v.k8sVersion)
+	warningList, errList := validateNIMServiceSpec(&nimservice.Spec, fldPath, v.k8sVersion)
 
 	if len(errList) > 0 {
-		return nil, errList.ToAggregate()
+		return warningList, errList.ToAggregate()
 	}
 
-	return nil, nil
+	return warningList, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NIMService.
 func (v *NIMServiceCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	nimservice, ok := newObj.(*appsv1alpha1.NIMService)
-	if !ok {
-		return nil, fmt.Errorf("expected a NIMService object for the newObj but got %T", newObj)
-	}
-	nimservicelog.V(4).Info("Validation for NIMService upon update", "name", nimservice.GetName())
-
-	fldPath := field.NewPath("nimservice").Child("spec")
-	// Start with structural validation to ensure the updated object is well formed.
-	errList := validateNIMServiceSpec(&nimservice.Spec, fldPath, v.k8sVersion)
-
-	// All fields of NIMService.Spec are mutable, except for:
-	// - Spec.MultiNode
-	// - If PVC has been created with PVC.Create = true, reject any updates to any fields of PVC object
 	oldNIMService, ok := oldObj.(*appsv1alpha1.NIMService)
 	if !ok {
 		return nil, fmt.Errorf("expected a NIMService object for oldObj but got %T", oldObj)
@@ -127,16 +114,29 @@ func (v *NIMServiceCustomValidator) ValidateUpdate(_ context.Context, oldObj, ne
 	if !ok {
 		return nil, fmt.Errorf("expected a NIMService object for newObj but got %T", newObj)
 	}
+	nimservicelog.V(4).Info("Validation for NIMService upon update", "name", newNIMService.GetName())
 
-	errList = append(errList, validateMultiNodeImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("multiNode"))...)
-	errList = append(errList, validatePVCImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("storage").Child("pvc"))...)
-	errList = append(errList, validateDRAResourceImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("draResources"))...)
+	fldPath := field.NewPath("nimservice").Child("spec")
+	// Start with structural validation to ensure the updated object is well formed.
+	warningList, errList := validateNIMServiceSpec(&newNIMService.Spec, fldPath, v.k8sVersion)
+
+	wList, eList := validateMultiNodeImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("multiNode"))
+	warningList = append(warningList, wList...)
+	errList = append(errList, eList...)
+
+	wList, eList = validatePVCImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("storage").Child("pvc"))
+	warningList = append(warningList, wList...)
+	errList = append(errList, eList...)
+
+	wList, eList = validateDRAResourceImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("draResources"))
+	warningList = append(warningList, wList...)
+	errList = append(errList, eList...)
 
 	if len(errList) > 0 {
-		return nil, errList.ToAggregate()
+		return warningList, errList.ToAggregate()
 	}
 
-	return nil, nil
+	return warningList, nil
 }
 
 func (v *NIMServiceCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {

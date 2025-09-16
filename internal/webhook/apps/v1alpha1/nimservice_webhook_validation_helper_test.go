@@ -32,41 +32,45 @@ func TestValidateImageConfiguration(t *testing.T) {
 	fldPath := field.NewPath("spec").Child("image")
 
 	tests := []struct {
-		name     string
-		image    *appsv1alpha1.Image
-		wantErrs int
+		name         string
+		image        *appsv1alpha1.Image
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "valid image",
-			image:    &appsv1alpha1.Image{Repository: "repo", Tag: "latest"},
-			wantErrs: 0,
+			name:         "valid image",
+			image:        &appsv1alpha1.Image{Repository: "repo", Tag: "latest"},
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
-			name:     "missing repository",
-			image:    &appsv1alpha1.Image{Tag: "v1"},
-			wantErrs: 1,
+			name:         "missing repository",
+			image:        &appsv1alpha1.Image{Tag: "v1"},
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
-			name:     "missing tag",
-			image:    &appsv1alpha1.Image{Repository: "repo"},
-			wantErrs: 1,
+			name:         "missing tag",
+			image:        &appsv1alpha1.Image{Repository: "repo"},
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
-			name:     "missing both",
-			image:    &appsv1alpha1.Image{},
-			wantErrs: 2,
+			name:         "missing both",
+			image:        &appsv1alpha1.Image{},
+			wantErrs:     2,
+			wantWarnings: 0,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateImageConfiguration(tc.image, fldPath)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateImageConfiguration(tc.image, fldPath)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -91,14 +95,16 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 	sizeNeg := resource.MustParse("0")
 
 	tests := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "missing both nimCache and pvc",
-			modify:   func(ns *appsv1alpha1.NIMService) {},
-			wantErrs: 1,
+			name:         "missing both nimCache and pvc",
+			modify:       func(ns *appsv1alpha1.NIMService) {},
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "both nimCache and pvc defined",
@@ -106,14 +112,16 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 				ns.Spec.Storage.NIMCache = appsv1alpha1.NIMCacheVolSpec{Name: "cache", Profile: "p"}
 				ns.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Name: "pvc"}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "nimCache missing name",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.Storage.NIMCache = appsv1alpha1.NIMCacheVolSpec{Profile: "p"}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "pvc create false name empty",
@@ -122,7 +130,8 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 					Create: &falseVal,
 				}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "pvc invalid volumeaccessmode",
@@ -132,7 +141,8 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 					VolumeAccessMode: "BadMode",
 				}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "shared memory size <=0",
@@ -140,14 +150,16 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 				ns.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Name: "pvc"}
 				ns.Spec.Storage.SharedMemorySizeLimit = &sizeNeg
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid nimCache",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.Storage.NIMCache = appsv1alpha1.NIMCacheVolSpec{Name: "cache", Profile: "default"}
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "valid pvc",
@@ -160,7 +172,8 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 					VolumeAccessMode: corev1.ReadWriteOnce,
 				}
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 	}
 
@@ -168,13 +181,12 @@ func TestValidateServiceStorageConfiguration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateServiceStorageConfiguration(&ns.Spec.Storage, fldPath)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateServiceStorageConfiguration(&ns.Spec.Storage, fldPath)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -186,18 +198,22 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 	fld := field.NewPath("spec")
 
 	cases := []struct {
-		name        string
-		modify      func(*appsv1alpha1.NIMService)
-		k8sVersion  string
-		wantErrs    int
-		wantErrMsgs []string
+		name            string
+		modify          func(*appsv1alpha1.NIMService)
+		k8sVersion      string
+		wantErrs        int
+		wantWarnings    int
+		wantErrMsgs     []string
+		wantWarningMsgs []string
 	}{
 		{
-			name:        "no dra resources",
-			modify:      func(ns *appsv1alpha1.NIMService) {},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    0,
-			wantErrMsgs: nil,
+			name:            "no dra resources",
+			modify:          func(ns *appsv1alpha1.NIMService) {},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        0,
+			wantWarnings:    0,
+			wantErrMsgs:     nil,
+			wantWarningMsgs: nil,
 		},
 		{
 			name: "unsupported k8s version",
@@ -206,9 +222,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
 				}}
 			},
-			k8sVersion:  "v1.32.0", // below MinSupportedClusterVersionForDRA
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources: Forbidden: is not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.33.0' or higher"},
+			k8sVersion:      "v1.32.0", // below MinSupportedClusterVersionForDRA
+			wantErrs:        1,
+			wantWarnings:    0,
+			wantErrMsgs:     []string{"spec.draResources: Forbidden: is not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.33.0' or higher"},
+			wantWarningMsgs: nil,
 		},
 		{
 			name: "both name and template provided",
@@ -218,9 +236,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantWarnings:    0,
+			wantErrMsgs:     []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
+			wantWarningMsgs: nil,
 		},
 		{
 			name: "both name and claimCreationSpec provided",
@@ -237,9 +257,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
+			wantWarningMsgs: nil,
 		},
 		{
 			name: "both template and claimCreationSpec provided",
@@ -256,9 +277,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "all three fields provided",
@@ -276,18 +299,22 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0]: Invalid value: \"multiple dra resource sources defined\": must specify exactly one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "neither name nor template nor claimCreationSpec provided",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0]: Required value: one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec must be provided"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantWarnings:    0,
+			wantWarningMsgs: nil,
+			wantErrMsgs:     []string{"spec.draResources[0]: Required value: one of spec.resourceClaimName, spec.resourceClaimTemplateName, or spec.claimCreationSpec must be provided"},
 		},
 		{
 			name: "resourceClaimName with replicas>1",
@@ -297,9 +324,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimName: ptr.To("claim1"),
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].resourceClaimName: Forbidden: must not be set when spec.replicas > 1, use spec.draResources[0].resourceClaimTemplateName instead"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantWarnings:    0,
+			wantErrMsgs:     []string{"spec.draResources[0].resourceClaimName: Forbidden: must not be set when spec.replicas > 1, use spec.draResources[0].resourceClaimTemplateName instead"},
+			wantWarningMsgs: nil,
 		},
 		{
 			name: "resourceClaimName with autoscaling enabled",
@@ -310,9 +339,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimName: ptr.To("claim1"),
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].resourceClaimName: Forbidden: must not be set when spec.scale.enabled is true, use spec.draResources[0].resourceClaimTemplateName instead"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantWarnings:    0,
+			wantErrMsgs:     []string{"spec.draResources[0].resourceClaimName: Forbidden: must not be set when spec.scale.enabled is true, use spec.draResources[0].resourceClaimTemplateName instead"},
+			wantWarningMsgs: nil,
 		},
 		{
 			name: "duplicate resourceClaimNames",
@@ -322,9 +353,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					{ResourceClaimName: ptr.To("dup")},
 				}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[1].resourceClaimName: Duplicate value: \"dup\""},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantWarnings:    0,
+			wantErrMsgs:     []string{"spec.draResources[1].resourceClaimName: Duplicate value: \"dup\""},
+			wantWarningMsgs: nil,
 		},
 		{
 			name: "claimCreationSpec with empty devices",
@@ -335,9 +368,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices: Required value: must be non-empty"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices: Required value: must be non-empty"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid device - missing name",
@@ -352,9 +387,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].name: Required value: is required"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].name: Required value: is required"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid device - zero count",
@@ -370,9 +407,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].count: Invalid value: 0: must be > 0"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].count: Invalid value: 0: must be > 0"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid device - missing deviceClassName",
@@ -387,9 +426,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].deviceClassName: Required value: is required"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].deviceClassName: Required value: is required"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid device - missing driverName",
@@ -404,9 +445,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].driverName: Required value: is required"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].driverName: Required value: is required"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with duplicate attributeSelectors keys",
@@ -438,9 +481,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with duplicate capacitySelectors keys",
@@ -468,9 +513,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[1]: Duplicate value: \"gpu.nvidia.com/memory\""},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid attribute selector - missing op",
@@ -495,9 +542,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].op: Required value: is required"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].op: Required value: is required"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid attribute selector - invalid op",
@@ -522,9 +571,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual]"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual]"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid attribute selector - no value",
@@ -547,9 +598,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Required value: must specify exactly one of spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.versionValue"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Required value: must specify exactly one of spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.versionValue"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid attribute selector - multiple values",
@@ -575,9 +628,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Invalid value: \"multiple attribute values defined\": must specify exactly one of spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.versionValue"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Invalid value: \"multiple attribute values defined\": must specify exactly one of spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.boolValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.intValue, spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.stringValue, or spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.versionValue"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid version value",
@@ -602,9 +657,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Invalid value: \"550.127.08\": must be a valid semantic version: Patch number must not contain leading zeroes \"08\""},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Invalid value: \"550.127.08\": must be a valid semantic version: Patch number must not contain leading zeroes \"08\""},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid quantity selector - invalid op",
@@ -627,9 +684,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual]"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[0].op: Invalid value: \"InvalidOp\": must be one of [Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual]"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "claimCreationSpec with invalid quantity selector - missing value",
@@ -652,9 +711,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					},
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    1,
-			wantErrMsgs: []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[0].value: Required value: is required"},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].capacitySelectors[0].value: Required value: is required"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
 		},
 		{
 			name: "valid template",
@@ -663,9 +724,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    0,
-			wantErrMsgs: nil,
+			k8sVersion:      "v1.34.0",
+			wantErrs:        0,
+			wantWarnings:    0,
+			wantWarningMsgs: nil,
+			wantErrMsgs:     nil,
 		},
 		{
 			name: "valid multiple templates",
@@ -676,68 +739,11 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl2"),
 				}}
 			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    0,
-			wantErrMsgs: nil,
-		},
-		{
-			name: "valid claimCreationSpec",
-			modify: func(ns *appsv1alpha1.NIMService) {
-				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
-						Devices: []appsv1alpha1.DRADeviceSpec{{
-							Name:            "gpu",
-							Count:           1,
-							DeviceClassName: "gpu.nvidia.com",
-							DriverName:      "gpu.nvidia.com",
-						}},
-					},
-				}}
-			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    0,
-			wantErrMsgs: nil,
-		},
-		{
-			name: "valid claimCreationSpec with attributes and capacity selectors",
-			modify: func(ns *appsv1alpha1.NIMService) {
-				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
-					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
-						Devices: []appsv1alpha1.DRADeviceSpec{{
-							Name:            "gpu",
-							Count:           2,
-							DeviceClassName: "gpu.nvidia.com",
-							DriverName:      "gpu.nvidia.com",
-							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
-								{
-									Key: "compute-capability",
-									Op:  appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
-									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
-										StringValue: ptr.To("8.6"),
-									},
-								},
-								{
-									Key: "nvidia.com/driver-version",
-									Op:  appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
-									Value: &appsv1alpha1.DRADeviceAttributeSelectorValue{
-										VersionValue: ptr.To("12.2.0"),
-									},
-								},
-							},
-							CapacitySelectors: []appsv1alpha1.DRAResourceQuantitySelector{
-								{
-									Key:   "memory",
-									Op:    appsv1alpha1.DRAResourceQuantitySelectorOpEqual,
-									Value: resource.NewQuantity(8*1024*1024*1024, resource.BinarySI),
-								},
-							},
-						}},
-					},
-				}}
-			},
-			k8sVersion:  "v1.34.0",
-			wantErrs:    0,
-			wantErrMsgs: nil,
+			k8sVersion:      "v1.34.0",
+			wantErrs:        0,
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
+			wantErrMsgs:     nil,
 		},
 	}
 
@@ -745,13 +751,12 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateDRAResourcesConfiguration(&ns.Spec, fld, tc.k8sVersion)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateDRAResourcesConfiguration(&ns.Spec, fld, tc.k8sVersion)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 
 			// Check exact error messages if expected
@@ -773,70 +778,22 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 func TestValidateAuthSecret(t *testing.T) {
 	fld := field.NewPath("spec").Child("authSecret")
 	cases := []struct {
-		name     string
-		value    string
-		wantErrs int
+		name         string
+		value        string
+		wantErrs     int
+		wantWarnings int
 	}{
-		{"non-empty", "secret", 0},
-		{"empty", "", 1},
+		{"non-empty", "secret", 0, 0},
+		{"empty", "", 1, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateAuthSecret(&tc.value, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateAuthSecret(&tc.value, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
-			}
-		})
-	}
-}
-
-// TestValidateExposeIngressConfiguration table-driven.
-func TestValidateExposeIngressConfiguration(t *testing.T) {
-	fld := field.NewPath("spec").Child("expose").Child("ingress")
-	enabled := true
-	class := "nginx"
-
-	cases := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
-	}{
-		{
-			name:     "ingress disabled",
-			modify:   func(ns *appsv1alpha1.NIMService) {},
-			wantErrs: 0,
-		},
-		{
-			name: "enabled empty spec",
-			modify: func(ns *appsv1alpha1.NIMService) {
-				ns.Spec.Expose.Ingress.Enabled = &enabled
-			},
-			wantErrs: 1,
-		},
-		{
-			name: "enabled with spec",
-			modify: func(ns *appsv1alpha1.NIMService) {
-				ns.Spec.Expose.Ingress.Enabled = &enabled
-				ns.Spec.Expose.Ingress.Spec.IngressClassName = &class
-			},
-			wantErrs: 0,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			ns := baseNIMService()
-			tc.modify(ns)
-			errs := validateExposeConfiguration(&ns.Spec.Expose, fld)
-			if got := len(errs); got != tc.wantErrs {
-				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -848,21 +805,24 @@ func TestValidateMetricsConfiguration(t *testing.T) {
 	enabled := true
 
 	cases := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
-			name:     "metrics disabled",
-			modify:   func(ns *appsv1alpha1.NIMService) {},
-			wantErrs: 0,
+			name:         "metrics disabled",
+			modify:       func(ns *appsv1alpha1.NIMService) {},
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "enabled empty monitor",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.Metrics.Enabled = &enabled
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "enabled valid",
@@ -870,20 +830,20 @@ func TestValidateMetricsConfiguration(t *testing.T) {
 				ns.Spec.Metrics.Enabled = &enabled
 				ns.Spec.Metrics.ServiceMonitor.Interval = "30s"
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateMetricsConfiguration(&ns.Spec.Metrics, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateMetricsConfiguration(&ns.Spec.Metrics, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -895,25 +855,25 @@ func TestValidateScaleConfiguration(t *testing.T) {
 	enabled := true
 
 	cases := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
-		{"autoscaling disabled", func(ns *appsv1alpha1.NIMService) {}, 0},
-		{"enabled empty HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled }, 1},
-		{"enabled valid HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled; ns.Spec.Scale.HPA.MaxReplicas = 3 }, 0},
+		{"autoscaling disabled", func(ns *appsv1alpha1.NIMService) {}, 0, 0},
+		{"enabled empty HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled }, 1, 0},
+		{"enabled valid HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled; ns.Spec.Scale.HPA.MaxReplicas = 3 }, 0, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateScaleConfiguration(&ns.Spec.Scale, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateScaleConfiguration(&ns.Spec.Scale, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -924,26 +884,26 @@ func TestValidateResourcesConfiguration(t *testing.T) {
 	fld := field.NewPath("spec").Child("resources")
 
 	cases := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
-		{"nil resources", func(ns *appsv1alpha1.NIMService) {}, 0},
+		{"nil resources", func(ns *appsv1alpha1.NIMService) {}, 0, 0},
 		{"with claims", func(ns *appsv1alpha1.NIMService) {
 			ns.Spec.Resources = &corev1.ResourceRequirements{Claims: []corev1.ResourceClaim{{Name: "c1"}}}
-		}, 1},
+		}, 1, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateResourcesConfiguration(ns.Spec.Resources, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validateResourcesConfiguration(ns.Spec.Resources, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -956,26 +916,30 @@ func TestValidateMultiNodeImmutability(t *testing.T) {
 	old.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Parallelism: &appsv1alpha1.ParallelismSpec{Pipeline: ptr.To(uint32(1))}}
 
 	cases := []struct {
-		name     string
-		newObj   *appsv1alpha1.NIMService
-		wantErrs int
+		name         string
+		newObj       *appsv1alpha1.NIMService
+		wantErrs     int
+		wantWarnings int
 	}{
 		{"unchanged", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
 			n.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Parallelism: &appsv1alpha1.ParallelismSpec{Pipeline: ptr.To(uint32(1))}}
 			return n
-		}(), 0},
+		}(), 0, 0},
 		{"changed", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
 			n.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Parallelism: &appsv1alpha1.ParallelismSpec{Pipeline: ptr.To(uint32(2))}}
 			return n
-		}(), 1},
+		}(), 1, 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			errs := validateMultiNodeImmutability(old, c.newObj, fld)
-			if got := len(errs); got != c.wantErrs {
-				t.Fatalf("got %d errs, want %d", got, c.wantErrs)
+			w, errs := validateMultiNodeImmutability(old, c.newObj, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != c.wantErrs || gotWarnings != c.wantWarnings {
+				t.Logf("Validation errors:")
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, c.wantErrs, c.wantWarnings)
 			}
 		})
 	}
@@ -989,30 +953,30 @@ func TestValidatePVCImmutability(t *testing.T) {
 	old.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Create: &trueVal, Size: "10Gi"}
 
 	cases := []struct {
-		name     string
-		newObj   *appsv1alpha1.NIMService
-		wantErrs int
+		name         string
+		newObj       *appsv1alpha1.NIMService
+		wantErrs     int
+		wantWarnings int
 	}{
 		{"no change", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
 			n.Spec.Storage.PVC = old.Spec.Storage.PVC
 			return n
-		}(), 0},
+		}(), 0, 0},
 		{"changed size", func() *appsv1alpha1.NIMService {
 			n := baseNIMService()
 			n.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Create: &trueVal, Size: "20Gi"}
 			return n
-		}(), 1},
+		}(), 1, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validatePVCImmutability(old, tc.newObj, fld)
-			if got := len(errs); got != tc.wantErrs {
+			w, errs := validatePVCImmutability(old, tc.newObj, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
 				t.Logf("Validation errors:")
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}
@@ -1025,16 +989,18 @@ func TestValidateKServeConfiguration(t *testing.T) {
 	trueVal := true
 
 	tests := []struct {
-		name     string
-		modify   func(*appsv1alpha1.NIMService)
-		wantErrs int
+		name         string
+		modify       func(*appsv1alpha1.NIMService)
+		wantErrs     int
+		wantWarnings int
 	}{
 		{
 			name: "standalone platform – no errors",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeStandalone
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "kserve serverless (annotation absent) – valid",
@@ -1042,7 +1008,8 @@ func TestValidateKServeConfiguration(t *testing.T) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				// No annotation ⇒ serverless by default.
 			},
-			wantErrs: 0,
+			wantErrs:     0,
+			wantWarnings: 0,
 		},
 		{
 			name: "kserve serverless (annotation present) – autoscaling set",
@@ -1051,16 +1018,19 @@ func TestValidateKServeConfiguration(t *testing.T) {
 				ns.Spec.Annotations = map[string]string{"serving.kserve.org/deploymentMode": "Serverless"}
 				ns.Spec.Scale.Enabled = &trueVal
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "kserve serverless – ingress set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				ingEnabled := true
-				ns.Spec.Expose.Ingress.Enabled = &ingEnabled
+				ns.Spec.Router.Ingress = &appsv1alpha1.RouterIngress{
+					IngressClass: "nginx",
+				}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "kserve serverless – servicemonitor set",
@@ -1068,18 +1038,21 @@ func TestValidateKServeConfiguration(t *testing.T) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				ns.Spec.Metrics.Enabled = &trueVal
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 		{
 			name: "kserve serverless – all prohibited set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				ns.Spec.Scale.Enabled = &trueVal
-				ingEnabled := true
-				ns.Spec.Expose.Ingress.Enabled = &ingEnabled
+				ns.Spec.Router.Ingress = &appsv1alpha1.RouterIngress{
+					IngressClass: "nginx",
+				}
 				ns.Spec.Metrics.Enabled = &trueVal
 			},
-			wantErrs: 3,
+			wantErrs:     3,
+			wantWarnings: 0,
 		},
 		{
 			name: "kserve rawdeployment – allowed autoscaling, but multidnode forbidden",
@@ -1089,7 +1062,8 @@ func TestValidateKServeConfiguration(t *testing.T) {
 				ns.Spec.Scale.Enabled = &trueVal // should be fine
 				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Parallelism: &appsv1alpha1.ParallelismSpec{Pipeline: ptr.To(uint32(1))}}
 			},
-			wantErrs: 1, // only multiNode should trigger
+			wantErrs:     1, // only multiNode should trigger
+			wantWarnings: 0,
 		},
 		{
 			name: "kserve – multidnode alone",
@@ -1097,7 +1071,8 @@ func TestValidateKServeConfiguration(t *testing.T) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Parallelism: &appsv1alpha1.ParallelismSpec{Pipeline: ptr.To(uint32(2))}}
 			},
-			wantErrs: 1,
+			wantErrs:     1,
+			wantWarnings: 0,
 		},
 	}
 
@@ -1107,17 +1082,17 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			// Ensure nested structs are initialised to avoid nil panics when we set sub-fields.
 			ns.Spec.Scale = appsv1alpha1.Autoscaling{}
 			ns.Spec.Expose = appsv1alpha1.Expose{}
-			ns.Spec.Expose.Ingress = appsv1alpha1.Ingress{}
+			ns.Spec.Router = appsv1alpha1.Router{}
 			ns.Spec.Metrics = appsv1alpha1.Metrics{}
 
 			tc.modify(ns)
 
-			errs := validateKServeConfiguration(&ns.Spec, fld)
-			if got := len(errs); got != tc.wantErrs {
-				for i, err := range errs {
-					t.Logf("  %d: %s", i+1, err.Error())
-				}
-				t.Fatalf("got %d errs, want %d", got, tc.wantErrs)
+			w, errs := validateKServeConfiguration(&ns.Spec, fld)
+			gotErrs := len(errs)
+			gotWarnings := len(w)
+			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
+				t.Logf("Validation errors:")
+				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}

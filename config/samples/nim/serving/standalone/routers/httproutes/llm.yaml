@@ -1,4 +1,3 @@
----
 # NIM Cache for LLM specific NIM
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
@@ -23,7 +22,7 @@ spec:
 
 ---
 # NIM Service for LLM specific NIM with Autoscaling
-# NOTE: Ingress controller (e.g. nginx) should be deployed as a pre-requisite
+# NOTE: Gateway controller (e.g. Istio) should be deployed as a pre-requisite
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
@@ -49,18 +48,9 @@ spec:
     service:
       type: ClusterIP
       port: 8000
-    ingress:
-      enabled: true
-      spec:
-        ingressClassName: nginx
-        rules:
-          - host: demo.nvidia.example.com
-            http:
-              paths:
-              - backend:
-                  service:
-                    name: meta-llama-3-2-1b-instruct
-                    port:
-                      number: 8000
-                path: /v1/chat/completions
-                pathType: Prefix
+  router:
+    gateway:
+      namespace: nim-service
+      name: istio-gateway
+      httpRoutesEnabled: true
+    hostDomainName: demo.nvidia.example.com
