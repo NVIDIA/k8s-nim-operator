@@ -140,6 +140,9 @@ Minimum required flags are --image-repository, --tag, and storage: reference eit
 
 	// add CPU/Memory resource limits?
 
+	// Hide the env flag from users, but keep it functional for internal use by deploy command.
+    cmd.Flags().MarkHidden("env")
+
 	return cmd
 }
 

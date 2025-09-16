@@ -123,7 +123,7 @@ func Run(ctx context.Context, options *util.FetchResourceOptions, k8sClient clie
 		}
 		switch imgSource {
 		case "ngc":
-			// If ngc, ask for modelPuller.
+			// If ngc, ask for endpoint.
 			fmt.Fprint(options.IoStreams.Out, "Enter the Model URL (eg: ngc://nvidia/nemo/<model_name>:2.0): ")
 			response, err := reader.ReadString('\n')
 			if err != nil {
