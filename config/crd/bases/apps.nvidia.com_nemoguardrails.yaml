@@ -1906,6 +1906,8 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-validations:
+                - message: 'unsupported field: spec.router.gateway.grpcRoutesEnabled'
+                  rule: '!(has(self.gateway) && self.gateway.grpcRoutesEnabled)'
                 - message: ingress and gateway cannot be specified together
                   rule: '!(has(self.gateway) && has(self.ingress))'
               runtimeClass:

@@ -76,7 +76,8 @@ type NemoEntitystoreSpec struct {
 	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
-	Expose  ExposeV1    `json:"expose,omitempty"`
+	Expose ExposeV1 `json:"expose,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && self.gateway.grpcRoutesEnabled)", message="unsupported field: spec.router.gateway.grpcRoutesEnabled"
 	Router  Router      `json:"router,omitempty"`
 	Scale   Autoscaling `json:"scale,omitempty"`
 	Metrics Metrics     `json:"metrics,omitempty"`
