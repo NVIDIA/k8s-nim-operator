@@ -2435,7 +2435,6 @@ spec:
                     type: object
                 type: object
               replicas:
-                default: 1
                 format: int32
                 minimum: 1
                 type: integer
@@ -3494,6 +3493,10 @@ spec:
             - message: spec.replicas cannot be set when spec.scale.enabled is true
               rule: '!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled
                 && has(self.replicas))'
+            - message: .spec.expose.service.grpcPort must be set when .spec.router.gateway.grpcRoutesEnabled
+                is true
+              rule: '!(has(self.router.gateway) && self.router.gateway.grpcRoutesEnabled
+                && !has(self.expose.service.grpcPort))'
             - message: .spec.expose.ingress is deprecated, and will be removed in
                 a future release. If .spec.expose.ingress is set, please do not set
                 .spec.router.ingress.
