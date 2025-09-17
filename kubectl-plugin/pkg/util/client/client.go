@@ -1,10 +1,10 @@
 package client
 
 import (
-    "k8s.io/client-go/kubernetes"
-    cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/client-go/kubernetes"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-    nimclientset "github.com/NVIDIA/k8s-nim-operator/api/versioned"
+	nimclientset "github.com/NVIDIA/k8s-nim-operator/api/versioned"
 )
 
 type Client interface {
@@ -13,8 +13,8 @@ type Client interface {
 }
 
 type k8sClient struct {
-    kubeClient kubernetes.Interface
-    nimClient  nimclientset.Interface
+	kubeClient kubernetes.Interface
+	nimClient  nimclientset.Interface
 }
 
 func NewClient(factory cmdutil.Factory) (Client, error) {
@@ -37,7 +37,6 @@ func NewClient(factory cmdutil.Factory) (Client, error) {
 		nimClient:  nimClient,
 	}, nil
 }
-
 
 func (c *k8sClient) KubernetesClient() kubernetes.Interface {
 	return c.kubeClient

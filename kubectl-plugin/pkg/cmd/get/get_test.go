@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
 // NIMService tests.
@@ -65,21 +65,13 @@ func withStorageHostPath(ns appsv1alpha1.NIMService, p string) appsv1alpha1.NIMS
 	return ns
 }
 
-func withSvcResources(ns appsv1alpha1.NIMService, limits, requests corev1.ResourceList, claims []corev1.ResourceClaim) appsv1alpha1.NIMService {
-	ns.Spec.Resources = &corev1.ResourceRequirements{
-		Limits:   limits,
-		Requests: requests,
-		Claims:   claims,
-	}
-	return ns
-}
 func Test_printNIMServices(t *testing.T) {
 	// Item 1
 	ns1 := withReplicas(withExposeService(withImage(newBaseNS("svc1", "ns1"), "repo1", "v1"), "api", 8080), 2)
 	ns1.Spec.Scale.Enabled = ptr.To(false)
 	ns1 = withStoragePVC(ns1, "pvc1", "10Gi")
 	ns1.Status.State = "Creating"
-	ns1.ObjectMeta.CreationTimestamp = metav1.NewTime(time.Now().Add(-1 * time.Hour))
+	ns1.CreationTimestamp = metav1.NewTime(time.Now().Add(-1 * time.Hour))
 
 	// Item 2 - with an endpoint
 	min := int32(1)
@@ -88,7 +80,7 @@ func Test_printNIMServices(t *testing.T) {
 	ns2 = withStorageNIMCache(ns2, "nimc", "fp8")
 	ns2.Status.State = "Ready"
 	ns2.Status.Model = &appsv1alpha1.ModelStatus{ExternalEndpoint: "http://example.com/api"}
-	ns2.ObjectMeta.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Hour))
+	ns2.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Hour))
 
 	list := &appsv1alpha1.NIMServiceList{Items: []appsv1alpha1.NIMService{ns1, ns2}}
 
@@ -192,7 +184,7 @@ func Test_printNIMServices_DifferentStates(t *testing.T) {
 	for i, state := range states {
 		ns := withImage(newBaseNS(fmt.Sprintf("svc-%s", strings.ToLower(state)), "ns"), "repo", "v1")
 		ns.Status.State = state
-		ns.ObjectMeta.CreationTimestamp = metav1.NewTime(time.Now().Add(time.Duration(-i) * time.Hour))
+		ns.CreationTimestamp = metav1.NewTime(time.Now().Add(time.Duration(-i) * time.Hour))
 		services = append(services, ns)
 	}
 
@@ -216,17 +208,17 @@ func Test_printNIMServices_WithDifferentStorageTypes(t *testing.T) {
 	// Service with HostPath
 	ns1 := withStorageHostPath(withImage(newBaseNS("svc-hostpath", "ns"), "repo", "v1"), "/mnt/models")
 	ns1.Status.State = "Ready"
-	ns1.ObjectMeta.CreationTimestamp = metav1.NewTime(time.Now().Add(-1 * time.Hour))
+	ns1.CreationTimestamp = metav1.NewTime(time.Now().Add(-1 * time.Hour))
 
 	// Service with NIMCache and profile
 	ns2 := withStorageNIMCache(withImage(newBaseNS("svc-nimcache", "ns"), "repo", "v2"), "cache1", "optimized")
 	ns2.Status.State = "Ready"
-	ns2.ObjectMeta.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Hour))
+	ns2.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Hour))
 
 	// Service with PVC
 	ns3 := withStoragePVC(withImage(newBaseNS("svc-pvc", "ns"), "repo", "v3"), "my-pvc", "100Gi")
 	ns3.Status.State = "Creating"
-	ns3.ObjectMeta.CreationTimestamp = metav1.NewTime(time.Now().Add(-30 * time.Minute))
+	ns3.CreationTimestamp = metav1.NewTime(time.Now().Add(-30 * time.Minute))
 
 	list := &appsv1alpha1.NIMServiceList{Items: []appsv1alpha1.NIMService{ns1, ns2, ns3}}
 
@@ -287,7 +279,7 @@ func withResources(nc appsv1alpha1.NIMCache, cpu, mem string) appsv1alpha1.NIMCa
 }
 
 func withCreationTime(nc appsv1alpha1.NIMCache, t time.Time) appsv1alpha1.NIMCache {
-	nc.ObjectMeta.CreationTimestamp = metav1.NewTime(t)
+	nc.CreationTimestamp = metav1.NewTime(t)
 	return nc
 }
 

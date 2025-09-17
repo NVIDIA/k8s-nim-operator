@@ -9,12 +9,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"k8s-nim-operator-cli/pkg/cmd/delete"
 	"k8s-nim-operator-cli/pkg/cmd/create"
+	"k8s-nim-operator-cli/pkg/cmd/delete"
+	"k8s-nim-operator-cli/pkg/cmd/deploy"
 	"k8s-nim-operator-cli/pkg/cmd/get"
 	"k8s-nim-operator-cli/pkg/cmd/log"
 	"k8s-nim-operator-cli/pkg/cmd/status"
-	"k8s-nim-operator-cli/pkg/cmd/deploy"
 )
 
 func init() {

@@ -6,7 +6,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 
-    "k8s-nim-operator-cli/pkg/cmd"
+	"k8s-nim-operator-cli/pkg/cmd"
 )
 
 func main() {

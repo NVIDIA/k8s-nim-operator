@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s-nim-operator-cli/pkg/util"
-	"k8s-nim-operator-cli/pkg/util/client"
-
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+
+	"k8s-nim-operator-cli/pkg/util"
+	"k8s-nim-operator-cli/pkg/util/client"
 )
 
 func NewLogStreamCommand(cmdFactory cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -92,33 +93,3 @@ func RunStream(ctx context.Context, options *util.FetchResourceOptions, k8sClien
 
 	return util.StreamResourceLogs(ctx, options, k8sClient, ns, name, selector)
 }
-
-// Custom help message template. Needed to show supported resource types as a custom category to be consistent with "Available Commands" for get and status.
-const streamHelpTemplate = `{{- if .Long }}{{ .Long }}{{- else }}{{ .Short }}{{- end }}
-
-Usage:{{if .Runnable}}
-  {{.UseLine}}{{end}}
-
-{{if gt (len .Aliases) 0}}Aliases:
-  {{.NameAndAliases}}
-
-Supported RESOURCE types:
-  nimcache     Stream NIMCache logs.
-  nimservice   Stream NIMService logs.
-
-{{end}}{{if .HasExample}}Examples:
-{{ .Example }}
-
-{{end}}{{if .HasAvailableLocalFlags}}Flags:
-{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}
-
-{{end}}{{if .HasAvailableInheritedFlags}}Global Flags:
-{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}
-
-{{end}}{{if .HasHelpSubCommands}}Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
-  {{.CommandPath}} {{.Short}}{{end}}{{end}}
-
-{{end}}{{if .HasAvailableSubCommands}}Available Commands:{{range .Commands}}{{if (and .IsAvailableCommand (not .IsAdditionalHelpTopicCommand))}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
-
-{{end}}`

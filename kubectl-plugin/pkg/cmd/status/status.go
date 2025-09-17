@@ -1,16 +1,18 @@
 package status
 
 import (
+	"context"
 	"fmt"
 	"strings"
-	"context"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+
 	"k8s-nim-operator-cli/pkg/util"
 	"k8s-nim-operator-cli/pkg/util/client"
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
 func NewStatusCommand(cmdFactory cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -34,7 +36,7 @@ func NewStatusCommand(cmdFactory cmdutil.Factory, streams genericclioptions.IOSt
 }
 
 // Common Run command for status' custom resources.
-func Run (ctx context.Context, options *util.FetchResourceOptions, k8sClient client.Client) error {
+func Run(ctx context.Context, options *util.FetchResourceOptions, k8sClient client.Client) error {
 	resourceList, err := util.FetchResources(ctx, options, k8sClient)
 	if err != nil {
 		return err

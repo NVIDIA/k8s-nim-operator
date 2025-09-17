@@ -93,7 +93,7 @@ func NewCreateNIMCacheCommand(cmdFactory cmdutil.Factory, streams genericcliopti
 		Long: `Create new NIMCache with specified parameters.
 Must specify --nim-source and storage: reference an existing/create new PVC.`,
 		SilenceUsage: true,
-		Args: cobra.MaximumNArgs(1),
+		Args:         cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				cmd.HelpFunc()(cmd, args)
@@ -256,7 +256,7 @@ func FillOutNIMCacheSpec(options *NIMCacheOptions) (*appsv1alpha1.NIMCache, erro
 
 		fillOutDSHF(&nimcache, options)
 	default:
-		//NeMo DataStore
+		// NeMo DataStore.
 		nimcache.Spec.Source.DataStore = &appsv1alpha1.NemoDataStoreSource{}
 		nimcache.Spec.Source.DataStore.Endpoint = options.AltEndpoint
 		nimcache.Spec.Source.DataStore.Namespace = options.AltNamespace

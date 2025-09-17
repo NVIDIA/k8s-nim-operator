@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	corev1 "k8s.io/api/core/v1"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -87,8 +87,6 @@ func FetchResources(ctx context.Context, options *FetchResourceOptions, k8sClien
 	switch options.ResourceType {
 
 	case NIMService:
-		resourceList = appsv1alpha1.NIMServiceList{}
-
 		// Retrieve NIMServices.
 		if options.AllNamespaces {
 			resourceList, err = k8sClient.NIMClient().AppsV1alpha1().NIMServices("").List(ctx, listopts)
@@ -119,8 +117,6 @@ func FetchResources(ctx context.Context, options *FetchResourceOptions, k8sClien
 		}
 
 	case NIMCache:
-		resourceList = appsv1alpha1.NIMCacheList{}
-
 		// Retrieve NIMCaches.
 		if options.AllNamespaces {
 			resourceList, err = k8sClient.NIMClient().AppsV1alpha1().NIMCaches("").List(ctx, listopts)

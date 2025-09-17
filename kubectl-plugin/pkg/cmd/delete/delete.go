@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s-nim-operator-cli/pkg/util"
-	"k8s-nim-operator-cli/pkg/util/client"
-
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/spf13/cobra"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+
+	"k8s-nim-operator-cli/pkg/util"
+	"k8s-nim-operator-cli/pkg/util/client"
 )
 
 func NewDeleteCommand(cmdFactory cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -24,8 +25,8 @@ func NewDeleteCommand(cmdFactory cmdutil.Factory, streams genericclioptions.IOSt
 		Long:  "Delete a NIM Operator custom resource's deployment",
 		Example: `  nim delete nimcache my-cache
   nim delete nimservice my-service`,
-		Aliases:      []string{"remove"},                             
-		SilenceUsage: true,                                              
+		Aliases:      []string{"remove"},
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch len(args) {
 			case 0:
@@ -72,8 +73,8 @@ func Run(ctx context.Context, options *util.FetchResourceOptions, k8sClient clie
 	}
 
 	var (
-		ns   = options.Namespace
-		name = options.ResourceName
+		ns   string
+		name string
 	)
 
 	switch options.ResourceType {

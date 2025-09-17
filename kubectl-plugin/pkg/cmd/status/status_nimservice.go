@@ -12,8 +12,8 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"k8s-nim-operator-cli/pkg/util/client"
 	util "k8s-nim-operator-cli/pkg/util"
+	"k8s-nim-operator-cli/pkg/util/client"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
@@ -25,9 +25,9 @@ func NewStatusNIMServiceCommand(cmdFactory cmdutil.Factory, streams genericcliop
 		Use:          "nimservice [NAME]",
 		Aliases:      []string{"nimservices"},
 		Short:        "Get NIMService information.",
-		Long: 		  "Get a summary of status information for all NIMServices in a namespace.",
+		Long:         "Get a summary of status information for all NIMServices in a namespace.",
 		SilenceUsage: true,
-		Args: cobra.MaximumNArgs(1),
+		Args:         cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := options.CompleteNamespace(args, cmd); err != nil {
 				return err

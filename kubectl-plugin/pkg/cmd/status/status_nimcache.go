@@ -12,8 +12,8 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"k8s-nim-operator-cli/pkg/util/client"
 	util "k8s-nim-operator-cli/pkg/util"
+	"k8s-nim-operator-cli/pkg/util/client"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
@@ -25,9 +25,9 @@ func NewStatusNIMCacheCommand(cmdFactory cmdutil.Factory, streams genericcliopti
 		Use:          "nimcache [NAME]",
 		Aliases:      []string{"nimcaches"},
 		Short:        "Get NIMCache status.",
-		Long: 		  "Get detailed status information about one NIMCache, or a summary of all NIMCaches in a namespace.",
+		Long:         "Get detailed status information about one NIMCache, or a summary of all NIMCaches in a namespace.",
 		SilenceUsage: true,
-		Args: cobra.MaximumNArgs(1),
+		Args:         cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := options.CompleteNamespace(args, cmd); err != nil {
 				return err

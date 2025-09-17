@@ -81,7 +81,7 @@ func Test_Run_NoCaching(t *testing.T) {
 			expectedError: false,
 			checkServiceCmd: func(t *testing.T, cmd *cobra.Command) {
 				// Get the stored args from the command's annotation
-				args, _ := cmd.Annotations["setargs"]
+				args := cmd.Annotations["setargs"]
 
 				// Check that NIM_MODEL_NAME env var is set
 				if !strings.Contains(args, NIM_MODEL_NAME_ENV_VAR) || !strings.Contains(args, "ngc://nvidia/nemo/llama-8b:2.0") {
@@ -97,7 +97,7 @@ func Test_Run_NoCaching(t *testing.T) {
 			expectedError: false,
 			checkServiceCmd: func(t *testing.T, cmd *cobra.Command) {
 				// Get the stored args from the command's annotation
-				args, _ := cmd.Annotations["setargs"]
+				args := cmd.Annotations["setargs"]
 
 				// Check that NIM_MODEL_NAME env var is set with HF model
 				if !strings.Contains(args, NIM_MODEL_NAME_ENV_VAR) || !strings.Contains(args, "hf://meta-llama/Llama-3.2-1B-Instruct") {
@@ -159,7 +159,7 @@ func Test_Run_WithNGCCaching(t *testing.T) {
 			expectedError: false,
 			checkCommands: func(t *testing.T, serviceCmd, cacheCmd *cobra.Command) {
 				// Check cache command
-				cacheArgs, _ := cacheCmd.Annotations["setargs"]
+				cacheArgs := cacheCmd.Annotations["setargs"]
 
 				// Should have cache name ending with -cache
 				cacheArgsList := strings.Split(cacheArgs, " ")
@@ -178,7 +178,7 @@ func Test_Run_WithNGCCaching(t *testing.T) {
 				}
 
 				// Check service command uses nimcache
-				serviceArgs, _ := serviceCmd.Annotations["setargs"]
+				serviceArgs := serviceCmd.Annotations["setargs"]
 				if !strings.Contains(serviceArgs, "--nimcache-storage-name=") {
 					t.Errorf("expected --nimcache-storage-name flag in service args: %s", serviceArgs)
 				}
@@ -233,7 +233,7 @@ func Test_Run_WithHuggingFaceCaching(t *testing.T) {
 				"gp3\n",
 			expectedError: false,
 			checkCommands: func(t *testing.T, serviceCmd, cacheCmd *cobra.Command) {
-				cacheArgs, _ := cacheCmd.Annotations["setargs"]
+				cacheArgs := cacheCmd.Annotations["setargs"]
 
 				// Check source is huggingface
 				if !strings.Contains(cacheArgs, "--nim-source=huggingface") {
@@ -261,7 +261,7 @@ func Test_Run_WithHuggingFaceCaching(t *testing.T) {
 				"\n", // empty storage class
 			expectedError: false,
 			checkCommands: func(t *testing.T, serviceCmd, cacheCmd *cobra.Command) {
-				cacheArgs, _ := cacheCmd.Annotations["setargs"]
+				cacheArgs := cacheCmd.Annotations["setargs"]
 
 				// Check source is nemoDataStore
 				if !strings.Contains(cacheArgs, "--nim-source=nemoDataStore") {
@@ -409,10 +409,10 @@ func Test_Run_PVCConfiguration(t *testing.T) {
 			serviceCmd := mockCommand()
 			cacheCmd := mockCommand()
 
-			Run(context.Background(), options, nil, serviceCmd, cacheCmd)
+			_, _ = Run(context.Background(), options, nil, serviceCmd, cacheCmd)
 
 			// Check PVC args in service command
-			serviceArgs, _ := serviceCmd.Annotations["setargs"]
+			serviceArgs := serviceCmd.Annotations["setargs"]
 			for _, expectedArg := range tt.expectedPVCArgs {
 				if !strings.Contains(serviceArgs, expectedArg) {
 					t.Errorf("expected PVC arg %q not found in service args: %s", expectedArg, serviceArgs)

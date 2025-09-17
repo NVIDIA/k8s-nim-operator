@@ -202,7 +202,7 @@ func Test_listResourceLogPaths_errors(t *testing.T) {
 
 			// Clean up permissions for test cleanup
 			nimDir := filepath.Join(root, "nim")
-			os.Chmod(nimDir, 0o755)
+			_ = os.Chmod(nimDir, 0o755)
 		})
 	}
 }
@@ -352,14 +352,10 @@ func Test_NewLogCommand_InvalidArgs(t *testing.T) {
 
 	// Test with multiple unknown arguments
 	cmd.SetArgs([]string{"unknown", "args", "extra"})
-	cmd.Execute()
+	_ = cmd.Execute()
 
-	// The error should be printed to stdout (based on the implementation)
-	// Note: The implementation prints to stdout, not stderr
-	output := errOut.String()
-	if strings.Contains(output, "unknown command") {
-		// If it's in stderr, that's fine too
-	}
+	// Will be implemented in e2e tests.
+	_ = errOut.String()
 }
 
 func Test_NewLogStreamCommand_Structure(t *testing.T) {
@@ -424,7 +420,7 @@ func Test_NewLogStreamCommand_InvalidArgCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd.SetArgs(tt.args)
-			cmd.Execute()
+			_ = cmd.Execute()
 			// The command prints error but doesn't return error for invalid args
 		})
 	}
@@ -458,7 +454,7 @@ func Test_NewLogCollectCommand_InvalidArgs(t *testing.T) {
 
 	// Test with unexpected arguments
 	cmd.SetArgs([]string{"unexpected", "args"})
-	cmd.Execute()
+	_ = cmd.Execute()
 	// The command prints error but doesn't return error
 }
 
@@ -525,7 +521,7 @@ func Test_parseArtifactDir_edgeCases(t *testing.T) {
 	}
 }
 
-// minimal test IOStreams without importing cli-runtime test helpers
+// minimal test IOStreams without importing cli-runtime test helpers.
 func genericTestIOStreams() (s genericclioptions.IOStreams, in *bytes.Buffer, out *bytes.Buffer, errOut *bytes.Buffer) {
 	in = &bytes.Buffer{}
 	out = &bytes.Buffer{}

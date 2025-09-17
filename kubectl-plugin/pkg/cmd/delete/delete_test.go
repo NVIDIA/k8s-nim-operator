@@ -21,7 +21,7 @@ func Test_NewDeleteCommand_Wiring(t *testing.T) {
 	}
 }
 
-// helpers
+// helpers.
 func genericTestIOStreams() (s genericclioptions.IOStreams, in *bytes.Buffer, out *bytes.Buffer, errOut *bytes.Buffer) {
 	in = &bytes.Buffer{}
 	out = &bytes.Buffer{}

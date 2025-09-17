@@ -1,15 +1,17 @@
 package get
 
 import (
+	"context"
 	"fmt"
 	"strings"
-	"context"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s-nim-operator-cli/pkg/util"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+
+	"k8s-nim-operator-cli/pkg/util"
 	"k8s-nim-operator-cli/pkg/util/client"
 )
 

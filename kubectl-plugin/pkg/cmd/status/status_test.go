@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
 // --- Status Command structure tests ---
@@ -66,7 +67,7 @@ func Test_NewStatusCommand_InvalidArgs(t *testing.T) {
 
 	// Test with unknown arguments
 	cmd.SetArgs([]string{"unknown", "args"})
-	cmd.Execute()
+	_ = cmd.Execute()
 	// The command prints error but doesn't return error
 }
 
@@ -109,7 +110,7 @@ func Test_NewStatusNIMCacheCommand_Structure(t *testing.T) {
 	}
 }
 
-// minimal test IOStreams
+// minimal test IOStreams.
 func genericTestIOStreams() genericclioptions.IOStreams {
 	return genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
@@ -137,7 +138,7 @@ func withStatus(n appsv1alpha1.NIMCache, state, pvc string, conds []metav1.Condi
 }
 
 func withCreatedAt(n appsv1alpha1.NIMCache, t time.Time) appsv1alpha1.NIMCache {
-	n.ObjectMeta.CreationTimestamp = metav1.NewTime(t)
+	n.CreationTimestamp = metav1.NewTime(t)
 	return n
 }
 
@@ -403,7 +404,7 @@ func withSvcStatus(n appsv1alpha1.NIMService, state string, available int32, con
 }
 
 func withSvcCreatedAt(n appsv1alpha1.NIMService, t time.Time) appsv1alpha1.NIMService {
-	n.ObjectMeta.CreationTimestamp = metav1.NewTime(t)
+	n.CreationTimestamp = metav1.NewTime(t)
 	return n
 }
 

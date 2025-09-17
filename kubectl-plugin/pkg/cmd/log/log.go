@@ -59,7 +59,9 @@ func NewLogCommand(cmdFactory cmdutil.Factory, streams genericclioptions.IOStrea
 func Run(ctx context.Context, options *util.FetchResourceOptions) error {
 	// Materialize the embedded script.
 	tmp, err := os.CreateTemp("", "must-gather-*.sh")
-	if err != nil { return fmt.Errorf("create temp: %w", err) }
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
+	}
 	defer os.Remove(tmp.Name())
 	if err := os.WriteFile(tmp.Name(), scripts.MustGather, 0o755); err != nil {
 		return fmt.Errorf("write script: %w", err)
@@ -87,7 +89,9 @@ func Run(ctx context.Context, options *util.FetchResourceOptions) error {
 
 	// Collect matching log file paths (prefix "<resourceName>-*.log").
 	paths, err := listResourceLogPaths(artifactDir)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	nimDir := filepath.Join(artifactDir, "nim")
 	fmt.Printf("\nDiagnostic bundle created at  %s.\n", nimDir)

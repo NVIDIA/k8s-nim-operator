@@ -22,7 +22,7 @@ import (
 	nimfake "github.com/NVIDIA/k8s-nim-operator/api/versioned/fake"
 )
 
-// Mock client implementation for testing
+// Mock client implementation for testing.
 type mockClient struct {
 	nimClient  nimclientset.Interface
 	kubeClient kubernetes.Interface
@@ -36,7 +36,7 @@ func (m *mockClient) KubernetesClient() kubernetes.Interface {
 	return m.kubeClient
 }
 
-// Test NewFetchResourceOptions
+// Test NewFetchResourceOptions.
 func Test_NewFetchResourceOptions(t *testing.T) {
 	streams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
@@ -57,7 +57,7 @@ func Test_NewFetchResourceOptions(t *testing.T) {
 	}
 }
 
-// Test CompleteNamespace
+// Test CompleteNamespace.
 func Test_CompleteNamespace(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -172,7 +172,7 @@ func Test_CompleteNamespace(t *testing.T) {
 	}
 }
 
-// Test FetchResources for NIMService
+// Test FetchResources for NIMService.
 func Test_FetchResources_NIMService(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -260,7 +260,7 @@ func Test_FetchResources_NIMService(t *testing.T) {
 				if !tt.options.AllNamespaces && tt.options.Namespace != "" && ns.Namespace != tt.options.Namespace {
 					continue
 				}
-				nimClient.AppsV1alpha1().NIMServices(ns.Namespace).Create(context.TODO(), &ns, metav1.CreateOptions{})
+				_, _ = nimClient.AppsV1alpha1().NIMServices(ns.Namespace).Create(context.TODO(), &ns, metav1.CreateOptions{})
 			}
 
 			// Create mock client
@@ -303,7 +303,7 @@ func Test_FetchResources_NIMService(t *testing.T) {
 	}
 }
 
-// Test FetchResources for NIMCache
+// Test FetchResources for NIMCache.
 func Test_FetchResources_NIMCache(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -367,7 +367,7 @@ func Test_FetchResources_NIMCache(t *testing.T) {
 				if !tt.options.AllNamespaces && tt.options.Namespace != "" && nc.Namespace != tt.options.Namespace {
 					continue
 				}
-				nimClient.AppsV1alpha1().NIMCaches(nc.Namespace).Create(context.TODO(), &nc, metav1.CreateOptions{})
+				_, _ = nimClient.AppsV1alpha1().NIMCaches(nc.Namespace).Create(context.TODO(), &nc, metav1.CreateOptions{})
 			}
 
 			// Create mock client
@@ -403,7 +403,7 @@ func Test_FetchResources_NIMCache(t *testing.T) {
 	}
 }
 
-// Test messageConditionFrom
+// Test messageConditionFrom.
 func Test_messageConditionFrom(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -497,7 +497,7 @@ func Test_messageConditionFrom(t *testing.T) {
 	}
 }
 
-// Test MessageCondition
+// Test MessageCondition.
 func Test_MessageCondition(t *testing.T) {
 	readyCondition := metav1.Condition{
 		Type:    "Ready",
@@ -583,7 +583,7 @@ func Test_MessageCondition(t *testing.T) {
 	}
 }
 
-// Test StreamResourceLogs
+// Test StreamResourceLogs.
 func Test_StreamResourceLogs(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -672,7 +672,7 @@ func Test_StreamResourceLogs(t *testing.T) {
 			// Create fake kubernetes client with pods
 			kubeClient := k8sfake.NewSimpleClientset()
 			for _, pod := range tt.pods {
-				kubeClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+				_, _ = kubeClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
 			}
 
 			// Note: Mocking actual log streaming with the fake client is complex
@@ -717,7 +717,7 @@ func Test_StreamResourceLogs(t *testing.T) {
 	}
 }
 
-// Test CompleteNamespace edge cases
+// Test CompleteNamespace edge cases.
 func Test_CompleteNamespace_EdgeCases(t *testing.T) {
 	t.Run("namespace flag error", func(t *testing.T) {
 		streams := genericclioptions.IOStreams{
@@ -766,7 +766,7 @@ func Test_CompleteNamespace_EdgeCases(t *testing.T) {
 	})
 }
 
-// Test FetchResources with client errors
+// Test FetchResources with client errors.
 func Test_FetchResources_ClientErrors(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -835,7 +835,7 @@ func Test_FetchResources_ClientErrors(t *testing.T) {
 	}
 }
 
-// Test StreamResourceLogs with actual log content
+// Test StreamResourceLogs with actual log content.
 func Test_StreamResourceLogs_LogContent(t *testing.T) {
 	// This test is simplified since mocking the actual log stream is complex
 	// In a real implementation, you would use a fake REST client that returns
@@ -875,14 +875,14 @@ func Test_StreamResourceLogs_LogContent(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 		defer cancel()
 
-		StreamResourceLogs(ctx, options, mockClient, "test-ns", "test-resource", "app=test")
+		_ = StreamResourceLogs(ctx, options, mockClient, "test-ns", "test-resource", "app=test")
 
 		// In a real test, we would verify the output format
 		// For now, just ensure no panic
 	})
 }
 
-// Test FetchResources with empty resource type
+// Test FetchResources with empty resource type.
 func Test_FetchResources_EmptyResourceType(t *testing.T) {
 	options := &FetchResourceOptions{
 		Namespace:    "test-ns",

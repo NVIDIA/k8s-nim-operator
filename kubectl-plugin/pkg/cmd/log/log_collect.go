@@ -1,11 +1,11 @@
 package log
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	_ "embed"
 	"fmt"
-	"bufio"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,14 +49,16 @@ func NewLogCollectCommand(cmdFactory cmdutil.Factory, streams genericclioptions.
 	}
 
 	cmd.SetHelpTemplate(helpTemplate)
-	
+
 	return cmd
 }
 
 func RunCollect(ctx context.Context, options *util.FetchResourceOptions) error {
 	// Materialize the embedded script.
 	tmp, err := os.CreateTemp("", "must-gather-*.sh")
-	if err != nil { return fmt.Errorf("create temp: %w", err) }
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
+	}
 	defer os.Remove(tmp.Name())
 	if err := os.WriteFile(tmp.Name(), scripts.MustGather, 0o755); err != nil {
 		return fmt.Errorf("write script: %w", err)
@@ -84,7 +86,9 @@ func RunCollect(ctx context.Context, options *util.FetchResourceOptions) error {
 
 	// Collect matching log file paths (prefix "<resourceName>-*.log").
 	paths, err := listResourceLogPaths(artifactDir)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	nimDir := filepath.Join(artifactDir, "nim")
 	fmt.Printf("\nDiagnostic bundle created at  %s.\n", nimDir)
@@ -95,15 +99,21 @@ func RunCollect(ctx context.Context, options *util.FetchResourceOptions) error {
 	return nil
 }
 
-// parse ARTIFACT_DIR=... from either stream (handles xtrace on stderr)
+// parse ARTIFACT_DIR=... from either stream (handles xtrace on stderr).
 func parseArtifactDir(out1, out2 []byte) string {
-	if v := findArtifactDirIn(out1); v != "" { return v }
-	if v := findArtifactDirIn(out2); v != "" { return v }
+	if v := findArtifactDirIn(out1); v != "" {
+		return v
+	}
+	if v := findArtifactDirIn(out2); v != "" {
+		return v
+	}
 	return ""
 }
 func findArtifactDirIn(b []byte) string {
 	re := regexp.MustCompile(`\bARTIFACT_DIR=([^\s]+)`)
-	if m := re.FindSubmatch(b); len(m) == 2 { return string(m[1]) }
+	if m := re.FindSubmatch(b); len(m) == 2 {
+		return string(m[1])
+	}
 	// fallback for explicit xtrace line
 	sc := bufio.NewScanner(bytes.NewReader(b))
 	for sc.Scan() {
@@ -115,7 +125,7 @@ func findArtifactDirIn(b []byte) string {
 	return ""
 }
 
-// returns full paths to files like "<artifactDir>/nim/<resourceName>-*.log"
+// returns full paths to files like "<artifactDir>/nim/<resourceName>-*.log".
 func listResourceLogPaths(artifactDir string) ([]string, error) {
 	nimDir := filepath.Join(artifactDir, "nim")
 	ents, err := os.ReadDir(nimDir)
@@ -149,8 +159,6 @@ func listResourceLogPaths(artifactDir string) ([]string, error) {
 
 	return paths, nil
 }
-
-
 
 // Custom help message template. Needed to show supported resource types as a custom category to be consistent with "Available Commands" for get and status.
 const helpTemplate = `{{- if .Long }}{{ .Long }}{{- else }}{{ .Short }}{{- end }}

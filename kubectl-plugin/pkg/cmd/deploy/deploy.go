@@ -29,9 +29,9 @@ func NewDeployCommand(cmdFactory cmdutil.Factory, streams genericclioptions.IOSt
 	options := util.NewFetchResourceOptions(cmdFactory, streams)
 
 	cmd := &cobra.Command{
-		Use:          "deploy NAME",
-		Short:        "Interactively deploy a NIMService custom resource.",
-		Long:         `Given an image name and some more information, deploys a NIMService running a universal nim for the user (with/without NIMCache).
+		Use:   "deploy NAME",
+		Short: "Interactively deploy a NIMService custom resource.",
+		Long: `Given an image name and some more information, deploys a NIMService running a universal nim for the user (with/without NIMCache).
 Note: ngc-secret, ngc-api-secret, and hf-api-secret (depending on model source) must exist and be defined pull secrets.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -130,7 +130,7 @@ func Run(ctx context.Context, options *util.FetchResourceOptions, k8sClient clie
 				return fmt.Errorf("failed to read model puller: %w", err), nil
 			}
 			endPoint = strings.TrimSpace(response)
-	
+
 		default:
 			// Ask for endpoint & modelName.
 			fmt.Fprint(options.IoStreams.Out, "Enter endpoint: ")
@@ -198,10 +198,10 @@ func Run(ctx context.Context, options *util.FetchResourceOptions, k8sClient clie
 			"--nim-source=" + imgSource,
 		}
 
-		cacheCmdArgs = append(cacheCmdArgs, "--model-puller=" + MULTI_LLM_NIM_REPO + ":" + MULTI_LLM_TAG)
+		cacheCmdArgs = append(cacheCmdArgs, "--model-puller="+MULTI_LLM_NIM_REPO+":"+MULTI_LLM_TAG)
 
 		if imgSource == "ngc" {
-			cacheCmdArgs = append(cacheCmdArgs, "--ngc-model-endpoint=" + endPoint)
+			cacheCmdArgs = append(cacheCmdArgs, "--ngc-model-endpoint="+endPoint)
 		} else {
 			cacheCmdArgs = append(cacheCmdArgs, "--alt-endpoint="+endPoint)
 			cacheCmdArgs = append(cacheCmdArgs, "--alt-namespace="+altNamespace)
@@ -210,7 +210,7 @@ func Run(ctx context.Context, options *util.FetchResourceOptions, k8sClient clie
 		}
 		cacheCmdArgs = append(cacheCmdArgs, pvcFlags...)
 		cacheCmd.SetArgs(cacheCmdArgs)
-		
+
 		// Assemble NIMService flags.
 		serviceCmdArgs := []string{
 			options.ResourceName,

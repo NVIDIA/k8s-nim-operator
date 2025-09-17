@@ -85,7 +85,7 @@ Minimum required flags are --image-repository, --tag, and storage: reference eit
 	- If using existing PVC, minimum required flags are pvc-storage-name. 
 	- If creating new PVC, minimum required flags are pvc-create, pvc-size, pvc-volume-access-mode, pvc-storage-class.`,
 		SilenceUsage: true,
-		Args: cobra.MaximumNArgs(1),
+		Args:         cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				cmd.HelpFunc()(cmd, args)
@@ -141,7 +141,7 @@ Minimum required flags are --image-repository, --tag, and storage: reference eit
 	// add CPU/Memory resource limits?
 
 	// Hide the env flag from users, but keep it functional for internal use by deploy command.
-    cmd.Flags().MarkHidden("env")
+	_ = cmd.Flags().MarkHidden("env")
 
 	return cmd
 }
@@ -178,14 +178,15 @@ func FillOutNIMServiceSpec(options *NIMServiceOptions) (*appsv1alpha1.NIMService
 	nimservice.Spec.Image.Tag = options.Tag
 
 	// Complete Storage.
-	if options.HostPath != "" {
+	switch {
+	case options.HostPath != "":
 		nimservice.Spec.Storage.HostPath = ptr.To(options.HostPath)
-	} else if options.NIMCacheStorageName != "" {
+	case options.NIMCacheStorageName != "":
 		nimservice.Spec.Storage.NIMCache.Name = options.NIMCacheStorageName
 		if options.NIMCacheStorageProfile != "" {
 			nimservice.Spec.Storage.NIMCache.Profile = options.NIMCacheStorageProfile
 		}
-	} else {
+	default:
 		if options.PVCStorageName != "" {
 			nimservice.Spec.Storage.PVC.Name = options.PVCStorageName
 		}
@@ -250,34 +251,36 @@ func FillOutNIMServiceSpec(options *NIMServiceOptions) (*appsv1alpha1.NIMService
 	}
 
 	// Expect max of two pairs of env name, value.
-	if len(options.Env) == 2 {
+	switch len(options.Env) {
+	case 2:
 		nimservice.Spec.Env = []corev1.EnvVar{{
 			Name:  options.Env[0],
 			Value: options.Env[1],
 		}}
-	} else if len(options.Env) == 4 {		  
+	case 4:
 		nimservice.Spec.Env = []corev1.EnvVar{
 			{
-			  Name:  options.Env[0],         // e.g. "NIM_MODEL_NAME"
-			  Value: options.Env[1],         // e.g. "hf://..."
+				Name:  options.Env[0], // e.g. "NIM_MODEL_NAME"
+				Value: options.Env[1], // e.g. "hf://..."
 			},
 			{
-			  Name: options.Env[2],          // e.g. "HF_TOKEN"
-			  ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-				  LocalObjectReference: corev1.LocalObjectReference{
-					Name: options.Env[3],    // e.g. "hf-api-secret"
-				  },
-				  Key: "HF_TOKEN",
-				  Optional: ptr.To(true),
+				Name: options.Env[2], // e.g. "HF_TOKEN"
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: options.Env[3], // e.g. "hf-api-secret"
+						},
+						Key:      "HF_TOKEN",
+						Optional: ptr.To(true),
+					},
 				},
-			  },
 			},
 		}
-	} else if len(options.Env) != 0 {
-		return &nimservice, fmt.Errorf("Only two env allowed, NIM_MODEL_NAME_ENV_VAR and HF_TOKEN.")
+	case 0:
+		// No environment variables
+	default:
+		return &nimservice, fmt.Errorf("only two env allowed, NIM_MODEL_NAME_ENV_VAR and HF_TOKEN")
 	}
-
 
 	return &nimservice, nil
 }
