@@ -1346,6 +1346,18 @@ spec:
               - create
               - delete
             - apiGroups:
+              - admissionregistration.k8s.io
+              resources:
+              - validatingwebhookconfigurations
+              verbs:
+              - get
+              - list
+              - watch
+              - create
+              - update
+              - patch
+              - delete
+            - apiGroups:
               - gateway.networking.k8s.io
               resources:
               - httproutes
@@ -1413,6 +1425,8 @@ spec:
                             fieldPath: metadata.namespace
                       - name: ENABLE_WEBHOOKS
                         value: "true"
+                      - name: OPERATOR_NAME_PREFIX
+                        value: "k8s-nim-operator"
                     image: 'ghcr.io/nvidia/k8s-nim-operator:main'
                     imagePullPolicy: Always
                     livenessProbe:
@@ -1426,6 +1440,10 @@ spec:
                       successThreshold: 1
                       timeoutSeconds: 1
                     name: manager
+                    volumeMounts:
+                      - name: cert
+                        mountPath: /tmp/k8s-webhook-server/serving-certs
+                        readOnly: true
                     readinessProbe:
                       failureThreshold: 3
                       httpGet:
@@ -1447,6 +1465,11 @@ spec:
                       allowPrivilegeEscalation: false
                     terminationMessagePath: /dev/termination-log
                     terminationMessagePolicy: File
+                volumes:
+                  - name: cert
+                    secret:
+                      secretName: k8s-nim-operator-webhook-server-cert
+                      defaultMode: 420
                 dnsPolicy: ClusterFirst
                 imagePullSecrets: []
                 restartPolicy: Always
@@ -1470,45 +1493,3 @@ spec:
       supported: false
     - type: AllNamespaces
       supported: true
-  webhookdefinitions:
-  - type: ValidatingAdmissionWebhook
-    admissionReviewVersions:
-      - v1
-    containerPort: 9443
-    targetPort: 9443          
-    deploymentName: k8s-nim-operator
-    failurePolicy: Fail
-    generateName: vnimcache-v1alpha1.kb.io
-    rules:
-      - apiGroups:
-          - apps.nvidia.com
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - nimcaches
-    sideEffects: None
-    webhookPath: /validate-apps-nvidia-com-v1alpha1-nimcache
-  - type: ValidatingAdmissionWebhook
-    admissionReviewVersions:
-      - v1
-    containerPort: 9443  
-    targetPort: 9443 
-    deploymentName: k8s-nim-operator
-    failurePolicy: Fail
-    generateName: vnimservice-v1alpha1.kb.io
-    rules:
-      - apiGroups:
-          - apps.nvidia.com
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - nimservices
-    sideEffects: None
-    webhookPath: /validate-apps-nvidia-com-v1alpha1-nimservice
-
