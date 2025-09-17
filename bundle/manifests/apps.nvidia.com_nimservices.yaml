@@ -1601,6 +1601,11 @@ spec:
                   gateway:
                     description: Gateway is the gateway to use for the created HTTPRoute.
                     properties:
+                      grpcRoutesEnabled:
+                        default: false
+                        description: GRPCRoutesEnabled is a flag to enable GRPCRoutes
+                          for the created gateway.
+                        type: boolean
                       httpRoutesEnabled:
                         default: true
                         description: HTTPRoutesEnabled is a flag to enable HTTPRoutes
@@ -2572,6 +2577,10 @@ spec:
             - message: autoScaling must be nil or disabled when multiNode is set
               rule: '!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled)
                 && self.scale.enabled)'
+            - message: .spec.expose.service.grpcPort must be set when .spec.router.gateway.grpcRoutesEnabled
+                is true
+              rule: '!(has(self.router.gateway) && self.router.gateway.grpcRoutesEnabled
+                && !has(self.expose.service.grpcPort))'
             - message: .spec.expose.ingress is deprecated, and will be removed in
                 a future release. If .spec.expose.ingress is set, please do not set
                 .spec.router.ingress.
