@@ -30,8 +30,6 @@ import (
 const (
 	// DefaultAPIPort is the default api port.
 	DefaultAPIPort = 8000
-	// DefaultGRPCPort is the default grpc port.
-	DefaultGRPCPort = 50051
 	// DefaultNamedPortAPI is the default name for api port.
 	DefaultNamedPortAPI = "api"
 	// DefaultNamedPortGRPC is the default name for grpc port.
