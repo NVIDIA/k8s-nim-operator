@@ -27,6 +27,7 @@ on:
     branches:
       - main
       - release-*
+      - e2e-*
 
 jobs:
   build:
