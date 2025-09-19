@@ -75,6 +75,14 @@ spec:
         {{- end }}
         image: {{ .Image }}
         imagePullPolicy: {{ .ImagePullPolicy }}
+        {{- if .Command }}
+        command:
+          {{ .Command | yaml | nindent 10 }}
+        {{- end }}
+        {{- if .Args}}
+        args:
+          {{ .Args| yaml | nindent 10 }}
+        {{- end }}
         volumeMounts:
         {{- range .VolumeMounts }}
         - name: {{ .Name }}
