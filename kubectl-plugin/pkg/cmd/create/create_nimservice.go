@@ -270,7 +270,7 @@ func FillOutNIMServiceSpec(options *NIMServiceOptions) (*appsv1alpha1.NIMService
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: options.Env[3], // e.g. "hf-api-secret"
 						},
-						Key:      "HF_TOKEN",
+						Key:      options.Env[2],
 						Optional: ptr.To(true),
 					},
 				},

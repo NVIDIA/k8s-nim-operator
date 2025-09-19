@@ -30,6 +30,7 @@ func NewLogStreamCommand(cmdFactory cmdutil.Factory, streams genericclioptions.I
 			case 0:
 				// Show help if no args provided.
 				cmd.HelpFunc()(cmd, args)
+				return fmt.Errorf("missing required arguments: RESOURCE and NAME")
 			case 2:
 				// Proceed as normal if two args provided.
 				if err := options.CompleteNamespace(args, cmd); err != nil {
@@ -41,9 +42,8 @@ func NewLogStreamCommand(cmdFactory cmdutil.Factory, streams genericclioptions.I
 				}
 				return RunStream(cmd.Context(), options, k8sClient)
 			default:
-				fmt.Println(fmt.Errorf("unknown command(s) %q", strings.Join(args, " ")))
+				return fmt.Errorf("too many arguments provided: %q. Expected: RESOURCE NAME", strings.Join(args, " "))
 			}
-			return nil
 		},
 	}
 

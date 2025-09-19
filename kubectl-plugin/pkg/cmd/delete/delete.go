@@ -74,7 +74,7 @@ func Run(ctx context.Context, options *util.FetchResourceOptions, k8sClient clie
 
 	var (
 		ns   string
-		name string
+		name string = options.ResourceName
 	)
 
 	switch options.ResourceType {

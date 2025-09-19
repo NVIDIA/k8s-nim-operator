@@ -35,18 +35,41 @@ func NewLogCommand(cmdFactory cmdutil.Factory, streams genericclioptions.IOStrea
 			case 0:
 				// Show help if no args provided.
 				cmd.HelpFunc()(cmd, args)
+				return nil
 			case 1:
-				// Proceed as normal if one arg provided.
-				if err := options.CompleteNamespace(args, cmd); err != nil {
-					return err
+				// Check if the single argument is a valid subcommand
+				validSubcommands := []string{"collect", "stream"}
+				isValidSubcommand := false
+				for _, validCmd := range validSubcommands {
+					if args[0] == validCmd {
+						isValidSubcommand = true
+						break
+					}
 				}
-				// Overwrite this as it would be populated with "collect". There is also no ResourceName involved in this operation.
-				options.ResourceName = ""
-				return Run(cmd.Context(), options)
+
+				if !isValidSubcommand {
+					return fmt.Errorf("unknown subcommand %q. Available subcommands: %s", args[0], strings.Join(validSubcommands, ", "))
+				}
+
+				// If it's "collect", treat it as the old behavior (namespace)
+				if args[0] == "collect" {
+					if err := options.CompleteNamespace([]string{}, cmd); err != nil {
+						return err
+					}
+					// Overwrite this as it would be populated with "collect". There is also no ResourceName involved in this operation.
+					options.ResourceName = ""
+					return Run(cmd.Context(), options)
+				}
+
+				// For "stream", show help since it needs more arguments
+				if args[0] == "stream" {
+					return fmt.Errorf("stream subcommand requires additional arguments: RESOURCE NAME")
+				}
+
+				return nil
 			default:
-				fmt.Println(fmt.Errorf("unknown command(s) %q", strings.Join(args, " ")))
+				return fmt.Errorf("too many arguments provided: %q", strings.Join(args, " "))
 			}
-			return nil
 		},
 	}
 

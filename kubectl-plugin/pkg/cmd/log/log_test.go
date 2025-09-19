@@ -203,6 +203,7 @@ func Test_listResourceLogPaths_errors(t *testing.T) {
 			// Clean up permissions for test cleanup
 			nimDir := filepath.Join(root, "nim")
 			_ = os.Chmod(nimDir, 0o755)
+			_ = os.Chmod(nimDir, 0o755)
 		})
 	}
 }
@@ -347,15 +348,53 @@ func Test_NewLogCommand_NoArgs(t *testing.T) {
 }
 
 func Test_NewLogCommand_InvalidArgs(t *testing.T) {
-	streams, _, _, errOut := genericTestIOStreams()
+	streams, _, _, _ := genericTestIOStreams()
 	cmd := NewLogCommand(nil, streams)
 
-	// Test with multiple unknown arguments
-	cmd.SetArgs([]string{"unknown", "args", "extra"})
-	_ = cmd.Execute()
+	tests := []struct {
+		name        string
+		args        []string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "unknown subcommand",
+			args:        []string{"unknown"},
+			expectError: true,
+			errorMsg:    "unknown command \"unknown\" for \"log\"",
+		},
+		{
+			name:        "stream without args",
+			args:        []string{"stream"},
+			expectError: true,
+			errorMsg:    "missing required arguments: RESOURCE and NAME",
+		},
+		{
+			name:        "too many args",
+			args:        []string{"collect", "extra", "args"},
+			expectError: true,
+			errorMsg:    "too many arguments provided",
+		},
+	}
 
-	// Will be implemented in e2e tests.
-	_ = errOut.String()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error to contain %q, got %q", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error but got: %v", err)
+				}
+			}
+		})
+	}
 }
 
 func Test_NewLogStreamCommand_Structure(t *testing.T) {
@@ -379,27 +418,20 @@ func Test_NewLogStreamCommand_Structure(t *testing.T) {
 }
 
 func Test_NewLogStreamCommand_NoArgs(t *testing.T) {
-	streams, _, out, _ := genericTestIOStreams()
+	streams, _, _, _ := genericTestIOStreams()
 	cmd := NewLogStreamCommand(nil, streams)
 
-	// Test with no arguments - should show help
+	// Test with no arguments - should return error now
 	cmd.SetArgs([]string{})
 	err := cmd.Execute()
 
-	if err != nil {
-		t.Fatalf("expected no error for no args, got: %v", err)
+	if err == nil {
+		t.Fatalf("expected error for no args, got none")
 	}
 
-	output := out.String()
-	// The help might be printed directly to os.Stdout rather than our test buffer
-	if output == "" {
-		// The help is being printed but not to our buffer - that's OK for this test
-		// We've verified the command accepts no args and shows help
-		return
-	}
-	// If we do capture output, verify it contains expected content
-	if !strings.Contains(output, "Usage:") {
-		t.Errorf("expected help output to contain Usage, got:\n%s", output)
+	expectedMsg := "missing required arguments: RESOURCE and NAME"
+	if !strings.Contains(err.Error(), expectedMsg) {
+		t.Errorf("expected error to contain %q, got %q", expectedMsg, err.Error())
 	}
 }
 
@@ -409,19 +441,47 @@ func Test_NewLogStreamCommand_InvalidArgCount(t *testing.T) {
 
 	// Test with wrong number of arguments
 	tests := []struct {
-		name string
-		args []string
+		name        string
+		args        []string
+		expectError bool
+		errorMsg    string
 	}{
-		{"one arg", []string{"nimservice"}},
-		{"three args", []string{"nimservice", "name", "extra"}},
-		{"four args", []string{"nimservice", "name", "extra", "more"}},
+		{
+			name:        "one arg",
+			args:        []string{"nimservice"},
+			expectError: true,
+			errorMsg:    "too many arguments provided",
+		},
+		{
+			name:        "three args",
+			args:        []string{"nimservice", "name", "extra"},
+			expectError: true,
+			errorMsg:    "too many arguments provided",
+		},
+		{
+			name:        "four args",
+			args:        []string{"nimservice", "name", "extra", "more"},
+			expectError: true,
+			errorMsg:    "too many arguments provided",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd.SetArgs(tt.args)
-			_ = cmd.Execute()
-			// The command prints error but doesn't return error for invalid args
+			err := cmd.Execute()
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error to contain %q, got %q", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error but got: %v", err)
+				}
+			}
 		})
 	}
 }
@@ -452,10 +512,44 @@ func Test_NewLogCollectCommand_InvalidArgs(t *testing.T) {
 	streams, _, _, _ := genericTestIOStreams()
 	cmd := NewLogCollectCommand(nil, streams)
 
-	// Test with unexpected arguments
-	cmd.SetArgs([]string{"unexpected", "args"})
-	_ = cmd.Execute()
-	// The command prints error but doesn't return error
+	tests := []struct {
+		name        string
+		args        []string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "one unexpected arg",
+			args:        []string{"unexpected"},
+			expectError: true,
+			errorMsg:    "too many arguments provided",
+		},
+		{
+			name:        "multiple unexpected args",
+			args:        []string{"unexpected", "args"},
+			expectError: true,
+			errorMsg:    "too many arguments provided",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error to contain %q, got %q", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error but got: %v", err)
+				}
+			}
+		})
+	}
 }
 
 func Test_NewLogCommand_DeprecatedCollectUsage(t *testing.T) {
@@ -519,6 +613,28 @@ func Test_parseArtifactDir_edgeCases(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_validateNamespaceExists(t *testing.T) {
+	// Note: This test would require mocking the Kubernetes client
+	// For now, we'll add a placeholder test that documents the expected behavior
+	t.Skip("validateNamespaceExists requires mocked Kubernetes client - tested in e2e tests")
+
+	// Expected behavior:
+	// - Should return nil for existing namespaces
+	// - Should return "namespace %q not found" error for non-existent namespaces
+	// - Should return wrapped error for other API errors
+}
+
+func Test_NewLogCollectCommand_NamespaceValidation(t *testing.T) {
+	// Note: This test would require mocking the Kubernetes client and cmdFactory
+	// For now, we'll add a placeholder test that documents the expected behavior
+	t.Skip("Namespace validation requires mocked Kubernetes client - tested in e2e tests")
+
+	// Expected behavior:
+	// - collect command should validate namespace exists before proceeding
+	// - Should return clear error message for non-existent namespaces
+	// - Should proceed normally for valid namespaces
 }
 
 // minimal test IOStreams without importing cli-runtime test helpers.

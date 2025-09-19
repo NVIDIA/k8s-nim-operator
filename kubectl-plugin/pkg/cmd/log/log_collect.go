@@ -14,10 +14,13 @@ import (
 	"strings"
 
 	"k8s-nim-operator-cli/pkg/util"
+	"k8s-nim-operator-cli/pkg/util/client"
 
 	"k8s-nim-operator-cli/scripts"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -36,21 +39,43 @@ func NewLogCollectCommand(cmdFactory cmdutil.Factory, streams genericclioptions.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch len(args) {
 			case 0:
-				// Proceed as normal if one arg provided.
+				// Proceed as normal if no args provided.
 				if err := options.CompleteNamespace(args, cmd); err != nil {
 					return err
 				}
+
+				// Validate namespace exists before proceeding
+				k8sClient, err := client.NewClient(cmdFactory)
+				if err != nil {
+					return fmt.Errorf("failed to create client: %w", err)
+				}
+
+				if err := validateNamespaceExists(cmd.Context(), k8sClient, options.Namespace); err != nil {
+					return err
+				}
+
 				return RunCollect(cmd.Context(), options)
 			default:
-				fmt.Println(fmt.Errorf("unknown command(s) %q", strings.Join(args, " ")))
+				return fmt.Errorf("too many arguments provided: %q. Expected no arguments", strings.Join(args, " "))
 			}
-			return nil
 		},
 	}
 
 	cmd.SetHelpTemplate(helpTemplate)
 
 	return cmd
+}
+
+// validateNamespaceExists checks if the specified namespace exists in the cluster
+func validateNamespaceExists(ctx context.Context, k8sClient client.Client, namespace string) error {
+	_, err := k8sClient.KubernetesClient().CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return fmt.Errorf("namespace %q not found", namespace)
+		}
+		return fmt.Errorf("failed to validate namespace %q: %w", namespace, err)
+	}
+	return nil
 }
 
 func RunCollect(ctx context.Context, options *util.FetchResourceOptions) error {

@@ -1,0 +1,25 @@
+apiVersion: apps.nim.nvidia.io/v1alpha1
+kind: NIMService
+metadata:
+  name: nimservice-autoscaling
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: latest
+    pullPolicy: IfNotPresent
+  imagePullSecrets:
+    - ngc-secret
+  nimCache:
+    name: nimcache-sample
+  scale:
+    min: 1
+    max: 5
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    limits:
+      nvidia.com/gpu: "1"
+    requests:
+      cpu: "8"
+      memory: "32Gi"

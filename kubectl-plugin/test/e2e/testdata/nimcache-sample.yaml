@@ -1,0 +1,18 @@
+apiVersion: apps.nim.nvidia.io/v1alpha1
+kind: NIMCache
+metadata:
+  name: nimcache-sample
+spec:
+  source: nim:llama-3.1-8b-instruct
+  authSecret: ngc-api-secret
+  imagePullSecrets:
+    - ngc-secret
+  storage:
+    pvc:
+      create: true
+      storageClass: standard
+      size: 20Gi
+      volumeAccessMode: ReadWriteMany
+  resources:
+    cpu: "2"
+    memory: "8Gi"
