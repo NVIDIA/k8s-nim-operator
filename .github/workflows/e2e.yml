@@ -17,6 +17,9 @@
 name: End-to-end Tests
 
 on:
+  push:
+    branches:
+      - e2e-*
   workflow_run:
     workflows: [Image]
     types:
