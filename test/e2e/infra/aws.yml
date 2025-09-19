@@ -6,11 +6,11 @@ metadata:
 spec:
   provider: aws
   auth:
-    keyName: cnt-ci
+    keyName: cnt-ci-east-1
     privateKey: HOLODECK_PRIVATE_KEY
   instance:
-    type: g4dn.xlarge
-    region: us-west-1
+    type: g6e.xlarge
+    region: us-east-1
     ingressIpRanges:
     - 18.190.12.32/32
     - 3.143.46.93/32
@@ -23,7 +23,6 @@ spec:
     - 44.230.241.223/32
     image:
       architecture: amd64
-      imageId: ami-07c175e73e37b02df
   containerRuntime:
     install: true
     name: containerd
