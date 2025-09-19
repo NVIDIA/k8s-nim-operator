@@ -9,8 +9,8 @@ spec:
     keyName: cnt-ci-east-1
     privateKey: HOLODECK_PRIVATE_KEY
   instance:
-    type: g6e.xlarge
-    region: us-east-1
+    type: g4dn.xlarge
+    region: us-west-1
     ingressIpRanges:
     - 18.190.12.32/32
     - 3.143.46.93/32
@@ -23,10 +23,13 @@ spec:
     - 44.230.241.223/32
     image:
       architecture: amd64
+      imageId: ami-07c175e73e37b02df
   containerRuntime:
     install: true
     name: containerd
   kubernetes:
     install: true
     installer: kubeadm
-    version: v1.32.1
+    version: v1.32.3
+    crictlVersion: v1.32.0
+    calicoVersion: v3.29.3
