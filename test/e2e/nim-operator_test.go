@@ -87,6 +87,7 @@ var _ = Describe("NIM Operator", func() {
 					fmt.Sprintf("operator.image.tag=%s", ImageTag),
 					fmt.Sprintf("operator.image.pullPolicy=%s", ImagePullPolicy),
 					fmt.Sprintf("operator.image.pullSecrets={%s}", strings.Join(pullSecrets, ",")),
+					"operator.admissionController.enabled=false",
 				},
 			}
 
