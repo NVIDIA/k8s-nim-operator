@@ -9,3 +9,11 @@ postgresql:
   username: guardrailuser
   password: guardrailpass
   database: guardraildb
+
+# OpenTelemetry Helm chart details
+opentelemetry:
+  enabled: true
+  helm_repo_name: "open-telemetry"
+  helm_repo_url: "https://open-telemetry.github.io/opentelemetry-helm-charts"
+  chart_name: "open-telemetry/opentelemetry-collector"
+  chart_version: "0.78.1"
