@@ -436,11 +436,11 @@ func validateMetricsConfiguration(metrics *appsv1alpha1.Metrics, fldPath *field.
 func validateRouterConfiguration(router *appsv1alpha1.Router, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
-	if router.HostDomainName == "" {
+	if (router.Ingress != nil || router.Gateway != nil) && router.HostDomainName == "" {
 		errList = append(errList, field.Required(fldPath.Child("hostDomainName"), "is required"))
 	}
 	if router.Ingress != nil && router.Gateway != nil {
-		errList = append(errList, field.Forbidden(fldPath, "ingressClass and gateway cannot be specified together"))
+		errList = append(errList, field.Forbidden(fldPath, "ingress and gateway cannot be specified together"))
 	}
 	return warningList, errList
 }
