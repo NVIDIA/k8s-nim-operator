@@ -78,6 +78,7 @@ var (
 	ImageTag                   string
 	ImagePullPolicy            string
 	CollectLogsFrom            string
+	AdmissionControllerEnabled bool
 	Timeout                    time.Duration
 
 	// k8s clients.
@@ -106,6 +107,7 @@ var (
 		"namespaces",
 		"deployments",
 		"daemonsets",
+		"jobs",
 	}
 
 	// NEMO microservice variables.
@@ -332,6 +334,8 @@ func getTestEnv() {
 	Expect(ImagePullPolicy).NotTo(BeEmpty(), "IMAGE_PULL_POLICY must be set")
 
 	CollectLogsFrom = os.Getenv("COLLECT_LOGS_FROM")
+
+	AdmissionControllerEnabled = getBoolEnvVar("ADMISSION_CONTROLLER_ENABLED", false)
 
 	if EnableNemoMicroservices {
 		// Entitystore env variables.
