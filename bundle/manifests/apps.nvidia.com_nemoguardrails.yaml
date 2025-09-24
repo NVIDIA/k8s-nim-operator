@@ -459,6 +459,67 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              otel:
+                description: OpenTelemetry Settings
+                properties:
+                  disableLogging:
+                    description: DisableLogging indicates whether Python logging auto-instrumentation
+                      should be disabled.
+                    type: boolean
+                  enabled:
+                    description: Enabled indicates if opentelemetry collector and
+                      tracing are enabled
+                    type: boolean
+                  excludedUrls:
+                    default:
+                    - health
+                    description: ExcludedUrls defines URLs to be excluded from tracing.
+                    items:
+                      type: string
+                    type: array
+                  exporterConfig:
+                    description: ExporterConfig defines configuration for different
+                      OTel exporters
+                    properties:
+                      logsExporter:
+                        default: otlp
+                        description: 'LogsExporter sets the logs exporter: (otlp,
+                          console, none).'
+                        enum:
+                        - otlp
+                        - console
+                        - none
+                        type: string
+                      metricsExporter:
+                        default: otlp
+                        description: 'MetricsExporter sets the metrics exporter: (otlp,
+                          console, none).'
+                        enum:
+                        - otlp
+                        - console
+                        - none
+                        type: string
+                      tracesExporter:
+                        default: otlp
+                        description: 'TracesExporter sets the traces exporter: (otlp,
+                          console, none).'
+                        enum:
+                        - otlp
+                        - console
+                        - none
+                        type: string
+                    type: object
+                  exporterOtlpEndpoint:
+                    description: ExporterOtlpEndpoint is the OTLP collector endpoint.
+                    type: string
+                  logLevel:
+                    default: INFO
+                    description: LogLevel defines the log level (e.g., INFO, DEBUG).
+                    enum:
+                    - INFO
+                    - DEBUG
+                    type: string
+                type: object
               podAffinity:
                 description: Pod affinity is a group of inter pod affinity scheduling
                   rules.
