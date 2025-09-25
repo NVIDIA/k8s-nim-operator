@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strconv"
+	"strings"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -88,6 +90,9 @@ type NemoGuardrailSpec struct {
 
 	// DatabaseConfig stores the metadata for the guardrail service.
 	DatabaseConfig *DatabaseConfig `json:"databaseConfig,omitempty"`
+	// OpenTelemetry Settings
+	// +kubebuilder:validation:Optional
+	OpenTelemetry *OTelSpec `json:"otel,omitempty"`
 }
 
 type NIMEndpoint struct {
@@ -241,7 +246,62 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 		// Append the environment variables for Postgres
 		envVars = append(envVars, n.GetPostgresEnv()...)
 	}
+
+	// Append the environment variables for OTel
+	envVars = append(envVars, n.GetOtelEnv()...)
 	return envVars
+}
+
+// IsOtelEnabled returns true if Open Telemetry Collector is enabled.
+func (n *NemoGuardrail) IsOtelEnabled() bool {
+	if n.Spec.OpenTelemetry != nil {
+		return n.Spec.OpenTelemetry.Enabled != nil && *n.Spec.OpenTelemetry.Enabled
+	}
+	return false
+}
+
+// GetOtelEnv generates OpenTelemetry-related environment variables.
+func (n *NemoGuardrail) GetOtelEnv() []corev1.EnvVar {
+	if !n.IsOtelEnabled() {
+		return []corev1.EnvVar{
+			{
+				Name:  "OTEL_SDK_DISABLED",
+				Value: "true",
+			},
+		}
+	}
+
+	var otelEnvVars []corev1.EnvVar
+	otelEnvVars = append(otelEnvVars,
+		corev1.EnvVar{Name: "OTEL_EXPORTER_OTLP_ENDPOINT", Value: n.Spec.OpenTelemetry.ExporterOtlpEndpoint},
+		corev1.EnvVar{Name: "OTEL_TRACES_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.TracesExporter},
+		corev1.EnvVar{Name: "OTEL_METRICS_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.MetricsExporter},
+		corev1.EnvVar{Name: "OTEL_LOGS_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.LogsExporter},
+		corev1.EnvVar{Name: "OTEL_LOG_LEVEL", Value: n.Spec.OpenTelemetry.LogLevel},
+	)
+
+	if len(n.Spec.OpenTelemetry.ExcludedUrls) > 0 {
+		otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+			Name:  "OTEL_PYTHON_EXCLUDED_URLS",
+			Value: strings.Join(n.Spec.OpenTelemetry.ExcludedUrls, ","),
+		})
+	}
+
+	var enableLog = true
+	if n.Spec.OpenTelemetry.DisableLogging != nil {
+		enableLog = !*n.Spec.OpenTelemetry.DisableLogging
+	}
+	otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+		Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
+		Value: strconv.FormatBool(enableLog),
+	})
+
+	otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+		Name:  "OTEL_RESOURCE_ATTRIBUTES",
+		Value: "deployment.environment=$(NAMESPACE)",
+	})
+
+	return otelEnvVars
 }
 
 // GetPostgresEnv returns the PostgreSQL environment variables for a Kubernetes pod.
