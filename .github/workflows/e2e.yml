@@ -20,7 +20,7 @@ on:
     types:
       - completed
     branches:
-      - "pull-request/[0-9]+"
+      - "pull-request/**"
       - main
       - release-*
 
@@ -28,6 +28,10 @@ jobs:
   e2e-tests:
     runs-on: linux-amd64-cpu4
     if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
+    permissions:
+      contents: read
+      checks: write
+      statuses: write
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -75,6 +79,21 @@ jobs:
           name: e2e-test-logs
           path: ./e2e_logs/
           retention-days: 15
+
+     # This makes the result appear on the merged commit's Checks tab
+      - name: Report status on merged commit
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'End-to-end Tests',
+              head_sha: '${{ github.event.workflow_run.head_sha }}',
+              status: 'completed',
+              conclusion: '${{ job.status }}' // success | failure | cancelled
+            })
 
       - name: Send Slack alert notification
         id: slack
