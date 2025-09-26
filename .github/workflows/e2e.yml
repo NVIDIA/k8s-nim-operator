@@ -27,8 +27,7 @@ on:
 jobs:
   e2e-tests:
     runs-on: linux-amd64-cpu4
-    #if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
-    if: false # TODO: Disabled until e2e test infra is fixed
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -41,7 +40,7 @@ jobs:
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION := }" >> $GITHUB_ENV
 
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.10
+        uses: NVIDIA/holodeck@v0.2.7
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -53,7 +52,7 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
-      - name: Intall dependencies
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y make
