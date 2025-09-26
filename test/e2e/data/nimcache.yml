@@ -5,22 +5,18 @@ metadata:
     app.kubernetes.io/name: k8s-nim-operator
   name: meta-llama3-8b-instruct
 spec:
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
   source:
     ngc:
-      modelPuller: nvcr.io/nim/meta/llama3-8b-instruct:1.0.0
+      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8
       pullSecret: ngc-secret
       authSecret: ngc-api-secret
       model:
         profiles: []
         lora: false
-        precision: "fp16"
-        engine: "tensorrt_llm"
-        qosProfile: "throughput"
-        gpus:
-          - product: "A100"
-            ids:
-              - "20b2"
         tensorParallelism: "1"
+        engine: "vllm"
   resources:
     cpu: 500m
     memory: 20Gi
