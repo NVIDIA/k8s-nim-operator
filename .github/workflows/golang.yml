@@ -47,8 +47,6 @@ jobs:
       uses: jfrog/setup-jfrog-cli@v4
       env:
         JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
-        OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
-        OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
         OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
       with:
         oidc-provider-name: nvgithub
@@ -78,8 +76,6 @@ jobs:
       uses: jfrog/setup-jfrog-cli@v4
       env:
         JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
-        OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
-        OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
         OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
       with:
         oidc-provider-name: nvgithub
@@ -114,8 +110,6 @@ jobs:
       uses: jfrog/setup-jfrog-cli@v4
       env:
         JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
-        OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
-        OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
         OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
       with:
         oidc-provider-name: nvgithub
