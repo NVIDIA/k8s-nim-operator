@@ -13,5 +13,6 @@
 # limitations under the License.
 
 PUSH_ON_BUILD ?= false
-DOCKER_BUILD_OPTIONS = --output=type=image,push=$(PUSH_ON_BUILD) --provenance=false --sbom=false
-DOCKER_BUILD_PLATFORM_OPTIONS = --platform=linux/amd64,linux/arm64
+ATTACH_ATTESTATIONS ?= false
+DOCKER_BUILD_OPTIONS = --output=type=image,push=$(PUSH_ON_BUILD) --provenance=$(ATTACH_ATTESTATIONS) --sbom=$(ATTACH_ATTESTATIONS)
+DOCKER_BUILD_PLATFORM_OPTIONS ?= --platform=linux/amd64,linux/arm64
