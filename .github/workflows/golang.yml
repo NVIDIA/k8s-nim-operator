@@ -56,6 +56,7 @@ jobs:
       with:
         oidc-provider-name: nvgithub
         oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+        cache: true
     - name: Check golang modules
       env:
         OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
@@ -103,6 +104,7 @@ jobs:
       with:
         oidc-provider-name: nvgithub
         oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+        cache: true
     - name: Run Coverage
       env:
         OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
@@ -141,6 +143,7 @@ jobs:
       with:
         oidc-provider-name: nvgithub
         oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+        cache: true
     - name: Run Build
       env:
         OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
