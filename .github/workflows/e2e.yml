@@ -26,7 +26,11 @@ on:
 
 jobs:
   e2e-tests:
+    needs: [build-multi-arch]
     runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
     permissions:
       contents: read
