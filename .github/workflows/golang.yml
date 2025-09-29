@@ -92,6 +92,17 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GOLANG_VERSION }}
+    - name: Setup JFrog CLI
+      id: jfrog
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
+        OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
+        OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
+        OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+      with:
+        oidc-provider-name: nvgithub
+        oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
     - name: Run Coverage
       env:
         OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
@@ -119,6 +130,17 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GOLANG_VERSION }}
+    - name: Setup JFrog CLI
+      id: jfrog
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
+        OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
+        OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
+        OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+      with:
+        oidc-provider-name: nvgithub
+        oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
     - name: Run Build
       env:
         OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
