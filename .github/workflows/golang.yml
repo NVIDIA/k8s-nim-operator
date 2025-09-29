@@ -42,6 +42,18 @@ jobs:
         version: latest
         args: -v --timeout 5m
         skip-cache: true
+    - name: Setup JFrog CLI
+      id: jfrog
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: https://${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}/
+        OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
+        OIDC_TOKEN: ${{ steps.jfrog.outputs.oidc-token }}
+        OIDC_ARTIFACTORY_ENDPOINT: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+      with:
+        oidc-provider-name: nvgithub
+        oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+        cache: true
     - name: Check golang modules
       run: make check-vendor
     - name: Check generated assets
@@ -72,6 +84,7 @@ jobs:
       with:
         oidc-provider-name: nvgithub
         oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+        cache: true
     - name: Run Coverage
       env:
         OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}
@@ -107,6 +120,7 @@ jobs:
       with:
         oidc-provider-name: nvgithub
         oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+        cache: true
     - name: Run Build
       env:
         OIDC_USER: ${{ steps.jfrog.outputs.oidc-user }}

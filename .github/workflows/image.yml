@@ -66,6 +66,7 @@ jobs:
         with:
           oidc-provider-name: nvgithub
           oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+          cache: true
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/k8s-nim-operator
@@ -125,6 +126,7 @@ jobs:
         with:
           oidc-provider-name: nvgithub
           oidc-audience: ${{ secrets.OIDC_ARTIFACTORY_ENDPOINT }}
+          cache: true
       - name: Build image
         env:
           IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/k8s-nim-operator
@@ -168,13 +170,31 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build image
+      # Always create/push the commit-SHA manifest
+      - name: Build Manifest (commit SHA)
         env:
-          IMAGE_NAME: ghcr.io/${LOWERCASE_REPO_OWNER}/k8s-nim-operator
-          VERSION: ${COMMIT_SHORT_SHA}
+          OPERATOR_IMAGE_ARM: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/k8s-nim-operator:${{ env.COMMIT_SHORT_SHA }}-arm64
+          OPERATOR_IMAGE_AMD: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/k8s-nim-operator:${{ env.COMMIT_SHORT_SHA }}-amd64
+          OPERATOR_MULTIARCH_IMAGE: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/k8s-nim-operator:${{ env.COMMIT_SHORT_SHA }}
         run: |
-          echo "${VERSION}"
-          make -f deployments/container/Makefile build
+          docker manifest create \
+            "${OPERATOR_MULTIARCH_IMAGE}" \
+            "${OPERATOR_IMAGE_AMD}" \
+            "${OPERATOR_IMAGE_ARM}"
+          docker manifest push "${OPERATOR_MULTIARCH_IMAGE}"
+      # Only create/push the branch-name manifest on main or release-* branches
+      - name: Build Manifest (branch tag)
+        if: ${{ github.ref_name == 'main' || startsWith(github.ref_name, 'release-') }}
+        env:
+          OPERATOR_IMAGE_ARM: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/k8s-nim-operator:${{ env.COMMIT_SHORT_SHA }}-arm64
+          OPERATOR_IMAGE_AMD: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/k8s-nim-operator:${{ env.COMMIT_SHORT_SHA }}-amd64
+          OPERATOR_MULTIARCH_IMAGE_BRANCH: ghcr.io/${{ env.LOWERCASE_REPO_OWNER }}/k8s-nim-operator:${{ env.BRANCH }}
+        run: |
+          docker manifest create \
+            "${OPERATOR_MULTIARCH_IMAGE_BRANCH}" \
+            "${OPERATOR_IMAGE_AMD}" \
+            "${OPERATOR_IMAGE_ARM}"
+          docker manifest push "${OPERATOR_MULTIARCH_IMAGE_BRANCH}"
   build-bundle:
     runs-on: ubuntu-latest
     needs: build
