@@ -5,6 +5,9 @@ FROM golang:${GOLANG_VERSION} AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
+ARG GOPROXY=direct
+ENV GOPROXY=$GOPROXY
+
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
