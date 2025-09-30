@@ -29,6 +29,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
     permissions:
       contents: read
+      id-token: write
       checks: write
       statuses: write
     steps:
