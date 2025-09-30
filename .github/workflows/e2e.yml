@@ -20,7 +20,6 @@ on:
     types:
       - completed
     branches:
-      - "pull-request/**"
       - main
       - release-*
 
