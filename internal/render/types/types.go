@@ -213,6 +213,15 @@ type HTTPRouteParams struct {
 	Spec        gatewayv1.HTTPRouteSpec
 }
 
+type GRPCRouteParams struct {
+	Enabled     bool
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	Spec        gatewayv1.GRPCRouteSpec
+}
+
 // IngressParams holds the parameters for rendering an Ingress template.
 type IngressParams struct {
 	Enabled     bool

@@ -111,6 +111,23 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
+	w, err = validateExposeRouterConfiguration(spec, fldPath)
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	return warningList, errList
+}
+
+func validateExposeRouterConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
+	errList := field.ErrorList{}
+	if spec.Expose.Service.Type == corev1.ServiceTypeLoadBalancer && (spec.Router.Gateway != nil || spec.Router.Ingress != nil) {
+		warningList = append(warningList, "spec.expose.service.type is set to LoadBalancer, but spec.router.gateway or spec.router.ingress is also set. This creates two entry points for the service. Consider only using one of them.")
+	}
+
+	if spec.Router.Gateway != nil && spec.Router.Gateway.GRPCRoutesEnabled && spec.Expose.Service.GRPCPort == nil {
+		errList = append(errList, field.Required(fldPath.Child("expose").Child("service").Child("grpcPort"), "must be set when .spec.router.gateway.grpcRoutesEnabled is true"))
+	}
 	return warningList, errList
 }
 

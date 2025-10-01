@@ -1,0 +1,54 @@
+---
+# NIM Cache for Riva TTS
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: riva-tts
+  namespace: nim-service
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/nvidia/riva-tts:1.3.0
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+  storage:
+    pvc:
+      create: true
+      storageClass: ""
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+
+---
+# # NIM Service for Riva TTS
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: riva-tts
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/riva-tts
+    tag: "1.3.0"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: riva-tts
+      profile: ''
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 9000
+      grpcPort: 50051
+  router:
+    gateway:
+      namespace: nemo
+      name: istio-gateway
+      grpcRoutesEnabled: true
+    hostDomainName: demo.nvidia.example.com

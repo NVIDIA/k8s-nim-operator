@@ -90,6 +90,7 @@ const (
 
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
+// +kubebuilder:validation:XValidation:rule="!(has(self.router.gateway) && self.router.gateway.grpcRoutesEnabled && !has(self.expose.service.grpcPort))", message=".spec.expose.service.grpcPort must be set when .spec.router.gateway.grpcRoutesEnabled is true"
 // +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingress."
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
@@ -963,6 +964,17 @@ func (n *NIMService) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
 	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
 }
 
+func (n *NIMService) IsGRPCRouteEnabled() bool {
+	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.GRPCRoutesEnabled
+}
+
+func (n *NIMService) GetGRPCRouteSpec() gatewayv1.GRPCRouteSpec {
+	if n.Spec.Expose.Service.GRPCPort == nil {
+		return gatewayv1.GRPCRouteSpec{}
+	}
+	return n.Spec.Router.GenerateGatewayGRPCRouteSpec(n.GetNamespace(), n.GetName(), *n.Spec.Expose.Service.GRPCPort)
+}
+
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NIMService deployment.
 func (n *NIMService) IsServiceMonitorEnabled() bool {
 	return n.Spec.Metrics.Enabled != nil && *n.Spec.Metrics.Enabled
@@ -1347,6 +1359,17 @@ func (n *NIMService) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
 	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetRouterAnnotations()
 	params.Spec = n.GetHTTPRouteSpec()
+	return params
+}
+
+func (n *NIMService) GetGRPCRouteParams() *rendertypes.GRPCRouteParams {
+	params := &rendertypes.GRPCRouteParams{}
+	params.Enabled = n.IsGRPCRouteEnabled()
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetRouterAnnotations()
+	params.Spec = n.GetGRPCRouteSpec()
 	return params
 }
 
