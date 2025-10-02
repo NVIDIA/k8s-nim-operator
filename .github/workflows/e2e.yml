@@ -15,6 +15,9 @@
 name: End-to-end Tests
 
 on:
+  push:
+    branches:
+      - e2e-test
   workflow_run:
     workflows: [Image]
     types:
@@ -69,6 +72,7 @@ jobs:
           E2E_IMAGE_TAG: ${{ env.COMMIT_SHORT_SHA }}
           LOG_ARTIFACTS: ${{ github.workspace }}/e2e_logs
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           ./hack/e2e_tests.sh
 
