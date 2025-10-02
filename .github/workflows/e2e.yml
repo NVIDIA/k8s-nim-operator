@@ -15,6 +15,9 @@
 name: End-to-end Tests
 
 on:
+  push:
+    branches:
+      - e2e-test
   workflow_run:
     workflows: [Image]
     types:
@@ -44,7 +47,7 @@ jobs:
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION := }" >> $GITHUB_ENV
 
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.7
+        uses: NVIDIA/holodeck@v0.2.17
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -66,9 +69,10 @@ jobs:
         env:
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
           E2E_IMAGE_REPO: ghcr.io/nvidia/k8s-nim-operator
-          E2E_IMAGE_TAG: ${{ env.COMMIT_SHORT_SHA }}
+          E2E_IMAGE_TAG: main
           LOG_ARTIFACTS: ${{ github.workspace }}/e2e_logs
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           ./hack/e2e_tests.sh
 
