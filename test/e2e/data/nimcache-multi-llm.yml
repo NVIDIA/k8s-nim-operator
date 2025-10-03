@@ -2,7 +2,6 @@ apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: nim-cache-multi-llm
-  namespace: nim-service
 spec:
   source:
     hf:
