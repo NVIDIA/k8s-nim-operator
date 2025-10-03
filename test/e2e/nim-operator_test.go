@@ -155,10 +155,12 @@ var _ = Describe("NIM Operator", Ordered, func() {
 		})
 	})
 
-	When("deploying Multi LLMNIMCache and NIMService", Ordered, func() {
+	When("deploying Multi LLM NIMCache and NIMService", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
-			cleanupNIMCRs()
+			if !CurrentSpecReport().Failed() {
+				cleanupNIMCRs()
+			}
 		})
 
 		It("should go to READY state", func(ctx context.Context) {
@@ -180,6 +182,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			By("Checking the NIMCache object state is ready")
 			Eventually(func() bool {
 				nimCacheObject, _ := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, nimCache.Name, metav1.GetOptions{})
+				fmt.Printf("NIMCache object state: %+v \n", nimCacheObject.Status.State)
 				return nimCacheObject.Status.State == v1alpha1.NimCacheStatusReady
 			}, Timeout, 5*time.Second).Should(BeTrue())
 
