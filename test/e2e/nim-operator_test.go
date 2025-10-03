@@ -157,7 +157,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 		})
 	})
 
-	When("deploying Multi LLM NIMCache and NIMService", Ordered, func() {
+	FWhen("deploying Multi LLM NIMCache and NIMService", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
 			if !CurrentSpecReport().Failed() {
