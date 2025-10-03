@@ -9,7 +9,7 @@ spec:
     hf:
       endpoint: "https://huggingface.co"
       namespace: "meta-llama"
-      authSecret: hf-api-secret
+      authSecret: hf-token-secret
       modelPuller: nvcr.io/nim/nvidia/llm-nim:1.12
       pullSecret: ngc-secret
       modelName: "Llama-3.2-1B-Instruct"
