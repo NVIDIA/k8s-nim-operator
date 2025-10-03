@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -111,6 +112,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
 			cleanupNIMCRs()
+			cleanupContainerImages()
 		})
 
 		It("should go to READY state", func(ctx context.Context) {
@@ -395,6 +397,26 @@ func cleanupCRDs() {
 		err := extClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, crd, metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	}
+}
+
+func cleanupContainerImages() {
+	cmd := exec.Command("sudo", "crictl", "images")
+
+	// Run and capture combined output (stdout + stderr)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+
+	fmt.Println("crictl images output: ", string(output))
+
+	cmd = exec.Command("sudo", "crictl", "rmi", "--prune")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+
+	fmt.Println("crictl rmi --prune output: ", string(output))
 }
 
 func installEntitystoreDependencies() {
