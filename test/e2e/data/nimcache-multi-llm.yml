@@ -3,6 +3,8 @@ kind: NIMCache
 metadata:
   name: nim-cache-multi-llm
 spec:
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
   source:
     hf:
       endpoint: "https://huggingface.co"

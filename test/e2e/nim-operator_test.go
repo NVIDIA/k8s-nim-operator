@@ -182,7 +182,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			By("Checking the NIMCache object state is ready")
 			Eventually(func() bool {
 				nimCacheObject, _ := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, nimCache.Name, metav1.GetOptions{})
-				fmt.Printf("NIMCache object state: %+v \n", nimCacheObject.Status.State)
+				fmt.Printf("NIMCache object status: %+v \n", nimCacheObject.Status)
 				return nimCacheObject.Status.State == v1alpha1.NimCacheStatusReady
 			}, Timeout, 5*time.Second).Should(BeTrue())
 
