@@ -417,6 +417,15 @@ func cleanupContainerImages() {
 	}
 
 	fmt.Println("crictl rmi --prune output: ", string(output))
+
+	cmd = exec.Command("df", "-h", "/", "/var/lib/containerd")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+
+	fmt.Println("df -h / /var/lib/containerd output: ", string(output))
+
 }
 
 func installEntitystoreDependencies() {
