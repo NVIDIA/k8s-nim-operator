@@ -5,7 +5,7 @@ FROM golang:${GOLANG_VERSION} AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
-ARG GOPROXY=direct
+ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=$GOPROXY
 
 WORKDIR /workspace

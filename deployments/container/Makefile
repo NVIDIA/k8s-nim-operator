@@ -47,7 +47,7 @@ OUT_IMAGE_VERSION ?= $(IMAGE_VERSION)
 OUT_IMAGE_TAG = $(OUT_IMAGE_VERSION)
 OUT_IMAGE = $(OUT_IMAGE_NAME):$(OUT_IMAGE_TAG)
 
-GOPROXY ?= direct
+GOPROXY ?= https://proxy.golang.org,direct
 
 # DEFAULT_CHANNEL defines the default channel used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
