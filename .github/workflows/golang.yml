@@ -23,7 +23,10 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
     - uses: actions/checkout@v4
       name: Checkout code
@@ -57,7 +60,10 @@ jobs:
         make validate-generated-assets
   test:
     name: Unit test
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -80,7 +86,10 @@ jobs:
         make coverage
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4

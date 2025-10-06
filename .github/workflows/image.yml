@@ -23,8 +23,12 @@ on:
       - "pull-request/[0-9]+"
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-image-arm64:
+    runs-on: linux-arm64-cpu4
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
         name: Check out code
