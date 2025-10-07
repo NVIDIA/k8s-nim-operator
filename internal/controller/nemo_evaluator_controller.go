@@ -457,20 +457,9 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, ne
 func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, nemoEvaluator *appsv1alpha1.NemoEvaluator, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: nemoEvaluator.GetName(), Namespace: nemoEvaluator.GetNamespace()}
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
-		return err
-	}
-	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoEvaluator.Spec)) {
-		return nil
-	}
-
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, namespacedName)
+		logger.Error(err, "failed to render", conditionType, nemoEvaluator.GetName(), nemoEvaluator.GetNamespace())
 		statusError := r.updater.SetConditionsFailed(ctx, nemoEvaluator, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoEvaluator", nemoEvaluator.GetName())
@@ -492,6 +481,30 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, nem
 
 	if metaAccessor == nil || metaAccessor.GetName() == "" || metaAccessor.GetNamespace() == "" {
 		logger.V(2).Info("rendered un-initialized resource")
+		return nil
+	}
+
+	namespacedName := types.NamespacedName{Name: nemoEvaluator.GetName(), Namespace: nemoEvaluator.GetNamespace()}
+	err = r.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
+		return err
+	}
+
+	// If we found the object and autoscaling is enabled on the Evaluator,
+	// copy the current replicas from the existing object into the desired (resource),
+	// so we don't fight the HPA (or external scaler) on each reconcile.
+	if err == nil && nemoEvaluator.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
+				replicas := *curr.Spec.Replicas
+				desired.Spec.Replicas = &replicas
+			}
+		}
+	}
+
+	// Don't do anything if CR is unchanged.
+	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoEvaluator.Spec)) {
 		return nil
 	}
 

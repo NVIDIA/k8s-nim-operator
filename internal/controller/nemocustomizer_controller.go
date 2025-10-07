@@ -802,17 +802,6 @@ func (r *NemoCustomizerReconciler) addCustomizationConfigTemplates(ctx context.C
 func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: nemoCustomizer.GetName(), Namespace: nemoCustomizer.GetNamespace()}
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
-		return err
-	}
-	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoCustomizer.Spec)) {
-		return nil
-	}
-
 	resource, err := renderFunc()
 	if err != nil {
 		logger.Error(err, "failed to render", conditionType, nemoCustomizer.GetName(), nemoCustomizer.GetNamespace())
@@ -838,6 +827,25 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, ne
 	if metaAccessor == nil || metaAccessor.GetName() == "" || metaAccessor.GetNamespace() == "" {
 		logger.V(2).Info("rendered un-initialized resource")
 		return nil
+	}
+
+	namespacedName := types.NamespacedName{Name: nemoCustomizer.GetName(), Namespace: nemoCustomizer.GetNamespace()}
+	err = r.Get(ctx, namespacedName, obj)
+	if err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
+		return err
+	}
+
+	// If we found the object and autoscaling is enabled on the Customizer,
+	// copy the current replicas from the existing object into the desired (resource),
+	// so we don't fight the HPA (or external scaler) on each reconcile.
+	if err == nil && nemoCustomizer.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
+				replicas := *curr.Spec.Replicas
+				desired.Spec.Replicas = &replicas
+			}
+		}
 	}
 
 	if err = controllerutil.SetControllerReference(nemoCustomizer, resource, r.GetScheme()); err != nil {

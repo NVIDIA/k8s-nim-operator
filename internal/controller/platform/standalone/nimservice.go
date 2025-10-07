@@ -805,6 +805,19 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
 		return err
 	}
+
+	// If we found the object and autoscaling is enabled on the NIMService,
+	// copy the current replicas from the existing object into the desired (resource),
+	// so we don't fight the HPA (or external scaler) on each reconcile.
+	if err == nil && nimService.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
+				replicas := *curr.Spec.Replicas
+				desired.Spec.Replicas = &replicas
+			}
+		}
+	}
+
 	// Don't do anything if CR is unchanged.
 	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
 		return nil
