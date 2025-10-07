@@ -15,21 +15,18 @@
 name: Golang
 
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-    branches:
-      - main
-      - release-*
   push:
     branches:
       - main
       - release-*
+      - "pull-request/[0-9]+"
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
     - uses: actions/checkout@v4
       name: Checkout code
@@ -48,13 +45,25 @@ jobs:
         version: latest
         args: -v --timeout 5m
         skip-cache: true
+    - name: Setup Go Proxy
+      id: setup-go-proxy
+      uses: nv-gha-runners/setup-artifactory-go-proxy@main
     - name: Check golang modules
-      run: make check-vendor
+      env:
+        GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+      run: |
+        make check-vendor
     - name: Check generated assets
-      run: make validate-generated-assets
+      env:
+        GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+      run: |
+        make validate-generated-assets
   test:
     name: Unit test
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -67,10 +76,20 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GOLANG_VERSION }}
-    - run: make coverage
+    - name: Setup Go Proxy
+      id: setup-go-proxy
+      uses: nv-gha-runners/setup-artifactory-go-proxy@main
+    - name: Run Coverage
+      env:
+        GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+      run: |
+        make coverage
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: linux-amd64-cpu4
+    permissions:
+      contents: read
+      id-token: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -83,4 +102,11 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GOLANG_VERSION }}
-    - run: make build
+    - name: Setup Go Proxy
+      id: setup-go-proxy
+      uses: nv-gha-runners/setup-artifactory-go-proxy@main
+    - name: Run Build
+      env:
+        GOPROXY: ${{ steps.setup-go-proxy.outputs.goproxy-url }}
+      run: |
+        make build

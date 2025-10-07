@@ -47,7 +47,7 @@ const (
 )
 
 // Actual test suite.
-var _ = Describe("NIM Operator", func() {
+var _ = Describe("NIM Operator", Ordered, func() {
 
 	AfterEach(func(ctx context.Context) {
 		// Run diagnostic collector if test failed
@@ -66,46 +66,45 @@ var _ = Describe("NIM Operator", func() {
 		}
 	})
 
-	When("deploying the K8s-NIM-Operator via Helm", Ordered, func() {
-		It("should be successful", func(ctx context.Context) {
-			// Add or Update Helm repo
-			helmRepo := repo.Entry{
-				Name: "nvidia",
-				URL:  nvidiaHelm,
-			}
-			err := helmClient.AddOrUpdateChartRepo(helmRepo)
-			Expect(err).NotTo(HaveOccurred())
+	BeforeAll(func() {
+		// Add or Update Helm repo
+		helmRepo := repo.Entry{
+			Name: "nvidia",
+			URL:  nvidiaHelm,
+		}
+		err := helmClient.AddOrUpdateChartRepo(helmRepo)
+		Expect(err).NotTo(HaveOccurred())
 
-			err = helmClient.UpdateChartRepos()
-			Expect(err).NotTo(HaveOccurred())
+		err = helmClient.UpdateChartRepos()
+		Expect(err).NotTo(HaveOccurred())
 
-			pullSecrets := []string{"ngc-secret"}
-			// Values
-			values := helmValues.Options{
-				Values: []string{
-					fmt.Sprintf("operator.image.repository=%s", ImageRepo),
-					fmt.Sprintf("operator.image.tag=%s", ImageTag),
-					fmt.Sprintf("operator.image.pullPolicy=%s", ImagePullPolicy),
-					fmt.Sprintf("operator.image.pullSecrets={%s}", strings.Join(pullSecrets, ",")),
-				},
-			}
+		pullSecrets := []string{"ngc-secret"}
+		// Values
+		values := helmValues.Options{
+			Values: []string{
+				fmt.Sprintf("operator.image.repository=%s", ImageRepo),
+				fmt.Sprintf("operator.image.tag=%s", ImageTag),
+				fmt.Sprintf("operator.image.pullPolicy=%s", ImagePullPolicy),
+				fmt.Sprintf("operator.image.pullSecrets={%s}", strings.Join(pullSecrets, ",")),
+				fmt.Sprintf("operator.admissionController.enabled=%t", AdmissionControllerEnabled),
+			},
+		}
 
-			// Chart spec
-			chartSpec := &helm.ChartSpec{
-				ReleaseName:     helmReleaseName,
-				ChartName:       helmChart,
-				Namespace:       testNamespace.Name,
-				CreateNamespace: true,
-				Wait:            true,
-				Timeout:         10 * time.Minute, // pull time is long
-				ValuesOptions:   values,
-				CleanupOnFail:   true,
-			}
+		// Chart spec
+		chartSpec := &helm.ChartSpec{
+			ReleaseName:     helmReleaseName,
+			ChartName:       helmChart,
+			Namespace:       testNamespace.Name,
+			CreateNamespace: true,
+			Wait:            true,
+			Timeout:         10 * time.Minute, // pull time is long
+			ValuesOptions:   values,
+			CleanupOnFail:   true,
+		}
 
-			By("Installing k8s-nim-operator Helm chart")
-			_, err = helmClient.InstallOrUpgradeChart(ctx, chartSpec, nil)
-			Expect(err).NotTo(HaveOccurred())
-		})
+		By("Installing k8s-nim-operator Helm chart")
+		_, err = helmClient.InstallOrUpgradeChart(ctx, chartSpec, nil)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	When("deploying NIMCache and NIMService", Ordered, func() {

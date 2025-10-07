@@ -20,15 +20,18 @@ on:
     types:
       - completed
     branches:
-      - "pull-request/[0-9]+"
       - main
       - release-*
 
 jobs:
   e2e-tests:
     runs-on: linux-amd64-cpu4
-    #if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
-    if: false # TODO: Disabled until e2e test infra is fixed
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
+    permissions:
+      contents: read
+      id-token: write
+      checks: write
+      statuses: write
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -41,7 +44,7 @@ jobs:
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION := }" >> $GITHUB_ENV
 
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.10
+        uses: NVIDIA/holodeck@v0.2.7
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -53,7 +56,7 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
-      - name: Intall dependencies
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y make
@@ -76,6 +79,21 @@ jobs:
           name: e2e-test-logs
           path: ./e2e_logs/
           retention-days: 15
+
+     # This makes the result appear on the merged commit's Checks tab
+      - name: Report status on merged commit
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'End-to-end Tests',
+              head_sha: '${{ github.event.workflow_run.head_sha }}',
+              status: 'completed',
+              conclusion: '${{ job.status }}' // success | failure | cancelled
+            })
 
       - name: Send Slack alert notification
         id: slack

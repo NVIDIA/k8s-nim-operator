@@ -10,3 +10,5 @@ primary:
       - {{ 'ReadWriteOnce' if localPathProvisioner.enabled else pvc.volume_access_mode }}
     enabled: true
     size: 500Mi
+image:
+  repository: bitnamilegacy/postgresql
