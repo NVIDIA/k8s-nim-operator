@@ -507,6 +507,21 @@ func (r *NemoGuardrailReconciler) reconcilePVC(ctx context.Context, nemoGuardrai
 func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nemoGuardrail *appsv1alpha1.NemoGuardrail, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
+	namespacedName := types.NamespacedName{Name: nemoGuardrail.GetName(), Namespace: nemoGuardrail.GetNamespace()}
+	getErr := r.Get(ctx, namespacedName, obj)
+	if getErr != nil && !errors.IsNotFound(getErr) {
+		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
+		return getErr
+	}
+
+	// Track an existing resource
+	found := getErr == nil
+
+	// Don't do anything if CR is unchanged.
+	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoGuardrail.Spec)) {
+		return nil
+	}
+
 	resource, err := renderFunc()
 	if err != nil {
 		logger.Error(err, "failed to render", conditionType, nemoGuardrail.GetName(), nemoGuardrail.GetNamespace())
@@ -534,28 +549,16 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 		return nil
 	}
 
-	namespacedName := types.NamespacedName{Name: nemoGuardrail.GetName(), Namespace: nemoGuardrail.GetNamespace()}
-	err = r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
-		return err
-	}
-
 	// If we found the object and autoscaling is enabled on the Guardrails,
 	// copy the current replicas from the existing object into the desired (resource),
 	// so we don't fight the HPA (or external scaler) on each reconcile.
-	if err == nil && nemoGuardrail.IsAutoScalingEnabled() {
+	if found && nemoGuardrail.IsAutoScalingEnabled() {
 		if curr, ok := obj.(*appsv1.Deployment); ok {
 			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
 				replicas := *curr.Spec.Replicas
 				desired.Spec.Replicas = &replicas
 			}
 		}
-	}
-
-	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoGuardrail.Spec)) {
-		return nil
 	}
 
 	if err = controllerutil.SetControllerReference(nemoGuardrail, resource, r.GetScheme()); err != nil {

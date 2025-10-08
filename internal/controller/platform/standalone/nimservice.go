@@ -771,12 +771,27 @@ func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimServ
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
+	namespacedName := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
+	getErr := r.Get(ctx, namespacedName, obj)
+	if getErr != nil && !k8serrors.IsNotFound(getErr) {
+		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
+		return getErr
+	}
+
+	// Track an existing resource
+	found := getErr == nil
+
+	// Don't do anything if CR is unchanged.
+	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
+		return nil
+	}
+
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", "conditionType", conditionType)
+		logger.Error(err, "failed to render", conditionType, nimService.GetName(), nimService.GetNamespace())
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "nimservice", nimService.Name)
+			logger.Error(statusError, "failed to update status", "NIMService", nimService.GetName())
 		}
 		return err
 	}
@@ -798,18 +813,10 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		return nil
 	}
 
-	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
-
-	err = r.Get(ctx, namespacedName, obj)
-	if err != nil && !k8serrors.IsNotFound(err) {
-		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
-		return err
-	}
-
 	// If we found the object and autoscaling is enabled on the NIMService,
 	// copy the current replicas from the existing object into the desired (resource),
 	// so we don't fight the HPA (or external scaler) on each reconcile.
-	if err == nil && nimService.IsAutoScalingEnabled() {
+	if found && nimService.IsAutoScalingEnabled() {
 		if curr, ok := obj.(*appsv1.Deployment); ok {
 			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
 				replicas := *curr.Spec.Replicas
@@ -818,16 +825,11 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		}
 	}
 
-	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
-		return nil
-	}
-
 	if err = controllerutil.SetControllerReference(nimService, resource, r.GetScheme()); err != nil {
 		logger.Error(err, "failed to set owner", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "nimservice", nimService.Name)
+			logger.Error(statusError, "failed to update status", "NIMService", nimService.GetName())
 		}
 		return err
 	}
@@ -837,7 +839,7 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 		logger.Error(err, "failed to sync", conditionType, namespacedName)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
 		if statusError != nil {
-			logger.Error(statusError, "failed to update status", "nimservice", nimService.Name)
+			logger.Error(statusError, "failed to update status", "NIMService", nimService.GetName())
 		}
 		return err
 	}
