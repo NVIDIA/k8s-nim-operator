@@ -24,6 +24,10 @@ spec:
         app: {{ .Name }}
     spec:
       runtimeClassName: {{ .RuntimeClassName }}
+      {{- if .Affinity }}
+      affinity:
+        {{ .Affinity | yaml | nindent 8 }}
+      {{- end }}
       initContainers:
       {{- range .InitContainers }}
       - name: {{ .Name }}

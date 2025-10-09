@@ -58,16 +58,18 @@ const (
 
 // NemoDatastoreSpec defines the desired state of NemoDatastore.
 type NemoDatastoreSpec struct {
-	Image        Image                        `json:"image"`
-	Command      []string                     `json:"command,omitempty"`
-	Args         []string                     `json:"args,omitempty"`
-	Env          []corev1.EnvVar              `json:"env,omitempty"`
-	Labels       map[string]string            `json:"labels,omitempty"`
-	Annotations  map[string]string            `json:"annotations,omitempty"`
-	NodeSelector map[string]string            `json:"nodeSelector,omitempty"`
-	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
-	PodAffinity  *corev1.PodAffinity          `json:"podAffinity,omitempty"`
-	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Image        Image               `json:"image"`
+	Command      []string            `json:"command,omitempty"`
+	Args         []string            `json:"args,omitempty"`
+	Env          []corev1.EnvVar     `json:"env,omitempty"`
+	Labels       map[string]string   `json:"labels,omitempty"`
+	Annotations  map[string]string   `json:"annotations,omitempty"`
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+	Affinity     *corev1.Affinity    `json:"affinity,omitempty"`
+	// Deprecated: Use Affinity instead.
+	PodAffinity *corev1.PodAffinity          `json:"podAffinity,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
 	Expose  ExposeV1    `json:"expose,omitempty"`
@@ -538,9 +540,9 @@ func (n *NemoDatastore) GetTolerations() []corev1.Toleration {
 	return n.Spec.Tolerations
 }
 
-// GetPodAffinity returns pod affinity for the NemoDatastore instance.
-func (n *NemoDatastore) GetPodAffinity() *corev1.PodAffinity {
-	return n.Spec.PodAffinity
+// GetAffinity returns affinity for the NemoDatastore instance.
+func (n *NemoDatastore) GetAffinity() *corev1.Affinity {
+	return n.Spec.Affinity
 }
 
 // GetContainerName returns name of the container for NemoDatastore deployment.
@@ -836,7 +838,7 @@ func (n *NemoDatastore) GetDeploymentParams() *rendertypes.DeploymentParams {
 	}
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
-	params.Affinity = n.GetPodAffinity()
+	params.Affinity = n.GetAffinity()
 	params.ImagePullSecrets = n.GetImagePullSecrets()
 	params.ImagePullPolicy = n.GetImagePullPolicy()
 
@@ -896,7 +898,7 @@ func (n *NemoDatastore) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	params.ServiceName = n.GetName()
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
-	params.Affinity = n.GetPodAffinity()
+	params.Affinity = n.GetAffinity()
 	params.ImagePullSecrets = n.GetImagePullSecrets()
 	params.ImagePullPolicy = n.GetImagePullPolicy()
 
