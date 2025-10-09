@@ -702,8 +702,8 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 	if len(n.Spec.Training.NodeSelector) > 0 {
 		trainingCfg["nodeSelector"] = n.Spec.Training.NodeSelector
 	}
-	if n.Spec.Training.PodAffinity != nil {
-		trainingCfg["affinity"] = n.Spec.Training.PodAffinity
+	if n.Spec.Training.Affinity != nil {
+		trainingCfg["affinity"] = n.Spec.Training.Affinity
 	}
 	if n.Spec.Training.Resources != nil {
 		trainingCfg["resources"] = n.Spec.Training.Resources
