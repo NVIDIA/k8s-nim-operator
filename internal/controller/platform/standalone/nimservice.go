@@ -771,21 +771,6 @@ func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimServ
 func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimService *appsv1alpha1.NIMService, renderer *render.Renderer, obj client.Object, renderFunc func() (client.Object, error), conditionType string, reason string) error {
 	logger := log.FromContext(ctx)
 
-	namespacedName := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
-	getErr := r.Get(ctx, namespacedName, obj)
-	if getErr != nil && !k8serrors.IsNotFound(getErr) {
-		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
-		return getErr
-	}
-
-	// Track an existing resource
-	found := getErr == nil
-
-	// Don't do anything if CR is unchanged.
-	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
-		return nil
-	}
-
 	resource, err := renderFunc()
 	if err != nil {
 		logger.Error(err, "failed to render", conditionType, nimService.GetName(), nimService.GetNamespace())
@@ -810,6 +795,23 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 
 	if metaAccessor == nil || metaAccessor.GetName() == "" || metaAccessor.GetNamespace() == "" {
 		logger.V(2).Info("rendered un-initialized resource")
+		return nil
+	}
+
+	// Use rendered resource name here as in some cases it can be different than nim service name
+	// e.g. (with LWS resources with suffix)
+	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
+	getErr := r.Get(ctx, namespacedName, obj)
+	if getErr != nil && !k8serrors.IsNotFound(getErr) {
+		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
+		return getErr
+	}
+
+	// Track an existing resource
+	found := getErr == nil
+
+	// Don't do anything if CR is unchanged.
+	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
 		return nil
 	}
 

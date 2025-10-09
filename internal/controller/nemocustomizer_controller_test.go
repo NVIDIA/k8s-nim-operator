@@ -216,7 +216,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 					Port:         5432,
 					DatabaseName: "ncsdb",
 				},
-				Replicas: 1,
+				Replicas: ptr.To(int32(1)),
 				Resources: &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
