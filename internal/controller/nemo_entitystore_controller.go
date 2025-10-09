@@ -453,7 +453,7 @@ func (r *NemoEntitystoreReconciler) renderAndSyncResource(ctx context.Context, n
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, nemoEntitystore.GetName(), nemoEntitystore.GetNamespace())
+		logger.Error(err, "failed to render", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoEntitystore, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoEntitystore", nemoEntitystore.GetName())

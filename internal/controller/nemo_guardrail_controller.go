@@ -524,7 +524,7 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, nemoGuardrail.GetName(), nemoGuardrail.GetNamespace())
+		logger.Error(err, "failed to render", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoGuardrail, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoGuardrail", nemoGuardrail.GetName())

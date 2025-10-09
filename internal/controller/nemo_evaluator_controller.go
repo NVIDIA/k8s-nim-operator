@@ -474,7 +474,7 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, nem
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, nemoEvaluator.GetName(), nemoEvaluator.GetNamespace())
+		logger.Error(err, "failed to render", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoEvaluator, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoEvaluator", nemoEvaluator.GetName())

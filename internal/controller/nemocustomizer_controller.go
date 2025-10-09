@@ -819,7 +819,7 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, ne
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, nemoCustomizer.GetName(), nemoCustomizer.GetNamespace())
+		logger.Error(err, "failed to render", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
