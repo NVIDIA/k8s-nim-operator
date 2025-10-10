@@ -155,6 +155,57 @@ var _ = Describe("NIM Operator", Ordered, func() {
 		})
 	})
 
+	When("deploying Multi LLM NIMCache and NIMService", Ordered, func() {
+
+		AfterEach(func() {
+			// Clean up
+			if !CurrentSpecReport().Failed() {
+				cleanupNIMCRs()
+			}
+		})
+
+		It("should go to READY state", func(ctx context.Context) {
+			// Create a NIMCache object
+			By("Creating a NIMCache object")
+			cli, err := versioned.NewForConfig(clientConfig)
+			Expect(err).NotTo(HaveOccurred())
+
+			nimCache := &v1alpha1.NIMCache{}
+			data, err := os.ReadFile(filepath.Join(cwd, "data", "nimcache-multi-llm.yml"))
+			Expect(err).NotTo(HaveOccurred())
+
+			err = yaml.Unmarshal(data, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Create(ctx, nimCache, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking the NIMCache object state is ready")
+			Eventually(func() bool {
+				nimCacheObject, _ := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, nimCache.Name, metav1.GetOptions{})
+				return nimCacheObject.Status.State == v1alpha1.NimCacheStatusReady
+			}, Timeout, 5*time.Second).Should(BeTrue())
+
+			// Create a NIMService object
+			By("Creating a NIMService object")
+			nimService := &v1alpha1.NIMService{}
+			data, err = os.ReadFile(filepath.Join(cwd, "data", "nimservice-multi-llm.yml"))
+			Expect(err).NotTo(HaveOccurred())
+
+			err = yaml.Unmarshal(data, nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = cli.AppsV1alpha1().NIMServices(testNamespace.Name).Create(ctx, nimService, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking the NIMService object state is ready")
+			Eventually(func() bool {
+				nimServiceObject, _ := cli.AppsV1alpha1().NIMServices(testNamespace.Name).Get(ctx, nimService.Name, metav1.GetOptions{})
+				return nimServiceObject.Status.State == v1alpha1.NIMServiceStatusReady
+			}, Timeout, 5*time.Second).Should(BeTrue())
+		})
+	})
+
 	When("deploying NEMO microservices", func() {
 		BeforeEach(func() {
 			if !EnableNemoMicroservices {
