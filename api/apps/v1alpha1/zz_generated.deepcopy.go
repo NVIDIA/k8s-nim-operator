@@ -1548,6 +1548,11 @@ func (in *NIMServiceSpec) DeepCopyInto(out *NIMServiceSpec) {
 	in.StartupProbe.DeepCopyInto(&out.StartupProbe)
 	in.Scale.DeepCopyInto(&out.Scale)
 	in.Metrics.DeepCopyInto(&out.Metrics)
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(int32)
+		**out = **in
+	}
 	if in.UserID != nil {
 		in, out := &in.UserID, &out.UserID
 		*out = new(int64)
@@ -1804,6 +1809,11 @@ func (in *NemoCustomizerSpec) DeepCopyInto(out *NemoCustomizerSpec) {
 	in.Router.DeepCopyInto(&out.Router)
 	in.Scale.DeepCopyInto(&out.Scale)
 	in.Metrics.DeepCopyInto(&out.Metrics)
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(int32)
+		**out = **in
+	}
 	if in.UserID != nil {
 		in, out := &in.UserID, &out.UserID
 		*out = new(int64)
@@ -2018,6 +2028,11 @@ func (in *NemoDatastoreSpec) DeepCopyInto(out *NemoDatastoreSpec) {
 	in.Router.DeepCopyInto(&out.Router)
 	in.Scale.DeepCopyInto(&out.Scale)
 	in.Metrics.DeepCopyInto(&out.Metrics)
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(int32)
+		**out = **in
+	}
 	if in.UserID != nil {
 		in, out := &in.UserID, &out.UserID
 		*out = new(int64)
@@ -2216,6 +2231,11 @@ func (in *NemoEntitystoreSpec) DeepCopyInto(out *NemoEntitystoreSpec) {
 	in.Router.DeepCopyInto(&out.Router)
 	in.Scale.DeepCopyInto(&out.Scale)
 	in.Metrics.DeepCopyInto(&out.Metrics)
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(int32)
+		**out = **in
+	}
 	if in.UserID != nil {
 		in, out := &in.UserID, &out.UserID
 		*out = new(int64)
@@ -2393,6 +2413,11 @@ func (in *NemoEvaluatorSpec) DeepCopyInto(out *NemoEvaluatorSpec) {
 	in.Router.DeepCopyInto(&out.Router)
 	in.Scale.DeepCopyInto(&out.Scale)
 	in.Metrics.DeepCopyInto(&out.Metrics)
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(int32)
+		**out = **in
+	}
 	if in.UserID != nil {
 		in, out := &in.UserID, &out.UserID
 		*out = new(int64)
@@ -2586,6 +2611,11 @@ func (in *NemoGuardrailSpec) DeepCopyInto(out *NemoGuardrailSpec) {
 	in.Router.DeepCopyInto(&out.Router)
 	in.Scale.DeepCopyInto(&out.Scale)
 	in.Metrics.DeepCopyInto(&out.Metrics)
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(int32)
+		**out = **in
+	}
 	if in.UserID != nil {
 		in, out := &in.UserID, &out.UserID
 		*out = new(int64)

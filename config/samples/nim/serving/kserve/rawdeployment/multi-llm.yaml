@@ -39,6 +39,7 @@ spec:
     pullSecrets:
       - ngc-secret
   authSecret: ngc-api-secret
+  replicas: 1
   storage:
     nimCache:
       name: nim-cache-multi-llm

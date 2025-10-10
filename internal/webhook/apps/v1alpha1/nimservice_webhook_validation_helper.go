@@ -87,7 +87,7 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
-	w, err = validateScaleConfiguration(&spec.Scale, fldPath.Child("scale"))
+	w, err = validateScaleConfiguration(&spec.Scale, spec.Replicas, fldPath.Child("scale"))
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
@@ -245,7 +245,7 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 
 		if hasName {
 			// resourceClaimName: spec.relicas must be <= 1 and spec.scale.enabled must be false.
-			if spec.Replicas > 1 {
+			if spec.Replicas != nil && *spec.Replicas > 1 {
 				errList = append(errList, field.Forbidden(
 					idxPath.Child("resourceClaimName"),
 					fmt.Sprintf("must not be set when %s > 1, use %s instead", fldPath.Child("replicas"), idxPath.Child("resourceClaimTemplateName")),
@@ -446,14 +446,24 @@ func validateRouterConfiguration(router *appsv1alpha1.Router, fldPath *field.Pat
 }
 
 // If Spec.Scale.Enabled is true, Spec.Scale.HPA must be non-empty HorizontalPodAutoScaler.
-func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, replicas *int32, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if scale.Enabled != nil && *scale.Enabled {
 		if reflect.DeepEqual(scale.HPA, appsv1alpha1.HorizontalPodAutoscalerSpec{}) {
 			errList = append(errList, field.Required(fldPath.Child("hpa"), fmt.Sprintf("must be defined if %s is true", fldPath.Child("enabled"))))
 		}
+
+		if replicas != nil {
+			errList = append(errList,
+				field.Forbidden(
+					field.NewPath("spec", "replicas"),
+					"cannot be set when autoscaling is enabled; configure min/max replicas in spec.scale.hpa instead",
+				),
+			)
+		}
 	}
+
 	return warningList, errList
 }
 

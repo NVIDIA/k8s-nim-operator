@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -57,7 +58,7 @@ var _ = Describe("NemoDatastore Controller", func() {
 					Repository: "test-repo",
 					Tag:        "test-tag",
 				},
-				Replicas: 1,
+				Replicas: ptr.To(int32(1)),
 				DatabaseConfig: appsv1alpha1.DatabaseConfig{
 					Host:         "test-pg-host",
 					DatabaseName: "test-pg-database",
