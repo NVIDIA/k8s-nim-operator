@@ -73,7 +73,7 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	errList = append(errList, validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))...)
 	errList = append(errList, validateExposeConfiguration(&spec.Expose, fldPath.Child("expose").Child("ingress"))...)
 	errList = append(errList, validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))...)
-	errList = append(errList, validateScaleConfiguration(&spec.Scale, fldPath.Child("scale"))...)
+	errList = append(errList, validateScaleConfiguration(&spec.Scale, spec.Replicas, fldPath.Child("scale"))...)
 	errList = append(errList, validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))...)
 	errList = append(errList, validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)...)
 	errList = append(errList, validateKServeConfiguration(spec, fldPath)...)
@@ -189,7 +189,7 @@ func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPat
 
 		if hasName {
 			// resourceClaimName: spec.relicas must be <= 1 and spec.scale.enabled must be false.
-			if spec.Replicas > 1 {
+			if spec.Replicas != nil && *spec.Replicas > 1 {
 				errList = append(errList, field.Forbidden(
 					idxPath.Child("resourceClaimName"),
 					fmt.Sprintf("must not be set when %s > 1, use %s instead", fldPath.Child("replicas"), idxPath.Child("resourceClaimTemplateName")),
@@ -374,11 +374,20 @@ func validateMetricsConfiguration(metrics *appsv1alpha1.Metrics, fldPath *field.
 }
 
 // If Spec.Scale.Enabled is true, Spec.Scale.HPA must be non-empty HorizontalPodAutoScaler.
-func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, fldPath *field.Path) field.ErrorList {
+func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, replicas *int32, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
 	if scale.Enabled != nil && *scale.Enabled {
 		if reflect.DeepEqual(scale.HPA, appsv1alpha1.HorizontalPodAutoscalerSpec{}) {
 			errList = append(errList, field.Required(fldPath.Child("hpa"), fmt.Sprintf("must be defined if %s is true", fldPath.Child("enabled"))))
+		}
+
+		if replicas != nil {
+			errList = append(errList,
+				field.Forbidden(
+					field.NewPath("spec", "replicas"),
+					"cannot be set when autoscaling is enabled; configure min/max replicas in spec.scale.hpa instead",
+				),
+			)
 		}
 	}
 	return errList

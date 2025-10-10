@@ -57,6 +57,8 @@ const (
 )
 
 // NemoGuardrailSpec defines the desired state of NemoGuardrail.
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingress."
+// +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
 type NemoGuardrailSpec struct {
 	Image       Image           `json:"image"`
 	Command     []string        `json:"command,omitempty"`
@@ -80,7 +82,7 @@ type NemoGuardrailSpec struct {
 	Metrics Metrics     `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas     int    `json:"replicas,omitempty"`
+	Replicas     *int32 `json:"replicas,omitempty"`
 	UserID       *int64 `json:"userID,omitempty"`
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
@@ -521,9 +523,9 @@ func (n *NemoGuardrail) GetServiceMonitor() ServiceMonitor {
 }
 
 // GetReplicas returns replicas for the NemoGuardrail deployment.
-func (n *NemoGuardrail) GetReplicas() int {
+func (n *NemoGuardrail) GetReplicas() *int32 {
 	if n.IsAutoScalingEnabled() {
-		return 0
+		return n.Spec.Scale.HPA.MinReplicas
 	}
 	return n.Spec.Replicas
 }

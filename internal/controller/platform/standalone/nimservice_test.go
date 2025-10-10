@@ -1915,6 +1915,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						PullPolicy:  "IfNotPresent",
 						PullSecrets: []string{"ngc-secret"},
 					},
+					Replicas: ptr.To(int32(1)),
 					Storage: appsv1alpha1.NIMServiceStorage{
 						PVC: appsv1alpha1.PersistentVolumeClaim{
 							Name:         "test-pvc",
@@ -2137,6 +2138,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						PullPolicy:  "IfNotPresent",
 						PullSecrets: []string{"ngc-secret"},
 					},
+					Replicas: ptr.To(int32(1)),
 					Storage: appsv1alpha1.NIMServiceStorage{
 						PVC: appsv1alpha1.PersistentVolumeClaim{
 							Name:         "test-pvc",

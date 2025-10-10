@@ -97,6 +97,8 @@ type Autoscaling struct {
 
 // HorizontalPodAutoscalerSpec defines the parameters required to setup HPA.
 type HorizontalPodAutoscalerSpec struct {
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default:=1
 	MinReplicas *int32                                         `json:"minReplicas,omitempty"`
 	MaxReplicas int32                                          `json:"maxReplicas"`
 	Metrics     []autoscalingv2.MetricSpec                     `json:"metrics,omitempty"`

@@ -429,19 +429,23 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, nem
 	logger := log.FromContext(ctx)
 
 	namespacedName := types.NamespacedName{Name: nemoEvaluator.GetName(), Namespace: nemoEvaluator.GetNamespace()}
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
-		return err
+	getErr := r.Get(ctx, namespacedName, obj)
+	if getErr != nil && !errors.IsNotFound(getErr) {
+		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
+		return getErr
 	}
+
+	// Track an existing resource
+	found := getErr == nil
+
 	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoEvaluator.Spec)) {
+	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoEvaluator.Spec)) {
 		return nil
 	}
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, namespacedName)
+		logger.Error(err, "failed to render", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoEvaluator, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoEvaluator", nemoEvaluator.GetName())
@@ -466,8 +470,20 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, nem
 		return nil
 	}
 
+	// If we found the object and autoscaling is enabled on the Evaluator,
+	// copy the current replicas from the existing object into the desired (resource),
+	// so we don't fight the HPA (or external scaler) on each reconcile.
+	if found && nemoEvaluator.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
+				replicas := *curr.Spec.Replicas
+				desired.Spec.Replicas = &replicas
+			}
+		}
+	}
+
 	if err = controllerutil.SetControllerReference(nemoEvaluator, resource, r.GetScheme()); err != nil {
-		logger.Error(err, "failed to set owner", conditionType, namespacedName)
+		logger.Error(err, "failed to set owner", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoEvaluator, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoEvaluator", nemoEvaluator.GetName())
@@ -477,7 +493,7 @@ func (r *NemoEvaluatorReconciler) renderAndSyncResource(ctx context.Context, nem
 
 	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
-		logger.Error(err, "failed to sync", conditionType, namespacedName)
+		logger.Error(err, "failed to sync", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoEvaluator, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoEvaluator", nemoEvaluator.GetName())

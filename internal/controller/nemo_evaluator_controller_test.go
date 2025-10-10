@@ -117,7 +117,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 					DisableLogging:       ptr.To[bool](false),
 					ExporterOtlpEndpoint: "http://opentelemetry-collector.default.svc.cluster.local:4317",
 				},
-				Replicas: 1,
+				Replicas: ptr.To(int32(1)),
 				Resources: &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),

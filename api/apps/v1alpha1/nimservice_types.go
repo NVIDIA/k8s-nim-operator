@@ -89,6 +89,8 @@ const (
 
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
+// +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingress."
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
@@ -121,7 +123,7 @@ type NIMServiceSpec struct {
 	Metrics        Metrics       `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Replicas         int                        `json:"replicas,omitempty"`
+	Replicas         *int32                     `json:"replicas,omitempty"`
 	UserID           *int64                     `json:"userID,omitempty"`
 	GroupID          *int64                     `json:"groupID,omitempty"`
 	RuntimeClassName string                     `json:"runtimeClassName,omitempty"`
@@ -899,9 +901,9 @@ func (n *NIMService) GetServiceMonitor() ServiceMonitor {
 }
 
 // GetReplicas returns replicas for the NIMService deployment.
-func (n *NIMService) GetReplicas() int {
+func (n *NIMService) GetReplicas() *int32 {
 	if n.IsAutoScalingEnabled() {
-		return 0
+		return n.Spec.Scale.HPA.MinReplicas
 	}
 	return n.Spec.Replicas
 }
@@ -1193,15 +1195,17 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 func (n *NIMService) generateMPIConfigData() map[string]string {
 	// Construct ConfigMap data
 	data := make(map[string]string)
-	for i := 0; i < n.Spec.Replicas; i++ {
-		hostfile := fmt.Sprintf("localhost slots=%d\n", n.GetMultiNodeTensorParallelism())
-		for j := 1; j < int(n.GetMultiNodePipelineParallelism()); j++ {
-			workerHostname := fmt.Sprintf("%s-%d-%d.%s.%s.svc slots=%d",
-				n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.GetMultiNodeTensorParallelism())
-			hostfile += workerHostname + "\n"
+	if n.Spec.Replicas != nil {
+		for i := 0; i < int(*n.Spec.Replicas); i++ {
+			hostfile := fmt.Sprintf("localhost slots=%d\n", n.GetMultiNodeTensorParallelism())
+			for j := 1; j < int(n.GetMultiNodePipelineParallelism()); j++ {
+				workerHostname := fmt.Sprintf("%s-%d-%d.%s.%s.svc slots=%d",
+					n.GetLWSName(), i, j, n.GetLWSName(), n.GetNamespace(), n.GetMultiNodeTensorParallelism())
+				hostfile += workerHostname + "\n"
+			}
+			dataKey := fmt.Sprintf("hostfile-%d", i)
+			data[dataKey] = hostfile
 		}
-		dataKey := fmt.Sprintf("hostfile-%d", i)
-		data[dataKey] = hostfile
 	}
 	return data
 }
@@ -1500,7 +1504,7 @@ func (n *NIMService) GetInferenceServiceParams(
 
 	// Set template spec
 	if !n.IsAutoScalingEnabled() || deploymentMode != kserveconstants.RawDeployment {
-		params.MinReplicas = ptr.To[int32](int32(n.GetReplicas()))
+		params.MinReplicas = n.GetReplicas()
 	} else {
 		params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
 
