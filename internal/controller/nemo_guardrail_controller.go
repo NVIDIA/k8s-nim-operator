@@ -524,7 +524,7 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType)
+		logger.Error(err, "failed to render", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoGuardrail, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoGuardrail", nemoGuardrail.GetName())
@@ -562,7 +562,7 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 	}
 
 	if err = controllerutil.SetControllerReference(nemoGuardrail, resource, r.GetScheme()); err != nil {
-		logger.Error(err, "failed to set owner", conditionType, namespacedName)
+		logger.Error(err, "failed to set owner", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoGuardrail, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoGuardrail", nemoGuardrail.GetName())
@@ -572,7 +572,7 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 
 	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
-		logger.Error(err, "failed to sync", conditionType, namespacedName)
+		logger.Error(err, "failed to sync", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoGuardrail, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoGuardrail", nemoGuardrail.GetName())

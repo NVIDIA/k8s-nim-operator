@@ -773,7 +773,7 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType)
+		logger.Error(err, "failed to render", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NIMService", nimService.GetName())
@@ -828,7 +828,7 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	}
 
 	if err = controllerutil.SetControllerReference(nimService, resource, r.GetScheme()); err != nil {
-		logger.Error(err, "failed to set owner", conditionType, namespacedName)
+		logger.Error(err, "failed to set owner", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NIMService", nimService.GetName())
@@ -838,7 +838,7 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 
 	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
-		logger.Error(err, "failed to sync", conditionType, namespacedName)
+		logger.Error(err, "failed to sync", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nimService, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NIMService", nimService.GetName())

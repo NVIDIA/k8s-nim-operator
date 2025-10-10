@@ -819,7 +819,7 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, ne
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType)
+		logger.Error(err, "failed to render", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
@@ -857,7 +857,7 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, ne
 	}
 
 	if err = controllerutil.SetControllerReference(nemoCustomizer, resource, r.GetScheme()); err != nil {
-		logger.Error(err, "failed to set owner", conditionType, namespacedName)
+		logger.Error(err, "failed to set owner", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
@@ -867,7 +867,7 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, ne
 
 	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
-		logger.Error(err, "failed to sync", conditionType, namespacedName)
+		logger.Error(err, "failed to sync", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
