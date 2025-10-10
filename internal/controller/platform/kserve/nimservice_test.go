@@ -199,6 +199,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 						Name: "test-nimcache",
 					},
 				},
+				Replicas: ptr.To(int32(1)),
 				Env: []corev1.EnvVar{
 					{
 						Name:  "custom-env",
@@ -846,7 +847,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Get(context.TODO(), namespacedName, isvc)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*isvc.Spec.Predictor.MinReplicas).To(Equal(int32(0)))
+			Expect(*isvc.Spec.Predictor.MinReplicas).To(Equal(int32(1)))
 			Expect(isvc.Spec.Predictor.MaxReplicas).To(Equal(int32(0)))
 			Expect(isvc.Spec.Predictor.ScaleMetricType).To(BeNil())
 			Expect(isvc.Spec.Predictor.ScaleMetric).To(BeNil())
