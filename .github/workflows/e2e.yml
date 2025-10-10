@@ -44,7 +44,7 @@ jobs:
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION := }" >> $GITHUB_ENV
 
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.7
+        uses: NVIDIA/holodeck@v0.2.17
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -69,6 +69,7 @@ jobs:
           E2E_IMAGE_TAG: ${{ env.COMMIT_SHORT_SHA }}
           LOG_ARTIFACTS: ${{ github.workspace }}/e2e_logs
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           ./hack/e2e_tests.sh
 
