@@ -153,7 +153,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 				Datastore: appsv1alpha1.Datastore{
 					Endpoint: "http://nemo-datastore:8000",
 				},
-				Replicas: 1,
+				Replicas: ptr.To(int32(1)),
 				Resources: &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
@@ -542,7 +542,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 						Repository: "test-repo",
 						Tag:        "test-tag",
 					},
-					Replicas: 1,
+					Replicas: ptr.To(int32(1)),
 					DatabaseConfig: &appsv1alpha1.DatabaseConfig{
 						Host:         "test-pg-host",
 						DatabaseName: "test-pg-database",

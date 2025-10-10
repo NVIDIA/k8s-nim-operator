@@ -2052,6 +2052,7 @@ spec:
                 type: object
               replicas:
                 default: 1
+                format: int32
                 minimum: 1
                 type: integer
               resources:
@@ -2809,7 +2810,9 @@ spec:
                           type: object
                         type: array
                       minReplicas:
+                        default: 1
                         format: int32
+                        minimum: 1
                         type: integer
                     required:
                     - maxReplicas
@@ -4660,6 +4663,9 @@ spec:
                 .spec.router.ingress.
               rule: '!(has(self.expose.ingress) && has(self.expose.ingress.enabled)
                 && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))'
+            - message: spec.replicas cannot be set when spec.scale.enabled is true
+              rule: '!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled
+                && has(self.replicas))'
           status:
             description: NemoCustomizerStatus defines the observed state of NemoCustomizer.
             properties:

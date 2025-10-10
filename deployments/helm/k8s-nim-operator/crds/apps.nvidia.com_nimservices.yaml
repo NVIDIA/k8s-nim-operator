@@ -2436,6 +2436,7 @@ spec:
                 type: object
               replicas:
                 default: 1
+                format: int32
                 minimum: 1
                 type: integer
               resources:
@@ -3197,7 +3198,9 @@ spec:
                           type: object
                         type: array
                       minReplicas:
+                        default: 1
                         format: int32
+                        minimum: 1
                         type: integer
                     required:
                     - maxReplicas
@@ -3483,6 +3486,9 @@ spec:
             - message: autoScaling must be nil or disabled when multiNode is set
               rule: '!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled)
                 && self.scale.enabled)'
+            - message: spec.replicas cannot be set when spec.scale.enabled is true
+              rule: '!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled
+                && has(self.replicas))'
             - message: .spec.expose.ingress is deprecated, and will be removed in
                 a future release. If .spec.expose.ingress is set, please do not set
                 .spec.router.ingress.
