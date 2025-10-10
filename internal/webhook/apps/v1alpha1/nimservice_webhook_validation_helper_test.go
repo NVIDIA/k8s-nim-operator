@@ -292,7 +292,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 		{
 			name: "resourceClaimName with replicas>1",
 			modify: func(ns *appsv1alpha1.NIMService) {
-				ns.Spec.Replicas = 2
+				ns.Spec.Replicas = ptr.To(int32(2))
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
 					ResourceClaimName: ptr.To("claim1"),
 				}}
@@ -902,12 +902,16 @@ func TestValidateScaleConfiguration(t *testing.T) {
 		{"autoscaling disabled", func(ns *appsv1alpha1.NIMService) {}, 0},
 		{"enabled empty HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled }, 1},
 		{"enabled valid HPA", func(ns *appsv1alpha1.NIMService) { ns.Spec.Scale.Enabled = &enabled; ns.Spec.Scale.HPA.MaxReplicas = 3 }, 0},
+		{"enabled both HPA and replicas", func(ns *appsv1alpha1.NIMService) {
+			ns.Spec.Scale.Enabled = &enabled
+			ns.Spec.Scale.HPA.MaxReplicas = 3
+			ns.Spec.Replicas = ptr.To(int32(2))
+		}, 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
-			errs := validateScaleConfiguration(&ns.Spec.Scale, fld)
 			if got := len(errs); got != tc.wantErrs {
 				t.Logf("Validation errors:")
 				for i, err := range errs {

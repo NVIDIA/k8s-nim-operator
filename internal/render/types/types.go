@@ -59,7 +59,7 @@ type DeploymentParams struct {
 	Annotations        map[string]string
 	PodAnnotations     map[string]string
 	SelectorLabels     map[string]string
-	Replicas           int
+	Replicas           *int32
 	ContainerName      string
 	Args               []string
 	Command            []string
@@ -96,7 +96,7 @@ type LeaderWorkerSetParams struct {
 	Annotations        map[string]string
 	PodAnnotations     map[string]string
 	SelectorLabels     map[string]string
-	Replicas           int
+	Replicas           *int32
 	Size               int
 	ContainerName      string
 	Args               []string
@@ -136,7 +136,7 @@ type StatefulSetParams struct {
 	Labels             map[string]string
 	Annotations        map[string]string
 	SelectorLabels     map[string]string
-	Replicas           int
+	Replicas           *int32
 	ContainerName      string
 	ServiceName        string
 	Image              string
