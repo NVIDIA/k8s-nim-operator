@@ -1,0 +1,21 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: nim-cache-multi-llm
+spec:
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+  source:
+    hf:
+      endpoint: "https://huggingface.co"
+      namespace: "meta-llama"
+      authSecret: hf-token-secret
+      modelPuller: nvcr.io/nim/nvidia/llm-nim:1.12
+      pullSecret: ngc-secret
+      modelName: "Llama-3.2-1B-Instruct"
+  storage:
+    pvc:
+      create: true
+      storageClass: "local-path"
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce

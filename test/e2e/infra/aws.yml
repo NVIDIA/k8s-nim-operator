@@ -11,6 +11,7 @@ spec:
   instance:
     type: g6e.2xlarge
     region: us-east-1
+    rootVolumeSizeGB: 120
     ingressIpRanges:
     - 18.190.12.32/32
     - 3.143.46.93/32
