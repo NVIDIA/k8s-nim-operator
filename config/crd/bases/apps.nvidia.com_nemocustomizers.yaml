@@ -2051,7 +2051,6 @@ spec:
                     x-kubernetes-list-type: atomic
                 type: object
               replicas:
-                default: 1
                 format: int32
                 minimum: 1
                 type: integer

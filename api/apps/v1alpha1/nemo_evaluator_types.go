@@ -80,7 +80,6 @@ type NemoEvaluatorSpec struct {
 	Scale   Autoscaling `json:"scale,omitempty"`
 	Metrics Metrics     `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default:=1
 	Replicas     *int32 `json:"replicas,omitempty"`
 	UserID       *int64 `json:"userID,omitempty"`
 	GroupID      *int64 `json:"groupID,omitempty"`
