@@ -60,7 +60,7 @@ type DeploymentParams struct {
 	Annotations        map[string]string
 	PodAnnotations     map[string]string
 	SelectorLabels     map[string]string
-	Replicas           int
+	Replicas           *int32
 	ContainerName      string
 	Args               []string
 	Command            []string
@@ -74,7 +74,7 @@ type DeploymentParams struct {
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
-	Affinity           *corev1.PodAffinity
+	Affinity           *corev1.Affinity
 	LivenessProbe      *corev1.Probe
 	ReadinessProbe     *corev1.Probe
 	StartupProbe       *corev1.Probe
@@ -97,7 +97,7 @@ type LeaderWorkerSetParams struct {
 	Annotations        map[string]string
 	PodAnnotations     map[string]string
 	SelectorLabels     map[string]string
-	Replicas           int
+	Replicas           *int32
 	Size               int
 	ContainerName      string
 	Args               []string
@@ -115,7 +115,7 @@ type LeaderWorkerSetParams struct {
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
-	Affinity           *corev1.PodAffinity
+	Affinity           *corev1.Affinity
 	LivenessProbe      *corev1.Probe
 	ReadinessProbe     *corev1.Probe
 	StartupProbe       *corev1.Probe
@@ -137,7 +137,7 @@ type StatefulSetParams struct {
 	Labels             map[string]string
 	Annotations        map[string]string
 	SelectorLabels     map[string]string
-	Replicas           int
+	Replicas           *int32
 	ContainerName      string
 	ServiceName        string
 	Image              string
@@ -151,7 +151,7 @@ type StatefulSetParams struct {
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
-	Affinity           *corev1.PodAffinity
+	Affinity           *corev1.Affinity
 	ServiceAccountName string
 	LivenessProbe      *corev1.Probe
 	ReadinessProbe     *corev1.Probe
@@ -307,7 +307,7 @@ type InferenceServiceParams struct {
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
-	Affinity           *corev1.PodAffinity
+	Affinity           *corev1.Affinity
 	LivenessProbe      *corev1.Probe
 	ReadinessProbe     *corev1.Probe
 	StartupProbe       *corev1.Probe
