@@ -912,6 +912,7 @@ func TestValidateScaleConfiguration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := baseNIMService()
 			tc.modify(ns)
+			errs := validateScaleConfiguration(&ns.Spec.Scale, ns.Spec.Replicas, fld)
 			if got := len(errs); got != tc.wantErrs {
 				t.Logf("Validation errors:")
 				for i, err := range errs {
