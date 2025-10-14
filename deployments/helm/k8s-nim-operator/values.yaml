@@ -56,7 +56,8 @@ operator:
   admissionController:
     # Enable the admission controller. 
     # Note: cert-manager must be installed beforehand, as it is required to generate the TLS certificates.
-    enabled: true    # TLS certificate configuration
+    enabled: false
+    # TLS certificate configuration
     tls:
       # Certificate management mode: "cert-manager" or "secret"
       # - "cert-manager": Use cert-manager to automatically generate and manage certificates
