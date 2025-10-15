@@ -57,70 +57,6 @@ type NIMManifest struct {
 	Profiles                 []NIMProfile `yaml:"profiles" json:"profiles,omitempty"`
 }
 
-func (manifest NIMManifest) MatchProfiles(modelSpec appsv1alpha1.ModelSpec, discoveredGPUs []string) ([]string, error) {
-	// TODO implement me
-	var selectedProfiles []string
-
-	for _, profile := range manifest.Profiles {
-		// Check precision, tensor parallelism, and QoS profile
-		if (modelSpec.Precision != "" && profile.Tags["precision"] != modelSpec.Precision) ||
-			(modelSpec.TensorParallelism != "" && profile.Tags["tp"] != modelSpec.TensorParallelism) ||
-			(modelSpec.QoSProfile != "" && profile.Tags["profile"] != modelSpec.QoSProfile) {
-			continue
-		}
-
-		// Check LoRA configuration
-		if modelSpec.Lora != nil && profile.Tags["feat_lora"] != strconv.FormatBool(*modelSpec.Lora) {
-			continue
-		}
-
-		if modelSpec.Buildable != nil && profile.Tags["trtllm_buildable"] != strconv.FormatBool(*modelSpec.Buildable) {
-			continue
-		}
-
-		// Determine backend type
-		backend := profile.Tags["llm_engine"]
-
-		// Use "model_type" if "llm_engine" is empty for non LLM models
-		if backend == "" {
-			backend = profile.Tags["model_type"]
-		}
-
-		// Fallback to deprecated "backend" tag for non LLM Models
-		if backend == "" {
-			backend = profile.Tags["backend"]
-		}
-
-		// modespec.Engine value can be "tensorrt_llm". If backend tag is "triton", convert it to "tensorrt".
-		if backend == "triton" {
-			backend = "tensorrt"
-		}
-
-		if modelSpec.Engine != "" && !strings.Contains(backend, strings.TrimSuffix(modelSpec.Engine, "_llm")) {
-			continue
-		}
-
-		// Perform GPU match only when optimized engine is selected or GPU filters are provided
-		if profile.Tags["trtllm_buildable"] != "true" && (isOptimizedEngine(modelSpec.Engine) || len(modelSpec.GPUs) > 0) {
-			// Skip non optimized profiles
-			if !isOptimizedEngine(backend) {
-				continue
-			}
-
-			if len(modelSpec.GPUs) > 0 || len(discoveredGPUs) > 0 {
-				if !matchGPUProfile(modelSpec, profile, discoveredGPUs) {
-					continue
-				}
-			}
-		}
-
-		// Profile matched the given model parameters, add hash to the selected profiles
-		selectedProfiles = append(selectedProfiles, profile.ID)
-	}
-
-	return selectedProfiles, nil
-}
-
 func (manifest NIMManifest) GetProfilesList() []string {
 
 	profileIDs := make([]string, len(manifest.Profiles))
@@ -130,9 +66,11 @@ func (manifest NIMManifest) GetProfilesList() []string {
 	}
 	return profileIDs
 }
+
 func (manifest NIMManifest) GetProfileModel(profileID string) string {
 	return ""
 }
+
 func (manifest NIMManifest) GetProfileTags(profileID string) map[string]string {
 	for _, profile := range manifest.Profiles {
 		if profileID == profile.ID {
@@ -141,85 +79,9 @@ func (manifest NIMManifest) GetProfileTags(profileID string) map[string]string {
 	}
 	return nil
 }
+
 func (manifest NIMManifest) GetProfileRelease(profileID string) string {
 	return ""
-}
-
-func isOptimizedEngine(engine string) bool {
-	return engine != "" && strings.Contains(strings.ToLower(engine), BackendTypeTensorRT)
-}
-
-func matchGPUProfile(modelSpec appsv1alpha1.ModelSpec, profile NIMProfile, discoveredGPUs []string) bool {
-	foundGPU := false
-
-	for _, gpu := range modelSpec.GPUs {
-		// Check for GPU product match
-		if gpu.Product != "" {
-			// Check if the product matches the "gpu" tag
-			if strings.Contains(strings.ToLower(profile.Tags["gpu"]), strings.ToLower(gpu.Product)) {
-				foundGPU = true
-			}
-
-			// Check if the product matches the "key" tag
-			if strings.Contains(strings.ToLower(profile.Tags["key"]), strings.ToLower(gpu.Product)) {
-				foundGPU = true
-			}
-
-			// If the GPU product matches, check the GPU IDs
-			if foundGPU && len(gpu.IDs) > 0 {
-				foundID := false
-				for _, id := range gpu.IDs {
-					if id == strings.TrimSuffix(profile.Tags["gpu_device"], ":10de") {
-						foundID = true
-						break
-					}
-				}
-
-				// If the GPU product matches but no IDs match, return false
-				if !foundID {
-					return false
-				}
-			}
-		}
-	}
-
-	// If a GPU product was matched and IDs (if any) also matched, return true
-	if foundGPU {
-		return true
-	}
-
-	// If no match was found in the specified GPUs, check the discovered GPUs
-	for _, productLabel := range discoveredGPUs {
-		if productLabel != "" {
-			// match for llm nim format
-			if strings.Contains(strings.ToLower(productLabel), strings.ToLower(profile.Tags["gpu"])) {
-				return true
-			}
-			// match for non-llm nim format
-			if matches, _ := matchesRegex(productLabel, profile.Tags["product_name_regex"]); matches {
-				return true
-			}
-		}
-	}
-
-	// If no match found in both specified and discovered GPUs, return false
-	return false
-}
-
-func matchesRegex(productLabel, regexPattern string) (bool, error) {
-	// If regexPattern is empty, return false
-	if regexPattern == "" {
-		return false, nil
-	}
-
-	// Compile the regex pattern
-	regex, err := regexp.Compile(regexPattern)
-	if err != nil {
-		return false, err
-	}
-
-	// Check if the productLabel matches the regex
-	return regex.MatchString(productLabel), nil
 }
 
 type NIMParser struct{}
@@ -246,4 +108,214 @@ func (NIMParser) ParseModelManifestFromRawOutput(data []byte) (nimparser.NIMMani
 		return nil, err
 	}
 	return config, nil
+}
+
+// MatchProfiles returns all manifest profile IDs that satisfy modelSpec and GPU filters.
+func (manifest NIMManifest) MatchProfiles(modelSpec appsv1alpha1.ModelSpec, discoveredGPUs []string) ([]string, error) {
+	var selected []string
+
+	for _, p := range manifest.Profiles {
+		// Match with all non-GPU filters
+		if !matchNonGPUFilters(modelSpec, p) {
+			continue
+		}
+
+		// Engine selection
+		if !matchEngine(modelSpec.Engine, p) {
+			continue
+		}
+
+		// GPU filtering
+		gpuOK := matchGPUProfile(modelSpec, p, discoveredGPUs)
+
+		// Exception: if GPU selection fails but profile is buildable, include it
+		if !gpuOK && strings.EqualFold(p.Tags["trtllm_buildable"], "true") {
+			selected = append(selected, p.ID)
+			continue
+		}
+
+		if gpuOK {
+			selected = append(selected, p.ID)
+		}
+	}
+
+	return selected, nil
+}
+
+func matchesRegex(productLabel, regexPattern string) (bool, error) {
+	// If regexPattern is empty, return false
+	if regexPattern == "" {
+		return false, nil
+	}
+
+	// Compile the regex pattern
+	regex, err := regexp.Compile(regexPattern)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if the productLabel matches the regex
+	return regex.MatchString(productLabel), nil
+}
+
+func matchNonGPUFilters(modelSpec appsv1alpha1.ModelSpec, p NIMProfile) bool {
+	// precision
+	if modelSpec.Precision != "" && !strings.EqualFold(p.Tags["precision"], modelSpec.Precision) {
+		return false
+	}
+	// tensor parallelism
+	if modelSpec.TensorParallelism != "" && !strings.EqualFold(p.Tags["tp"], modelSpec.TensorParallelism) {
+		return false
+	}
+	// QoS profile
+	if modelSpec.QoSProfile != "" && !strings.EqualFold(p.Tags["profile"], modelSpec.QoSProfile) {
+		return false
+	}
+	// LoRA
+	if modelSpec.Lora != nil && !boolTagEquals(p.Tags["feat_lora"], *modelSpec.Lora) {
+		return false
+	}
+	// Buildable profile
+	if modelSpec.Buildable != nil && !boolTagEquals(p.Tags["trtllm_buildable"], *modelSpec.Buildable) {
+		return false
+	}
+	return true
+}
+
+func matchEngine(requestedEngine string, p NIMProfile) bool {
+	// Determine backend from tags
+	backend := p.Tags["llm_engine"]
+	if backend == "" {
+		backend = p.Tags["model_type"]
+	}
+	if backend == "" {
+		// deprecated fallback
+		backend = p.Tags["backend"]
+	}
+	// Map "triton" -> "tensorrt" for non-LLM consistency
+	if strings.EqualFold(backend, "triton") {
+		backend = "tensorrt"
+	}
+
+	if requestedEngine == "" {
+		return true
+	}
+	// Allow matching "tensorrt_llm" against "tensorrt"
+	req := strings.TrimSuffix(strings.ToLower(requestedEngine), "_llm")
+	return strings.Contains(strings.ToLower(backend), req)
+}
+
+func matchGPUProfile(modelSpec appsv1alpha1.ModelSpec, p NIMProfile, discoveredGPUs []string) bool {
+	// If the user specified no GPU filters and there are no discovered GPUs or GPU-identifying tags,
+	// we consider the profile as non gpu specific
+	hasGPUIdentityTags := p.Tags["gpu"] != "" || p.Tags["key"] != "" || p.Tags["product_name_regex"] != ""
+	if len(modelSpec.GPUs) == 0 && (!hasGPUIdentityTags || len(discoveredGPUs) == 0) {
+		return true
+	}
+
+	// If IDs are specified in any of the requested GPUs, enforce gpu_device match
+	if hasAnyIDs(modelSpec) {
+		tagID := strings.TrimSuffix(p.Tags["gpu_device"], ":10de")
+		if tagID == "" {
+			return false
+		}
+		if !anyIDEquals(modelSpec, tagID) {
+			return false
+		}
+	}
+
+	// If Product is specified, require product to match "gpu" or "key"
+	if hasAnyProduct(modelSpec) {
+		if !anyProductMatchesProfile(modelSpec, p) {
+			return false
+		}
+	}
+
+	// If nothing specified in modelSpec.GPUs matched yet and we have GPU identity tags,
+	// try discovered GPUs
+	if len(modelSpec.GPUs) == 0 && hasGPUIdentityTags && len(discoveredGPUs) > 0 {
+		if discoveredMatchesProfile(discoveredGPUs, p) {
+			return true
+		}
+		// No discovered GPU matched
+		return false
+	}
+
+	return true
+}
+
+func anyProductMatchesProfile(modelSpec appsv1alpha1.ModelSpec, p NIMProfile) bool {
+	gpuTag := strings.ToLower(p.Tags["gpu"])
+	keyTag := strings.ToLower(p.Tags["key"])
+
+	for _, g := range modelSpec.GPUs {
+		if g.Product == "" {
+			continue
+		}
+		prod := strings.ToLower(g.Product)
+
+		// match against "gpu" or "key"
+		if (gpuTag != "" && strings.Contains(gpuTag, prod)) ||
+			(keyTag != "" && strings.Contains(keyTag, prod)) {
+			return true
+		}
+	}
+	return false
+}
+
+func discoveredMatchesProfile(discovered []string, p NIMProfile) bool {
+	gpuTag := strings.ToLower(p.Tags["gpu"])
+	keyTag := strings.ToLower(p.Tags["key"])
+	regex := p.Tags["product_name_regex"]
+
+	for _, label := range discovered {
+		l := strings.ToLower(label)
+		// gpu type match
+		if gpuTag != "" && strings.Contains(l, gpuTag) {
+			return true
+		}
+		if keyTag != "" && strings.Contains(l, keyTag) {
+			return true
+		}
+		// product name regex match
+		if regex != "" {
+			if ok, _ := matchesRegex(label, regex); ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasAnyIDs(modelSpec appsv1alpha1.ModelSpec) bool {
+	for _, g := range modelSpec.GPUs {
+		if len(g.IDs) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func anyIDEquals(modelSpec appsv1alpha1.ModelSpec, tagID string) bool {
+	for _, g := range modelSpec.GPUs {
+		for _, id := range g.IDs {
+			if id == tagID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasAnyProduct(modelSpec appsv1alpha1.ModelSpec) bool {
+	for _, g := range modelSpec.GPUs {
+		if g.Product != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func boolTagEquals(tag string, want bool) bool {
+	return strings.EqualFold(tag, strconv.FormatBool(want))
 }
