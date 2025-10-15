@@ -18,7 +18,7 @@ import (
 type token struct{}
 
 // A Group is a collection of goroutines working on subtasks that are part of
-// the same overall task.
+// the same overall task. A Group should not be reused for different tasks.
 //
 // A zero Group is valid, has no limit on the number of active goroutines,
 // and does not cancel on error.
