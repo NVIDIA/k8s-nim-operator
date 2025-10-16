@@ -67,7 +67,7 @@ const (
 )
 
 // NemoCustomizerSpec defines the desired state of NemoCustomizer.
-// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingress."
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
 // +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
 type NemoCustomizerSpec struct {
 	Image        Image               `json:"image"`
@@ -84,9 +84,7 @@ type NemoCustomizerSpec struct {
 	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
-	Expose ExposeV1 `json:"expose,omitempty"`
-	// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && self.gateway.grpcRoutesEnabled)", message="unsupported field: spec.router.gateway.grpcRoutesEnabled"
-	Router  Router      `json:"router,omitempty"`
+	Expose  ExposeV1    `json:"expose,omitempty"`
 	Scale   Autoscaling `json:"scale,omitempty"`
 	Metrics Metrics     `json:"metrics,omitempty"`
 
@@ -644,7 +642,7 @@ func (n *NemoCustomizer) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NemoCustomizer deployment.
 func (n *NemoCustomizer) IsIngressEnabled() bool {
-	return (n.Spec.Router.Ingress != nil && n.Spec.Router.Ingress.IngressClass != "") ||
+	return (n.Spec.Expose.Router.Ingress != nil && n.Spec.Expose.Router.Ingress.IngressClass != "") ||
 		(n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled) // TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
 }
 
@@ -654,15 +652,15 @@ func (n *NemoCustomizer) GetIngressSpec() networkingv1.IngressSpec {
 	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
 	}
-	return n.Spec.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
+	return n.Spec.Expose.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
 }
 
 func (n *NemoCustomizer) IsHTTPRouteEnabled() bool {
-	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.HTTPRoutesEnabled
+	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
 }
 
 func (n *NemoCustomizer) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
-	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
+	return n.Spec.Expose.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoCustomizer deployment.
@@ -1057,8 +1055,8 @@ func (n *NemoCustomizer) GetIngressAnnotations() map[string]string {
 	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return utils.MergeMaps(NemoCustomizerAnnotations, n.Spec.Expose.Ingress.Annotations)
 	}
-	if n.Spec.Router.Annotations != nil {
-		return utils.MergeMaps(NemoCustomizerAnnotations, n.Spec.Router.Annotations)
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(NemoCustomizerAnnotations, n.Spec.Expose.Router.Annotations)
 	}
 	return NemoCustomizerAnnotations
 }
@@ -1066,8 +1064,8 @@ func (n *NemoCustomizer) GetIngressAnnotations() map[string]string {
 func (n *NemoCustomizer) GetHTTPRouteAnnotations() map[string]string {
 	annotations := n.GetNemoCustomizerAnnotations()
 
-	if n.Spec.Router.Annotations != nil {
-		return utils.MergeMaps(annotations, n.Spec.Router.Annotations)
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(annotations, n.Spec.Expose.Router.Annotations)
 	}
 	return annotations
 }

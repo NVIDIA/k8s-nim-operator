@@ -489,7 +489,7 @@ var _ = Describe("NemoEvaluator Controller", func() {
 			err = client.Get(context.TODO(), namespacedName, nemoEvaluator)
 			Expect(err).NotTo(HaveOccurred())
 			nemoEvaluator.Spec.Scale.Enabled = ptr.To[bool](false)
-			nemoEvaluator.Spec.Router.Ingress = nil
+			nemoEvaluator.Spec.Expose.Router.Ingress = nil
 			err = client.Update(context.TODO(), nemoEvaluator)
 			Expect(err).NotTo(HaveOccurred())
 

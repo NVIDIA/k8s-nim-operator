@@ -55,9 +55,9 @@ spec:
     service:
       type: ClusterIP
       port: 8000
-  router:
-    gateway:
-      namespace: nim-service
-      name: istio-gateway
-      httpRoutesEnabled: true
-    hostDomainName: demo.nvidia.example.com
+    router:
+      gateway:
+        namespace: nim-service
+        name: istio-gateway
+        httpRoutesEnabled: true
+      hostDomainName: demo.nvidia.example.com

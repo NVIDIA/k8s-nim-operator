@@ -41,8 +41,10 @@ const (
 // Expose defines attributes to expose the service.
 type Expose struct {
 	Service Service `json:"service,omitempty"`
-	// Deprecated: Use .spec.router instead.
+	// Deprecated: Use .spec.expose.router instead.
 	Ingress Ingress `json:"ingress,omitempty"`
+
+	Router Router `json:"router,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingress))", message="ingress and gateway cannot be specified together"
@@ -95,6 +97,8 @@ type Gateway struct {
 type ExposeV1 struct {
 	Service Service   `json:"service,omitempty"`
 	Ingress IngressV1 `json:"ingress,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && self.gateway.grpcRoutesEnabled)", message="unsupported field: spec.expose.router.gateway.grpcRoutesEnabled"
+	Router Router `json:"router,omitempty"`
 }
 
 // Service defines attributes to create a service.
@@ -123,7 +127,7 @@ type Service struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// Deprecated: Use .spec.router.ingress instead.
+// Deprecated: Use .spec.expose.router.ingress instead.
 // IngressV1 defines attributes for ingress
 // +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
 type IngressV1 struct {

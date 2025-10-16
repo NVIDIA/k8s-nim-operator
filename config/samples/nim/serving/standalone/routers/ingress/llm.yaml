@@ -49,7 +49,7 @@ spec:
     service:
       type: ClusterIP
       port: 8000
-  router:
-    ingress:
-      ingressClass: nginx
-    hostDomainName: demo.nvidia.example.com
+    router:
+      ingress:
+        ingressClass: nginx
+      hostDomainName: demo.nvidia.example.com

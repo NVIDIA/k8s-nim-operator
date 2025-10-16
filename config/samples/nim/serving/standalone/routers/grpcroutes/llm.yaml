@@ -46,9 +46,9 @@ spec:
       type: ClusterIP
       port: 9000
       grpcPort: 50051
-  router:
-    gateway:
-      namespace: nemo
-      name: istio-gateway
-      grpcRoutesEnabled: true
-    hostDomainName: demo.nvidia.example.com
+    router:
+      gateway:
+        namespace: nemo
+        name: istio-gateway
+        grpcRoutesEnabled: true
+      hostDomainName: demo.nvidia.example.com
