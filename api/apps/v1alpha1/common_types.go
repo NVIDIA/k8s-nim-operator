@@ -43,6 +43,8 @@ type Expose struct {
 	Service Service `json:"service,omitempty"`
 	// Deprecated: Use .spec.router instead.
 	Ingress Ingress `json:"ingress,omitempty"`
+
+	Router Router `json:"router,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingress))", message="ingress and gateway cannot be specified together"
@@ -95,6 +97,8 @@ type Gateway struct {
 type ExposeV1 struct {
 	Service Service   `json:"service,omitempty"`
 	Ingress IngressV1 `json:"ingress,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && self.gateway.grpcRoutesEnabled)", message="unsupported field: spec.router.gateway.grpcRoutesEnabled"
+	Router Router `json:"router,omitempty"`
 }
 
 // Service defines attributes to create a service.
