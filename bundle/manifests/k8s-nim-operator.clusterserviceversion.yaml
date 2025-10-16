@@ -1349,6 +1349,7 @@ spec:
               - gateway.networking.k8s.io
               resources:
               - httproutes
+              - grpcroutes
               verbs:
               - create
               - delete

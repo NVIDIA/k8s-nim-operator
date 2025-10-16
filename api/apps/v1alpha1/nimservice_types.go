@@ -91,6 +91,7 @@ const (
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
+// +kubebuilder:validation:XValidation:rule="!(has(self.router.gateway) && self.router.gateway.grpcRoutesEnabled && !has(self.expose.service.grpcPort))", message=".spec.expose.service.grpcPort must be set when .spec.router.gateway.grpcRoutesEnabled is true"
 // +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.router.ingress."
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
@@ -129,7 +130,6 @@ type NIMServiceSpec struct {
 	RuntimeClassName string                     `json:"runtimeClassName,omitempty"`
 	Proxy            *ProxySpec                 `json:"proxy,omitempty"`
 	MultiNode        *NimServiceMultiNodeConfig `json:"multiNode,omitempty"`
-	Router           Router                     `json:"router,omitempty"`
 	// InferencePlatform specifies the inference platform to use for this NIMService.
 	// Valid values are "standalone" (default) and "kserve".
 	// +kubebuilder:validation:Enum=standalone;kserve
@@ -945,7 +945,7 @@ func (n *NIMService) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NIMService deployment.
 func (n *NIMService) IsIngressEnabled() bool {
-	return (n.Spec.Router.Ingress != nil && n.Spec.Router.Ingress.IngressClass != "") || (n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled)
+	return (n.Spec.Expose.Router.Ingress != nil && n.Spec.Expose.Router.Ingress.IngressClass != "") || (n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled)
 }
 
 // GetIngressSpec returns the Ingress spec NIMService deployment.
@@ -954,15 +954,26 @@ func (n *NIMService) GetIngressSpec() networkingv1.IngressSpec {
 	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return n.Spec.Expose.GenerateIngressSpec(n.GetName())
 	}
-	return n.Spec.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
+	return n.Spec.Expose.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
 }
 
 func (n *NIMService) IsHTTPRouteEnabled() bool {
-	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.HTTPRoutesEnabled
+	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
 }
 
 func (n *NIMService) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
-	return n.Spec.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
+	return n.Spec.Expose.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
+}
+
+func (n *NIMService) IsGRPCRouteEnabled() bool {
+	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.GRPCRoutesEnabled
+}
+
+func (n *NIMService) GetGRPCRouteSpec() gatewayv1.GRPCRouteSpec {
+	if n.Spec.Expose.Service.GRPCPort == nil {
+		return gatewayv1.GRPCRouteSpec{}
+	}
+	return n.Spec.Expose.Router.GenerateGatewayGRPCRouteSpec(n.GetNamespace(), n.GetName(), *n.Spec.Expose.Service.GRPCPort)
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NIMService deployment.
@@ -1353,6 +1364,17 @@ func (n *NIMService) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
 	return params
 }
 
+func (n *NIMService) GetGRPCRouteParams() *rendertypes.GRPCRouteParams {
+	params := &rendertypes.GRPCRouteParams{}
+	params.Enabled = n.IsGRPCRouteEnabled()
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetRouterAnnotations()
+	params.Spec = n.GetGRPCRouteSpec()
+	return params
+}
+
 // GetRoleParams returns params to render Role from templates.
 func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
@@ -1477,8 +1499,8 @@ func (n *NIMService) GetServiceMonitorParams() *rendertypes.ServiceMonitorParams
 func (n *NIMService) GetRouterAnnotations() map[string]string {
 	nimServiceAnnotations := n.GetNIMServiceAnnotations()
 
-	if n.Spec.Router.Annotations != nil {
-		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Router.Annotations)
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Router.Annotations)
 	}
 	return nimServiceAnnotations
 }
@@ -1490,8 +1512,8 @@ func (n *NIMService) GetIngressAnnotations() map[string]string {
 	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Ingress.Annotations)
 	}
-	if n.Spec.Router.Annotations != nil {
-		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Router.Annotations)
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(nimServiceAnnotations, n.Spec.Expose.Router.Annotations)
 	}
 	return nimServiceAnnotations
 }

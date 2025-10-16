@@ -103,7 +103,7 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes;grpcroutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 // +kubebuilder:rbac:groups=leaderworkerset.x-k8s.io,resources=leaderworkersets,verbs=get;list;watch;create;update;patch;delete
@@ -345,6 +345,16 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		nimServiceBuilder,
 		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
 		&gatewayv1.HTTPRoute{},
+	)
+	if err != nil {
+		return err
+	}
+
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		gatewayv1.SchemeGroupVersion.WithResource("grpcroutes"),
+		&gatewayv1.GRPCRoute{},
 	)
 	if err != nil {
 		return err

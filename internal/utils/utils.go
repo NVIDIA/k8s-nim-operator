@@ -351,9 +351,18 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 		return updateInferenceService(castedObj, desired.(*kservev1beta1.InferenceService)) //nolint:forcetypeassert
 	case *gatewayv1.HTTPRoute:
 		return updateHTTPRoute(castedObj, desired.(*gatewayv1.HTTPRoute)) //nolint:forcetypeassert
+	case *gatewayv1.GRPCRoute:
+		return updateGRPCRoute(castedObj, desired.(*gatewayv1.GRPCRoute)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
+}
+
+func updateGRPCRoute(obj, desired *gatewayv1.GRPCRoute) *gatewayv1.GRPCRoute {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
 }
 
 func updateHTTPRoute(obj, desired *gatewayv1.HTTPRoute) *gatewayv1.HTTPRoute {
