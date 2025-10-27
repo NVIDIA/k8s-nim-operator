@@ -839,7 +839,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Get(context.TODO(), namespacedName, nimService)
 			Expect(err).NotTo(HaveOccurred())
 			nimService.Spec.Scale.Enabled = ptr.To(false)
-			nimService.Spec.Router.Ingress = nil
+			nimService.Spec.Expose.Router.Ingress = nil
 			err = client.Update(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
 

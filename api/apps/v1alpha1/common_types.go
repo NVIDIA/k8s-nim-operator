@@ -41,8 +41,10 @@ const (
 // Expose defines attributes to expose the service.
 type Expose struct {
 	Service Service `json:"service,omitempty"`
-	// Deprecated: Use .spec.router instead.
+	// Deprecated: Use .spec.expose.router instead.
 	Ingress Ingress `json:"ingress,omitempty"`
+
+	Router Router `json:"router,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingress))", message="ingress and gateway cannot be specified together"
@@ -85,12 +87,18 @@ type Gateway struct {
 	// +kubebuilder:default:=true
 	// HTTPRoutesEnabled is a flag to enable HTTPRoutes for the created gateway.
 	HTTPRoutesEnabled bool `json:"httpRoutesEnabled,omitempty"`
+
+	// +kubebuilder:default:=false
+	// GRPCRoutesEnabled is a flag to enable GRPCRoutes for the created gateway.
+	GRPCRoutesEnabled bool `json:"grpcRoutesEnabled,omitempty"`
 }
 
 // DEPRECATED ExposeV1 defines attributes to expose the service.
 type ExposeV1 struct {
 	Service Service   `json:"service,omitempty"`
 	Ingress IngressV1 `json:"ingress,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && self.gateway.grpcRoutesEnabled)", message="unsupported field: spec.expose.router.gateway.grpcRoutesEnabled"
+	Router Router `json:"router,omitempty"`
 }
 
 // Service defines attributes to create a service.
@@ -119,7 +127,7 @@ type Service struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// Deprecated: Use .spec.router.ingress instead.
+// Deprecated: Use .spec.expose.router.ingress instead.
 // IngressV1 defines attributes for ingress
 // +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
 type IngressV1 struct {
@@ -264,6 +272,38 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(namespace, name string, port int32
 						Path: &gatewayv1.HTTPPathMatch{
 							Type:  ptr.To(gatewayv1.PathMatchPathPrefix),
 							Value: ptr.To("/"),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (r *Router) GenerateGatewayGRPCRouteSpec(namespace, name string, port int32) gatewayv1.GRPCRouteSpec {
+	if r.Gateway == nil || !r.Gateway.GRPCRoutesEnabled {
+		return gatewayv1.GRPCRouteSpec{}
+	}
+
+	return gatewayv1.GRPCRouteSpec{
+		CommonRouteSpec: gatewayv1.CommonRouteSpec{
+			ParentRefs: []gatewayv1.ParentReference{
+				{
+					Name:      gatewayv1.ObjectName(r.Gateway.Name),
+					Namespace: ptr.To(gatewayv1.Namespace(r.Gateway.Namespace)),
+				},
+			},
+		},
+		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(r.getHostname(namespace, name))},
+		Rules: []gatewayv1.GRPCRouteRule{
+			{
+				BackendRefs: []gatewayv1.GRPCBackendRef{
+					{
+						BackendRef: gatewayv1.BackendRef{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
+								Name: gatewayv1.ObjectName(name),
+								Port: ptr.To(gatewayv1.PortNumber(port)),
+							},
 						},
 					},
 				},

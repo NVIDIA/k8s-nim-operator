@@ -79,7 +79,7 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
-	w, err = validateRouterConfiguration(&spec.Router, fldPath.Child("router"))
+	w, err = validateRouterConfiguration(&spec.Expose.Router, fldPath.Child("expose").Child("router"))
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
@@ -111,14 +111,31 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
+	w, err = validateExposeRouterConfiguration(spec, fldPath)
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	return warningList, errList
+}
+
+func validateExposeRouterConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
+	errList := field.ErrorList{}
+	if spec.Expose.Service.Type == corev1.ServiceTypeLoadBalancer && (spec.Expose.Router.Gateway != nil || spec.Expose.Router.Ingress != nil) {
+		warningList = append(warningList, "spec.expose.service.type is set to LoadBalancer, but spec.expose.router.gateway or spec.expose.router.ingress is also set. This creates two entry points for the service. Consider only using one of them.")
+	}
+
+	if spec.Expose.Router.Gateway != nil && spec.Expose.Router.Gateway.GRPCRoutesEnabled && spec.Expose.Service.GRPCPort == nil {
+		errList = append(errList, field.Required(fldPath.Child("expose").Child("service").Child("grpcPort"), "must be set when .spec.expose.router.gateway.grpcRoutesEnabled is true"))
+	}
 	return warningList, errList
 }
 
 func validateRedundantIngressConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
-	if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled && spec.Router.Ingress != nil { //nolint:staticcheck
-		errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress"), fmt.Sprintf("%s is deprecated. Omit the field if you use .spec.router instead", fldPath.Child("expose").Child("ingress"))))
+	if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled && spec.Expose.Router.Ingress != nil { //nolint:staticcheck
+		errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress"), fmt.Sprintf("%s is deprecated. Omit the field if you use .spec.expose.router instead", fldPath.Child("expose").Child("ingress"))))
 	}
 	return warningList, errList
 }
@@ -127,7 +144,7 @@ func validateExposeConfiguration(expose *appsv1alpha1.Expose, fldPath *field.Pat
 	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if expose.Ingress.Enabled != nil && *expose.Ingress.Enabled { //nolint:staticcheck
-		warningList = append(warningList, ".spec.expose.ingress is deprecated, use .spec.router instead.")
+		warningList = append(warningList, ".spec.expose.ingress is deprecated, use .spec.expose.router instead.")
 	}
 	return warningList, errList
 }
@@ -503,13 +520,13 @@ func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *fie
 			errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("expose").Child("ingress").Child("enabled"))))
 		}
 
-		// Spec.Router.Ingress cannot be set.
-		if spec.Router.Ingress != nil {
+		// Spec.Expose.Router.Ingress cannot be set.
+		if spec.Expose.Router.Ingress != nil {
 			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingress"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("ingress"))))
 		}
 
-		// Spec.Router.Gateway cannot be set.
-		if spec.Router.Gateway != nil {
+		// Spec.Expose.Router.Gateway cannot be set.
+		if spec.Expose.Router.Gateway != nil {
 			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("gateway"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("gateway"))))
 		}
 
