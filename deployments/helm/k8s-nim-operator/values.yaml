@@ -86,4 +86,4 @@ metricsService:
 
 nfd:
   nodeFeatureRules:
-    deviceID: true
+    deviceID: false
