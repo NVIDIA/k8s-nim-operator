@@ -494,22 +494,3 @@ func IsVersionGreaterThanOrEqual(version string, minVersion string) bool {
 	}
 	return cv.AtLeast(mv)
 }
-
-func RemoveEnvVar(envs []corev1.EnvVar, name string) []corev1.EnvVar {
-	result := make([]corev1.EnvVar, 0, len(envs))
-	for _, e := range envs {
-		if e.Name != name {
-			result = append(result, e)
-		}
-	}
-	return result
-}
-
-func FindEnvByValue(envs []corev1.EnvVar, key string) *corev1.EnvVar {
-	for i := range envs {
-		if envs[i].Name == key {
-			return &envs[i]
-		}
-	}
-	return nil
-}

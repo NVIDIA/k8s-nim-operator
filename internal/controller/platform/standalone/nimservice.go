@@ -462,26 +462,6 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 				Value: utils.DefaultModelStorePath,
 			}}, deploymentParams.Env)
 		}
-		// If NIMCache is not provided, and the model is from Hugging Face, add the HF_TOKEN to the environment variables
-		if nimService.GetNIMCacheName() == "" {
-			env := utils.FindEnvByValue(deploymentParams.Env, "NIM_MODEL_NAME")
-			if env != nil {
-				if strings.HasPrefix(env.Value, "hf://") {
-					deploymentParams.Env = utils.RemoveEnvVar(deploymentParams.Env, "NGC_API_KEY")
-					envVars, err := k8sutil.GetSecretEnvVars(r.GetClient(), ctx, nimService.GetNamespace(), nimService.Spec.AuthSecret)
-					if err != nil {
-						return ctrl.Result{}, err
-					}
-					env = utils.FindEnvByValue(envVars, "HF_TOKEN")
-					if env != nil {
-						deploymentParams.Env = utils.MergeEnvVars(envVars, deploymentParams.Env)
-					} else {
-						return ctrl.Result{}, fmt.Errorf("HF_TOKEN not found in secret %s", env.Value)
-					}
-
-				}
-			}
-		}
 		// Setup volume mounts with model store
 		deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
 		deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
