@@ -728,6 +728,17 @@ func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume
 				},
 			},
 		})
+	} else if n.Spec.Storage.HostPath != nil && *n.Spec.Storage.HostPath != "" {
+		hostPathType := corev1.HostPathDirectoryOrCreate
+		volumes = append(volumes, corev1.Volume{
+			Name: "model-store",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: *n.Spec.Storage.HostPath,
+					Type: &hostPathType,
+				},
+			},
+		})
 	}
 
 	if n.GetProxyCertConfigMap() != "" {
