@@ -412,3 +412,32 @@ func ControllerOwnsIfCRDExists(discoveryClient discovery.DiscoveryInterface,
 		},
 	)
 }
+
+func GetSecretEnvVars(cli client.Client, ctx context.Context, namespace, secretName string) ([]corev1.EnvVar, error) {
+	secret := &corev1.Secret{}
+	err := cli.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      secretName,
+	}, secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get secret %s: %w", secretName, err)
+	}
+
+	// Convert the secret data into EnvVars
+	envVars := []corev1.EnvVar{}
+	for key := range secret.Data {
+		envVars = append(envVars, corev1.EnvVar{
+			Name: key,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: key,
+				},
+			},
+		})
+	}
+
+	return envVars, nil
+}
