@@ -110,7 +110,7 @@ func TestGetVolumes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vols := tt.nimService.GetVolumes(tt.modelPVC)
+			vols := tt.nimService.GetVolumes(&tt.modelPVC)
 			if !reflect.DeepEqual(vols, tt.desired) {
 				t.Errorf("GetVolumes() = %v, want %v", vols, tt.desired)
 			}
