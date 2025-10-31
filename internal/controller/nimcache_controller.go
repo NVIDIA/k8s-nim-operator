@@ -1258,7 +1258,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.Spec.Env)
 
 	// Inject custom CA certificates when running in a proxy envronment
-	if nimCache.Spec.CertConfig != nil {
+	if nimCache.Spec.CertConfig != nil { //nolint:staticcheck // checking for deprecated field
 		err := errors.NewBadRequest("Deprecated field 'CertConfig' is used. Please migrate to 'Proxy' field on NIMCache.\"")
 		logger.Error(err, err.Error())
 		return nil, err
