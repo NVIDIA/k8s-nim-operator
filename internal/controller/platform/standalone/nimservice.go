@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -405,7 +406,11 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	if nimService.Spec.MultiNode != nil && nimService.Spec.MultiNode.BackendType == appsv1alpha1.NIMBackendTypeLWS {
+	if nimService.IsMultiNode() && nimService.Spec.MultiNode.BackendType == appsv1alpha1.NIMBackendTypeLWS {
+		err := r.reconcileComputeDomain(ctx, nimService, namedDraResources)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 		lwsParams := nimService.GetLWSParams()
 		lwsParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
 		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
@@ -514,6 +519,13 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	}
 
+	if nimService.IsComputeDomainEnabled() {
+		updateErr := r.updateComputeDomainStatus(ctx, nimService)
+		if updateErr != nil {
+			logger.Info("WARN: Compute Domain status update failed, will retry in 5 seconds", "error", updateErr.Error())
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+	}
 	// TODO: Rework NIMService Status to split into MODIFY and APPLY phases for better readability
 	// (Currently we're using `updater.SetConditions*` to implicitly take all previous changes and
 	// apply them along with the conditions.)
@@ -1119,6 +1131,40 @@ func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimSer
 		if err != nil {
 			return fmt.Errorf("failed to reconcile DRAResource %s: %w", namedDraResource.ResourceName, err)
 		}
+	}
+	return nil
+}
+
+func (r *NIMServiceReconciler) reconcileComputeDomain(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources []shared.NamedDRAResource) error {
+	logger := log.FromContext(ctx)
+	renderer := r.GetRenderer()
+	if !nimService.IsComputeDomainEnabled() {
+		return nil
+	}
+	// The last item in the namedDraResources is the compute domain resource claim template.
+	computeDomainResource := namedDraResources[len(namedDraResources)-1]
+	cdParams := nimService.GetComputeDomainParams(computeDomainResource.ResourceName)
+	if cdParams == nil {
+		return nil
+	}
+	err := r.renderAndSyncResource(ctx, nimService, &renderer, &nvidiaresourcev1beta1.ComputeDomain{}, func() (client.Object, error) {
+		return renderer.ComputeDomain(cdParams)
+	}, "computedomain", conditions.ReasonComputeDomainFailed)
+	if err != nil {
+		logger.Error(err, "failed to reconcile ComputeDomain", "ComputeDomain", cdParams.Name)
+		return err
+	}
+	return nil
+}
+
+func (r *NIMServiceReconciler) updateComputeDomainStatus(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
+	computeDomain := &nvidiaresourcev1beta1.ComputeDomain{}
+	err := r.Get(ctx, client.ObjectKey{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}, computeDomain)
+	if err != nil {
+		return err
+	}
+	nimService.Status.ComputeDomainStatus = &appsv1alpha1.ComputeDomainStatus{
+		Status: computeDomain.Status.Status,
 	}
 	return nil
 }

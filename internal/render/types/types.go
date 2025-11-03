@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -337,4 +338,13 @@ type ResourceClaimTemplateParams struct {
 	Annotations      map[string]string
 	ClaimAnnotations map[string]string
 	Devices          []DRADeviceParams
+}
+
+// ComputeDomainParams holds the parameters for rendering a ComputeDomain template.
+type ComputeDomainParams struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	Spec        *nvidiaresourcev1beta1.ComputeDomainSpec
 }

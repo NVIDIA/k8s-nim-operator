@@ -34,6 +34,7 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	securityv1 "github.com/openshift/api/security/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -82,6 +83,7 @@ type Renderer interface {
 	Secret(params *types.SecretParams) (*corev1.Secret, error)
 	InferenceService(params *types.InferenceServiceParams) (*kservev1beta1.InferenceService, error)
 	ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1beta2.ResourceClaimTemplate, error)
+	ComputeDomain(params *types.ComputeDomainParams) (*nvidiaresourcev1beta1.ComputeDomain, error)
 }
 
 // TemplateData is used by the templating engine to render templates.
@@ -483,4 +485,21 @@ func (r *textTemplateRenderer) ResourceClaimTemplate(params *types.ResourceClaim
 		return nil, fmt.Errorf("error converting unstructured object to ResourceClaimTemplate: %w", err)
 	}
 	return resourceClaimTemplate, nil
+}
+
+// ComputeDomain renders a ComputeDomain spec with given templating data.
+func (r *textTemplateRenderer) ComputeDomain(params *types.ComputeDomainParams) (*nvidiaresourcev1beta1.ComputeDomain, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "computedomain.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	computeDomain := &nvidiaresourcev1beta1.ComputeDomain{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, computeDomain)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to ComputeDomain: %w", err)
+	}
+	return computeDomain, nil
 }

@@ -1955,6 +1955,11 @@ spec:
                               enum:
                               - lws
                               type: string
+                            computeDomain:
+                              description: |-
+                                ComputeDomainSpec specifies the specification for the compute domain to create for the
+                                multi-node NIMService.
+                              type: object
                             mpi:
                               description: MPI config for NIMService using LeaderWorkerSet
                               properties:
@@ -2523,7 +2528,6 @@ spec:
                               type: object
                           type: object
                         replicas:
-                          default: 1
                           format: int32
                           minimum: 1
                           type: integer

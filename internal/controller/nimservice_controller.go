@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	"github.com/go-logr/logr"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -350,6 +351,15 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		nvidiaresourcev1beta1.SchemeGroupVersion.WithResource("computedomains"),
+		&nvidiaresourcev1beta1.ComputeDomain{},
+	)
+	if err != nil {
+		return err
+	}
 	return nimServiceBuilder.Complete(r)
 }
 

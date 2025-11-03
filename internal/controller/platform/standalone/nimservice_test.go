@@ -61,10 +61,12 @@ import (
 
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
 
 func sortEnvVars(envVars []corev1.EnvVar) {
@@ -1359,6 +1361,42 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(Equal(false))
 			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is not ready", lws.Name)))
+		})
+	})
+	Describe("ComputeDomain-enabled multi-node NIMService", func() {
+		It("should create compute domain when provided", func() {
+			computeDomain := &nvidiaresourcev1beta1.ComputeDomain{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+			}
+			err := client.Get(context.TODO(), types.NamespacedName{Name: "test-nimservice", Namespace: "default"}, computeDomain)
+			Expect(err).To(HaveOccurred())
+			mnns := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
+					},
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism:   &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(8)), Pipeline: ptr.To(uint32(2))},
+						ComputeDomain: &appsv1alpha1.NIMServiceComputeDomainSpec{},
+					},
+				},
+			}
+			namedDraResources := shared.GenerateNamedDRAResources(mnns)
+			Expect(len(namedDraResources)).To(Equal(1))
+			Expect(namedDraResources[0].ResourceName).To(Equal("compute-domain-8568b4fb55"))
+			err = reconciler.reconcileComputeDomain(context.TODO(), mnns, namedDraResources)
+			Expect(err).ToNot(HaveOccurred())
+			err = client.Get(context.TODO(), types.NamespacedName{Name: "test-nimservice", Namespace: "default"}, computeDomain)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(computeDomain.Spec.Channel.ResourceClaimTemplate.Name).To(Equal("compute-domain-8568b4fb55"))
+			Expect(computeDomain.Spec.Channel.AllocationMode).To(Equal(nvidiaresourcev1beta1.ComputeDomainChannelAllocationModeSingle))
 		})
 	})
 	Describe("update model status on NIMService", func() {
