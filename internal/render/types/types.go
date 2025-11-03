@@ -347,3 +347,13 @@ type ResourceClaimTemplateParams struct {
 	ClaimAnnotations map[string]string
 	Devices          []DRADeviceParams
 }
+
+// ComputeDomainParams holds the parameters for rendering a ComputeDomain template.
+type ComputeDomainParams struct {
+	Name                      string
+	Namespace                 string
+	Labels                    map[string]string
+	Annotations               map[string]string
+	NumNodes                  uint32
+	ResourceClaimTemplateName string
+}
