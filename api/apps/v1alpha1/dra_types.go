@@ -324,3 +324,37 @@ type DRAResourceClaimTemplateStatusInfo struct {
 	// ResourceClaimStatuses is the statuses of the generated resource claims from this resource claim template.
 	ResourceClaimStatuses []DRAResourceClaimStatusInfo `json:"resourceClaimStatuses,omitempty"`
 }
+
+// ComputeDomain defines the specification for the compute domain to use for a multi-node NIMService.
+// (Note: this will only work on NVLink-enabled nodes.)
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.create) && self.create) ? !has(self.name) : (has(self.name) && size(self.name) > 0)",message="if create is true, name must not be set; otherwise name is required."
+type ComputeDomain struct {
+	// Create specifies whether to create a new ComputeDomain or use an existing one.
+	// If set to false, an existing ComputeDomain must be specified via the `Name` field.
+	Create *bool `json:"create,omitempty"`
+	// Name of the ComputeDomain to use. Required if `Create` is false (i.e., using an existing ComputeDomain).
+	Name string `json:"name,omitempty"`
+}
+
+// ComputeDomainStatus defines the status of the ComputeDomain.
+type ComputeDomainStatus struct {
+	Name   string                    `json:"name"`
+	Status string                    `json:"status,omitempty"`
+	Nodes  []ComputeDomainNodeStatus `json:"nodes,omitempty"`
+}
+
+// ComputeDomainStatus defines the status of a node in the ComputeDomain.
+type ComputeDomainNodeStatus struct {
+	// Name is the name of the node.
+	Name string `json:"name"`
+	// CliqueID is the clique ID of the NVLink domain.
+	CliqueID string `json:"cliqueID"`
+	// Status tracks the readiness of the IMEX daemon running on this node.
+	// * Ready: the IMEX daemon is ready to broker GPU memory exchanges.
+	// * NotReady: the IMEX daemon is not ready to broker GPU memory exchanges.
+	//
+	// +kubebuilder:validation:Enum=Ready;NotReady
+	// +kubebuilder:default=NotReady
+	Status string `json:"status,omitempty"`
+}

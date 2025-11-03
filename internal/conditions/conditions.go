@@ -81,6 +81,8 @@ const (
 	ReasonResourceClaimFailed = "ResourceClaimFailed"
 	// ReasonResourceClaimTemplateFailed indicates that the creation of resourceclaimtemplate has failed.
 	ReasonResourceClaimTemplateFailed = "ResourceClaimTemplateFailed"
+	// ReasonComputeDomainFailed indicates that the creation of computedomain has failed.
+	ReasonComputeDomainFailed = "ComputeDomainFailed"
 )
 
 // Updater is the condition updater.

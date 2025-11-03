@@ -14,8 +14,6 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= ghcr.io/nvidia/k8s-nim-operator:${VERSION}
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.30.0
 
 GO_CMD ?= go
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -135,12 +133,12 @@ coverage: test
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v test/ | grep -v api/) -coverprofile $(COVERAGE_FILE)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -ldflags "-X github.com/NVIDIA/k8s-dra-driver-gpu/internal/info.version=$(NVIDIA_DRA_DRIVER_GPU_VERSION)" $$(go list ./... | grep -v test/ | grep -v api/) -coverprofile $(COVERAGE_FILE)
 
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
 test-e2e:
-	go test ./test/e2e/ -v -ginkgo.v
+	go test -ldflags "-X github.com/NVIDIA/k8s-dra-driver-gpu/internal/info.version=$(NVIDIA_DRA_DRIVER_GPU_VERSION)" ./test/e2e/ -v -ginkgo.v
 
 .PHONY: lint
 lint: golangci-lint
@@ -155,7 +153,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	go build -ldflags "-X github.com/NVIDIA/k8s-dra-driver-gpu/internal/info.version=$(NVIDIA_DRA_DRIVER_GPU_VERSION)" -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.

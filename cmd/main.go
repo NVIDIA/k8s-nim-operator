@@ -22,6 +22,7 @@ import (
 	"os"
 	"strconv"
 
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	monitoring "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
@@ -63,6 +64,7 @@ func init() {
 	utilruntime.Must(lws.AddToScheme(scheme))
 	utilruntime.Must(kservev1beta1.AddToScheme(scheme))
 	utilruntime.Must(gatewayv1.Install(scheme))
+	utilruntime.Must(nvidiaresourcev1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

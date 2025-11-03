@@ -2057,6 +2057,27 @@ spec:
                               enum:
                               - lws
                               type: string
+                            computeDomain:
+                              description: |-
+                                ComputeDomain specifies the compute domain to use for a
+                                multi-node NIMService.
+                              properties:
+                                create:
+                                  description: |-
+                                    Create specifies whether to create a new ComputeDomain or use an existing one.
+                                    If set to false, an existing ComputeDomain must be specified via the `Name` field.
+                                  type: boolean
+                                name:
+                                  description: Name of the ComputeDomain to use. Required
+                                    if `Create` is false (i.e., using an existing
+                                    ComputeDomain).
+                                  type: string
+                              type: object
+                              x-kubernetes-validations:
+                              - message: if create is true, name must not be set;
+                                  otherwise name is required.
+                                rule: '(has(self.create) && self.create) ? !has(self.name)
+                                  : (has(self.name) && size(self.name) > 0)'
                             mpi:
                               description: MPI config for NIMService using LeaderWorkerSet
                               properties:
