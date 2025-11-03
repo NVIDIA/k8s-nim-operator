@@ -162,8 +162,8 @@ func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage
 		storage.PVC.Size != "" || storage.PVC.VolumeAccessMode != "" || storage.PVC.SubPath != "" ||
 		len(storage.PVC.Annotations) > 0
 
-	// Check if HostPath is defined (non-empty)
-	hostPathDefined := storage.HostPath != nil && *storage.HostPath != ""
+	// Check if EmptyDir is defined (non-empty)
+	emptyDirDefined := storage.EmptyDir != nil && *storage.EmptyDir
 
 	// Count how many are defined
 	definedCount := 0
@@ -173,15 +173,15 @@ func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage
 	if pvcDefined {
 		definedCount++
 	}
-	if hostPathDefined {
+	if emptyDirDefined {
 		definedCount++
 	}
 
-	// Ensure only one of nimCache, PVC, or HostPath is defined
+	// Ensure only one of nimCache, PVC, or EmptyDir is defined
 	if definedCount == 0 {
-		errList = append(errList, field.Required(fldPath, fmt.Sprintf("one of %s, %s, or %s must be defined", fldPath.Child("nimCache"), fldPath.Child("pvc"), fldPath.Child("hostPath"))))
+		errList = append(errList, field.Required(fldPath, fmt.Sprintf("one of %s, %s or %s, must be defined", fldPath.Child("nimCache"), fldPath.Child("pvc"), fldPath.Child("emptyDir"))))
 	} else if definedCount > 1 {
-		errList = append(errList, field.Invalid(fldPath, "multiple storage sources defined", fmt.Sprintf("only one of %s, %s, or %s must be defined", fldPath.Child("nimCache"), fldPath.Child("pvc"), fldPath.Child("hostPath"))))
+		errList = append(errList, field.Invalid(fldPath, "multiple storage sources defined", fmt.Sprintf("only one of %s, %s or %s must be defined", fldPath.Child("nimCache"), fldPath.Child("pvc"), fldPath.Child("emptyDir"))))
 	}
 
 	// If NIMCache is non-nil, NIMCache.Name must not be empty

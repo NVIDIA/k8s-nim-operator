@@ -2523,7 +2523,6 @@ spec:
                               type: object
                           type: object
                         replicas:
-                          default: 1
                           format: int32
                           minimum: 1
                           type: integer
@@ -3483,6 +3482,10 @@ spec:
                           description: Storage is the target storage for caching NIM
                             model if NIMCache is not provided
                           properties:
+                            emptyDir:
+                              description: EmptyDir is the empty dir volume used for
+                                caching NIM
+                              type: boolean
                             hostPath:
                               description: HostPath is the host path volume for caching
                                 NIM

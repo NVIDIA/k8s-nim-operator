@@ -152,7 +152,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	modelPVC, modelProfile, nimCache, err = r.renderAndSyncCache(ctx, nimService)
 	if err != nil {
 		return ctrl.Result{}, err
-	} else if modelPVC == nil {
+	} else if nimCache == nil {
 		return ctrl.Result{}, nil
 	}
 
@@ -340,6 +340,8 @@ func (r *NIMServiceReconciler) renderAndSyncCache(ctx context.Context,
 	} else if nimService.Spec.Storage.PVC.Name != "" {
 		// Use an existing PVC
 		modelPVC = &nimService.Spec.Storage.PVC
+	} else if nimService.Spec.Storage.EmptyDir != nil && *nimService.Spec.Storage.EmptyDir {
+		modelPVC = nil
 	} else {
 		err := fmt.Errorf("neither external PVC name or NIMCache volume is provided")
 		logger.Error(err, "failed to determine PVC for model-store")
@@ -476,8 +478,8 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 		}, isvcParams.Env)
 	}
 	// Setup volume mounts with model store
-	isvcParams.Volumes = nimService.GetVolumes(*modelPVC)
-	isvcParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
+	isvcParams.Volumes = nimService.GetVolumes(modelPVC)
+	isvcParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
 	if profileEnv != nil {
 		isvcParams.Env = utils.MergeEnvVars(*profileEnv, isvcParams.Env)
 	}
