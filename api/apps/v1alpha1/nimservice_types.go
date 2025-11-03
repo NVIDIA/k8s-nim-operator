@@ -229,7 +229,12 @@ type NIMServiceStorage struct {
 	// ReadOnly mode indicates if the volume should be mounted as read-only
 	ReadOnly *bool `json:"readOnly,omitempty"`
 	// EmptyDir is the empty dir volume used for caching NIM
-	EmptyDir *bool `json:"emptyDir,omitempty"`
+	EmptyDir *EmptyDirSpec `json:"emptyDir,omitempty"`
+}
+
+type EmptyDirSpec struct {
+	// SizeLimit is the size limit of the empty dir volume
+	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty"`
 }
 
 // GetLWSName returns the name to be used for the LeaderWorkerSet based on the custom spec.
@@ -725,11 +730,13 @@ func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume
 				},
 			},
 		})
-	} else if n.Spec.Storage.EmptyDir != nil && *n.Spec.Storage.EmptyDir {
+	} else if n.Spec.Storage.EmptyDir != nil {
 		volumes = append(volumes, corev1.Volume{
 			Name: "model-store",
 			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: n.Spec.Storage.EmptyDir.SizeLimit,
+				},
 			},
 		})
 	}

@@ -355,7 +355,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	} else if nimService.Spec.Storage.PVC.Name != "" {
 		// Use an existing PVC
 		modelPVC = &nimService.Spec.Storage.PVC
-	} else if nimService.Spec.Storage.EmptyDir != nil && *nimService.Spec.Storage.EmptyDir {
+	} else if nimService.Spec.Storage.EmptyDir != nil {
 		modelPVC = nil
 	} else {
 		err = fmt.Errorf("neither external PVC name, NIMCache volume or empty dir is provided")

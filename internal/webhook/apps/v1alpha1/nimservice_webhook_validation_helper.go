@@ -163,7 +163,7 @@ func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage
 		len(storage.PVC.Annotations) > 0
 
 	// Check if EmptyDir is defined (non-empty)
-	emptyDirDefined := storage.EmptyDir != nil && *storage.EmptyDir
+	emptyDirDefined := storage.EmptyDir != nil
 
 	// Count how many are defined
 	definedCount := 0

@@ -340,7 +340,7 @@ func (r *NIMServiceReconciler) renderAndSyncCache(ctx context.Context,
 	} else if nimService.Spec.Storage.PVC.Name != "" {
 		// Use an existing PVC
 		modelPVC = &nimService.Spec.Storage.PVC
-	} else if nimService.Spec.Storage.EmptyDir != nil && *nimService.Spec.Storage.EmptyDir {
+	} else if nimService.Spec.Storage.EmptyDir != nil {
 		modelPVC = nil
 	} else {
 		err := fmt.Errorf("neither external PVC name or NIMCache volume is provided")
