@@ -1124,17 +1124,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Value: "/model-store",
 				},
 				{
-					Name: "NGC_API_KEY",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "",
-							},
-							Key: "NGC_API_KEY",
-						},
-					},
-				},
-				{
 					Name:  "OUTLINES_CACHE_DIR",
 					Value: "/tmp/outlines",
 				},
@@ -1224,17 +1213,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				{
 					Name:  "NIM_CACHE_PATH",
 					Value: "/model-store",
-				},
-				{
-					Name: "NGC_API_KEY",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "",
-							},
-							Key: "NGC_API_KEY",
-						},
-					},
 				},
 				{
 					Name:  "OUTLINES_CACHE_DIR",

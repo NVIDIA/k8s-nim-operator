@@ -70,6 +70,7 @@ type DeploymentParams struct {
 	Volumes            []corev1.Volume
 	VolumeMounts       []corev1.VolumeMount
 	Env                []corev1.EnvVar
+	EnvFrom            []corev1.EnvFromSource
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
@@ -111,6 +112,8 @@ type LeaderWorkerSetParams struct {
 	LeaderVolumeMounts []corev1.VolumeMount
 	WorkerEnvs         []corev1.EnvVar
 	LeaderEnvs         []corev1.EnvVar
+	WorkerEnvFrom      []corev1.EnvFromSource
+	LeaderEnvFrom      []corev1.EnvFromSource
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
