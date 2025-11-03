@@ -48,6 +48,7 @@ type NIMCacheSpec struct {
 	GroupID *int64 `json:"groupID,omitempty"`
 	// CertConfig is the name of the ConfigMap containing the custom certificates.
 	// for secure communication.
+	//
 	// Deprecated: use `Proxy` instead to configure custom certificates for using proxy.
 	// +optional
 	CertConfig *CertConfig `json:"certConfig,omitempty"`
