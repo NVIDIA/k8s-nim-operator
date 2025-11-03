@@ -53,4 +53,4 @@ spec:
       namespace: nim-service
       name: istio-gateway
       httpRoutesEnabled: true
-    hostDomainName: demo.nvidia.example.com
+    hostDomainName: demo.example.nvidia.com
