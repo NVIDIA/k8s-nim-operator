@@ -58,4 +58,4 @@ spec:
   router:
     ingress:
       ingressClass: nginx
-    hostDomainName: demo.nvidia.example.com
+    hostDomainName: demo.example.nvidia.com
