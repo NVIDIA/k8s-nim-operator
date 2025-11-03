@@ -87,6 +87,8 @@ build:
 		--build-arg GOLANG_VERSION="$(GOLANG_VERSION)" \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
+		--build-arg GOPROXY="$(GOPROXY)" \
+		--build-arg NVIDIA_DRA_DRIVER_GPU_VERSION="$(NVIDIA_DRA_DRIVER_GPU_VERSION)" \
 		-f $(DOCKERFILE) \
 		$(CURDIR)
 
