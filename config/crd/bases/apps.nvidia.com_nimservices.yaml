@@ -1978,6 +1978,26 @@ spec:
                     enum:
                     - lws
                     type: string
+                  computeDomain:
+                    description: |-
+                      ComputeDomain specifies the compute domain to use for a
+                      multi-node NIMService.
+                    properties:
+                      create:
+                        description: |-
+                          Create specifies whether to create a new ComputeDomain or use an existing one.
+                          If set to false, an existing ComputeDomain must be specified via the `Name` field.
+                        type: boolean
+                      name:
+                        description: Name of the ComputeDomain to use. Required if
+                          `Create` is false (i.e., using an existing ComputeDomain).
+                        type: string
+                    type: object
+                    x-kubernetes-validations:
+                    - message: if create is true, name must not be set; otherwise
+                        name is required.
+                      rule: '(has(self.create) && self.create) ? !has(self.name) :
+                        (has(self.name) && size(self.name) > 0)'
                   mpi:
                     description: MPI config for NIMService using LeaderWorkerSet
                     properties:
@@ -3557,6 +3577,43 @@ spec:
               availableReplicas:
                 format: int32
                 type: integer
+              computeDomainStatus:
+                description: ComputeDomainStatus is the status of the ComputeDomain
+                  for a multi-node NIMService.
+                properties:
+                  name:
+                    type: string
+                  nodes:
+                    items:
+                      description: ComputeDomainStatus defines the status of a node
+                        in the ComputeDomain.
+                      properties:
+                        cliqueID:
+                          description: CliqueID is the clique ID of the NVLink domain.
+                          type: string
+                        name:
+                          description: Name is the name of the node.
+                          type: string
+                        status:
+                          default: NotReady
+                          description: |-
+                            Status tracks the readiness of the IMEX daemon running on this node.
+                            * Ready: the IMEX daemon is ready to broker GPU memory exchanges.
+                            * NotReady: the IMEX daemon is not ready to broker GPU memory exchanges.
+                          enum:
+                          - Ready
+                          - NotReady
+                          type: string
+                      required:
+                      - cliqueID
+                      - name
+                      type: object
+                    type: array
+                  status:
+                    type: string
+                required:
+                - name
+                type: object
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current

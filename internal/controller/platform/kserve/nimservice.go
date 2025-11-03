@@ -449,8 +449,12 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	}
 
 	initContainers = nimService.GetInitContainers()
-	namedDraResources := shared.GenerateNamedDRAResources(nimService)
-	err := r.reconcileDRAResources(ctx, nimService, namedDraResources)
+	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
+	if err != nil {
+		logger.Error(err, "Failed to get named dra resources")
+		return err
+	}
+	err = r.reconcileDRAResources(ctx, nimService, namedDraResources)
 	if err != nil {
 		logger.Error(err, "Failed to reconcile DRAResources")
 		return err
@@ -475,7 +479,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 	isvcParams.OrchestratorType = string(r.orchestratorType)
 
-	isvcParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
+	isvcParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 	if nimCache.IsUniversalNIM() {
 		isvcParams.Env = utils.MergeEnvVars([]corev1.EnvVar{
 			{
@@ -521,7 +525,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 			result.Spec.Predictor.InitContainers = initContainers
 		}
 		// Update Container resources with DRA resource claims.
-		shared.UpdateContainerResourceClaims(result.Spec.Predictor.Containers, namedDraResources)
+		namedDraResources.UpdateContainerResourceClaims(result.Spec.Predictor.Containers)
 		return result, nil
 	}
 	conType = "InferenceService"
@@ -652,8 +656,12 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 		return &ctrl.Result{}, err
 	}
 
-	namedDraResources := shared.GenerateNamedDRAResources(nimService)
-	if len(namedDraResources) > 0 {
+	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
+	if err != nil {
+		logger.Error(err, "Failed to get named dra resources")
+		return &ctrl.Result{}, err
+	}
+	if len(namedDraResources.Resources) > 0 {
 		// Update NIMServiceStatus with resource claims.
 		updateErr := r.updateResourceClaimStatus(ctx, nimService, namedDraResources)
 		if updateErr != nil {
@@ -869,10 +877,10 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 	return true, "", nil
 }
 
-func (r *NIMServiceReconciler) updateResourceClaimStatus(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources []shared.NamedDRAResource) error {
+func (r *NIMServiceReconciler) updateResourceClaimStatus(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources *shared.NamedDRAResourceList) error {
 	logger := log.FromContext(ctx)
 
-	draResourceStatuses, err := shared.GenerateDRAResourceStatuses(ctx, r.Client, nimService.GetNamespace(), namedDraResources)
+	draResourceStatuses, err := namedDraResources.GenerateDRAResourceStatuses(ctx, r.Client, nimService.GetNamespace())
 	if err != nil {
 		logger.Error(err, "Failed to generate DRA resource statuses", "nimservice", nimService.Name)
 		return err
@@ -962,8 +970,8 @@ func (r *NIMServiceReconciler) getKServeDeploymentMode(ctx context.Context,
 	return deploymentMode, nil
 }
 
-func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources []shared.NamedDRAResource) error {
-	for _, namedDraResource := range namedDraResources {
+func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources *shared.NamedDRAResourceList) error {
+	for _, namedDraResource := range namedDraResources.Resources {
 		if !shared.ShouldCreateDRAResource(namedDraResource.DRAResource) {
 			continue
 		}

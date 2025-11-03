@@ -149,6 +149,10 @@ type NimServiceMultiNodeConfig struct {
 
 	// MPI config for NIMService using LeaderWorkerSet
 	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
+
+	// ComputeDomain specifies the compute domain to use for a
+	// multi-node NIMService.
+	ComputeDomain *ComputeDomain `json:"computeDomain,omitempty"`
 }
 
 type ParallelismSpec struct {
@@ -183,6 +187,8 @@ type NIMServiceStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	DRAResourceStatuses []DRAResourceStatus `json:"draResourceStatuses,omitempty"`
+	// ComputeDomainStatus is the status of the ComputeDomain for a multi-node NIMService.
+	ComputeDomainStatus *ComputeDomainStatus `json:"computeDomainStatus,omitempty"`
 }
 
 // ModelStatus defines the configuration of the NIMService model.
@@ -1898,6 +1904,12 @@ func (n *NIMService) GetInferenceServiceHPAParams() (*int32, int32, string, stri
 	return minReplicas, maxReplicas, metric, metricType, target
 }
 
+// IsMultiNode returns true if the NIMService is a multi-node NIMService.
+func (n *NIMService) IsMultiNode() bool {
+	return n.GetMultiNodePipelineParallelism() > 1
+}
+
+// GetMultiNodeTensorParallelism returns the tensor parallelism size for the multi-node NIMService.
 func (n *NIMService) GetMultiNodeTensorParallelism() uint32 {
 	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Tensor != nil {
 		return *n.Spec.MultiNode.Parallelism.Tensor
@@ -1905,11 +1917,45 @@ func (n *NIMService) GetMultiNodeTensorParallelism() uint32 {
 	return 0
 }
 
+// GetMultiNodePipelineParallelism returns the pipeline parallelism size for the multi-node NIMService.
 func (n *NIMService) GetMultiNodePipelineParallelism() uint32 {
-	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Tensor != nil {
+	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Pipeline != nil {
 		return *n.Spec.MultiNode.Parallelism.Pipeline
 	}
 	return 0
+}
+
+// IsComputeDomainEnabled returns true if the NIMService is a multi-node NIMService and a compute domain is requested.
+func (n *NIMService) IsComputeDomainEnabled() bool {
+	if !n.IsMultiNode() {
+		return false
+	}
+	return n.Spec.MultiNode.ComputeDomain != nil
+}
+
+// GetComputeDomainName returns the name of the ComputeDomain for the multi-node NIMService.
+func (n *NIMService) GetComputeDomainName() string {
+	if n.IsComputeDomainEnabled() {
+		if n.Spec.MultiNode.ComputeDomain.Create == nil || !*n.Spec.MultiNode.ComputeDomain.Create {
+			return n.Spec.MultiNode.ComputeDomain.Name
+		}
+
+		return n.GetName()
+	}
+
+	return ""
+}
+
+// GetComputeDomainParams returns the parameters for rendering the ComputeDomain for the multi-node NIMService.
+func (n *NIMService) GetComputeDomainParams(resourceClaimTemplateName string) *rendertypes.ComputeDomainParams {
+	return &rendertypes.ComputeDomainParams{
+		Name:                      n.GetName(),
+		Namespace:                 n.GetNamespace(),
+		Labels:                    n.GetServiceLabels(),
+		Annotations:               n.GetNIMServiceAnnotations(),
+		NumNodes:                  n.GetMultiNodePipelineParallelism(),
+		ResourceClaimTemplateName: resourceClaimTemplateName,
+	}
 }
 
 func init() {
