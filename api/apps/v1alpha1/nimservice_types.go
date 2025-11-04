@@ -228,6 +228,13 @@ type NIMServiceStorage struct {
 	HostPath *string `json:"hostPath,omitempty"`
 	// ReadOnly mode indicates if the volume should be mounted as read-only
 	ReadOnly *bool `json:"readOnly,omitempty"`
+	// EmptyDir is the empty dir volume used for caching NIM
+	EmptyDir *EmptyDirSpec `json:"emptyDir,omitempty"`
+}
+
+type EmptyDirSpec struct {
+	// SizeLimit is the size limit of the empty dir volume
+	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty"`
 }
 
 // GetLWSName returns the name to be used for the LeaderWorkerSet based on the custom spec.
@@ -700,7 +707,7 @@ func (n *NIMService) GetVolumesMounts() []corev1.Volume {
 }
 
 // GetVolumes returns volumes for the NIMService container.
-func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume {
+func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume {
 	// TODO: Fetch actual PVC name from associated NIMCache obj
 	volumes := []corev1.Volume{
 		{
@@ -712,7 +719,9 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 				},
 			},
 		},
-		{
+	}
+	if modelPVC != nil {
+		volumes = append(volumes, corev1.Volume{
 			Name: "model-store",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
@@ -720,7 +729,16 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 					ReadOnly:  n.GetStorageReadOnly(),
 				},
 			},
-		},
+		})
+	} else if n.Spec.Storage.EmptyDir != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "model-store",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: n.Spec.Storage.EmptyDir.SizeLimit,
+				},
+			},
+		})
 	}
 
 	if n.GetProxySpec() != nil {
@@ -729,7 +747,7 @@ func (n *NIMService) GetVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume 
 	return volumes
 }
 
-func (n *NIMService) GetLeaderVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume {
+func (n *NIMService) GetLeaderVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume {
 	volumes := n.GetVolumes(modelPVC)
 
 	volumes = append(volumes,
@@ -774,7 +792,7 @@ func (n *NIMService) GetLeaderVolumes(modelPVC PersistentVolumeClaim) []corev1.V
 	return volumes
 }
 
-func (n *NIMService) GetWorkerVolumes(modelPVC PersistentVolumeClaim) []corev1.Volume {
+func (n *NIMService) GetWorkerVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume {
 	volumes := n.GetVolumes(modelPVC)
 	volumes = append(volumes,
 		corev1.Volume{
@@ -814,12 +832,16 @@ func (n *NIMService) GetWorkerVolumes(modelPVC PersistentVolumeClaim) []corev1.V
 }
 
 // GetVolumeMounts returns volumes for the NIMService container.
-func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.VolumeMount {
+func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
+	subPath := ""
+	if modelPVC != nil {
+		subPath = modelPVC.SubPath
+	}
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "model-store",
 			MountPath: "/model-store",
-			SubPath:   modelPVC.SubPath,
+			SubPath:   subPath,
 		},
 		{
 			Name:      "dshm",
@@ -833,7 +855,7 @@ func (n *NIMService) GetVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.Vo
 	return volumeMounts
 }
 
-func (n *NIMService) GetWorkerVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.VolumeMount {
+func (n *NIMService) GetWorkerVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
 	volumeMounts := n.GetVolumeMounts(modelPVC)
 
 	volumeMounts = append(volumeMounts,
@@ -858,7 +880,7 @@ func (n *NIMService) GetWorkerVolumeMounts(modelPVC PersistentVolumeClaim) []cor
 	return volumeMounts
 }
 
-func (n *NIMService) GetLeaderVolumeMounts(modelPVC PersistentVolumeClaim) []corev1.VolumeMount {
+func (n *NIMService) GetLeaderVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
 	volumeMounts := n.GetVolumeMounts(modelPVC)
 	volumeMounts = append(volumeMounts,
 		corev1.VolumeMount{
