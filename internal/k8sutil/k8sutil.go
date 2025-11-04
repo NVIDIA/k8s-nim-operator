@@ -412,3 +412,16 @@ func ControllerOwnsIfCRDExists(discoveryClient discovery.DiscoveryInterface,
 		},
 	)
 }
+
+func GetSecretData(cli client.Client, ctx context.Context, namespace, secretName string) (map[string][]byte, error) {
+	secret := &corev1.Secret{}
+	err := cli.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      secretName,
+	}, secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get secret %s: %w", secretName, err)
+	}
+
+	return secret.Data, nil
+}

@@ -73,6 +73,8 @@ const (
 	ReasonNIMCacheNotReady = "NIMCacheNotReady"
 	// ReasonDRAResourcesUnsupported indicates that the DRA resources are not supported on this cluster version.
 	ReasonDRAResourcesUnsupported = "DRAResourcesUnsupported"
+	// ReasonAuthSecretMissingKey indicates that the auth secret has missing key.
+	ReasonAuthSecretMissingKey = "AuthSecretMissingKey"
 	// ReasonInferenceServiceFailed indicates that the creation of inferenceservice has failed.
 	ReasonInferenceServiceFailed = "InferenceServiceFailed"
 	// ReasonResourceClaimFailed indicates that the creation of resourceclaim has failed.

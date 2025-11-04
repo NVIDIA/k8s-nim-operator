@@ -121,6 +121,15 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		r.recorder.Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, msg)
 		return ctrl.Result{}, err
 	}
+	isValid, msg, err = r.validateAuthSecret(ctx, nimService, nimService.Spec.Env)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if !isValid {
+		err = r.updater.SetConditionsFailed(ctx, nimService, conditions.ReasonAuthSecretMissingKey, msg)
+		r.recorder.Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, msg)
+		return ctrl.Result{}, err
+	}
 
 	// Sync serviceaccount
 	err = r.renderAndSyncResource(ctx, nimService, &corev1.ServiceAccount{}, func() (client.Object, error) {
@@ -988,4 +997,32 @@ func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimSer
 		}
 	}
 	return nil
+}
+
+func (r *NIMServiceReconciler) validateAuthSecret(ctx context.Context, nimService *appsv1alpha1.NIMService, envParams []corev1.EnvVar) (bool, string, error) {
+
+	secretData, err := k8sutil.GetSecretData(r.Client, ctx, nimService.GetNamespace(), nimService.Spec.AuthSecret)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to get auth secret %s: %w", nimService.Spec.AuthSecret, err)
+	}
+	// If NIMCache is not used and model is from HuggingFace, validate the AuthSecret for HuggingFace
+	if nimService.GetNIMCacheName() == "" {
+		env := utils.FindEnvByValue(envParams, "NIM_MODEL_NAME")
+		if env != nil {
+			if strings.HasPrefix(env.Value, "hf://") {
+				_, ok := secretData["HF_TOKEN"]
+				if !ok {
+					return false, fmt.Sprintf("HF_TOKEN not found in AuthSecret %s", nimService.Spec.AuthSecret), nil
+				}
+			}
+		}
+	} else {
+		// If NIMCache is used, validate the AuthSecret for NGC
+		_, ok := secretData["NGC_API_KEY"]
+		if !ok {
+			return false, fmt.Sprintf("NGC_API_KEY not found in AuthSecret %s", nimService.Spec.AuthSecret), nil
+		}
+	}
+
+	return true, "", nil
 }

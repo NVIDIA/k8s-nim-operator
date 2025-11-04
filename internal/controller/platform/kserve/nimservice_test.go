@@ -124,7 +124,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return m.originalTransport.RoundTrip(req)
 }
 
-var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
+var _ = Describe("NIMServiceReconciler for a KServe platform", Ordered, func() {
 	var (
 		client            client.Client
 		reconciler        *NIMServiceReconciler
@@ -138,7 +138,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		originalTransport = http.DefaultTransport
 		discoveryClient   *discoveryfake.FakeDiscovery
 	)
-	BeforeEach(func() {
+	BeforeAll(func() {
 		scheme = runtime.NewScheme()
 		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
 		Expect(appsv1.AddToScheme(scheme)).To(Succeed())
@@ -190,6 +190,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Namespace: "default",
 			},
 			Spec: appsv1alpha1.NIMServiceSpec{
+				AuthSecret:  "ngc-api-secret",
 				Labels:      map[string]string{"app": "test-app"},
 				Annotations: map[string]string{"annotation-key": "annotation-value"},
 				Image:       appsv1alpha1.Image{Repository: "nvcr.io/nvidia/nim-llm", PullPolicy: "IfNotPresent", Tag: "v0.1.0", PullSecrets: []string{"ngc-secret"}},
@@ -460,6 +461,15 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		err = client.Create(context.TODO(), isvcConfig)
 		Expect(err).NotTo(HaveOccurred())
 
+		err = client.Create(context.TODO(), &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ngc-api-secret",
+				Namespace: "default",
+			},
+			Data: map[string][]byte{"NGC_API_KEY": []byte("test-api-key")},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
 		var buf bytes.Buffer
 		log.SetOutput(&buf)
 		defer func() {
@@ -485,44 +495,42 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 	})
 
 	AfterEach(func() {
-		defer func() { http.DefaultTransport = originalTransport }()
-		defer testServer.Close()
 		// Clean up the NIMService instance
-		nimService := &appsv1alpha1.NIMService{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-nimservice",
-				Namespace: "default",
-			},
+		err := client.Delete(context.TODO(), nimService)
+		if err != nil && !errors.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
 		}
-		_ = client.Delete(context.TODO(), nimService)
+
+		// Reset the nimService object metadata to avoid stale resourceVersion
+		nimService.ResourceVersion = ""
+		nimService.UID = ""
+		nimService.Generation = 0
+		nimService.CreationTimestamp = metav1.Time{}
+		nimService.Status = appsv1alpha1.NIMServiceStatus{
+			State: conditions.NotReady,
+		}
+
+		// Reset spec fields that tests might modify
+		nimService.Spec.DRAResources = nil
+
+		// Restore the discoveryClient to its original state
+		reconciler.discoveryClient = discoveryClient
 
 		// Ensure that nimCache status is ready before each test
 		nimCache.Status = appsv1alpha1.NIMCacheStatus{
 			State: appsv1alpha1.NimCacheStatusReady,
+			PVC:   "test-pvc",
+			Profiles: []appsv1alpha1.NIMProfile{{
+				Name:   "test-profile",
+				Config: map[string]string{"tp": "4"}},
+			},
 		}
 
 		// Update nimCache status
 		Expect(client.Status().Update(context.TODO(), nimCache)).To(Succeed())
 
-		By("delete the KServe Deployment")
-		kserveDeployment := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "kserve-controller-manager",
-				Namespace: "default",
-			},
-		}
-		err := client.Delete(context.TODO(), kserveDeployment)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("delete the isvc ConfigMap")
-		isvcConfig := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      kserveconstants.InferenceServiceConfigMapName,
-				Namespace: "default",
-			},
-		}
-		err = client.Delete(context.TODO(), isvcConfig)
-		Expect(err).NotTo(HaveOccurred())
+		// Note: KServe Deployment and ConfigMap are created in BeforeAll and should not be deleted here
+		// They are shared across all tests in this suite
 	})
 
 	Describe("Reconcile", func() {
@@ -1211,6 +1219,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					AuthSecret:  "ngc-api-secret",
 					Labels:      map[string]string{"app": "test-app"},
 					Annotations: map[string]string{"annotation-key": "annotation-value"},
 					Image: appsv1alpha1.Image{
@@ -1344,6 +1353,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					AuthSecret:  "ngc-api-secret",
 					Labels:      map[string]string{"app": "test-app"},
 					Annotations: map[string]string{"annotation-key": "annotation-value"},
 					Image: appsv1alpha1.Image{
@@ -1475,6 +1485,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					AuthSecret: "ngc-api-secret",
 					Env: []corev1.EnvVar{
 						{
 							Name:  "NIM_MODEL_NAME",
@@ -1677,6 +1688,14 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 	})
 
 	Describe("addGPUResources", func() {
+		AfterEach(func() {
+			nimService.Spec.Resources = &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("250m"), corev1.ResourceMemory: resource.MustParse("64Mi")},
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m"), corev1.ResourceMemory: resource.MustParse("128Mi")},
+			}
+			nimService.Spec.MultiNode = nil
+		})
+
 		It("should not provide GPU resources if user has already provided them", func() {
 			profile := &appsv1alpha1.NIMProfile{
 				Name:   "test-profile",

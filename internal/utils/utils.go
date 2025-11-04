@@ -494,3 +494,12 @@ func IsVersionGreaterThanOrEqual(version string, minVersion string) bool {
 	}
 	return cv.AtLeast(mv)
 }
+
+func FindEnvByValue(envs []corev1.EnvVar, key string) *corev1.EnvVar {
+	for i := range envs {
+		if envs[i].Name == key {
+			return &envs[i]
+		}
+	}
+	return nil
+}

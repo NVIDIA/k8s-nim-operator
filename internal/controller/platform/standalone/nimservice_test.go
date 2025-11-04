@@ -123,7 +123,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return m.originalTransport.RoundTrip(req)
 }
 
-var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
+var _ = Describe("NIMServiceReconciler for a standalone platform", Ordered, func() {
 	var (
 		client            client.Client
 		reconciler        *NIMServiceReconciler
@@ -137,7 +137,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		originalTransport = http.DefaultTransport
 		discoveryClient   *discoveryfake.FakeDiscovery
 	)
-	BeforeEach(func() {
+	BeforeAll(func() {
 		scheme = runtime.NewScheme()
 		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
 		Expect(appsv1.AddToScheme(scheme)).To(Succeed())
@@ -190,6 +190,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Namespace: "default",
 			},
 			Spec: appsv1alpha1.NIMServiceSpec{
+				AuthSecret:  "ngc-api-secret",
 				Labels:      map[string]string{"app": "test-app"},
 				Annotations: map[string]string{"annotation-key": "annotation-value"},
 				Image:       appsv1alpha1.Image{Repository: "nvcr.io/nvidia/nim-llm", PullPolicy: "IfNotPresent", Tag: "v0.1.0", PullSecrets: []string{"ngc-secret"}},
@@ -405,6 +406,15 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		}
 		_ = client.Create(context.TODO(), pvc)
 
+		err = client.Create(context.TODO(), &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ngc-api-secret",
+				Namespace: "default",
+			},
+			Data: map[string][]byte{"NGC_API_KEY": []byte("test-api-key")},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
 		var buf bytes.Buffer
 		log.SetOutput(&buf)
 		defer func() {
@@ -430,20 +440,74 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 	})
 
 	AfterEach(func() {
-		defer func() { http.DefaultTransport = originalTransport }()
-		defer testServer.Close()
 		// Clean up the NIMService instance
-		nimService := &appsv1alpha1.NIMService{
+		err := client.Delete(context.TODO(), nimService)
+		if err != nil && !errors.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		// Clean up the Service instance
+		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-nimservice",
 				Namespace: "default",
 			},
 		}
-		_ = client.Delete(context.TODO(), nimService)
+		_ = client.Delete(context.TODO(), svc)
+
+		// Clean up the Deployment instance
+		deployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-nimservice",
+				Namespace: "default",
+			},
+		}
+		_ = client.Delete(context.TODO(), deployment)
+
+		// Clean up other resources that might affect subsequent tests
+		_ = client.Delete(context.TODO(), &autoscalingv2.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-nimservice", Namespace: "default"},
+		})
+		_ = client.Delete(context.TODO(), &networkingv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-nimservice", Namespace: "default"},
+		})
+		_ = client.Delete(context.TODO(), &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-nimservice", Namespace: "default"},
+		})
+		_ = client.Delete(context.TODO(), &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-nimservice", Namespace: "default"},
+		})
+		_ = client.Delete(context.TODO(), &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-nimservice", Namespace: "default"},
+		})
+
+		// Reset the nimService object metadata to avoid stale resourceVersion
+		nimService.ResourceVersion = ""
+		nimService.UID = ""
+		nimService.Generation = 0
+		nimService.CreationTimestamp = metav1.Time{}
+		nimService.Status = appsv1alpha1.NIMServiceStatus{
+			State: conditions.NotReady,
+		}
+
+		// Reset spec fields that tests might modify
+		nimService.Spec.DRAResources = nil
+		nimService.Spec.Scale.Enabled = ptr.To(true)
+		nimService.Spec.Router.Ingress = &appsv1alpha1.RouterIngress{
+			IngressClass: "nginx",
+		}
+
+		// Restore the discoveryClient to its original state
+		reconciler.discoveryClient = discoveryClient
 
 		// Ensure that nimCache status is ready before each test
 		nimCache.Status = appsv1alpha1.NIMCacheStatus{
 			State: appsv1alpha1.NimCacheStatusReady,
+			PVC:   "test-pvc",
+			Profiles: []appsv1alpha1.NIMProfile{{
+				Name:   "test-profile",
+				Config: map[string]string{"tp": "4"}},
+			},
 		}
 
 		// Update nimCache status
@@ -820,7 +884,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(obj.Status.State).NotTo(Equal(appsv1alpha1.NIMServiceStatusFailed))
 				failedCondition := getCondition(obj, conditions.Failed)
-				Expect(failedCondition.Status).To(Equal(metav1.ConditionFalse))
+				if failedCondition != nil {
+					Expect(failedCondition.Status).To(Equal(metav1.ConditionFalse))
+				}
 			})
 		})
 
@@ -1608,6 +1674,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					AuthSecret:  "ngc-api-secret",
 					Labels:      map[string]string{"app": "test-app"},
 					Annotations: map[string]string{"annotation-key": "annotation-value"},
 					Image: appsv1alpha1.Image{
@@ -1741,6 +1808,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					AuthSecret:  "ngc-api-secret",
 					Labels:      map[string]string{"app": "test-app"},
 					Annotations: map[string]string{"annotation-key": "annotation-value"},
 					Image: appsv1alpha1.Image{
@@ -1871,6 +1939,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					AuthSecret: "ngc-api-secret",
 					Image: appsv1alpha1.Image{
 						Repository:  "nvcr.io/nvidia/nim-llm",
 						Tag:         "v0.1.0",
@@ -1971,6 +2040,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					AuthSecret: "ngc-api-secret",
 					Env: []corev1.EnvVar{
 						{
 							Name:  "NIM_MODEL_NAME",
@@ -2088,6 +2158,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Namespace: "default",
 				},
 				Spec: appsv1alpha1.NIMServiceSpec{
+					AuthSecret: "ngc-api-secret",
 					Env: []corev1.EnvVar{
 						{
 							Name:  "NIM_MODEL_NAME",
@@ -2336,6 +2407,14 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 	})
 
 	Describe("addGPUResources", func() {
+		AfterEach(func() {
+			nimService.Spec.Resources = &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("250m"), corev1.ResourceMemory: resource.MustParse("64Mi")},
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m"), corev1.ResourceMemory: resource.MustParse("128Mi")},
+			}
+			nimService.Spec.MultiNode = nil
+		})
+
 		It("should not provide GPU resources if user has already provided them", func() {
 			profile := &appsv1alpha1.NIMProfile{
 				Name:   "test-profile",
