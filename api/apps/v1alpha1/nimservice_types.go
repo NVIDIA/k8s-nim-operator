@@ -280,6 +280,17 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 			Value: utils.DefaultModelStorePath,
 		},
 		{
+			Name: "NGC_API_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.AuthSecret,
+					},
+					Key: "NGC_API_KEY",
+				},
+			},
+		},
+		{
 			Name:  "OUTLINES_CACHE_DIR",
 			Value: "/tmp/outlines",
 		},
@@ -353,11 +364,6 @@ func (n *NIMService) getLWSCommonEnv() []corev1.EnvVar {
 		},
 	}, env)
 	return env
-}
-
-// GetLWSLeaderEnvFrom returns the env from sources for the leader worker set.
-func (n *NIMService) GetLWSCommonEnvFrom() []corev1.EnvFromSource {
-	return n.GetEnvFrom()
 }
 
 func (n *NIMService) GetLWSLeaderEnv() []corev1.EnvVar {
@@ -562,23 +568,6 @@ func (n *NIMService) GetEnv() []corev1.EnvVar {
 		envVarList = utils.MergeEnvVars(envVarList, n.GetProxyEnv())
 	}
 	return envVarList
-}
-
-// GetEnvFrom returns merged slice of standard and user specified env from sources.
-func (n *NIMService) GetEnvFrom() []corev1.EnvFromSource {
-	if n.Spec.AuthSecret != "" {
-		return []corev1.EnvFromSource{
-			{
-				SecretRef: &corev1.SecretEnvSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.AuthSecret,
-					},
-				},
-			},
-		}
-	}
-	// no secrets to source the env variables
-	return []corev1.EnvFromSource{}
 }
 
 // GetImage returns container image for the NIMService.
@@ -1065,7 +1054,6 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	// Set container spec
 	params.ContainerName = n.GetContainerName()
 	params.Env = n.GetEnv()
-	params.EnvFrom = n.GetEnvFrom()
 	params.Args = n.GetArgs()
 	params.Command = n.GetCommand()
 	params.Resources = n.GetResources()
@@ -1137,8 +1125,6 @@ func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
 	params.Command = n.GetCommand()
 	params.LeaderEnvs = n.GetLWSLeaderEnv()
 	params.WorkerEnvs = n.GetLWSWorkerEnv()
-	params.LeaderEnvFrom = n.GetLWSCommonEnvFrom()
-	params.WorkerEnvFrom = n.GetLWSCommonEnvFrom()
 	params.UserID = n.GetUserID()
 	params.GroupID = n.GetGroupID()
 	params.Image = n.GetImage()
