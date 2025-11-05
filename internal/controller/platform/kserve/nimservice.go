@@ -477,28 +477,24 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 			},
 		}, isvcParams.Env)
 	}
-	// If NIMCache is not provided, and the model is from Hugging Face, add the HF_TOKEN to the environment variables
-	if nimService.GetNIMCacheName() == "" {
-		env := utils.FindEnvByValue(isvcParams.Env, "NIM_MODEL_NAME")
-		if env != nil {
-			if strings.HasPrefix(env.Value, "hf://") {
-				isvcParams.Env = utils.RemoveEnvVar(isvcParams.Env, "NGC_API_KEY")
-				isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{
-					{
-						Name: "HF_TOKEN",
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: nimService.Spec.AuthSecret,
-								},
-								Key: "HF_TOKEN",
-							},
+	// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, add the HF_TOKEN to the environment variables
+	if nimCache.IsHFMultiLLM() || nimService.IsHFMultiLLM() {
+		isvcParams.Env = utils.RemoveEnvVar(isvcParams.Env, "NGC_API_KEY")
+		isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{
+			{
+				Name: "HF_TOKEN",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: nimService.Spec.AuthSecret,
 						},
+						Key: "HF_TOKEN",
 					},
-				})
-			}
-		}
+				},
+			},
+		})
 	}
+
 	// Setup volume mounts with model store
 	isvcParams.Volumes = nimService.GetVolumes(modelPVC)
 	isvcParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strings"
 
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -981,6 +982,16 @@ func (n *NIMService) GetIngressSpec() networkingv1.IngressSpec {
 
 func (n *NIMService) IsHTTPRouteEnabled() bool {
 	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.HTTPRoutesEnabled
+}
+
+func (n *NIMService) IsHFMultiLLM() bool {
+	env := utils.FindEnvByValue(n.GetEnv(), "NIM_MODEL_NAME")
+	if env != nil {
+		if strings.HasPrefix(env.Value, "hf://") {
+			return true
+		}
+	}
+	return false
 }
 
 func (n *NIMService) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
