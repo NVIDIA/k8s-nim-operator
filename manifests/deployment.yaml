@@ -98,10 +98,6 @@ spec:
         {{- if .Env }}
           {{- .Env | yaml | nindent 10 }}
         {{- end }}
-        envFrom:
-        {{- if .EnvFrom }}
-          {{- .EnvFrom | yaml | nindent 10 }}
-        {{- end }}
         {{- with .Resources }}
         resources:
           {{ . | yaml | nindent 10 }}
