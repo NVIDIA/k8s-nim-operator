@@ -2023,6 +2023,150 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Expect(customEnv.Value).To(Equal("custom-value"))
 			})
 
+			It("should replace NGC_API_KEY with HF_TOKEN when NIMCache is a DataStore source", func() {
+				// Create a DataStore NIMCache
+				dsNimCache := &appsv1alpha1.NIMCache{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-ds-nimcache-kserve",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.NIMCacheSpec{
+						Source: appsv1alpha1.NIMSource{
+							DataStore: &appsv1alpha1.NemoDataStoreSource{
+								Endpoint:  "https://datastore.nvidia.com/v1/hf/",
+								Namespace: "default",
+								DSHFCommonFields: appsv1alpha1.DSHFCommonFields{
+									ModelName:   ptr.To("meta-llama/Llama-2-7b-chat-hf"),
+									AuthSecret:  "hf-secret",
+									ModelPuller: "nvcr.io/nvidia/hf-model-puller:latest",
+									PullSecret:  "hf-secret",
+								},
+							},
+						},
+						Storage: appsv1alpha1.NIMCacheStorage{
+							PVC: appsv1alpha1.PersistentVolumeClaim{
+								Create:       ptr.To[bool](true),
+								StorageClass: "standard",
+								Size:         "1Gi",
+							},
+						},
+					},
+					Status: appsv1alpha1.NIMCacheStatus{
+						State: appsv1alpha1.NimCacheStatusReady,
+						PVC:   "test-ds-nimcache-kserve-pvc",
+						Profiles: []appsv1alpha1.NIMProfile{{
+							Name:   "test-profile",
+							Config: map[string]string{"tp": "2"}},
+						},
+					},
+				}
+				Expect(client.Create(context.TODO(), dsNimCache)).To(Succeed())
+
+				// Create PVC for the DataStore NIMCache
+				dsPVC := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-ds-nimcache-kserve-pvc",
+						Namespace: "default",
+					},
+				}
+				Expect(client.Create(context.TODO(), dsPVC)).To(Succeed())
+
+				// Create a NIMService that uses the DataStore NIMCache
+				testNimService := &appsv1alpha1.NIMService{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-ds-nimservice-kserve",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.NIMServiceSpec{
+						Labels:      map[string]string{"app": "test-ds-app"},
+						Annotations: map[string]string{"annotation-key": "annotation-value"},
+						Image: appsv1alpha1.Image{
+							Repository:  "nvcr.io/nvidia/nim-llm",
+							Tag:         "v0.1.0",
+							PullPolicy:  "IfNotPresent",
+							PullSecrets: []string{"hf-secret"},
+						},
+						AuthSecret: "hf-secret",
+						Storage: appsv1alpha1.NIMServiceStorage{
+							NIMCache: appsv1alpha1.NIMCacheVolSpec{
+								Name: "test-ds-nimcache-kserve",
+							},
+						},
+						Env: []corev1.EnvVar{
+							{
+								Name:  "custom-env",
+								Value: "custom-value",
+							},
+						},
+						Resources: &corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("250m"),
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+						},
+						Expose: appsv1alpha1.Expose{
+							Service: appsv1alpha1.Service{Type: corev1.ServiceTypeClusterIP, Port: ptr.To[int32](8000)},
+						},
+					},
+				}
+
+				namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+				Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+				result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(ctrl.Result{}))
+
+				// InferenceService should be created
+				isvc := &kservev1beta1.InferenceService{}
+				err = client.Get(context.TODO(), namespacedName, isvc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(isvc.Name).To(Equal(testNimService.GetName()))
+				Expect(isvc.Namespace).To(Equal(testNimService.GetNamespace()))
+
+				// Verify environment variables
+				container := isvc.Spec.Predictor.Containers[0]
+
+				// NGC_API_KEY should NOT be present
+				var ngcKeyPresent bool
+				for _, env := range container.Env {
+					if env.Name == appsv1alpha1.NGCAPIKey {
+						ngcKeyPresent = true
+						break
+					}
+				}
+				Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for DataStore models")
+
+				// HF_TOKEN should be present with correct secret reference
+				var hfTokenEnv *corev1.EnvVar
+				for _, env := range container.Env {
+					if env.Name == appsv1alpha1.HFToken {
+						hfTokenEnv = &env
+						break
+					}
+				}
+				Expect(hfTokenEnv).NotTo(BeNil(), "HF_TOKEN environment variable should be present")
+				Expect(hfTokenEnv.ValueFrom).NotTo(BeNil())
+				Expect(hfTokenEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(hfTokenEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+				Expect(hfTokenEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.HFToken))
+
+				// Verify that custom environment variables are still present
+				var customEnv *corev1.EnvVar
+				for _, env := range container.Env {
+					if env.Name == "custom-env" {
+						customEnv = &env
+						break
+					}
+				}
+				Expect(customEnv).NotTo(BeNil(), "Custom environment variables should still be present")
+				Expect(customEnv.Value).To(Equal("custom-value"))
+			})
+
 			It("should replace NGC_API_KEY with HF_TOKEN when NIMService has HF model name", func() {
 				// Create a regular NGC NIMCache (not HF)
 				regularNimCache := &appsv1alpha1.NIMCache{
