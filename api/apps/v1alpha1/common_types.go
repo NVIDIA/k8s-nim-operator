@@ -36,6 +36,10 @@ const (
 	DefaultNamedPortGRPC = "grpc"
 	// DefaultNamedPortMetrics is the default name for metrics port.
 	DefaultNamedPortMetrics = "metrics"
+	// NGCAPIKey is the environment variable name for NGC API key.
+	NGCAPIKey = "NGC_API_KEY"
+	// HFToken is the environment variable name for Hugging Face token.
+	HFToken = "HF_TOKEN"
 )
 
 // Expose defines attributes to expose the service.
