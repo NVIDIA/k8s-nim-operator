@@ -1268,7 +1268,6 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.GetEnvWithProxy())
 		if nimCache.GetProxyCertConfigMap() != "" {
 			job.Spec.Template.Spec.InitContainers = nimCache.GetInitContainers()
-			job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.GetEnvWithProxy())
 			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
 			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, k8sutil.GetVolumesForUpdatingCaCert(nimCache.Spec.Proxy.CertConfigMap)...)
 		}
