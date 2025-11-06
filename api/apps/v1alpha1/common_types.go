@@ -45,17 +45,17 @@ const (
 // Expose defines attributes to expose the service.
 type Expose struct {
 	Service Service `json:"service,omitempty"`
-	// Deprecated: Use .spec.router instead.
-	// Ingress Ingress `json:"ingress,omitempty"`
-	// Deprecated: Use .spec.router instead.
-	// HTTPRoute HTTPRoute `json:"httpRoute,omitempty"`
+	// Deprecated: Use .spec.expose.router instead.
+	Ingress Ingress `json:"ingress,omitempty"`
+
+	Router Router `json:"router,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingressClass))", message="ingressClass and gateway cannot be specified together"
+// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingress))", message="ingress and gateway cannot be specified together"
 type Router struct {
 	// HostDomainName is the domain name of the hostname matched by the router.
-	// The hostname is constructed as "<nimServiceName>.<hostDomainName>", where the <nimServiceName> a subdomain of the matched hostname.
-	// eg. example.com for "<nimServiceName>.example.com"
+	// The hostname is constructed as "<nimServiceName>.<namespace>.<hostDomainName>", where the <nimServiceName> a subdomain of the matched hostname.
+	// eg. example.com for "<nimServiceName>.<namespace>.example.com"
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern=`^(([a-z0-9][a-z0-9\-]*[a-z0-9])|[a-z0-9]+\.)*([a-z]+|xn\-\-[a-z0-9]+)\.?$`
@@ -64,11 +64,20 @@ type Router struct {
 	// Annotations for the router, e.g. for ingress class or gateway
 	Annotations map[string]string `json:"annotations,omitempty"`
 
-	// IngressClass is the class of the ingress controller to use for the created ingress.
-	IngressClass *string `json:"ingressClass,omitempty"`
+	// Ingress is the ingress controller to use for the created ingress.
+	Ingress *RouterIngress `json:"ingress,omitempty"`
 
 	// Gateway is the gateway to use for the created HTTPRoute.
 	Gateway *Gateway `json:"gateway,omitempty"`
+}
+
+type RouterIngress struct {
+	// +kubebuilder:validation:MinLength=1
+	// IngressClass is the ingress class to use for the created ingress.
+	IngressClass string `json:"ingressClass"`
+
+	// TLSSecretName is the name of the secret containing the TLS certificate and key.
+	TLSSecretName string `json:"tlsSecretName,omitempty"`
 }
 
 type Gateway struct {
@@ -78,6 +87,22 @@ type Gateway struct {
 	// +kubebuilder:validation:MinLength=1
 	// Name of the gateway
 	Name string `json:"name"`
+
+	// +kubebuilder:default:=true
+	// HTTPRoutesEnabled is a flag to enable HTTPRoutes for the created gateway.
+	HTTPRoutesEnabled bool `json:"httpRoutesEnabled,omitempty"`
+
+	// +kubebuilder:default:=false
+	// GRPCRoutesEnabled is a flag to enable GRPCRoutes for the created gateway.
+	GRPCRoutesEnabled bool `json:"grpcRoutesEnabled,omitempty"`
+}
+
+// DEPRECATED ExposeV1 defines attributes to expose the service.
+type ExposeV1 struct {
+	Service Service   `json:"service,omitempty"`
+	Ingress IngressV1 `json:"ingress,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && self.gateway.grpcRoutesEnabled)", message="unsupported field: spec.expose.router.gateway.grpcRoutesEnabled"
+	Router Router `json:"router,omitempty"`
 }
 
 // Service defines attributes to create a service.
@@ -104,6 +129,15 @@ type Service struct {
 	// +kubebuilder:validation:Maximum=65535
 	MetricsPort *int32            `json:"metricsPort,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// Deprecated: Use .spec.expose.router.ingress instead.
+// IngressV1 defines attributes for ingress
+// +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
+type IngressV1 struct {
+	Enabled     *bool             `json:"enabled,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Spec        *IngressSpec      `json:"spec,omitempty"`
 }
 
 // Metrics defines attributes to setup metrics collection.
@@ -154,41 +188,6 @@ type Ingress struct {
 	Spec        networkingv1.IngressSpec `json:"spec,omitempty"`
 }
 
-// HTTPRoute defines attributes to HTTPRoute in Gateway API.
-type HTTPRoute struct {
-	Enabled     *bool             `json:"enabled,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Spec        *HTTPRouteSpec    `json:"spec,omitempty"`
-}
-
-type HTTPRouteSpec struct {
-	gatewayv1.CommonRouteSpec `json:",inline"`
-	Host                      gatewayv1.Hostname `json:"host,omitempty"`
-	Paths                     []HTTPPathMatch    `json:"paths,omitempty"`
-}
-
-type HTTPPathMatch struct {
-	// Type specifies how to match against the path Value.
-	// +optional
-	// +kubebuilder:default=PathPrefix
-	Type *gatewayv1.PathMatchType `json:"type,omitempty"`
-
-	// Value of the HTTP path to match against.
-	// +optional
-	// +kubebuilder:default="/"
-	// +kubebuilder:validation:MaxLength=1024
-	Value *string `json:"value,omitempty"`
-}
-
-// IngressV1 defines attributes for ingress
-//
-// +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
-type IngressV1 struct {
-	Enabled     *bool             `json:"enabled,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Spec        *IngressSpec      `json:"spec,omitempty"`
-}
-
 // ResourceRequirements defines the resources required for a container.
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
@@ -203,8 +202,50 @@ type ResourceRequirements struct {
 	Requests corev1.ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
 }
 
-func (r *Router) GenerateGatewayHTTPRouteSpec(name string) gatewayv1.HTTPRouteSpec {
-	if r.Gateway == nil {
+func (i *IngressV1) GenerateNetworkingV1IngressSpec(name string) networkingv1.IngressSpec {
+	if i.Spec == nil {
+		return networkingv1.IngressSpec{}
+	}
+
+	ingressSpec := networkingv1.IngressSpec{
+		IngressClassName: &i.Spec.IngressClassName,
+		Rules: []networkingv1.IngressRule{
+			{
+				Host: i.Spec.Host,
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{},
+				},
+			},
+		},
+	}
+
+	svcBackend := networkingv1.IngressBackend{
+		Service: &networkingv1.IngressServiceBackend{
+			Name: name,
+			Port: networkingv1.ServiceBackendPort{
+				Name: DefaultNamedPortAPI,
+			},
+		},
+	}
+	if len(i.Spec.Paths) == 0 {
+		ingressSpec.Rules[0].HTTP.Paths = append(ingressSpec.Rules[0].HTTP.Paths, networkingv1.HTTPIngressPath{
+			Path:     "/",
+			PathType: ptr.To(networkingv1.PathTypePrefix),
+			Backend:  svcBackend,
+		})
+	}
+	for _, path := range i.Spec.Paths {
+		ingressSpec.Rules[0].HTTP.Paths = append(ingressSpec.Rules[0].HTTP.Paths, networkingv1.HTTPIngressPath{
+			Path:     path.Path,
+			PathType: path.PathType,
+			Backend:  svcBackend,
+		})
+	}
+	return ingressSpec
+}
+
+func (r *Router) GenerateGatewayHTTPRouteSpec(namespace, name string, port int32) gatewayv1.HTTPRouteSpec {
+	if r.Gateway == nil || !r.Gateway.HTTPRoutesEnabled {
 		return gatewayv1.HTTPRouteSpec{}
 	}
 
@@ -217,7 +258,7 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(name string) gatewayv1.HTTPRouteSp
 				},
 			},
 		},
-		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(r.getHostname(name))},
+		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(r.getHostname(namespace, name))},
 		Rules: []gatewayv1.HTTPRouteRule{
 			{
 				BackendRefs: []gatewayv1.HTTPBackendRef{
@@ -225,7 +266,7 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(name string) gatewayv1.HTTPRouteSp
 						BackendRef: gatewayv1.BackendRef{
 							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: gatewayv1.ObjectName(name),
-								Port: ptr.To(gatewayv1.PortNumber(DefaultAPIPort)),
+								Port: ptr.To(gatewayv1.PortNumber(port)),
 							},
 						},
 					},
@@ -243,20 +284,52 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(name string) gatewayv1.HTTPRouteSp
 	}
 }
 
-func (r *Router) getHostname(name string) string {
-	return fmt.Sprintf("%s.%s", name, r.HostDomainName)
+func (r *Router) GenerateGatewayGRPCRouteSpec(namespace, name string, port int32) gatewayv1.GRPCRouteSpec {
+	if r.Gateway == nil || !r.Gateway.GRPCRoutesEnabled {
+		return gatewayv1.GRPCRouteSpec{}
+	}
+
+	return gatewayv1.GRPCRouteSpec{
+		CommonRouteSpec: gatewayv1.CommonRouteSpec{
+			ParentRefs: []gatewayv1.ParentReference{
+				{
+					Name:      gatewayv1.ObjectName(r.Gateway.Name),
+					Namespace: ptr.To(gatewayv1.Namespace(r.Gateway.Namespace)),
+				},
+			},
+		},
+		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(r.getHostname(namespace, name))},
+		Rules: []gatewayv1.GRPCRouteRule{
+			{
+				BackendRefs: []gatewayv1.GRPCBackendRef{
+					{
+						BackendRef: gatewayv1.BackendRef{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
+								Name: gatewayv1.ObjectName(name),
+								Port: ptr.To(gatewayv1.PortNumber(port)),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
-func (r *Router) GenerateIngressSpec(name string) networkingv1.IngressSpec {
-	if r.IngressClass == nil {
+func (r *Router) getHostname(namespace, name string) string {
+	return fmt.Sprintf("%s.%s.%s", name, namespace, r.HostDomainName)
+}
+
+func (r *Router) GenerateIngressSpec(namespace, name string) networkingv1.IngressSpec {
+	if r.Ingress == nil {
 		return networkingv1.IngressSpec{}
 	}
 
-	return networkingv1.IngressSpec{
-		IngressClassName: r.IngressClass,
+	ingressSpec := networkingv1.IngressSpec{
+		IngressClassName: ptr.To(r.Ingress.IngressClass),
 		Rules: []networkingv1.IngressRule{
 			{
-				Host: r.getHostname(name),
+				Host: r.getHostname(namespace, name),
 				IngressRuleValue: networkingv1.IngressRuleValue{
 					HTTP: &networkingv1.HTTPIngressRuleValue{
 						Paths: []networkingv1.HTTPIngressPath{
@@ -278,6 +351,23 @@ func (r *Router) GenerateIngressSpec(name string) networkingv1.IngressSpec {
 			},
 		},
 	}
+
+	if r.Ingress.TLSSecretName != "" {
+		ingressSpec.TLS = []networkingv1.IngressTLS{
+			{
+				Hosts:      []string{r.getHostname(namespace, name)},
+				SecretName: r.Ingress.TLSSecretName,
+			},
+		}
+	}
+	return ingressSpec
+}
+
+func (r *Expose) GenerateIngressSpec(name string) networkingv1.IngressSpec {
+	if r.Ingress.Enabled == nil || !*r.Ingress.Enabled {
+		return networkingv1.IngressSpec{}
+	}
+	return r.Ingress.Spec
 }
 
 type IngressSpec struct {

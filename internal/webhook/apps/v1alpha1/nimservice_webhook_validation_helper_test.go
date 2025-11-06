@@ -1053,7 +1053,9 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			name: "kserve serverless – ingress set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				ns.Spec.Router.IngressClass = ptr.To("nginx")
+				ns.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+					IngressClass: "nginx",
+				}
 			},
 			wantErrs: 1,
 		},
@@ -1070,7 +1072,9 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				ns.Spec.Scale.Enabled = &trueVal
-				ns.Spec.Router.IngressClass = ptr.To("nginx")
+				ns.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+					IngressClass: "nginx",
+				}
 				ns.Spec.Metrics.Enabled = &trueVal
 			},
 			wantErrs: 3,
@@ -1101,7 +1105,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			// Ensure nested structs are initialised to avoid nil panics when we set sub-fields.
 			ns.Spec.Scale = appsv1alpha1.Autoscaling{}
 			ns.Spec.Expose = appsv1alpha1.Expose{}
-			ns.Spec.Router = appsv1alpha1.Router{}
+			ns.Spec.Expose.Router = appsv1alpha1.Router{}
 			ns.Spec.Metrics = appsv1alpha1.Metrics{}
 
 			tc.modify(ns)

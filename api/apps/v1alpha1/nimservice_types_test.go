@@ -138,7 +138,6 @@ func TestGetVolumes(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestHTTpRoute(t *testing.T) {
@@ -206,7 +205,7 @@ func TestHTTpRoute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gwSpec := tt.router.GenerateGatewayHTTPRouteSpec("test")
+			gwSpec := tt.router.GenerateGatewayHTTPRouteSpec("test", "test", DefaultAPIPort)
 			if !reflect.DeepEqual(gwSpec, tt.desiredGWSpec) {
 				t.Errorf("GenerateGatewayHTTPRouteSpec() = %+v, want %+v", gwSpec, tt.desiredGWSpec)
 			}
@@ -223,7 +222,7 @@ func TestIngress(t *testing.T) {
 		{
 			name: "should return empty networkingv1.IngressSpec if Router does not have an ingress class defined.",
 			router: Router{
-				IngressClass: nil,
+				Ingress: nil,
 			},
 			desiredIngressSpec: networkingv1.IngressSpec{},
 		},
@@ -231,7 +230,9 @@ func TestIngress(t *testing.T) {
 			name: "should correctly translate to networkingv1.IngressSpec",
 			router: Router{
 				HostDomainName: "foobar.nim",
-				IngressClass:   ptr.To("nginx"),
+				Ingress: &RouterIngress{
+					IngressClass: "nginx",
+				},
 			},
 			desiredIngressSpec: networkingv1.IngressSpec{
 				IngressClassName: ptr.To("nginx"),
@@ -245,7 +246,7 @@ func TestIngress(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ingressSpec := tt.router.GenerateIngressSpec("test")
+			ingressSpec := tt.router.GenerateIngressSpec("test", "test")
 			if !reflect.DeepEqual(ingressSpec, tt.desiredIngressSpec) {
 				t.Errorf("GenerateIngressSpec() = %+v, want %+v", ingressSpec, tt.desiredIngressSpec)
 			}

@@ -55,18 +55,7 @@ spec:
     service:
       type: ClusterIP
       port: 8000
-    ingress:
-      enabled: true
-      spec:
-        ingressClassName: nginx
-        rules:
-          - host: demo.nvidia.example.com
-            http:
-              paths:
-              - backend:
-                  service:
-                    name: meta-llama-3-2-1b-instruct
-                    port:
-                      number: 8000
-                path: /v1/chat/completions
-                pathType: Prefix
+    router:
+      ingress:
+        ingressClass: nginx
+      hostDomainName: demo.nvidia.example.com
