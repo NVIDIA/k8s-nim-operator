@@ -152,7 +152,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	modelPVC, modelProfile, nimCache, err = r.renderAndSyncCache(ctx, nimService)
 	if err != nil {
 		return ctrl.Result{}, err
-	} else if modelPVC == nil {
+	} else if nimCache == nil {
 		return ctrl.Result{}, nil
 	}
 
@@ -340,6 +340,8 @@ func (r *NIMServiceReconciler) renderAndSyncCache(ctx context.Context,
 	} else if nimService.Spec.Storage.PVC.Name != "" {
 		// Use an existing PVC
 		modelPVC = &nimService.Spec.Storage.PVC
+	} else if nimService.Spec.Storage.EmptyDir != nil {
+		modelPVC = nil
 	} else {
 		err := fmt.Errorf("neither external PVC name or NIMCache volume is provided")
 		logger.Error(err, "failed to determine PVC for model-store")
@@ -475,9 +477,31 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 			},
 		}, isvcParams.Env)
 	}
+	// If NIMCache is not provided, and the model is from Hugging Face, add the HF_TOKEN to the environment variables
+	if nimService.GetNIMCacheName() == "" {
+		env := utils.FindEnvByValue(isvcParams.Env, "NIM_MODEL_NAME")
+		if env != nil {
+			if strings.HasPrefix(env.Value, "hf://") {
+				isvcParams.Env = utils.RemoveEnvVar(isvcParams.Env, "NGC_API_KEY")
+				isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{
+					{
+						Name: "HF_TOKEN",
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key: "HF_TOKEN",
+							},
+						},
+					},
+				})
+			}
+		}
+	}
 	// Setup volume mounts with model store
-	isvcParams.Volumes = nimService.GetVolumes(*modelPVC)
-	isvcParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
+	isvcParams.Volumes = nimService.GetVolumes(modelPVC)
+	isvcParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
 	if profileEnv != nil {
 		isvcParams.Env = utils.MergeEnvVars(*profileEnv, isvcParams.Env)
 	}

@@ -370,9 +370,11 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	} else if nimService.Spec.Storage.PVC.Name != "" {
 		// Use an existing PVC
 		modelPVC = &nimService.Spec.Storage.PVC
+	} else if nimService.Spec.Storage.EmptyDir != nil {
+		modelPVC = nil
 	} else {
-		err = fmt.Errorf("neither external PVC name or NIMCache volume is provided")
-		logger.Error(err, "failed to determine PVC for model-store")
+		err = fmt.Errorf("neither external PVC name, NIMCache volume or empty dir is provided")
+		logger.Error(err, "failed to determine PVC , NIMCache volume or empty dir for model-store")
 		return ctrl.Result{}, err
 	}
 
@@ -424,8 +426,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		lwsParams := nimService.GetLWSParams()
 		lwsParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
 		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
-		lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(*modelPVC)
-		lwsParams.WorkerVolumes = nimService.GetWorkerVolumes(*modelPVC)
+		lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(modelPVC)
+		lwsParams.WorkerVolumes = nimService.GetWorkerVolumes(modelPVC)
 		if nimCache.IsUniversalNIM() {
 			lwsParams.WorkerEnvs = utils.MergeEnvVars([]corev1.EnvVar{{
 				Name:  "NIM_MODEL_NAME",
@@ -436,8 +438,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 				Value: utils.DefaultModelStorePath,
 			}}, lwsParams.LeaderEnvs)
 		}
-		lwsParams.LeaderVolumeMounts = nimService.GetLeaderVolumeMounts(*modelPVC)
-		lwsParams.WorkerVolumeMounts = nimService.GetWorkerVolumeMounts(*modelPVC)
+		lwsParams.LeaderVolumeMounts = nimService.GetLeaderVolumeMounts(modelPVC)
+		lwsParams.WorkerVolumeMounts = nimService.GetWorkerVolumeMounts(modelPVC)
 		if profileEnv != nil {
 			lwsParams.WorkerEnvs = utils.MergeEnvVars(*profileEnv, lwsParams.WorkerEnvs)
 			lwsParams.LeaderEnvs = utils.MergeEnvVars(*profileEnv, lwsParams.LeaderEnvs)
@@ -477,9 +479,31 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 				Value: utils.DefaultModelStorePath,
 			}}, deploymentParams.Env)
 		}
+		// If NIMCache is not provided, and the model is from Hugging Face, add the HF_TOKEN to the environment variables
+		if nimService.GetNIMCacheName() == "" {
+			env := utils.FindEnvByValue(deploymentParams.Env, "NIM_MODEL_NAME")
+			if env != nil {
+				if strings.HasPrefix(env.Value, "hf://") {
+					deploymentParams.Env = utils.RemoveEnvVar(deploymentParams.Env, "NGC_API_KEY")
+					deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
+						{
+							Name: "HF_TOKEN",
+							ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: nimService.Spec.AuthSecret,
+									},
+									Key: "HF_TOKEN",
+								},
+							},
+						},
+					})
+				}
+			}
+		}
 		// Setup volume mounts with model store
-		deploymentParams.Volumes = nimService.GetVolumes(*modelPVC)
-		deploymentParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
+		deploymentParams.Volumes = nimService.GetVolumes(modelPVC)
+		deploymentParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
 		if profileEnv != nil {
 			deploymentParams.Env = utils.MergeEnvVars(*profileEnv, deploymentParams.Env)
 		}
