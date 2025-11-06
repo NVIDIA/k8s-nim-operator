@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strings"
 
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -283,13 +284,13 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 			Value: utils.DefaultModelStorePath,
 		},
 		{
-			Name: "NGC_API_KEY",
+			Name: NGCAPIKey,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: n.Spec.AuthSecret,
 					},
-					Key: "NGC_API_KEY",
+					Key: NGCAPIKey,
 				},
 			},
 		},
@@ -981,6 +982,17 @@ func (n *NIMService) GetIngressSpec() networkingv1.IngressSpec {
 
 func (n *NIMService) IsHTTPRouteEnabled() bool {
 	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.HTTPRoutesEnabled
+}
+
+// IsHFModel returns true if the NIMService is using an HF model.
+func (n *NIMService) IsHFModel() bool {
+	env := utils.FindEnvByValue(n.GetEnv(), "NIM_MODEL_NAME")
+	if env != nil {
+		if strings.HasPrefix(env.Value, "hf://") {
+			return true
+		}
+	}
+	return false
 }
 
 func (n *NIMService) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
