@@ -244,13 +244,13 @@ var _ = Describe("NemoCustomizer Controller", func() {
 							"annotation-key-specific": "service",
 						},
 					},
-				},
-				Router: appsv1alpha1.Router{
-					Ingress: &appsv1alpha1.RouterIngress{
-						IngressClass: "nginx",
-					},
-					Annotations: map[string]string{
-						"annotation-key-specific": "ingress",
+					Router: appsv1alpha1.Router{
+						Ingress: &appsv1alpha1.RouterIngress{
+							IngressClass: "nginx",
+						},
+						Annotations: map[string]string{
+							"annotation-key-specific": "ingress",
+						},
 					},
 				},
 				Scale: appsv1alpha1.Autoscaling{
@@ -672,7 +672,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			err = client.Get(context.TODO(), namespacedName, nemoCustomizer)
 			Expect(err).NotTo(HaveOccurred())
 			nemoCustomizer.Spec.Scale.Enabled = ptr.To[bool](false)
-			nemoCustomizer.Spec.Router.Ingress = nil
+			nemoCustomizer.Spec.Expose.Router.Ingress = nil
 			err = client.Update(context.TODO(), nemoCustomizer)
 			Expect(err).NotTo(HaveOccurred())
 

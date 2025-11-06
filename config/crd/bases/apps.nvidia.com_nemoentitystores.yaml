@@ -1163,7 +1163,7 @@ spec:
                 properties:
                   ingress:
                     description: |-
-                      Deprecated: Use .spec.router.ingress instead.
+                      Deprecated: Use .spec.expose.router.ingress instead.
                       IngressV1 defines attributes for ingress
                     properties:
                       annotations:
@@ -1202,6 +1202,71 @@ spec:
                     - message: spec cannot be nil when ingress is enabled
                       rule: (has(self.spec) && has(self.enabled) && self.enabled)
                         || !has(self.enabled) || !self.enabled
+                  router:
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations for the router, e.g. for ingress
+                          class or gateway
+                        type: object
+                      gateway:
+                        description: Gateway is the gateway to use for the created
+                          HTTPRoute.
+                        properties:
+                          grpcRoutesEnabled:
+                            default: false
+                            description: GRPCRoutesEnabled is a flag to enable GRPCRoutes
+                              for the created gateway.
+                            type: boolean
+                          httpRoutesEnabled:
+                            default: true
+                            description: HTTPRoutesEnabled is a flag to enable HTTPRoutes
+                              for the created gateway.
+                            type: boolean
+                          name:
+                            description: Name of the gateway
+                            minLength: 1
+                            type: string
+                          namespace:
+                            description: Namespace of the gateway
+                            minLength: 1
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
+                      hostDomainName:
+                        description: |-
+                          HostDomainName is the domain name of the hostname matched by the router.
+                          The hostname is constructed as "<nimServiceName>.<namespace>.<hostDomainName>", where the <nimServiceName> a subdomain of the matched hostname.
+                          eg. example.com for "<nimServiceName>.<namespace>.example.com"
+                        maxLength: 63
+                        minLength: 1
+                        pattern: ^(([a-z0-9][a-z0-9\-]*[a-z0-9])|[a-z0-9]+\.)*([a-z]+|xn\-\-[a-z0-9]+)\.?$
+                        type: string
+                      ingress:
+                        description: Ingress is the ingress controller to use for
+                          the created ingress.
+                        properties:
+                          ingressClass:
+                            description: IngressClass is the ingress class to use
+                              for the created ingress.
+                            minLength: 1
+                            type: string
+                          tlsSecretName:
+                            description: TLSSecretName is the name of the secret containing
+                              the TLS certificate and key.
+                            type: string
+                        required:
+                        - ingressClass
+                        type: object
+                    type: object
+                    x-kubernetes-validations:
+                    - message: 'unsupported field: spec.expose.router.gateway.grpcRoutesEnabled'
+                      rule: '!(has(self.gateway) && self.gateway.grpcRoutesEnabled)'
+                    - message: ingress and gateway cannot be specified together
+                      rule: '!(has(self.gateway) && has(self.ingress))'
                   service:
                     description: Service defines attributes to create a service.
                     properties:
@@ -1722,63 +1787,6 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
-              router:
-                properties:
-                  annotations:
-                    additionalProperties:
-                      type: string
-                    description: Annotations for the router, e.g. for ingress class
-                      or gateway
-                    type: object
-                  gateway:
-                    description: Gateway is the gateway to use for the created HTTPRoute.
-                    properties:
-                      httpRoutesEnabled:
-                        default: true
-                        description: HTTPRoutesEnabled is a flag to enable HTTPRoutes
-                          for the created gateway.
-                        type: boolean
-                      name:
-                        description: Name of the gateway
-                        minLength: 1
-                        type: string
-                      namespace:
-                        description: Namespace of the gateway
-                        minLength: 1
-                        type: string
-                    required:
-                    - name
-                    - namespace
-                    type: object
-                  hostDomainName:
-                    description: |-
-                      HostDomainName is the domain name of the hostname matched by the router.
-                      The hostname is constructed as "<nimServiceName>.<namespace>.<hostDomainName>", where the <nimServiceName> a subdomain of the matched hostname.
-                      eg. example.com for "<nimServiceName>.<namespace>.example.com"
-                    maxLength: 63
-                    minLength: 1
-                    pattern: ^(([a-z0-9][a-z0-9\-]*[a-z0-9])|[a-z0-9]+\.)*([a-z]+|xn\-\-[a-z0-9]+)\.?$
-                    type: string
-                  ingress:
-                    description: Ingress is the ingress controller to use for the
-                      created ingress.
-                    properties:
-                      ingressClass:
-                        description: IngressClass is the ingress class to use for
-                          the created ingress.
-                        minLength: 1
-                        type: string
-                      tlsSecretName:
-                        description: TLSSecretName is the name of the secret containing
-                          the TLS certificate and key.
-                        type: string
-                    required:
-                    - ingressClass
-                    type: object
-                type: object
-                x-kubernetes-validations:
-                - message: ingress and gateway cannot be specified together
-                  rule: '!(has(self.gateway) && has(self.ingress))'
               runtimeClass:
                 type: string
               scale:
@@ -2475,9 +2483,9 @@ spec:
             x-kubernetes-validations:
             - message: .spec.expose.ingress is deprecated, and will be removed in
                 a future release. If .spec.expose.ingress is set, please do not set
-                .spec.router.ingress.
+                .spec.expose.router.ingress.
               rule: '!(has(self.expose.ingress) && has(self.expose.ingress.enabled)
-                && self.expose.ingress.enabled && has(self.router) && has(self.router.ingress))'
+                && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))'
             - message: spec.replicas cannot be set when spec.scale.enabled is true
               rule: '!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled
                 && has(self.replicas))'
