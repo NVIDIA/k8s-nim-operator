@@ -331,6 +331,11 @@ func (n *NIMCache) IsUniversalNIM() bool {
 	return false
 }
 
+// IsHFModel returns true if the NIMCache is for a Hugging Face model.
+func (n *NIMCache) IsHFModel() bool {
+	return n.Spec.Source.HF != nil || n.Spec.Source.DataStore != nil
+}
+
 // IsOptimizedNIM returns true if the NIMCache is for an optimized NIM.
 func (n *NIMCache) IsOptimizedNIM() bool {
 	// Universal NIM is when the modelEndpoint is set in the NGCSource.
