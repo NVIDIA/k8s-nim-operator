@@ -1,0 +1,17 @@
+{{ if .Enabled }}
+apiVersion: nvidia.com/resource/v1beta1
+kind: ComputeDomain
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}  
+  {{- if .Labels }}
+  labels:
+    {{- .Labels | yaml | nindent 4 }}
+  {{- end }}
+  {{- if .Annotations }}
+  annotations:
+    {{- .Annotations | yaml | nindent 4 }}
+  {{- end }}
+  spec:
+    {{- .Spec | yaml | nindent 4 }}
+{{- end }}

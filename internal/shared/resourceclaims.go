@@ -34,6 +34,10 @@ const (
 	podClaimNamePrefix = "claim"
 )
 
+const (
+	noIndexSuffix = -1
+)
+
 type DraResourceFieldType int
 
 const (
@@ -88,7 +92,8 @@ func UpdateContainerResourceClaims(containers []corev1.Container, resources []Na
 
 func GenerateNamedDRAResources(nimService *appsv1alpha1.NIMService) []NamedDRAResource {
 	nameCache := make(map[string]int)
-	namedDraResources := make([]NamedDRAResource, len(nimService.Spec.DRAResources))
+	// Provide an extra buffer for a compute domain, if any.
+	namedDraResources := make([]NamedDRAResource, len(nimService.Spec.DRAResources), len(nimService.Spec.DRAResources)+1)
 	for idx, resource := range nimService.Spec.DRAResources {
 		namedDraResources[idx] = NamedDRAResource{
 			DRAResource: resource,
@@ -106,6 +111,16 @@ func GenerateNamedDRAResources(nimService *appsv1alpha1.NIMService) []NamedDRARe
 			namedDraResources[idx].ResourceName = generateUniqueDRAResourceName(nimService.Name, resource.ClaimCreationSpec.GetNamePrefix(), idx)
 		}
 
+		namedDraResources[idx].Name = generateUniquePodClaimName(nameCache, nimService.Name, namedDraResources[idx].ResourceName, namedDraResources[idx].FieldType)
+	}
+
+	// Add generated resourceclaimtemplate for compute domain, if any.
+	if nimService.IsComputeDomainEnabled() {
+		idx := len(nimService.Spec.DRAResources)
+		namedDraResources[idx] = NamedDRAResource{
+			FieldType:    DRAResourceFieldTypeClaimTemplate,
+			ResourceName: generateUniqueDRAResourceName(nimService.Name, "compute-domain", noIndexSuffix),
+		}
 		namedDraResources[idx].Name = generateUniquePodClaimName(nameCache, nimService.Name, namedDraResources[idx].ResourceName, namedDraResources[idx].FieldType)
 	}
 	return namedDraResources
@@ -126,8 +141,11 @@ func generateUniquePodClaimName(nameCache map[string]int, nimServiceName string,
 
 func generateUniqueDRAResourceName(nimServiceName string, namePrefix string, idx int) string {
 	nimServiceNameHash := utils.GetTruncatedStringHash(nimServiceName, 12)
-	uniqueName := fmt.Sprintf("%s-%s-%d", namePrefix, nimServiceNameHash, idx)
-	return uniqueName
+	// If idx is
+	if idx == noIndexSuffix {
+		return fmt.Sprintf("%s-%s", namePrefix, nimServiceNameHash)
+	}
+	return fmt.Sprintf("%s-%s-%d", namePrefix, nimServiceNameHash, idx)
 }
 
 func GetPodResourceClaims(resources []NamedDRAResource) []corev1.PodResourceClaim {

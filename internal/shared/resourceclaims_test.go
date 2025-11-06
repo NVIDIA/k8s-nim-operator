@@ -378,6 +378,11 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			Expect(result1).To(HaveSuffix("-0"))
 			Expect(result2).To(HaveSuffix("-1"))
 		})
+
+		It("should generate correct compute domain resource name", func() {
+			name := generateUniqueDRAResourceName(nimServiceName, "compute-domain", noIndexSuffix)
+			Expect(name).To(Equal("compute-domain-8568b4fb55"))
+		})
 	})
 
 	Describe("generateDRAResourceStatus", func() {
