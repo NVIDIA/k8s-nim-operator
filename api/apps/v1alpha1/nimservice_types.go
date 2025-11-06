@@ -284,13 +284,13 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 			Value: utils.DefaultModelStorePath,
 		},
 		{
-			Name: "NGC_API_KEY",
+			Name: NGCAPIKey,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: n.Spec.AuthSecret,
 					},
-					Key: "NGC_API_KEY",
+					Key: NGCAPIKey,
 				},
 			},
 		},
@@ -984,7 +984,7 @@ func (n *NIMService) IsHTTPRouteEnabled() bool {
 	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.HTTPRoutesEnabled
 }
 
-func (n *NIMService) IsHFMultiLLM() bool {
+func (n *NIMService) IsHFModel() bool {
 	env := utils.FindEnvByValue(n.GetEnv(), "NIM_MODEL_NAME")
 	if env != nil {
 		if strings.HasPrefix(env.Value, "hf://") {

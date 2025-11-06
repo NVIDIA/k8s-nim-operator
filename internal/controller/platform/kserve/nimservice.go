@@ -478,17 +478,17 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 		}, isvcParams.Env)
 	}
 	// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, add the HF_TOKEN to the environment variables
-	if nimCache.IsHFMultiLLM() || nimService.IsHFMultiLLM() {
-		isvcParams.Env = utils.RemoveEnvVar(isvcParams.Env, "NGC_API_KEY")
+	if nimCache.IsHFModel() || nimService.IsHFModel() {
+		isvcParams.Env = utils.RemoveEnvVar(isvcParams.Env, appsv1alpha1.NGCAPIKey)
 		isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{
 			{
-				Name: "HF_TOKEN",
+				Name: appsv1alpha1.HFToken,
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: nimService.Spec.AuthSecret,
 						},
-						Key: "HF_TOKEN",
+						Key: appsv1alpha1.HFToken,
 					},
 				},
 			},

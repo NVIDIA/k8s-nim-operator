@@ -642,13 +642,13 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 					Value: inputNimProfile.Name,
 				},
 				{
-					Name: "NGC_API_KEY",
+					Name: appsv1alpha1.NGCAPIKey,
 					ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: nimCache.Spec.Source.NGC.AuthSecret,
 							},
-							Key: "NGC_API_KEY",
+							Key: appsv1alpha1.NGCAPIKey,
 						},
 					},
 				},
