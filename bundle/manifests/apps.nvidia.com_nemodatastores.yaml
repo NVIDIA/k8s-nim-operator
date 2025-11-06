@@ -1151,7 +1151,7 @@ spec:
                 properties:
                   ingress:
                     description: |-
-                      Deprecated: Use .spec.router.ingress instead.
+                      Deprecated: Use .spec.expose.router.ingress instead.
                       IngressV1 defines attributes for ingress
                     properties:
                       annotations:
@@ -1251,7 +1251,7 @@ spec:
                         type: object
                     type: object
                     x-kubernetes-validations:
-                    - message: 'unsupported field: spec.router.gateway.grpcRoutesEnabled'
+                    - message: 'unsupported field: spec.expose.router.gateway.grpcRoutesEnabled'
                       rule: '!(has(self.gateway) && self.gateway.grpcRoutesEnabled)'
                     - message: ingress and gateway cannot be specified together
                       rule: '!(has(self.gateway) && has(self.ingress))'
@@ -2574,7 +2574,7 @@ spec:
             x-kubernetes-validations:
             - message: .spec.expose.ingress is deprecated, and will be removed in
                 a future release. If .spec.expose.ingress is set, please do not set
-                .spec.router.ingress.
+                .spec.expose.router.ingress.
               rule: '!(has(self.expose.ingress) && has(self.expose.ingress.enabled)
                 && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))'
             - message: spec.replicas cannot be set when spec.scale.enabled is true

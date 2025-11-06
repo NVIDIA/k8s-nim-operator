@@ -264,10 +264,10 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				},
 				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
-				},
-				Router: appsv1alpha1.Router{
-					Ingress: &appsv1alpha1.RouterIngress{
-						IngressClass: "nginx",
+					Router: appsv1alpha1.Router{
+						Ingress: &appsv1alpha1.RouterIngress{
+							IngressClass: "nginx",
+						},
 					},
 				},
 				Scale: appsv1alpha1.Autoscaling{

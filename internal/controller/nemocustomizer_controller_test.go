@@ -244,13 +244,13 @@ var _ = Describe("NemoCustomizer Controller", func() {
 							"annotation-key-specific": "service",
 						},
 					},
-				},
-				Router: appsv1alpha1.Router{
-					Ingress: &appsv1alpha1.RouterIngress{
-						IngressClass: "nginx",
-					},
-					Annotations: map[string]string{
-						"annotation-key-specific": "ingress",
+					Router: appsv1alpha1.Router{
+						Ingress: &appsv1alpha1.RouterIngress{
+							IngressClass: "nginx",
+						},
+						Annotations: map[string]string{
+							"annotation-key-specific": "ingress",
+						},
 					},
 				},
 				Scale: appsv1alpha1.Autoscaling{

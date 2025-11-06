@@ -263,15 +263,16 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
-				},
-				Router: appsv1alpha1.Router{
-					Ingress: &appsv1alpha1.RouterIngress{
-						IngressClass: "nginx",
+
+					Router: appsv1alpha1.Router{
+						Ingress: &appsv1alpha1.RouterIngress{
+							IngressClass: "nginx",
+						},
+						Annotations: map[string]string{
+							"annotation-key-specific": "ingress",
+						},
+						HostDomainName: "example.com",
 					},
-					Annotations: map[string]string{
-						"annotation-key-specific": "ingress",
-					},
-					HostDomainName: "example.com",
 				},
 				Scale: appsv1alpha1.Autoscaling{
 					Enabled:     ptr.To[bool](true),
