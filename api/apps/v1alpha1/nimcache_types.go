@@ -331,7 +331,7 @@ func (n *NIMCache) IsUniversalNIM() bool {
 	return false
 }
 
-// IsHFMultiLLM returns true if the NIMCache is for a Hugging Face Multi-LLM NIM.
+// IsHFModel returns true if the NIMCache is for a Hugging Face model.
 func (n *NIMCache) IsHFModel() bool {
 	return n.Spec.Source.HF != nil || n.Spec.Source.DataStore != nil
 }

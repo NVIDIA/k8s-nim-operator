@@ -984,6 +984,7 @@ func (n *NIMService) IsHTTPRouteEnabled() bool {
 	return n.Spec.Router.Gateway != nil && n.Spec.Router.Gateway.HTTPRoutesEnabled
 }
 
+// IsHFModel returns true if the NIMService is using an HF model.
 func (n *NIMService) IsHFModel() bool {
 	env := utils.FindEnvByValue(n.GetEnv(), "NIM_MODEL_NAME")
 	if env != nil {
