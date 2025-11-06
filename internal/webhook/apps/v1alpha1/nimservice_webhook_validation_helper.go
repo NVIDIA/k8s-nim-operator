@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/blang/semver/v4"
 
@@ -63,24 +64,94 @@ var validDRAResourceQuantitySelectorOps = []appsv1alpha1.DRAResourceQuantitySele
 // object. It is intended to be invoked by both ValidateCreate and ValidateUpdate to
 // ensure the resource is well-formed before any other validation (e.g. immutability)
 // is performed.
-func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, kubeVersion string) field.ErrorList {
-	errList := field.ErrorList{}
+func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, kubeVersion string) (admission.Warnings, field.ErrorList) {
+	warningList, errList := validateImageConfiguration(&spec.Image, fldPath.Child("image"))
 
-	// Validate individual sections of the spec using existing helper functions.
-	errList = append(errList, validateImageConfiguration(&spec.Image, fldPath.Child("image"))...)
-	errList = append(errList, validateAuthSecret(&spec.AuthSecret, fldPath.Child("authSecret"))...)
-	errList = append(errList, validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))...)
-	errList = append(errList, validateRouter(&spec.Router, fldPath.Child("router"))...)
-	errList = append(errList, validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))...)
-	errList = append(errList, validateScaleConfiguration(&spec.Scale, spec.Replicas, fldPath.Child("scale"))...)
-	errList = append(errList, validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))...)
-	errList = append(errList, validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)...)
-	errList = append(errList, validateKServeConfiguration(spec, fldPath)...)
+	// TODO abstract all validation functions with a single signature validateFunc(*appsv1alpha1.NIMServiceSpec, *field.Path) (admission.Warnings, field.ErrorList)
+	w, err := validateImageConfiguration(&spec.Image, fldPath.Child("image"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
 
-	return errList
+	w, err = validateAuthSecret(&spec.AuthSecret, fldPath.Child("authSecret"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateRouterConfiguration(&spec.Expose.Router, fldPath.Child("expose").Child("router"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateMetricsConfiguration(&spec.Metrics, fldPath.Child("metrics"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateScaleConfiguration(&spec.Scale, spec.Replicas, fldPath.Child("scale"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateResourcesConfiguration(spec.Resources, fldPath.Child("resources"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateDRAResourcesConfiguration(spec, fldPath, kubeVersion)
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateKServeConfiguration(spec, fldPath)
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateExposeConfiguration(&spec.Expose, fldPath.Child("expose"))
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateRedundantIngressConfiguration(spec, fldPath)
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	w, err = validateExposeRouterConfiguration(spec, fldPath)
+	warningList = append(warningList, w...)
+	errList = append(errList, err...)
+
+	return warningList, errList
 }
 
-func validateImageConfiguration(image *appsv1alpha1.Image, fldPath *field.Path) field.ErrorList {
+func validateExposeRouterConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
+	errList := field.ErrorList{}
+	if spec.Expose.Service.Type == corev1.ServiceTypeLoadBalancer && (spec.Expose.Router.Gateway != nil || spec.Expose.Router.Ingress != nil) {
+		warningList = append(warningList, "spec.expose.service.type is set to LoadBalancer, but spec.expose.router.gateway or spec.expose.router.ingress is also set. This creates two entry points for the service. Consider only using one of them.")
+	}
+
+	if spec.Expose.Router.Gateway != nil && spec.Expose.Router.Gateway.GRPCRoutesEnabled && spec.Expose.Service.GRPCPort == nil {
+		errList = append(errList, field.Required(fldPath.Child("expose").Child("service").Child("grpcPort"), "must be set when .spec.expose.router.gateway.grpcRoutesEnabled is true"))
+	}
+	return warningList, errList
+}
+
+func validateRedundantIngressConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
+	errList := field.ErrorList{}
+	if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled && spec.Expose.Router.Ingress != nil { //nolint:staticcheck
+		errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress"), fmt.Sprintf("%s is deprecated. Omit the field if you use .spec.expose.router instead", fldPath.Child("expose").Child("ingress"))))
+	}
+	return warningList, errList
+}
+
+func validateExposeConfiguration(expose *appsv1alpha1.Expose, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
+	errList := field.ErrorList{}
+	if expose.Ingress.Enabled != nil && *expose.Ingress.Enabled { //nolint:staticcheck
+		warningList = append(warningList, ".spec.expose.ingress is deprecated, use .spec.expose.router instead.")
+	}
+	return warningList, errList
+}
+
+func validateImageConfiguration(image *appsv1alpha1.Image, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if image.Repository == "" {
 		errList = append(errList, field.Required(fldPath.Child("repository"), "is required"))
@@ -91,7 +162,8 @@ func validateImageConfiguration(image *appsv1alpha1.Image, fldPath *field.Path) 
 	return errList
 }
 
-func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage, fldPath *field.Path) field.ErrorList {
+func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	// If size limit is defined, it must be greater than 0
 	if storage.SharedMemorySizeLimit != nil {
@@ -145,10 +217,12 @@ func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage
 
 	// Enforcing PVC rules if defined
 	if pvcDefined {
-		errList = append(errList, validatePVCConfiguration(&storage.PVC, fldPath.Child("pvc"))...)
+		wList, eList := validatePVCConfiguration(&storage.PVC, fldPath.Child("pvc"))
+		warningList = append(warningList, wList...)
+		errList = append(errList, eList...)
 	}
 
-	return errList
+	return warningList, errList
 }
 
 func validateDRAResourcesConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, k8sVersion string) field.ErrorList {
@@ -348,37 +422,42 @@ func validateDRAResourceQuantitySelectorValue(value *apiresource.Quantity, fldPa
 	return errList
 }
 
-func validateAuthSecret(authSecret *string, fldPath *field.Path) field.ErrorList {
+func validateAuthSecret(authSecret *string, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if *authSecret == "" {
 		errList = append(errList, field.Required(fldPath, "is required"))
 	}
-	return errList
+	return warningList, errList
 }
 
-// If Spec.Expose.Ingress.Enabled is true, Spec.Expose.Ingress.Spec must be non-nil.
-func validateRouter(r *appsv1alpha1.Router, fldPath *field.Path) field.ErrorList {
+func validateRouterConfiguration(router *appsv1alpha1.Router, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
-	if r.Gateway != nil && r.IngressClass != nil {
-		errList = append(errList, field.Forbidden(fldPath, "ingressClass and gateway cannot be specified together"))
+	if (router.Ingress != nil || router.Gateway != nil) && router.HostDomainName == "" {
+		errList = append(errList, field.Required(fldPath.Child("hostDomainName"), "is required"))
 	}
-
-	return errList
+	if router.Ingress != nil && router.Gateway != nil {
+		errList = append(errList, field.Forbidden(fldPath, "ingress and gateway cannot be specified together"))
+	}
+	return warningList, errList
 }
 
 // If Spec.Metrics.Enabled is true, Spec.Metrics.ServiceMonitor must not be empty.
-func validateMetricsConfiguration(metrics *appsv1alpha1.Metrics, fldPath *field.Path) field.ErrorList {
+func validateMetricsConfiguration(metrics *appsv1alpha1.Metrics, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if metrics.Enabled != nil && *metrics.Enabled {
 		if reflect.DeepEqual(metrics.ServiceMonitor, appsv1alpha1.ServiceMonitor{}) {
 			errList = append(errList, field.Required(fldPath.Child("serviceMonitor"), fmt.Sprintf("must be defined if %s is true", fldPath.Child("enabled"))))
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
 // If Spec.Scale.Enabled is true, Spec.Scale.HPA must be non-empty HorizontalPodAutoScaler.
-func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, replicas *int32, fldPath *field.Path) field.ErrorList {
+func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, replicas *int32, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if scale.Enabled != nil && *scale.Enabled {
 		if reflect.DeepEqual(scale.HPA, appsv1alpha1.HorizontalPodAutoscalerSpec{}) {
@@ -394,7 +473,7 @@ func validateScaleConfiguration(scale *appsv1alpha1.Autoscaling, replicas *int32
 			)
 		}
 	}
-	return errList
+	return warningList, errList
 }
 
 // Spec.Resources.Claims must be empty.
@@ -431,7 +510,13 @@ func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *fie
 			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingressClass"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("ingressClass"))))
 		}
 
-		if spec.Router.Gateway != nil {
+		// Spec.Expose.Router.Ingress cannot be set.
+		if spec.Expose.Router.Ingress != nil {
+			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingress"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("ingress"))))
+		}
+
+		// Spec.Expose.Router.Gateway cannot be set.
+		if spec.Expose.Router.Gateway != nil {
 			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("gateway"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("gateway"))))
 		}
 

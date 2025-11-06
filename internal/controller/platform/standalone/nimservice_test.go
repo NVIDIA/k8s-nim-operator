@@ -263,13 +263,16 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 				Expose: appsv1alpha1.Expose{
 					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
-				},
-				Router: appsv1alpha1.Router{
-					IngressClass: ptr.To("nginx"),
-					Annotations: map[string]string{
-						"annotation-key-specific": "ingress",
+
+					Router: appsv1alpha1.Router{
+						Ingress: &appsv1alpha1.RouterIngress{
+							IngressClass: "nginx",
+						},
+						Annotations: map[string]string{
+							"annotation-key-specific": "ingress",
+						},
+						HostDomainName: "example.com",
 					},
-					HostDomainName: "default.example.com",
 				},
 				Scale: appsv1alpha1.Autoscaling{
 					Enabled:     ptr.To[bool](true),
@@ -864,7 +867,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			err = client.Get(context.TODO(), namespacedName, nimService)
 			Expect(err).NotTo(HaveOccurred())
 			nimService.Spec.Scale.Enabled = ptr.To(false)
-			nimService.Spec.Router.IngressClass = nil
+			nimService.Spec.Expose.Router.Ingress = nil
 			err = client.Update(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -2255,7 +2258,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 
 		It("should return only svc endpoints when ingress is disabled", func() {
-			nimService.Spec.Router.IngressClass = nil
+			nimService.Spec.Expose.Router.Ingress = nil
 			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(internal).To(Equal("127.0.0.1:8123"))
@@ -2270,7 +2273,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 
 		It("should return ingress loadbalancer ip as external endpoint", func() {
-			nimService.Spec.Router.IngressClass = ptr.To("nginx")
+			nimService.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+				IngressClass: "nginx",
+			}
 			ingress.Spec.Rules[0].Host = ""
 			_ = client.Update(context.TODO(), ingress)
 			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
@@ -2280,7 +2285,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 
 		It("should return ingress loadbalancer hostname as external endpoint", func() {
-			nimService.Spec.Router.IngressClass = ptr.To("nginx")
+			nimService.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+				IngressClass: "nginx",
+			}
 			ingress.Spec.Rules[0].Host = ""
 			_ = client.Update(context.TODO(), ingress)
 			ingress.Status = networkingv1.IngressStatus{

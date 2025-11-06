@@ -1,29 +1,29 @@
 ---
-# NIM Cache for LLM specific NIM
+# NIM Cache for Multi-LLM NIM
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  name: meta-llama-3-2-1b-instruct
+  name: nim-cache-multi-llm
   namespace: nim-service
 spec:
   source:
-    ngc:
-      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8
+    hf:
+      endpoint: "https://huggingface.co"
+      namespace: "meta-llama"
+      authSecret: hf-api-secret
+      modelPuller: nvcr.io/nim/nvidia/llm-nim:1.12
       pullSecret: ngc-secret
-      authSecret: ngc-api-secret
-      model:
-        engine: tensorrt_llm
-        tensorParallelism: "1"
+      modelName: "Llama-3.2-1B-Instruct"
   storage:
     pvc:
       create: true
-      storageClass: ""
+      storageClass: ''
       size: "50Gi"
       volumeAccessMode: ReadWriteOnce
 
 ---
-# NIM Service for LLM specific NIM with Autoscaling
-# NOTE: Ingress controller (e.g. nginx) should be deployed as a pre-requisite
+# NIM Service with Multi-LLM NIM with Autoscaling
+# NOTE: Gateway controller (e.g. Istio) should be deployed as a pre-requisite
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
@@ -31,20 +31,26 @@ metadata:
   namespace: nim-service
 spec:
   image:
-    repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
-    tag: "1.8"
+    repository: nvcr.io/nim/nvidia/llm-nim
+    tag: "1.12"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
   authSecret: ngc-api-secret
   storage:
     nimCache:
-      name: meta-llama-3-2-1b-instruct
-      profile: ''
-  replicas: 1
+      name: nim-cache-multi-llm
+      profile: 'tensorrt_llm'
   resources:
     limits:
       nvidia.com/gpu: 1
+      cpu: "12"
+      memory: 32Gi
+    requests:
+      nvidia.com/gpu: 1
+      cpu: "4"
+      memory: 6Gi
+  replicas: 1
   expose:
     service:
       type: ClusterIP
