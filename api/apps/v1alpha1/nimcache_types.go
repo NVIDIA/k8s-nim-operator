@@ -358,6 +358,14 @@ func (n *NIMCache) GetProxySpec() *ProxySpec {
 	return n.Spec.Proxy
 }
 
+// GetProxyCertConfigMap returns the cert config map for the NIMCache.
+func (n *NIMCache) GetProxyCertConfigMap() string {
+	if n.GetProxySpec() != nil && n.GetProxySpec().CertConfigMap != "" {
+		return n.GetProxySpec().CertConfigMap
+	}
+	return ""
+}
+
 func (n *NIMCache) GetEnvWithProxy() []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
