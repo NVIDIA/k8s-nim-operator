@@ -495,7 +495,7 @@ func (n *NIMService) GetStandardAnnotations() map[string]string {
 		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
-	if n.GetProxySpec() != nil {
+	if n.GetProxyCertConfigMap() != "" {
 		standardAnnotations["openshift.io/required-scc"] = "anyuid"
 	}
 	return standardAnnotations
@@ -728,8 +728,8 @@ func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume
 		})
 	}
 
-	if n.GetProxySpec() != nil {
-		volumes = append(volumes, k8sutil.GetVolumesForUpdatingCaCert(n.Spec.Proxy.CertConfigMap)...)
+	if n.GetProxyCertConfigMap() != "" {
+		volumes = append(volumes, k8sutil.GetVolumesForUpdatingCaCert(n.GetProxySpec().CertConfigMap)...)
 	}
 	return volumes
 }
@@ -836,7 +836,7 @@ func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.V
 		},
 	}
 
-	if n.GetProxySpec() != nil {
+	if n.GetProxyCertConfigMap() != "" {
 		volumeMounts = append(volumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
 	}
 	return volumeMounts
@@ -943,7 +943,7 @@ func (n *NIMService) GetDeploymentKind() string {
 
 // GetInitContainers returns the init containers for the NIMService deployment.
 func (n *NIMService) GetInitContainers() []corev1.Container {
-	if n.Spec.Proxy != nil {
+	if n.GetProxyCertConfigMap() != "" {
 		return []corev1.Container{
 			{
 				Name:            "update-ca-certificates",
@@ -1518,6 +1518,14 @@ func (n *NIMService) GetServiceMonitorAnnotations() map[string]string {
 // GetProxySpec returns the proxy spec for the NIMService deployment.
 func (n *NIMService) GetProxySpec() *ProxySpec {
 	return n.Spec.Proxy
+}
+
+// GetProxyCertConfigMap returns the cert config map for the NIMService deployment.
+func (n *NIMService) GetProxyCertConfigMap() string {
+	if n.GetProxySpec() != nil && n.GetProxySpec().CertConfigMap != "" {
+		return n.GetProxySpec().CertConfigMap
+	}
+	return ""
 }
 
 // GetInferenceServiceParams returns params to render InferenceService from templates.
