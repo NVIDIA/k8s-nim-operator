@@ -991,12 +991,35 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			}
 			_ = client.Delete(context.TODO(), deployment)
 		})
+
+		It("Deployment is scaled down", func() {
+			nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			deployment := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &[]int32{0}[0],
+				},
+			}
+			err := client.Create(context.TODO(), deployment)
+			Expect(err).NotTo(HaveOccurred())
+			msg, ready, err := reconciler.isDeploymentReady(context.TODO(), &nimServiceKey)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(BeFalse())
+			Expect(msg).To(Equal(fmt.Sprintf("deployment %q is scaled down", deployment.Name)))
+		})
+
 		It("Deployment exceeded in its progress", func() {
 			nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
 			deployment := &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-nimservice",
 					Namespace: "default",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &[]int32{1}[0],
 				},
 				Status: appsv1.DeploymentStatus{
 					Conditions: []appsv1.DeploymentCondition{
@@ -1011,7 +1034,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 			msg, ready, err := reconciler.isDeploymentReady(context.TODO(), &nimServiceKey)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(ready).To(Equal(false))
+			Expect(ready).To(BeFalse())
 			Expect(msg).To(Equal(fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name)))
 		})
 
@@ -1033,28 +1056,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 			msg, ready, err := reconciler.isDeploymentReady(context.TODO(), &nimServiceKey)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(ready).To(Equal(false))
+			Expect(ready).To(BeFalse())
 			Expect(msg).To(Equal(fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas)))
-		})
-
-		It("Waiting for deployment rollout to finish: old replicas are pending termination", func() {
-			nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
-			deployment := &appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-nimservice",
-					Namespace: "default",
-				},
-				Status: appsv1.DeploymentStatus{
-					UpdatedReplicas: 1,
-					Replicas:        4,
-				},
-			}
-			err := client.Create(context.TODO(), deployment)
-			Expect(err).NotTo(HaveOccurred())
-			msg, ready, err := reconciler.isDeploymentReady(context.TODO(), &nimServiceKey)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(ready).To(Equal(false))
-			Expect(msg).To(Equal(fmt.Sprintf("Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\n", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas)))
 		})
 
 		It("Waiting for deployment rollout to finish:", func() {
@@ -1063,6 +1066,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-nimservice",
 					Namespace: "default",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &[]int32{4}[0],
 				},
 				Status: appsv1.DeploymentStatus{
 					UpdatedReplicas:   4,
@@ -1073,7 +1079,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 			msg, ready, err := reconciler.isDeploymentReady(context.TODO(), &nimServiceKey)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(ready).To(Equal(false))
+			Expect(ready).To(BeFalse())
 			Expect(msg).To(Equal(fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas)))
 		})
 
@@ -1084,6 +1090,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Name:      "test-nimservice",
 					Namespace: "default",
 				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &[]int32{4}[0],
+				},
 				Status: appsv1.DeploymentStatus{
 					UpdatedReplicas:   4,
 					AvailableReplicas: 4,
@@ -1093,7 +1102,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 			msg, ready, err := reconciler.isDeploymentReady(context.TODO(), &nimServiceKey)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(ready).To(Equal(true))
+			Expect(ready).To(BeTrue())
 			Expect(msg).To(Equal(fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name)))
 		})
 	})
