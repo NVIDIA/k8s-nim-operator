@@ -545,7 +545,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		// Update NIMServiceStatus with resource claims.
 		updateErr := r.updateResourceClaimStatus(ctx, nimService, namedDraResources)
 		if updateErr != nil {
-			logger.Info("WARN: Resource claim status update failed, will retry in 5 seconds", "error", updateErr.Error())
+			logger.V(4).Info("WARN: Resource claim status update failed, will retry in 5 seconds", "error", updateErr.Error())
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 	}
@@ -557,12 +557,12 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		// Update status as NotReady
 		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
-			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
+			"NIMService %s not ready, msg: %s", nimService.Name, msg)
 	} else {
 		// Update NIMServiceStatus with model config.
 		updateErr := r.updateModelStatus(ctx, nimService)
 		if updateErr != nil {
-			logger.Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
+			logger.V(4).Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 
@@ -913,15 +913,15 @@ func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespaced
 		return "", false, err
 	}
 
+	if deployment.Spec.Replicas == nil || *deployment.Spec.Replicas == 0 {
+		return fmt.Sprintf("deployment %q is scaled down", deployment.Name), false, nil
+	}
 	cond := getDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
 	if cond != nil && cond.Reason == "ProgressDeadlineExceeded" {
 		return fmt.Sprintf("deployment %q exceeded its progress deadline", deployment.Name), false, nil
 	}
-	if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
+	if deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
 		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil
-	}
-	if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
-		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\n", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil
 	}
 	if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
 		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
