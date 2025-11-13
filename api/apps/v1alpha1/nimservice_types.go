@@ -499,6 +499,8 @@ func (n *NIMService) GetStandardAnnotations() map[string]string {
 	}
 	if n.GetProxyCertConfigMap() != "" {
 		standardAnnotations["openshift.io/required-scc"] = "anyuid"
+	} else if n.GetHostPath() != "" {
+		standardAnnotations["openshift.io/required-scc"] = "hostmount-anyuid"
 	}
 	return standardAnnotations
 }
@@ -709,7 +711,8 @@ func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume
 			},
 		},
 	}
-	if modelPVC != nil {
+	switch {
+	case modelPVC != nil:
 		volumes = append(volumes, corev1.Volume{
 			Name: "model-store",
 			VolumeSource: corev1.VolumeSource{
@@ -719,7 +722,7 @@ func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume
 				},
 			},
 		})
-	} else if n.Spec.Storage.EmptyDir != nil {
+	case n.Spec.Storage.EmptyDir != nil:
 		volumes = append(volumes, corev1.Volume{
 			Name: "model-store",
 			VolumeSource: corev1.VolumeSource{
@@ -728,7 +731,7 @@ func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume
 				},
 			},
 		})
-	} else if n.Spec.Storage.HostPath != nil && *n.Spec.Storage.HostPath != "" {
+	case n.GetHostPath() != "":
 		hostPathType := corev1.HostPathDirectoryOrCreate
 		volumes = append(volumes, corev1.Volume{
 			Name: "model-store",
@@ -1428,7 +1431,8 @@ func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
 	params.Namespace = n.GetNamespace()
 
 	// Set rules to use SCC
-	if n.GetProxySpec() != nil {
+	switch {
+	case n.GetProxySpec() != nil:
 		params.Rules = []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{"security.openshift.io"},
@@ -1437,7 +1441,16 @@ func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
 				Verbs:         []string{"use"},
 			},
 		}
-	} else {
+	case n.GetHostPath() != "":
+		params.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"hostmount-anyuid"},
+				Verbs:         []string{"use"},
+			},
+		}
+	default:
 		params.Rules = []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{"security.openshift.io"},
@@ -1598,6 +1611,14 @@ func (n *NIMService) GetProxySpec() *ProxySpec {
 func (n *NIMService) GetProxyCertConfigMap() string {
 	if n.GetProxySpec() != nil && n.GetProxySpec().CertConfigMap != "" {
 		return n.GetProxySpec().CertConfigMap
+	}
+	return ""
+}
+
+// GetHostPath returns the host path for the NIMService deployment.
+func (n *NIMService) GetHostPath() string {
+	if n.Spec.Storage.HostPath != nil && *n.Spec.Storage.HostPath != "" {
+		return *n.Spec.Storage.HostPath
 	}
 	return ""
 }
