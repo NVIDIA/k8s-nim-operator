@@ -342,9 +342,11 @@ func (r *NIMServiceReconciler) renderAndSyncCache(ctx context.Context,
 		modelPVC = &nimService.Spec.Storage.PVC
 	} else if nimService.Spec.Storage.EmptyDir != nil {
 		modelPVC = nil
+	} else if nimService.Spec.Storage.HostPath != nil && *nimService.Spec.Storage.HostPath != "" {
+		modelPVC = nil
 	} else {
-		err := fmt.Errorf("neither external PVC name or NIMCache volume is provided")
-		logger.Error(err, "failed to determine PVC for model-store")
+		err := fmt.Errorf("neither external PVC name, NIMCache volume, empty dir or local host path should be provided")
+		logger.Error(err, "failed to determine PVC , NIMCache volume, empty dir or local host path for model-store")
 		return nil, "", nil, err
 	}
 
