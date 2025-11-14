@@ -341,9 +341,11 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		modelPVC = &nimService.Spec.Storage.PVC
 	} else if nimService.Spec.Storage.EmptyDir != nil {
 		modelPVC = nil
+	} else if nimService.Spec.Storage.HostPath != nil && *nimService.Spec.Storage.HostPath != "" {
+		modelPVC = nil
 	} else {
-		err = fmt.Errorf("neither external PVC name, NIMCache volume or empty dir is provided")
-		logger.Error(err, "failed to determine PVC , NIMCache volume or empty dir for model-store")
+		err = fmt.Errorf("neither external PVC name, NIMCache volume, empty dir or local host path should be provided")
+		logger.Error(err, "failed to determine PVC , NIMCache volume, empty dir or local host path for model-store")
 		return ctrl.Result{}, err
 	}
 
