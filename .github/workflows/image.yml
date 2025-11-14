@@ -30,7 +30,7 @@ jobs:
       id-token: write
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Calculate build vars
         id: vars
@@ -179,7 +179,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-image-multi-arch
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         name: Check out code
       - name: Calculate build vars
         id: vars
