@@ -437,6 +437,7 @@ rules:
   resourceNames:
   - nonroot
   - anyuid
+  - hostmount-anyuid
   resources:
   - securitycontextconstraints
   verbs:
