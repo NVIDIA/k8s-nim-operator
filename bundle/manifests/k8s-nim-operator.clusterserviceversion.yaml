@@ -1466,7 +1466,7 @@ spec:
     containerPort: 9443
     targetPort: 9443          
     deploymentName: k8s-nim-operator
-    failurePolicy: Fail
+    failurePolicy: Ignore
     generateName: vnimcache-v1alpha1.kb.io
     rules:
       - apiGroups:
@@ -1486,7 +1486,7 @@ spec:
     containerPort: 9443  
     targetPort: 9443 
     deploymentName: k8s-nim-operator
-    failurePolicy: Fail
+    failurePolicy: Ignore
     generateName: vnimservice-v1alpha1.kb.io
     rules:
       - apiGroups:
