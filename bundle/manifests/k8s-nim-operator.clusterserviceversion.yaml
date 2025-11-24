@@ -1,7 +1,7 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  name: nim-operator-certified.v3.0.0
+  name: nim-operator-certified.v3.0.2
   namespace: placeholder
   labels:
     operatorframework.io/arch.amd64: supported
@@ -526,8 +526,8 @@ spec:
     * NeMo Entity Store
 
   maturity: stable
-  version: 3.0.0
-  replaces: 'nim-operator-certified.v2.0.2'
+  version: 3.0.2
+  replaces: 'nim-operator-certified.v3.0.1'
   skips: []
   minKubeVersion: 1.26.0
   keywords: []
@@ -1466,7 +1466,7 @@ spec:
     containerPort: 9443
     targetPort: 9443          
     deploymentName: k8s-nim-operator
-    failurePolicy: Fail
+    failurePolicy: Ignore
     generateName: vnimcache-v1alpha1.kb.io
     rules:
       - apiGroups:
@@ -1486,7 +1486,7 @@ spec:
     containerPort: 9443  
     targetPort: 9443 
     deploymentName: k8s-nim-operator
-    failurePolicy: Fail
+    failurePolicy: Ignore
     generateName: vnimservice-v1alpha1.kb.io
     rules:
       - apiGroups:
