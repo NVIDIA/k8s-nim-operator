@@ -222,10 +222,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
 				}}
 			},
-			k8sVersion:      "v1.32.0", // below MinSupportedClusterVersionForDRA
+			k8sVersion:      "v1.33.0", // below MinSupportedClusterVersionForDRA
 			wantErrs:        1,
 			wantWarnings:    0,
-			wantErrMsgs:     []string{"spec.draResources: Forbidden: is not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.33.0' or higher"},
+			wantErrMsgs:     []string{"spec.draResources: Forbidden: is not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.34.0' or higher"},
 			wantWarningMsgs: nil,
 		},
 		{

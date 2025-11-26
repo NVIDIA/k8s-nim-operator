@@ -18,13 +18,15 @@ package storage
 
 type Provider interface {
 	DownloadModel(modelDir string, modelName string, storageUri string) error
+	UploadObject(bucket string, key string, object []byte) error
 }
 
 type Protocol string
 
 const (
-	S3  Protocol = "s3://"
-	GCS Protocol = "gs://"
+	S3    Protocol = "s3://"
+	GCS   Protocol = "gs://"
+	AZURE Protocol = "abfs://"
 	// PVC   Protocol = "pvc://"
 	// File  Protocol = "file://"
 	HTTPS Protocol = "https://"

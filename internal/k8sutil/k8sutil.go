@@ -36,7 +36,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -386,7 +386,7 @@ func NormalizeQualifiedName(name string, defaultDomain string) string {
 func ControllerCallbackIfCRDExists(discoveryClient discovery.DiscoveryInterface,
 	ctrlBuilder *builder.Builder,
 	gvr schema.GroupVersionResource,
-	cb func(builder *builder.Builder) *builder.Builder) (*builder.Builder, error) {
+	cb func(blder *builder.Builder) *builder.Builder) (*builder.Builder, error) {
 
 	exists, err := CRDExists(discoveryClient, gvr)
 	if err != nil {
@@ -407,8 +407,29 @@ func ControllerOwnsIfCRDExists(discoveryClient discovery.DiscoveryInterface,
 		discoveryClient,
 		ctrlBuilder,
 		gvr,
-		func(builder *builder.Builder) *builder.Builder {
-			return builder.Owns(object)
+		func(blder *builder.Builder) *builder.Builder {
+			return blder.Owns(object)
+		},
+	)
+}
+
+func ControllerWatchesIfCRDExists(discoveryClient discovery.DiscoveryInterface,
+	ctrlBuilder *builder.Builder,
+	gvr schema.GroupVersionResource,
+	object client.Object,
+	eventHandler handler.EventHandler,
+	opts ...builder.WatchesOption) (*builder.Builder, error) {
+
+	return ControllerCallbackIfCRDExists(
+		discoveryClient,
+		ctrlBuilder,
+		gvr,
+		func(blder *builder.Builder) *builder.Builder {
+			return blder.Watches(
+				object,
+				eventHandler,
+				opts...,
+			)
 		},
 	)
 }
