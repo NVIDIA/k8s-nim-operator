@@ -35,7 +35,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
@@ -163,7 +163,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	if deploymentMode == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(deploymentMode) {
 		// Sync Service Monitor
 		if nimService.IsServiceMonitorEnabled() {
 			err = r.renderAndSyncResource(ctx, nimService, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
@@ -827,18 +827,6 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 		return false, msg, nil
 	}
 
-	// Check if the resource claim CRD exists
-	crdExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
-	if err != nil {
-		logger.Error(err, "failed to check if resource claim CRD exists")
-		return false, "", err
-	}
-	if !crdExists {
-		msg := "DRA resources are not supported by NIM-Operator on this cluster, please ensure resource.k8s.io/v1beta2 API group is enabled"
-		logger.Error(fmt.Errorf("%s", msg), msg, "nimService", nimService.Name)
-		return false, msg, nil
-	}
-
 	// Check if duplicate resource claim names are provided
 	resourceClaimNames := make(map[string]bool)
 	for idx, resource := range nimService.Spec.DRAResources {
@@ -965,7 +953,7 @@ func (r *NIMServiceReconciler) getKServeDeploymentMode(ctx context.Context,
 		return "", err
 	}
 
-	deploymentMode := isvcutils.GetDeploymentMode(annotations, deployConfig)
+	deploymentMode := isvcutils.GetDeploymentMode("", annotations, deployConfig)
 	return deploymentMode, nil
 }
 
@@ -980,7 +968,7 @@ func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimSer
 		claimAnnotations := nimService.GetNIMServiceAnnotations()
 		delete(claimAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 		// Sync ResourceClaimTemplate
-		err := r.renderAndSyncResource(ctx, nimService, &resourcev1beta2.ResourceClaimTemplate{}, func() (client.Object, error) {
+		err := r.renderAndSyncResource(ctx, nimService, &resourcev1.ResourceClaimTemplate{}, func() (client.Object, error) {
 			resourceClaimTemplateParams := &rendertypes.ResourceClaimTemplateParams{
 				Name:             namedDraResource.ResourceName,
 				Namespace:        nimService.GetNamespace(),

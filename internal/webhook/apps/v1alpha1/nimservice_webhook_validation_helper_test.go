@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 // TestValidateImageConfiguration covers required field checks on Image.
@@ -222,10 +223,10 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 					ResourceClaimTemplateName: ptr.To("tmpl1"),
 				}}
 			},
-			k8sVersion:      "v1.32.0", // below MinSupportedClusterVersionForDRA
+			k8sVersion:      "v1.33.0", // below MinSupportedClusterVersionForDRA
 			wantErrs:        1,
 			wantWarnings:    0,
-			wantErrMsgs:     []string{"spec.draResources: Forbidden: is not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.33.0' or higher"},
+			wantErrMsgs:     []string{"spec.draResources: Forbidden: is not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.34.0' or higher"},
 			wantWarningMsgs: nil,
 		},
 		{
@@ -1009,26 +1010,26 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			wantWarnings: 0,
 		},
 		{
-			name: "kserve serverless (annotation absent) – valid",
+			name: "kserve knative (annotation absent) – valid",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				// No annotation ⇒ serverless by default.
+				// No annotation ⇒ knative by default.
 			},
 			wantErrs:     0,
 			wantWarnings: 0,
 		},
 		{
-			name: "kserve serverless (annotation present) – autoscaling set",
+			name: "kserve knative (annotation present) – autoscaling set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				ns.Spec.Annotations = map[string]string{"serving.kserve.org/deploymentMode": "Serverless"}
+				ns.Spec.Annotations = map[string]string{utils.KServeDeploymentModeAnnotationKey: "Knative"}
 				ns.Spec.Scale.Enabled = &trueVal
 			},
 			wantErrs:     1,
 			wantWarnings: 0,
 		},
 		{
-			name: "kserve serverless – ingress set",
+			name: "kserve knative – ingress set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				ns.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
@@ -1039,7 +1040,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			wantWarnings: 0,
 		},
 		{
-			name: "kserve serverless – servicemonitor set",
+			name: "kserve knative – servicemonitor set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				ns.Spec.Metrics.Enabled = &trueVal
@@ -1048,7 +1049,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			wantWarnings: 0,
 		},
 		{
-			name: "kserve serverless – all prohibited set",
+			name: "kserve knative – all prohibited set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
 				ns.Spec.Scale.Enabled = &trueVal
@@ -1064,7 +1065,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			name: "kserve rawdeployment – allowed autoscaling, but multidnode forbidden",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				ns.Spec.Annotations = map[string]string{"serving.kserve.org/deploymentMode": "RawDeployment"}
+				ns.Spec.Annotations = map[string]string{utils.KServeDeploymentModeAnnotationKey: "RawDeployment"}
 				ns.Spec.Scale.Enabled = &trueVal // should be fine
 				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Parallelism: &appsv1alpha1.ParallelismSpec{Pipeline: ptr.To(uint32(1))}}
 			},

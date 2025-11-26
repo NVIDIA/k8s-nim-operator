@@ -19,11 +19,12 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
+	"path/filepath"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -44,44 +45,6 @@ const (
 	ErrValueExceedsInt32Limit = "value exceeds int32 limit %d"
 )
 
-func Filter(origin map[string]string, predicate func(string) bool) map[string]string {
-	result := make(map[string]string)
-	for k, v := range origin {
-		if predicate(k) {
-			result[k] = v
-		}
-	}
-	return result
-}
-
-func Union(maps ...map[string]string) map[string]string {
-	result := make(map[string]string)
-	for _, m := range maps {
-		for k, v := range m {
-			result[k] = v
-		}
-	}
-	return result
-}
-
-func Includes(slice []string, value string) bool {
-	for _, v := range slice {
-		if v == value {
-			return true
-		}
-	}
-	return false
-}
-
-func IncludesArg(slice []string, arg string) bool {
-	for _, v := range slice {
-		if v == arg || strings.HasPrefix(v, arg) {
-			return true
-		}
-	}
-	return false
-}
-
 func AppendVolumeIfNotExists(slice []corev1.Volume, volume corev1.Volume) []corev1.Volume {
 	for i := range slice {
 		if slice[i].Name == volume.Name {
@@ -93,7 +56,16 @@ func AppendVolumeIfNotExists(slice []corev1.Volume, volume corev1.Volume) []core
 
 func IsGPUEnabled(requirements corev1.ResourceRequirements) bool {
 	_, ok := requirements.Limits[constants.NvidiaGPUResourceType]
-	return ok
+	if ok {
+		return true
+	}
+	for resourceName := range requirements.Limits {
+		// Check if the resource name has the MIG prefix
+		if strings.HasPrefix(string(resourceName), constants.NvidiaMigGPUResourceTypePrefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // FirstNonNilError returns the first non nil interface in the slice
@@ -125,6 +97,21 @@ func IsPrefixSupported(input string, prefixes []string) bool {
 		}
 	}
 	return false
+}
+
+// PropagatePrefixedMap filters keys in source by the provided prefixes and propagates matching key-value pairs to dest.
+// Initializes dest if nil.
+func PropagatePrefixedMap(source map[string]string, dest *map[string]string, prefixes ...string) {
+	for k, v := range source {
+		// The nested loop and if statement are replaced with a single, clear function call.
+		if IsPrefixSupported(k, prefixes) {
+			// Initialize the destination map if it's nil
+			if *dest == nil {
+				*dest = make(map[string]string)
+			}
+			(*dest)[k] = v
+		}
+	}
 }
 
 // MergeEnvs Merge a slice of EnvVars (`O`) into another slice of EnvVars (`B`), which does the following:
@@ -167,6 +154,27 @@ func AppendEnvVarIfNotExists(slice []corev1.EnvVar, elems ...corev1.EnvVar) []co
 		}
 	}
 	return slice
+}
+
+// Add an environment variable with the given value to the environments
+// variables of the given container, potentially replacing an env var that already exists
+// with this name
+func AddOrReplaceEnv(container *corev1.Container, envKey string, envValue string) {
+	if container.Env == nil {
+		container.Env = []corev1.EnvVar{}
+	}
+
+	for i, envVar := range container.Env {
+		if envVar.Name == envKey {
+			container.Env[i].Value = envValue
+			return
+		}
+	}
+
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:  envKey,
+		Value: envValue,
+	})
 }
 
 func AppendPortIfNotExists(slice []corev1.ContainerPort, elems ...corev1.ContainerPort) []corev1.ContainerPort {
@@ -253,8 +261,65 @@ func GetEnvVarValue(envVars []corev1.EnvVar, key string) (string, bool) {
 	return "", false // if key does not exist, return "", false
 }
 
-// IsUnknownGpuResourceType check if the provided gpu resource type is unknown one
-func IsUnknownGpuResourceType(resources corev1.ResourceRequirements, annotations map[string]string) (bool, error) {
+func GetContainerWithName(podSpec *corev1.PodSpec, name string) *corev1.Container {
+	for idx, container := range podSpec.Containers {
+		if strings.Compare(container.Name, name) == 0 {
+			return &podSpec.Containers[idx]
+		}
+	}
+	return nil
+}
+
+func GetInitContainerWithName(podSpec *corev1.PodSpec, name string) *corev1.Container {
+	for idx, container := range podSpec.InitContainers {
+		if strings.Compare(container.Name, name) == 0 {
+			return &podSpec.InitContainers[idx]
+		}
+	}
+	return nil
+}
+
+// AddVolumeMountIfNotPresent adds a volume mount to a given container but only if no volume mount
+// with this name has been already added. Container must not be nil
+func AddVolumeMountIfNotPresent(container *corev1.Container, mountName, mountPath string, readOnly bool) {
+	for _, v := range container.VolumeMounts {
+		if v.Name == mountName {
+			return
+		}
+	}
+	modelMount := corev1.VolumeMount{
+		Name:      mountName,
+		MountPath: mountPath,
+		ReadOnly:  readOnly,
+	}
+	container.VolumeMounts = append(container.VolumeMounts, modelMount)
+}
+
+// Returns the value of the stop annotation
+// Defaults to false if the annotation is not present
+func GetForceStopRuntime(obj metav1.Object) bool {
+	forceStopRuntime := false
+	// Check that the object exists
+	if obj == nil {
+		return forceStopRuntime
+	}
+
+	// Check that the annotations exist
+	anns := obj.GetAnnotations()
+	if anns == nil {
+		return forceStopRuntime
+	}
+
+	// Determine the value of the stop annotation
+	if val, exist := anns[constants.StopAnnotationKey]; exist {
+		forceStopRuntime = strings.EqualFold(val, "true")
+	}
+
+	return forceStopRuntime
+}
+
+// HasUnknownGpuResourceType check if the provided gpu resource type is unknown one
+func HasUnknownGpuResourceType(resources corev1.ResourceRequirements, annotations map[string]string) (bool, error) {
 	basicResourceTypes := map[corev1.ResourceName]struct{}{
 		corev1.ResourceCPU:              {},
 		corev1.ResourceMemory:           {},
@@ -322,15 +387,6 @@ func IsValidCustomGPUArray(s string) ([]string, bool) {
 	return customGPUTypes, true
 }
 
-// StringToInt32 converts a given integer to int32. If the number exceeds the int32 limit, it returns an error.
-func StringToInt32(number string) (int32, error) {
-	converted, err := strconv.ParseInt(number, 10, 32)
-	if err != nil {
-		return 0, err
-	}
-	return int32(converted), err
-}
-
 // UpdateGPUResourceTypeListByAnnotation updates the GPU resource type list
 // by combining the global GPU resource types from inferenceservice-config with custom GPU resource types specified in the annotations.
 func UpdateGPUResourceTypeListByAnnotation(isvcAnnotations map[string]string) ([]string, error) {
@@ -377,4 +433,43 @@ func UpdateGlobalGPUResourceTypeList(newGPUResourceTypes []string) error {
 	}
 
 	return nil
+}
+
+// GetGPUResourceQtyByType retrieves the GPU resource quantity from the given ResourceRequirements.
+// It checks both Request and Limit based on the provided resourceType.
+func GetGPUResourceQtyByType(resourceRequirements *corev1.ResourceRequirements, resourceType string) (corev1.ResourceName, *resource.Quantity, bool) {
+	if resourceType == "Limit" {
+		for resourceName, quantity := range resourceRequirements.Limits {
+			for _, gpuResourceType := range constants.DefaultGPUResourceTypeList {
+				if string(resourceName) == gpuResourceType {
+					return resourceName, &quantity, true
+				}
+			}
+		}
+	} else {
+		for resourceName, quantity := range resourceRequirements.Requests {
+			for _, gpuResourceType := range constants.DefaultGPUResourceTypeList {
+				if string(resourceName) == gpuResourceType {
+					return resourceName, &quantity, true
+				}
+			}
+		}
+	}
+	qty := resource.NewQuantity(0, resource.DecimalSI)
+
+	return "", qty, false
+}
+
+// GetParentDirectory returns the parent directory of the given path,
+// or "/" if the path is a top-level directory.
+func GetParentDirectory(path string) string {
+	// Get the parent directory
+	parentDir := filepath.Dir(path)
+
+	// Check if it's a top-level directory
+	if parentDir == "." || parentDir == "/" {
+		return "/"
+	}
+
+	return parentDir
 }
