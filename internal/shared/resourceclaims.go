@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -185,7 +185,7 @@ func generateDRAResourceStatus(ctx context.Context, client client.Client, namesp
 	return status, nil
 }
 
-func getDRAResourceClaimStatus(resourceClaim *resourcev1beta2.ResourceClaim) *appsv1alpha1.DRAResourceClaimStatusInfo {
+func getDRAResourceClaimStatus(resourceClaim *resourcev1.ResourceClaim) *appsv1alpha1.DRAResourceClaimStatusInfo {
 	claimStatus := &appsv1alpha1.DRAResourceClaimStatusInfo{
 		Name:  resourceClaim.GetName(),
 		State: k8sutil.GetResourceClaimState(resourceClaim),

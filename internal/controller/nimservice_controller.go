@@ -28,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -295,16 +295,23 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		)
 
-	nimServiceBuilder, err = k8sutil.ControllerCallbackIfCRDExists(r.discoveryClient,
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
 		nimServiceBuilder,
-		resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"),
-		func(bd *builder.Builder) *builder.Builder {
-			return bd.Watches(
-				&resourcev1beta2.ResourceClaim{},
-				handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
-				builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-			)
-		},
+		resourcev1.SchemeGroupVersion.WithResource("resourceclaimtemplates"),
+		&resourcev1.ResourceClaimTemplate{},
+	)
+	if err != nil {
+		return err
+	}
+
+	nimServiceBuilder, err = k8sutil.ControllerWatchesIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		resourcev1.SchemeGroupVersion.WithResource("resourceclaims"),
+		&resourcev1.ResourceClaim{},
+		handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
 	if err != nil {
 		return err
@@ -325,16 +332,6 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		nimServiceBuilder,
 		kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"),
 		&kservev1beta1.InferenceService{},
-	)
-	if err != nil {
-		return err
-	}
-
-	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		nimServiceBuilder,
-		resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaimtemplates"),
-		&resourcev1beta2.ResourceClaimTemplate{},
 	)
 	if err != nil {
 		return err
@@ -389,7 +386,7 @@ func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj 
 }
 
 func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
-	resourceClaim, ok := obj.(*resourcev1beta2.ResourceClaim)
+	resourceClaim, ok := obj.(*resourcev1.ResourceClaim)
 	if !ok {
 		return []ctrl.Request{}
 	}
