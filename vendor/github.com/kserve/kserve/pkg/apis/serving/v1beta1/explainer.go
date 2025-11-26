@@ -35,6 +35,11 @@ type ExplainerSpec struct {
 	PodSpec `json:",inline"`
 	// Component extension defines the deployment configurations for explainer
 	ComponentExtensionSpec `json:",inline"`
+
+	// Spec for multiple storage uris.
+	// +listType=atomic
+	// +kubebuilder:validation:MinItems=1
+	StorageUris []StorageUri `json:"storageUris,omitempty"`
 }
 
 // ExplainerExtensionSpec defines configuration shared across all explainer frameworks
@@ -51,7 +56,7 @@ type ExplainerExtensionSpec struct {
 	corev1.Container `json:",inline"`
 	// Storage Spec for model location
 	// +optional
-	Storage *StorageSpec `json:"storage,omitempty"`
+	Storage *ModelStorageSpec `json:"storage,omitempty"`
 }
 
 var _ Component = &ExplainerSpec{}
@@ -72,7 +77,7 @@ func (e *ExplainerExtensionSpec) GetStorageUri() *string {
 }
 
 // GetStorageSpec returns the predictor storage spec object
-func (e *ExplainerExtensionSpec) GetStorageSpec() *StorageSpec {
+func (e *ExplainerExtensionSpec) GetStorageSpec() *ModelStorageSpec {
 	return e.Storage
 }
 

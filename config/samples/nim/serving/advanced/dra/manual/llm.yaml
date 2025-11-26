@@ -1,6 +1,6 @@
 ---
-# Pre-create a resource claim template
-apiVersion: resource.k8s.io/v1beta2
+# Create a ResourceClaimTemplate for GPU allocation
+apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
 metadata:
   name: gpu-resourceclaimtemplate

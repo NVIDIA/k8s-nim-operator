@@ -142,7 +142,7 @@ func BuildExpr(key string, op ComparisonOperator, value interface{}, vt ValueTyp
 }
 
 func ValidateExpr(expression string) error {
-	compiler := dracel.GetCompiler()
+	compiler := dracel.GetCompiler(dracel.Features{})
 	result := compiler.CompileCELExpression(expression, dracel.Options{DisableCostEstimation: true})
 
 	if result.Error != nil {

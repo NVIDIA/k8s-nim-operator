@@ -31,7 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
@@ -119,18 +119,6 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 	if !utils.IsVersionGreaterThanOrEqual(clusterVersion, utils.MinSupportedClusterVersionForDRA) {
 		msg := fmt.Sprintf("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version '%s' or higher", utils.MinSupportedClusterVersionForDRA)
 		logger.Error(errors.New(msg), msg, "nimService", nimService.Name)
-		return false, msg, nil
-	}
-
-	// Check if the resource claim CRD exists
-	crdExists, err := k8sutil.CRDExists(r.GetDiscoveryClient(), resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
-	if err != nil {
-		logger.Error(err, "failed to check if resource claim CRD exists")
-		return false, "", err
-	}
-	if !crdExists {
-		msg := "DRA resources are not supported by NIM-Operator on this cluster, please ensure resource.k8s.io/v1beta2 API group is enabled"
-		logger.Error(fmt.Errorf("%s", msg), msg, "nimService", nimService.Name)
 		return false, msg, nil
 	}
 
@@ -1130,7 +1118,7 @@ func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimSer
 		claimAnnotations := nimService.GetNIMServiceAnnotations()
 		delete(claimAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 		// Sync ResourceClaimTemplate
-		err := r.renderAndSyncResource(ctx, nimService, &renderer, &resourcev1beta2.ResourceClaimTemplate{}, func() (client.Object, error) {
+		err := r.renderAndSyncResource(ctx, nimService, &renderer, &resourcev1.ResourceClaimTemplate{}, func() (client.Object, error) {
 			resourceClaimTemplateParams := &rendertypes.ResourceClaimTemplateParams{
 				Name:             namedDraResource.ResourceName,
 				Namespace:        nimService.GetNamespace(),

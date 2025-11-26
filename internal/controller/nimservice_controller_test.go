@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,8 +54,7 @@ var _ = Describe("NIMService Controller", func() {
 		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
 		Expect(batchv1.AddToScheme(scheme)).To(Succeed())
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
-		Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
-		Expect(gatewayv1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.Install(scheme)).To(Succeed())
 
 		testClient = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -262,7 +261,7 @@ var _ = Describe("NIMService Controller", func() {
 
 	Describe("mapResourceClaimToNIMService tests", func() {
 		It("should return reconcile requests for NIMServices with matching ResourceClaimName in the same namespace", func() {
-			resourceClaim := &resourcev1beta2.ResourceClaim{
+			resourceClaim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-claim",
 					Namespace: "default",
@@ -323,7 +322,7 @@ var _ = Describe("NIMService Controller", func() {
 		})
 
 		It("should return reconcile requests for NIMServices with matching ResourceClaimTemplateName", func() {
-			resourceClaim := &resourcev1beta2.ResourceClaim{
+			resourceClaim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "template-generated-claim",
 					Namespace: "default",
@@ -359,7 +358,7 @@ var _ = Describe("NIMService Controller", func() {
 		})
 
 		It("should return empty requests when no NIMServices reference the claim", func() {
-			resourceClaim := &resourcev1beta2.ResourceClaim{
+			resourceClaim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-claim",
 					Namespace: "default",
@@ -402,7 +401,7 @@ var _ = Describe("NIMService Controller", func() {
 
 		It("should handle NIMServices without DRA resources", func() {
 			// Create a ResourceClaim
-			resourceClaim := &resourcev1beta2.ResourceClaim{
+			resourceClaim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-claim",
 					Namespace: "default",

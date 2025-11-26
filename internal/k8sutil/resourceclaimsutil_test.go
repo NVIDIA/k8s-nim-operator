@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
@@ -28,13 +28,13 @@ var _ = Describe("Test ResourceClaims k8s utils", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		s = scheme.Scheme
-		err := resourcev1beta2.AddToScheme(s)
+		err := resourcev1.AddToScheme(s)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Context("Test ListResourceClaimsByPodClaimName", func() {
 		It("should return all matching claims", func() {
-			claims := []resourcev1beta2.ResourceClaim{
+			claims := []resourcev1.ResourceClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "claim-1",
@@ -70,7 +70,7 @@ var _ = Describe("Test ResourceClaims k8s utils", func() {
 		})
 
 		It("should return an empty list when no claims match", func() {
-			claims := []resourcev1beta2.ResourceClaim{
+			claims := []resourcev1.ResourceClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "claim-1",
@@ -101,7 +101,7 @@ var _ = Describe("Test ResourceClaims k8s utils", func() {
 		})
 
 		It("should return claims sorted by creation timestamp", func() {
-			claims := []resourcev1beta2.ResourceClaim{
+			claims := []resourcev1.ResourceClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "newer-claim",
@@ -137,7 +137,7 @@ var _ = Describe("Test ResourceClaims k8s utils", func() {
 		})
 
 		It("should return an empty list when podClaimName is empty", func() {
-			claims := []resourcev1beta2.ResourceClaim{
+			claims := []resourcev1.ResourceClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "claim-1",
@@ -169,7 +169,7 @@ var _ = Describe("Test ResourceClaims k8s utils", func() {
 		})
 
 		It("should return matching claims from all namespaces when namespace is empty", func() {
-			claims := []resourcev1beta2.ResourceClaim{
+			claims := []resourcev1.ResourceClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "claim-1",
@@ -206,31 +206,31 @@ var _ = Describe("Test ResourceClaims k8s utils", func() {
 	})
 
 	DescribeTable("getDRAResourceClaimState",
-		func(claim *resourcev1beta2.ResourceClaim, expectedState string) {
+		func(claim *resourcev1.ResourceClaim, expectedState string) {
 			state := GetResourceClaimState(claim)
 			Expect(state).To(Equal(expectedState))
 		},
 		Entry("pending claim",
-			&resourcev1beta2.ResourceClaim{
+			&resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-claim",
 					Namespace:         "test-ns",
 					CreationTimestamp: metav1.Time{},
 				},
-				Status: resourcev1beta2.ResourceClaimStatus{},
+				Status: resourcev1.ResourceClaimStatus{},
 			},
 			"pending",
 		),
 		Entry("allocated and reserved claim",
-			&resourcev1beta2.ResourceClaim{
+			&resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-claim",
 					Namespace:         "test-ns",
 					CreationTimestamp: metav1.Time{},
 				},
-				Status: resourcev1beta2.ResourceClaimStatus{
-					Allocation: &resourcev1beta2.AllocationResult{},
-					ReservedFor: []resourcev1beta2.ResourceClaimConsumerReference{
+				Status: resourcev1.ResourceClaimStatus{
+					Allocation: &resourcev1.AllocationResult{},
+					ReservedFor: []resourcev1.ResourceClaimConsumerReference{
 						{
 							Name:     "pod-test",
 							Resource: "pods",
@@ -242,34 +242,34 @@ var _ = Describe("Test ResourceClaims k8s utils", func() {
 			"allocated,reserved",
 		),
 		Entry("deleted claim",
-			&resourcev1beta2.ResourceClaim{
+			&resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-claim",
 					Namespace:         "test-ns",
 					CreationTimestamp: metav1.Time{},
 					DeletionTimestamp: &metav1.Time{},
 					Finalizers: []string{
-						resourcev1beta2.Finalizer,
+						resourcev1.Finalizer,
 					},
 				},
-				Status: resourcev1beta2.ResourceClaimStatus{},
+				Status: resourcev1.ResourceClaimStatus{},
 			},
 			"deleted",
 		),
 		Entry("deleted, allocated and reserved claim",
-			&resourcev1beta2.ResourceClaim{
+			&resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-claim",
 					Namespace:         "test-ns",
 					CreationTimestamp: metav1.Time{},
 					DeletionTimestamp: &metav1.Time{},
 					Finalizers: []string{
-						resourcev1beta2.Finalizer,
+						resourcev1.Finalizer,
 					},
 				},
-				Status: resourcev1beta2.ResourceClaimStatus{
-					Allocation: &resourcev1beta2.AllocationResult{},
-					ReservedFor: []resourcev1beta2.ResourceClaimConsumerReference{
+				Status: resourcev1.ResourceClaimStatus{
+					Allocation: &resourcev1.AllocationResult{},
+					ReservedFor: []resourcev1.ResourceClaimConsumerReference{
 						{
 							Name:     "pod-test",
 							Resource: "pods",
