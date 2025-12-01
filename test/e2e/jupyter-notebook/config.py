@@ -4,7 +4,7 @@ ENTITY_STORE_URL = "http://nemoentitystore-sample.nemo.svc.cluster.local:8000" #
 CUSTOMIZER_URL = "http://nemocustomizer-sample.nemo.svc.cluster.local:8000" # Customizer
 EVALUATOR_URL = "http://nemoevaluator-sample.nemo.svc.cluster.local:8000" # Evaluator
 GUARDRAILS_URL = "http://nemoguardrails-sample.nemo.svc.cluster.local:8000" # Guardrails
-NIM_URL = "http://meta-llama3-1b-instruct.nemo.svc.cluster.local:8000" # NIM
+NIM_URL = "http://meta-llama-3-1-8b-instruct.nemo.svc.cluster.local:8000" # NIM
 
 # (Required) Hugging Face Token
 HF_TOKEN = ""
@@ -20,5 +20,5 @@ NMS_NAMESPACE = "xlam-tutorial-ns"
 DATASET_NAME = "xlam-ft-dataset"
 
 # (Optional) Configure the base model. Must be one supported by the NeMo Customizer deployment!
-BASE_MODEL = "meta/llama-3.2-1b-instruct"
+BASE_MODEL = "meta/llama-3.1-8b-instruct"
 BASE_MODEL_VERSION = "v1.0.0+A100"
