@@ -2,12 +2,12 @@
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  name: meta-llama3-1b-instruct
+  name: meta-llama-3-1-8b-instruct
   namespace: nemo
 spec:
   source:
     ngc:
-      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.3
+      modelPuller: nvcr.io/nim/meta/llama-3.1-8b-instruct:1.8.6
       pullSecret: ngc-secret
       authSecret: ngc-api-secret
       model:
@@ -19,16 +19,15 @@ spec:
       storageClass: ""
       size: "50Gi"
       volumeAccessMode: ReadWriteOnce
-
 ---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMPipeline
 metadata:
-  name: llama3-1b-pipeline
+  name: llama3-1-8b-pipeline
   namespace: nemo
 spec:
   services:
-    - name: meta-llama3-1b-instruct
+    - name: meta-llama-3-1-8b-instruct
       enabled: true
       spec:
         env:
@@ -43,15 +42,15 @@ spec:
           - name: NIM_GUIDED_DECODING_BACKEND
             value: fast_outlines
         image:
-          repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
-          tag: 1.8.3
+          repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+          tag: 1.8.6
           pullPolicy: IfNotPresent
           pullSecrets:
           - ngc-secret
         authSecret: ngc-api-secret
         storage:
           nimCache:
-            name: meta-llama3-1b-instruct
+            name: meta-llama-3-1-8b-instruct
             profile: ''
         replicas: 1
         resources:
