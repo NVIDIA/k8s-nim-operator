@@ -15,7 +15,7 @@ EVALUATOR_URL = "http://nemoevaluator-sample.nemo.svc.cluster.local:8000" # Eval
 GUARDRAILS_URL = "http://nemoguardrails-sample.nemo.svc.cluster.local:8000" # Guardrails
 NIM_URL = "http://meta-llama3-1b-instruct.nemo.svc.cluster.local:8000" # NIM
 HF_TOKEN = "<your-huggingface-token>"
-BASE_MODEL = "meta/llama-3.2-1b-instruct"
+BASE_MODEL = "meta/llama-3.1-8b-instruct"
 ```
 
 **NOTE:** if you have are already gone through steps in the QuickStart guide, you can skip steps 2-4
