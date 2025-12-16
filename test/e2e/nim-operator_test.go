@@ -27,7 +27,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/urfave/cli"
 
 	helm "github.com/mittwald/go-helm-client"
 	helmValues "github.com/mittwald/go-helm-client/values"
@@ -113,6 +112,8 @@ var _ = Describe("NIM Operator", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
 			//cleanupNIMCRs()
+			cli, err := versioned.NewForConfig(clientConfig)
+			Expect(err).NotTo(HaveOccurred())
 			nimCache, err := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, "nimcache", metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			log.Println(nimCache)

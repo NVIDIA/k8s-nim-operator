@@ -15,15 +15,12 @@
 name: End-to-end Tests
 
 on:
-  workflow_run:
-    workflows: [Image]
-    types:
-      - completed
+  on:
+  push:
     branches:
       - main
       - release-*
       - e2e-test
-  workflow_dispatch:
 
 jobs:
   e2e-tests:
