@@ -20,6 +20,7 @@ on:
     branches:
       - main
       - release-*
+      - e2e-test
       - "pull-request/[0-9]+"
 
 jobs:
