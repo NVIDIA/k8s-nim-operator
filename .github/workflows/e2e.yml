@@ -15,7 +15,6 @@
 name: End-to-end Tests
 
 on:
-  on:
   push:
     branches:
       - main
