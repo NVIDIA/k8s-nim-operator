@@ -34,7 +34,7 @@ jobs:
       statuses: write
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         
       - name: Calculate build vars
         id: vars
@@ -52,7 +52,7 @@ jobs:
           holodeck_config: "test/e2e/infra/aws.yml"
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
@@ -75,7 +75,7 @@ jobs:
 
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-test-logs
           path: ./e2e_logs/
@@ -84,7 +84,7 @@ jobs:
      # This makes the result appear on the merged commit's Checks tab
       - name: Report status on merged commit
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             await github.rest.checks.create({
