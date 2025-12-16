@@ -19,13 +19,13 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
 	helm "github.com/mittwald/go-helm-client"
@@ -111,12 +111,14 @@ var _ = Describe("NIM Operator", Ordered, func() {
 	When("deploying NIMCache and NIMService", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
-			//cleanupNIMCRs()
-			cli, err := versioned.NewForConfig(clientConfig)
+			if CurrentSpecReport().State.Is(types.SpecStatePassed) {
+				cleanupNIMCRs()
+			}
+			/*cli, err := versioned.NewForConfig(clientConfig)
 			Expect(err).NotTo(HaveOccurred())
 			nimCache, err := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, "meta-llama3-8b-instruct", metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			log.Printf("%+v\n", nimCache.Status)
+			log.Printf("%+v\n", nimCache.Status)*/
 		})
 
 		It("should go to READY state", func(ctx context.Context) {
@@ -165,7 +167,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 
 		AfterEach(func() {
 			// Clean up
-			if !CurrentSpecReport().Failed() {
+			if CurrentSpecReport().State.Is(types.SpecStatePassed) {
 				cleanupNIMCRs()
 			}
 		})
