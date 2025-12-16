@@ -116,7 +116,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			nimCache, err := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, "meta-llama3-8b-instruct", metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			log.Println(nimCache)
+			log.Printf("%+v\n", nimCache.Status)
 		})
 
 		It("should go to READY state", func(ctx context.Context) {
