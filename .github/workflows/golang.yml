@@ -20,6 +20,7 @@ on:
       - main
       - release-*
       - "pull-request/[0-9]+"
+      - e2e-test
 
 jobs:
   check:
