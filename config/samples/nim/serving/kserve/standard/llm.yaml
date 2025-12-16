@@ -31,7 +31,7 @@ metadata:
 spec:
   inferencePlatform: kserve
   annotations:
-    serving.kserve.io/deploymentMode: 'RawDeployment'
+    serving.kserve.io/deploymentMode: 'Standard'
   scale:
     enabled: true
     hpa:

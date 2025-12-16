@@ -176,7 +176,7 @@ spec:
       - name: {{ . }}
     {{- end }}
     {{- end }}
-    {{- if eq .DeploymentMode "RawDeployment" }}
+    {{- if or (eq .DeploymentMode "RawDeployment") (eq .DeploymentMode "Standard") }}
     securityContext:
       {{- if eq .OrchestratorType "TKGS" }}
       seccompProfile:
