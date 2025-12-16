@@ -19,6 +19,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/urfave/cli"
 
 	helm "github.com/mittwald/go-helm-client"
 	helmValues "github.com/mittwald/go-helm-client/values"
@@ -110,7 +112,10 @@ var _ = Describe("NIM Operator", Ordered, func() {
 	When("deploying NIMCache and NIMService", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
-			cleanupNIMCRs()
+			//cleanupNIMCRs()
+			nimCache, err := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, "nimcache", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			log.Println(nimCache)
 		})
 
 		It("should go to READY state", func(ctx context.Context) {
@@ -133,7 +138,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			Eventually(func() bool {
 				nimCacheObject, _ := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, nimCache.Name, metav1.GetOptions{})
 				return nimCacheObject.Status.State == v1alpha1.NimCacheStatusReady
-			}, Timeout, 5*time.Second).Should(BeTrue())
+			}, 10*time.Minute, 5*time.Second).Should(BeTrue())
 
 			// Create a NIMService object
 			By("Creating a NIMService object")

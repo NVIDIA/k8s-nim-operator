@@ -23,11 +23,12 @@ on:
       - main
       - release-*
       - e2e-test
+  workflow_dispatch:
 
 jobs:
   e2e-tests:
     runs-on: linux-amd64-cpu4
-    if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
+    #if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
     permissions:
       contents: read
       id-token: write
@@ -67,7 +68,7 @@ jobs:
         env:
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
           E2E_IMAGE_REPO: ghcr.io/nvidia/k8s-nim-operator
-          E2E_IMAGE_TAG: ${{ env.COMMIT_SHORT_SHA }}
+          E2E_IMAGE_TAG: main
           LOG_ARTIFACTS: ${{ github.workspace }}/e2e_logs
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
