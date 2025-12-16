@@ -22,6 +22,7 @@ on:
     branches:
       - main
       - release-*
+      - e2e-test
 
 jobs:
   e2e-tests:
