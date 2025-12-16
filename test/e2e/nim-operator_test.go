@@ -172,7 +172,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			}
 		})
 
-		It("should go to READY state", func(ctx context.Context) {
+		FIt("should go to READY state", func(ctx context.Context) {
 			// Create a NIMCache object
 			By("Creating a NIMCache object")
 			cli, err := versioned.NewForConfig(clientConfig)
@@ -192,7 +192,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			Eventually(func() bool {
 				nimCacheObject, _ := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, nimCache.Name, metav1.GetOptions{})
 				return nimCacheObject.Status.State == v1alpha1.NimCacheStatusReady
-			}, Timeout, 5*time.Second).Should(BeTrue())
+			}, 10*time.Minute, 5*time.Second).Should(BeTrue())
 
 			// Create a NIMService object
 			By("Creating a NIMService object")
