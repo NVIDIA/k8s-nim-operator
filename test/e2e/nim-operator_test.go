@@ -25,7 +25,6 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
 	helm "github.com/mittwald/go-helm-client"
@@ -111,7 +110,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 	When("deploying NIMCache and NIMService", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
-			if CurrentSpecReport().State.Is(types.SpecStatePassed) {
+			if !CurrentSpecReport().Failed() {
 				cleanupNIMCRs()
 			}
 		})
@@ -162,7 +161,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 
 		AfterEach(func() {
 			// Clean up
-			if CurrentSpecReport().State.Is(types.SpecStatePassed) {
+			if !CurrentSpecReport().Failed() {
 				cleanupNIMCRs()
 			}
 		})
