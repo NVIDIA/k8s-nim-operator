@@ -141,7 +141,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			Eventually(func() bool {
 				nimCacheObject, _ := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, nimCache.Name, metav1.GetOptions{})
 				return nimCacheObject.Status.State == v1alpha1.NimCacheStatusReady
-			}, 2*time.Minute, 5*time.Second).Should(BeTrue())
+			}, Timeout, 5*time.Second).Should(BeTrue())
 
 			// Create a NIMService object
 			By("Creating a NIMService object")
@@ -192,7 +192,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			Eventually(func() bool {
 				nimCacheObject, _ := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, nimCache.Name, metav1.GetOptions{})
 				return nimCacheObject.Status.State == v1alpha1.NimCacheStatusReady
-			}, 10*time.Minute, 5*time.Second).Should(BeTrue())
+			}, Timeout, 5*time.Second).Should(BeTrue())
 
 			// Create a NIMService object
 			By("Creating a NIMService object")
