@@ -8,7 +8,7 @@ spec:
     tag: "1.12"
     pullPolicy: IfNotPresent
     pullSecrets:
-      - ngc-secret
+      - hf-token-secret
   authSecret: ngc-api-secret
   storage:
     nimCache:

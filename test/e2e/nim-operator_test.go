@@ -172,7 +172,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			}
 		})
 
-		FIt("should go to READY state", func(ctx context.Context) {
+		It("should go to READY state", func(ctx context.Context) {
 			// Create a NIMCache object
 			By("Creating a NIMCache object")
 			cli, err := versioned.NewForConfig(clientConfig)
