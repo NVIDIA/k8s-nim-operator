@@ -25,6 +25,7 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 
 	helm "github.com/mittwald/go-helm-client"
@@ -110,7 +111,9 @@ var _ = Describe("NIM Operator", Ordered, func() {
 	When("deploying NIMCache and NIMService", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
-			cleanupNIMCRs()
+			if CurrentSpecReport().State.Is(types.SpecStatePassed) {
+				cleanupNIMCRs()
+			}
 		})
 
 		It("should go to READY state", func(ctx context.Context) {
@@ -159,7 +162,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 
 		AfterEach(func() {
 			// Clean up
-			if !CurrentSpecReport().Failed() {
+			if CurrentSpecReport().State.Is(types.SpecStatePassed) {
 				cleanupNIMCRs()
 			}
 		})
