@@ -110,7 +110,9 @@ var _ = Describe("NIM Operator", Ordered, func() {
 	When("deploying NIMCache and NIMService", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
-			cleanupNIMCRs()
+			if !CurrentSpecReport().Failed() {
+				cleanupNIMCRs()
+			}
 		})
 
 		It("should go to READY state", func(ctx context.Context) {
