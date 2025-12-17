@@ -8,8 +8,8 @@ spec:
     tag: "1.12"
     pullPolicy: IfNotPresent
     pullSecrets:
-      - hf-token-secret
-  authSecret: ngc-api-secret
+      - ngc-secret
+  authSecret: hf-token-secret
   storage:
     nimCache:
       name: nim-cache-multi-llm
