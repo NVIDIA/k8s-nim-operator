@@ -111,7 +111,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 	When("deploying NIMCache and NIMService", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
-			if CurrentSpecReport().State.Is(types.SpecStatePassed) {
+			if !CurrentSpecReport().Failed() {
 				cleanupNIMCRs()
 			}
 			/*cli, err := versioned.NewForConfig(clientConfig)
@@ -159,7 +159,7 @@ var _ = Describe("NIM Operator", Ordered, func() {
 			Eventually(func() bool {
 				nimServiceObject, _ := cli.AppsV1alpha1().NIMServices(testNamespace.Name).Get(ctx, nimService.Name, metav1.GetOptions{})
 				return nimServiceObject.Status.State == v1alpha1.NIMServiceStatusReady
-			}, Timeout, 5*time.Second).Should(BeTrue())
+			}, 2*time.Minute, 5*time.Second).Should(BeTrue())
 		})
 	})
 
