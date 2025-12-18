@@ -42,7 +42,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
@@ -82,7 +82,7 @@ type Renderer interface {
 	ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error)
 	Secret(params *types.SecretParams) (*corev1.Secret, error)
 	InferenceService(params *types.InferenceServiceParams) (*kservev1beta1.InferenceService, error)
-	ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1beta2.ResourceClaimTemplate, error)
+	ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1.ResourceClaimTemplate, error)
 }
 
 // TemplateData is used by the templating engine to render templates.
@@ -487,7 +487,7 @@ func (r *textTemplateRenderer) InferenceService(params *types.InferenceServicePa
 }
 
 // ResourceClaimTemplate renders a ResourceClaimTemplate spec with given templating data.
-func (r *textTemplateRenderer) ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1beta2.ResourceClaimTemplate, error) {
+func (r *textTemplateRenderer) ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1.ResourceClaimTemplate, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "resourceclaimtemplate.yaml"), &TemplateData{Data: params})
 	if err != nil {
 		return nil, err
@@ -495,7 +495,7 @@ func (r *textTemplateRenderer) ResourceClaimTemplate(params *types.ResourceClaim
 	if len(objs) == 0 {
 		return nil, nil
 	}
-	resourceClaimTemplate := &resourcev1beta2.ResourceClaimTemplate{}
+	resourceClaimTemplate := &resourcev1.ResourceClaimTemplate{}
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, resourceClaimTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("error converting unstructured object to ResourceClaimTemplate: %w", err)
