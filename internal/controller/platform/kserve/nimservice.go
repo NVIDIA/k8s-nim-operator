@@ -463,6 +463,11 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	isvcParams.Annotations[kserveconstants.EnableMetricAggregation] = "true"
 	isvcParams.Annotations[kserveconstants.SetPrometheusAnnotation] = "true"
 
+	// Ensure deployment mode annotation is always set
+	if _, ok := isvcParams.Annotations[utils.KServeDeploymentModeAnnotationKey]; !ok {
+		isvcParams.Annotations[kserveconstants.DeploymentMode] = string(deploymentMode)
+	}
+
 	// Sync ingress
 	if !nimService.IsIngressEnabled() {
 		isvcParams.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
