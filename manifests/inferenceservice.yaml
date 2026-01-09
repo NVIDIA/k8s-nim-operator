@@ -16,7 +16,7 @@ spec:
     {{- if .MinReplicas }}
     minReplicas: {{ .MinReplicas }}
     {{- end }}
-    {{- if eq .DeploymentMode "RawDeployment" }}
+    {{- if or (eq .DeploymentMode "RawDeployment") (eq .DeploymentMode "Standard") }}
     {{- if .MaxReplicas }}
     maxReplicas: {{ .MaxReplicas }}
     {{- end }}
@@ -176,7 +176,7 @@ spec:
       - name: {{ . }}
     {{- end }}
     {{- end }}
-    {{- if eq .DeploymentMode "RawDeployment" }}
+    {{- if or (eq .DeploymentMode "RawDeployment") (eq .DeploymentMode "Standard") }}
     securityContext:
       {{- if eq .OrchestratorType "TKGS" }}
       seccompProfile:
