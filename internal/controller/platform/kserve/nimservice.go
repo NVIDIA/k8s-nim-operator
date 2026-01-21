@@ -27,12 +27,9 @@ import (
 	"github.com/go-logr/logr"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
-	isvcutils "github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/utils"
-	kserveutils "github.com/kserve/kserve/pkg/utils"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	knativeapis "knative.dev/pkg/apis"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
@@ -158,7 +155,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 	var deploymentMode kserveconstants.DeploymentModeType
 	// Check KServe deployment mode
-	deploymentMode, err = r.getKServeDeploymentMode(ctx, nimService.Spec.Annotations)
+	namespacedName := client.ObjectKeyFromObject(nimService)
+	deploymentMode, err = utils.GetKServeDeploymentMode(ctx, r.Client, nimService.Spec.Annotations, &namespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -468,7 +466,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	isvcParams.Annotations[kserveconstants.SetPrometheusAnnotation] = "true"
 
 	// Ensure deployment mode annotation is always set
-	if _, ok := isvcParams.Annotations[utils.KServeDeploymentModeAnnotationKey]; !ok {
+	if _, ok := isvcParams.Annotations[kserveconstants.DeploymentMode]; !ok {
 		isvcParams.Annotations[kserveconstants.DeploymentMode] = string(deploymentMode)
 	}
 
@@ -924,54 +922,6 @@ func getModelNameFromModelsList(modelsList *nimmodels.ModelsV1List) (string, err
 	}
 
 	return "", fmt.Errorf("no valid model found")
-}
-
-func (r *NIMServiceReconciler) getKServeDeploymentMode(ctx context.Context,
-	podAnnotations map[string]string) (kserveconstants.DeploymentModeType, error) {
-
-	var namespace string
-	deploymentList := &appsv1.DeploymentList{}
-	if err := r.List(ctx, deploymentList, client.HasLabels{"app.kubernetes.io/name: kserve-controller-manager"}); err != nil {
-		return "", err
-	}
-	for _, deployment := range deploymentList.Items {
-		if deployment.GetName() == "kserve-controller-manager" {
-			namespace = deployment.Namespace
-			break
-		}
-	}
-
-	if namespace == "" {
-		return "", fmt.Errorf("failed to find the namespace of KServe Deployment")
-	}
-
-	isvcConfigMap := &corev1.ConfigMap{}
-	err := r.Get(ctx,
-		types.NamespacedName{
-			Name:      kserveconstants.InferenceServiceConfigMapName,
-			Namespace: namespace},
-		isvcConfigMap)
-	if err != nil {
-		return "", err
-	}
-
-	isvcConfig, err := kservev1beta1.NewInferenceServicesConfig(isvcConfigMap)
-	if err != nil {
-		return "", err
-	}
-
-	// get annotations from isvc
-	annotations := kserveutils.Filter(podAnnotations, func(key string) bool {
-		return !kserveutils.Includes(isvcConfig.ServiceAnnotationDisallowedList, key)
-	})
-
-	deployConfig, err := kservev1beta1.NewDeployConfig(isvcConfigMap)
-	if err != nil {
-		return "", err
-	}
-
-	deploymentMode := isvcutils.GetDeploymentMode("", annotations, deployConfig)
-	return deploymentMode, nil
 }
 
 func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources *shared.NamedDRAResourceList) error {
