@@ -735,21 +735,6 @@ func TestGetInferenceServiceParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Mock the deployment mode type - use string representation for test
-			var deploymentMode interface{}
-			switch tt.deploymentMode {
-			case "RawDeployment":
-				deploymentMode = "RawDeployment"
-			case "Standard":
-				deploymentMode = "Standard"
-			case "Knative":
-				deploymentMode = "Knative"
-			default:
-				deploymentMode = "RawDeployment"
-			}
-
-			// Note: We can't directly test GetInferenceServiceParams without importing kserve constants
-			// which would create a circular dependency. Instead, we test the conditions independently.
 
 			// Test autoscaling enabled state
 			isAutoScalingEnabled := tt.nimService.IsAutoScalingEnabled()
@@ -776,8 +761,6 @@ func TestGetInferenceServiceParams(t *testing.T) {
 					t.Errorf("Expected replicas to be set for HPA, but got nil")
 				}
 			}
-
-			_ = deploymentMode // Use the variable to avoid unused warning
 		})
 	}
 }
