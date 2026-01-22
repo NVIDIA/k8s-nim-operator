@@ -1012,7 +1012,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			name: "kserve standard (annotation absent) – valid",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				// No annotation ⇒ knative by default.
+				// No annotation ⇒ Standard by default.
 			},
 			wantErrs:     0,
 			wantWarnings: 0,
