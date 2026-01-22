@@ -150,29 +150,34 @@ ODH 3.0 supports "RawDeployment", "Serverless", and doesn't accept "Standard", "
 Ref: https://github.com/opendatahub-io/kserve/blob/cf2920b4276d97fc2d2d700efe4879749a56b418/pkg/apis/serving/v1beta1/configmap.go#L359
 */
 func newDeployConfig(isvcConfigMap *corev1.ConfigMap) (*kservev1beta1.DeployConfig, error) {
-	deployConfig := &kservev1beta1.DeployConfig{}
-	if deploy, ok := isvcConfigMap.Data[kservev1beta1.DeployConfigName]; ok {
-		err := json.Unmarshal([]byte(deploy), &deployConfig)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse deploy config json: %w", err)
-		}
-
-		if deployConfig.DefaultDeploymentMode == "" {
-			return nil, errors.New("invalid deploy config, defaultDeploymentMode is required")
-		}
-
-		// Note: ODH 3.0 requires using "RawDeployment" and "Serverless" directly
-		// without conversion to "Standard" and "Knative". Do not convert legacy modes.
-
-		if deployConfig.DefaultDeploymentMode != string(kserveconstants.Knative) &&
-			deployConfig.DefaultDeploymentMode != string(kserveconstants.Standard) &&
-			deployConfig.DefaultDeploymentMode != string(kserveconstants.ModelMeshDeployment) &&
-			deployConfig.DefaultDeploymentMode != string(kserveconstants.LegacyRawDeployment) &&
-			deployConfig.DefaultDeploymentMode != string(kserveconstants.LegacyServerless) {
-			return nil, errors.New("invalid deployment mode. Supported modes are Knative," +
-				" Standard and ModelMesh")
-		}
+	deploy, ok := isvcConfigMap.Data[kservev1beta1.DeployConfigName]
+	if !ok {
+		// No deploy config in ConfigMap, return nil so caller falls back to default
+		return nil, nil
 	}
+
+	deployConfig := &kservev1beta1.DeployConfig{}
+	err := json.Unmarshal([]byte(deploy), &deployConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse deploy config json: %w", err)
+	}
+
+	if deployConfig.DefaultDeploymentMode == "" {
+		return nil, errors.New("invalid deploy config, defaultDeploymentMode is required")
+	}
+
+	// Note: ODH 3.0 requires using "RawDeployment" and "Serverless" directly
+	// without conversion to "Standard" and "Knative". Do not convert legacy modes.
+
+	if deployConfig.DefaultDeploymentMode != string(kserveconstants.Knative) &&
+		deployConfig.DefaultDeploymentMode != string(kserveconstants.Standard) &&
+		deployConfig.DefaultDeploymentMode != string(kserveconstants.ModelMeshDeployment) &&
+		deployConfig.DefaultDeploymentMode != string(kserveconstants.LegacyRawDeployment) &&
+		deployConfig.DefaultDeploymentMode != string(kserveconstants.LegacyServerless) {
+		return nil, errors.New("invalid deployment mode. Supported modes are Knative," +
+			" Standard, ModelMesh and RawDeployment, Serverless")
+	}
+
 	return deployConfig, nil
 }
 
