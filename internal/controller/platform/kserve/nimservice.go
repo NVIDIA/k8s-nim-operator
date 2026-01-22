@@ -737,6 +737,12 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 		return err
 	}
 
+	// KServe RawDeployment mode creates headless services (clusterIP: None) by default, which prevents
+	// standard service-based access for model endpoints. To enable regular ClusterIP services:
+	//   - Upstream KServe: Set "serviceClusterIPNone: false" in the "deploy" section of the
+	//     "inferenceservice-config" ConfigMap (in the KServe controller namespace)
+	//   - OpenDataHub: Set "rawDeploymentServiceConfig: Headed" (not "Headless") in the
+	//     kserve spec of the DataScienceCluster object
 	modelName, err := r.getNIMModelName(ctx, clusterEndpoint)
 	if err != nil {
 		return err
