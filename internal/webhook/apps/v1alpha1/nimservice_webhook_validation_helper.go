@@ -67,8 +67,10 @@ var validDRAResourceQuantitySelectorOps = []appsv1alpha1.DRAResourceQuantitySele
 // object. It is intended to be invoked by both ValidateCreate and ValidateUpdate to
 // ensure the resource is well-formed before any other validation (e.g. immutability)
 // is performed.
-func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, kubeVersion string,
-	k8sClient client.Client, namespacedName *types.NamespacedName) (admission.Warnings, field.ErrorList) {
+func validateNIMServiceSpec(nimservice *appsv1alpha1.NIMService, fldPath *field.Path, kubeVersion string,
+	k8sClient client.Client) (admission.Warnings, field.ErrorList) {
+	spec := &nimservice.Spec
+
 	warningList, errList := validateImageConfiguration(&spec.Image, fldPath.Child("image"))
 
 	// TODO abstract all validation functions with a single signature validateFunc(*appsv1alpha1.NIMServiceSpec, *field.Path) (admission.Warnings, field.ErrorList)
@@ -104,7 +106,8 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
-	w, err = validateKServeConfiguration(spec, fldPath, namespacedName, k8sClient)
+	namespacedName := client.ObjectKeyFromObject(nimservice)
+	w, err = validateKServeConfiguration(spec, fldPath, &namespacedName, k8sClient)
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
@@ -513,9 +516,7 @@ func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *fie
 	errList := field.ErrorList{}
 	warningList := admission.Warnings{}
 
-	platformIsKServe := spec.InferencePlatform == appsv1alpha1.PlatformTypeKServe
-
-	if platformIsKServe {
+	if spec.InferencePlatform == appsv1alpha1.PlatformTypeKServe {
 		// Get the deployment mode
 		mode, err := utils.GetKServeDeploymentMode(context.TODO(), k8sClient, spec.Annotations, namespacedName)
 		if err != nil {
