@@ -3,7 +3,7 @@ name: Bug report
 about: Create a report to help us improve
 title: Bug report template
 labels: ''
-assignees: slu2011, visheshtanksale, shivamerla
+assignees: shivamerla, visheshtanksale
 
 ---
 
