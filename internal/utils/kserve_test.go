@@ -54,10 +54,10 @@ var _ = Describe("KServe Utilities", func() {
 		createKServeDeployment := func() *appsv1.Deployment {
 			return &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "kserve-controller-manager",
+					Name:      KServeControllerName,
 					Namespace: namespace,
 					Labels: map[string]string{
-						"app.kubernetes.io/name": "kserve-controller-manager",
+						"app.kubernetes.io/name": KServeControllerName,
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
@@ -101,10 +101,10 @@ var _ = Describe("KServe Utilities", func() {
 
 			kserveDeployment = &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "kserve-controller-manager",
+					Name:      KServeControllerName,
 					Namespace: namespace,
 					Labels: map[string]string{
-						"app.kubernetes.io/name": "kserve-controller-manager",
+						"app.kubernetes.io/name": KServeControllerName,
 					},
 				},
 				Spec: appsv1.DeploymentSpec{

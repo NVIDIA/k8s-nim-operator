@@ -31,6 +31,11 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+const (
+	KServeControllerName = "kserve-controller-manager"
 )
 
 func IsKServeStandardDeploymentMode(deploymentMode kserveconstants.DeploymentModeType) bool {
@@ -43,6 +48,8 @@ func IsKServeKnativeDeploymentMode(deploymentMode kserveconstants.DeploymentMode
 
 func GetKServeDeploymentMode(ctx context.Context, k8sClient client.Client,
 	podAnnotations map[string]string, isvcNamespacedName *types.NamespacedName) (kserveconstants.DeploymentModeType, error) {
+	logger := log.FromContext(ctx).WithName("KServe").WithName("Deployment Mode")
+
 	var annotations map[string]string
 	var deployConfig *kservev1beta1.DeployConfig
 	var statusDeploymentMode string
@@ -74,6 +81,9 @@ func GetKServeDeploymentMode(ctx context.Context, k8sClient client.Client,
 			if err != nil {
 				return "", err
 			}
+		} else {
+			logger.V(1).Info("ConfigMap inferenceservice-config is not found in the cluster, skipping the " +
+				"default deployment mode check from the ConfigMap")
 		}
 
 		// Try to get the deployment mode from the InferenceService status if it exists.
@@ -87,15 +97,21 @@ func GetKServeDeploymentMode(ctx context.Context, k8sClient client.Client,
 				if !k8serrors.IsNotFound(err) {
 					return "", err
 				}
+				logger.V(1).Info("InferenceService not found, deployment mode from status is not available",
+					"InferenceService", isvcNamespacedName.String())
 			} else {
 				statusDeploymentMode = isvc.Status.DeploymentMode
 			}
+		} else {
+			logger.V(1).Info("InferenceService name is not set, skipping deployment mode check from InferenceService status")
 		}
 	} else {
+		logger.V(1).Info("k8sClient is nil, skipping default deployment mode retrieval from the inferenceservice-config ConfigMap, " +
+			"skipping deployment mode check from InferenceService status, using the annotations only")
 		annotations = podAnnotations
 	}
 
-	deploymentMode := getDeploymentMode(statusDeploymentMode, annotations, deployConfig)
+	deploymentMode := getDeploymentMode(ctx, statusDeploymentMode, annotations, deployConfig)
 	return deploymentMode, nil
 }
 
@@ -113,10 +129,14 @@ case 2: serving.kserve.org/deploymentMode is set
 ODH 3.0 supports "RawDeployment", "Serverless", and doesn't accept "Standard", "Knative"
 Ref: https://github.com/opendatahub-io/kserve/blob/cf2920b4276d97fc2d2d700efe4879749a56b418/pkg/controller/v1beta1/inferenceservice/utils/utils.go#L220
 */
-func getDeploymentMode(statusDeploymentMode string, annotations map[string]string,
+func getDeploymentMode(ctx context.Context, statusDeploymentMode string, annotations map[string]string,
 	deployConfig *kservev1beta1.DeployConfig) kserveconstants.DeploymentModeType {
+	logger := log.FromContext(ctx).WithName("KServe").WithName("Deployment Mode")
+
 	// First priority is the deploymentMode recorded in the status
 	if len(statusDeploymentMode) != 0 {
+		logger.Info("using deployment mode from InferenceService status",
+			"Deployment Mode", statusDeploymentMode)
 		return kserveconstants.DeploymentModeType(statusDeploymentMode)
 	}
 
@@ -132,16 +152,30 @@ func getDeploymentMode(statusDeploymentMode string, annotations map[string]strin
 			deploymentMode == string(kserveconstants.ModelMeshDeployment) ||
 			deploymentMode == string(kserveconstants.LegacyRawDeployment) ||
 			deploymentMode == string(kserveconstants.LegacyServerless)) {
+			logger.Info("using deployment mode from annotations",
+				"Deployment Mode", deploymentMode)
 			return kserveconstants.DeploymentModeType(deploymentMode)
+		}
+
+		if ok {
+			logger.V(1).Info("warning: deployment mode annotation found but value is invalid",
+				"Deployment Mode", deploymentMode)
+		} else {
+			logger.V(1).Info("warning: deployment mode annotation not found in annotations")
 		}
 	}
 
 	if deployConfig != nil {
 		// Finally, if an InferenceService is being created and does not explicitly specify a DeploymentMode
+		logger.Info("using the default deployment mode from the inferenceservice-config ConfigMap",
+			"Deployment Mode", deployConfig.DefaultDeploymentMode)
 		return kserveconstants.DeploymentModeType(deployConfig.DefaultDeploymentMode)
 	}
 
 	// If InferenceServicesConfig doesn't exist, use the default deployment mode
+	// For ODH, InferenceServicesConfig is always bundled, and this line should not be reached
+	logger.Info("deployment mode is not found in any configurations, using default deployment mode",
+		"Deployment Mode", kserveconstants.DefaultDeployment)
 	return kserveconstants.DefaultDeployment
 }
 
@@ -183,12 +217,13 @@ func newDeployConfig(isvcConfigMap *corev1.ConfigMap) (*kservev1beta1.DeployConf
 
 func getISVCConfigMap(ctx context.Context, k8sClient client.Client) (*corev1.ConfigMap, error) {
 	var namespace string
+	// Find the namespace of the KServe controller
 	deploymentList := &appsv1.DeploymentList{}
-	if err := k8sClient.List(ctx, deploymentList, client.HasLabels{"app.kubernetes.io/name: kserve-controller-manager"}); err != nil {
+	if err := k8sClient.List(ctx, deploymentList, client.MatchingLabels{"app.kubernetes.io/name": KServeControllerName}); err != nil {
 		return nil, err
 	}
 	for _, deployment := range deploymentList.Items {
-		if deployment.GetName() == "kserve-controller-manager" {
+		if deployment.GetName() == KServeControllerName {
 			namespace = deployment.Namespace
 			break
 		}
@@ -198,6 +233,7 @@ func getISVCConfigMap(ctx context.Context, k8sClient client.Client) (*corev1.Con
 		return nil, fmt.Errorf("failed to find the namespace of KServe Deployment")
 	}
 
+	// Get the inferenceservice-config ConfigMap in the namespace
 	isvcConfigMap := &corev1.ConfigMap{}
 	err := k8sClient.Get(ctx,
 		types.NamespacedName{

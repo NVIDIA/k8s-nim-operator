@@ -100,8 +100,7 @@ func (v *NIMServiceCustomValidator) ValidateCreate(_ context.Context, obj runtim
 	fldPath := field.NewPath("nimservice").Child("spec")
 
 	// Perform comprehensive spec validation via helper.
-	namespacedName := client.ObjectKeyFromObject(nimservice)
-	warningList, errList := validateNIMServiceSpec(&nimservice.Spec, fldPath, v.k8sVersion, v.k8sClient, &namespacedName)
+	warningList, errList := validateNIMServiceSpec(nimservice, fldPath, v.k8sVersion, v.k8sClient)
 
 	if len(errList) > 0 {
 		return warningList, errList.ToAggregate()
@@ -123,9 +122,8 @@ func (v *NIMServiceCustomValidator) ValidateUpdate(_ context.Context, oldObj, ne
 	nimservicelog.V(4).Info("Validation for NIMService upon update", "name", newNIMService.GetName())
 
 	fldPath := field.NewPath("nimservice").Child("spec")
-	namespacedName := client.ObjectKeyFromObject(newNIMService)
 	// Start with structural validation to ensure the updated object is well formed.
-	warningList, errList := validateNIMServiceSpec(&newNIMService.Spec, fldPath, v.k8sVersion, v.k8sClient, &namespacedName)
+	warningList, errList := validateNIMServiceSpec(newNIMService, fldPath, v.k8sVersion, v.k8sClient)
 
 	wList, eList := validateMultiNodeImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("multiNode"))
 	warningList = append(warningList, wList...)
