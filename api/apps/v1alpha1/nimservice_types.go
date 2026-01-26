@@ -1096,9 +1096,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
-	if !n.IsAutoScalingEnabled() {
-		params.Replicas = n.GetReplicas()
-	}
+	params.Replicas = n.GetReplicas()
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
 	params.Affinity = n.GetAffinity()
