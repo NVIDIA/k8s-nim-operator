@@ -52,6 +52,8 @@ type NIMCacheReconciler struct {
 	log      logr.Logger
 	updater  conditions.Updater
 	recorder record.EventRecorder
+	// uncached reader to bypass client cache for certain get operations
+	apiReader client.Reader
 }
 
 // NIMServiceReconciler represents the NIMService reconciler instance for standalone mode.
@@ -64,16 +66,19 @@ type NIMServiceReconciler struct {
 	renderer         render.Renderer
 	recorder         record.EventRecorder
 	orchestratorType k8sutil.OrchestratorType
+	// uncached reader to bypass client cache for certain get operations
+	apiReader client.Reader
 }
 
 // NewNIMCacheReconciler returns NIMCacheReconciler for standalone mode.
 func NewNIMCacheReconciler(r shared.Reconciler) *NIMCacheReconciler {
 	return &NIMCacheReconciler{
-		Client:   r.GetClient(),
-		scheme:   r.GetScheme(),
-		log:      r.GetLogger(),
-		updater:  r.GetUpdater(),
-		recorder: r.GetEventRecorder(),
+		Client:    r.GetClient(),
+		scheme:    r.GetScheme(),
+		log:       r.GetLogger(),
+		updater:   r.GetUpdater(),
+		recorder:  r.GetEventRecorder(),
+		apiReader: r.GetAPIReader(),
 	}
 }
 
@@ -89,6 +94,7 @@ func NewNIMServiceReconciler(ctx context.Context, r shared.Reconciler) *NIMServi
 		discoveryClient:  r.GetDiscoveryClient(),
 		recorder:         r.GetEventRecorder(),
 		orchestratorType: orchestratorType,
+		apiReader:        r.GetAPIReader(),
 	}
 }
 

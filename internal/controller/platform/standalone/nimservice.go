@@ -33,7 +33,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -228,7 +228,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !k8serrors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -243,7 +243,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
-		if err != nil && !k8serrors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -258,7 +258,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.GRPCRoute{}, namespacedName)
-		if err != nil && !k8serrors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -298,7 +298,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	if nimCacheName != "" { // nolint:gocritic
 		if err := r.Get(ctx, types.NamespacedName{Name: nimCacheName, Namespace: nimService.GetNamespace()}, &nimCache); err != nil {
 			// Fail the NIMService if the NIMCache is not found
-			if k8serrors.IsNotFound(err) {
+			if apiErrors.IsNotFound(err) {
 				msg := fmt.Sprintf("NIMCache %s not found", nimCacheName)
 				statusUpdateErr := r.updater.SetConditionsFailed(ctx, nimService, conditions.ReasonNIMCacheNotFound, msg)
 				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, msg)
@@ -866,9 +866,18 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	// e.g. (with LWS resources with suffix)
 	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
 	getErr := r.Get(ctx, namespacedName, obj)
-	if getErr != nil && !k8serrors.IsNotFound(getErr) {
-		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
-		return getErr
+	if getErr != nil {
+		if apiErrors.IsNotFound(getErr) {
+			// try to get the object again to avoid potential cache miss
+			getErr = r.apiReader.Get(ctx, namespacedName, obj)
+			if getErr != nil && !apiErrors.IsNotFound(getErr) {
+				logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s using the uncached reader: %v", obj.GetObjectKind(), getErr))
+				return getErr
+			}
+		} else {
+			logger.Error(getErr, fmt.Sprintf("Error getting %s: %v", obj.GetObjectKind(), getErr))
+			return getErr
+		}
 	}
 
 	// Track an existing resource
@@ -916,7 +925,7 @@ func (r *NIMServiceReconciler) isLeaderWorkerSetReady(ctx context.Context, nimSe
 	leaderWorkerSet := &lws.LeaderWorkerSet{}
 	err := r.Get(ctx, client.ObjectKey{Name: nimService.GetLWSName(), Namespace: nimService.GetNamespace()}, leaderWorkerSet)
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if apiErrors.IsNotFound(err) {
 			return "", false, nil
 		}
 		return "", false, err
@@ -938,7 +947,7 @@ func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespaced
 	deployment := &appsv1.Deployment{}
 	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, deployment)
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if apiErrors.IsNotFound(err) {
 			return "", false, nil
 		}
 		return "", false, err
@@ -997,14 +1006,28 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nimService.GetNamespace()}
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, pvcNamespacedName, pvc)
-	if err != nil && client.IgnoreNotFound(err) != nil {
-		return nil, err
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			// might be cache miss: fallback to apiserver (uncached)
+			err = r.apiReader.Get(ctx, pvcNamespacedName, pvc)
+			if err != nil && !apiErrors.IsNotFound(err) {
+				return nil, err
+			}
+		} else {
+			logger.Error(err, "Failed to get pvc", "name", pvcName)
+			return nil, err
+		}
 	}
 
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
-			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace()})
+			labels := map[string]string{
+				"app":                          "k8s-nim-operator",
+				"app.kubernetes.io/name":       nimService.Name,
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
+			}
+			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace(), Labels: labels})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return nil, err

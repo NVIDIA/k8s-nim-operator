@@ -105,11 +105,12 @@ var _ = Describe("NemoDatastore Controller", func() {
 			Build()
 
 		dsRec = &NemoDatastoreReconciler{
-			Client:   client,
-			scheme:   scheme,
-			updater:  conditions.NewUpdater(client),
-			recorder: record.NewFakeRecorder(1000),
-			renderer: render.NewRenderer(manifestsDir),
+			Client:    client,
+			scheme:    scheme,
+			updater:   conditions.NewUpdater(client),
+			recorder:  record.NewFakeRecorder(1000),
+			renderer:  render.NewRenderer(manifestsDir),
+			apiReader: client,
 		}
 	})
 

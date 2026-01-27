@@ -66,19 +66,23 @@ type NemoEvaluatorReconciler struct {
 	Config           *rest.Config
 	recorder         record.EventRecorder
 	orchestratorType k8sutil.OrchestratorType
+	// apiReader is used to read objects from the API server directly, bypassing the cache.
+	// this is useful as a fallback to read objects that are not cached due to missing labels for example.
+	apiReader client.Reader
 }
 
 // Ensure NemoEvaluatorReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NemoEvaluatorReconciler{}
 
 // NemoEvaluatorReconciler creates a new reconciler for NemoEvaluator with the given platform.
-func NewNemoEvaluatorReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NemoEvaluatorReconciler {
+func NewNemoEvaluatorReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, apiReader client.Reader, log logr.Logger) *NemoEvaluatorReconciler {
 	return &NemoEvaluatorReconciler{
 		Client:          client,
 		scheme:          scheme,
 		updater:         updater,
 		discoveryClient: discoveryClient,
 		renderer:        renderer,
+		apiReader:       apiReader,
 		log:             log,
 	}
 }
@@ -217,6 +221,11 @@ func (r *NemoEvaluatorReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder.
 func (r *NemoEvaluatorReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
+}
+
+// GetAPIReader returns the api reader.
+func (r *NemoEvaluatorReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
 }
 
 // GetOrchestratorType returns the container platform type.

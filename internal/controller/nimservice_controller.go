@@ -70,19 +70,23 @@ type NIMServiceReconciler struct {
 	Config           *rest.Config
 	orchestratorType k8sutil.OrchestratorType
 	recorder         record.EventRecorder
+	// apiReader is used to read objects from the API server directly, bypassing the cache.
+	// this is useful as a fallback to read objects that are not cached due to missing labels for example.
+	apiReader client.Reader
 }
 
 // Ensure NIMServiceReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NIMServiceReconciler{}
 
 // NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform factory.
-func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NIMServiceReconciler {
+func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, apiReader client.Reader, log logr.Logger) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
 		Client:          client,
 		scheme:          scheme,
 		updater:         updater,
 		discoveryClient: discoveryClient,
 		renderer:        renderer,
+		apiReader:       apiReader,
 		log:             log,
 	}
 }
@@ -230,6 +234,11 @@ func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder.
 func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
+}
+
+// GetAPIReader returns the api reader.
+func (r *NIMServiceReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
 }
 
 // GetOrchestratorType returns the container platform type.

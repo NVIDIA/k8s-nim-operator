@@ -73,17 +73,19 @@ type NIMBuildReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 	updater          conditions.Updater
 	recorder         record.EventRecorder
+	apiReader        client.Reader
 }
 
 // Ensure NIMBuildReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NIMBuildReconciler{}
 
 // NewNIMBuildReconciler creates a new reconciler for NIMBuild with the given platform.
-func NewNIMBuildReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger) *NIMBuildReconciler {
+func NewNIMBuildReconciler(client client.Client, scheme *runtime.Scheme, apiReader client.Reader, log logr.Logger) *NIMBuildReconciler {
 	return &NIMBuildReconciler{
-		Client: client,
-		scheme: scheme,
-		log:    log,
+		Client:    client,
+		scheme:    scheme,
+		apiReader: apiReader,
+		log:       log,
 	}
 }
 
@@ -201,6 +203,11 @@ func (r *NIMBuildReconciler) GetRenderer() render.Renderer {
 
 func (r *NIMBuildReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
+}
+
+// GetAPIReader returns the api reader.
+func (r *NIMBuildReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
 }
 
 func (r *NIMBuildReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
@@ -1025,6 +1032,10 @@ func (r *NIMBuildReconciler) updateManifestConfigMap(ctx context.Context, nimCac
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getManifestConfigName(nimCache),
 			Namespace: nimCache.GetNamespace(),
+			Labels: map[string]string{
+				"app":                          nimCache.GetName(),
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
+			},
 		},
 	}
 

@@ -3,6 +3,10 @@ kind: Role
 metadata:
   name: {{ .Name }}
   namespace: {{ .Namespace }}
+  labels:
+  {{- if .Labels }}
+    {{- .Labels | yaml | nindent 4 }}
+  {{- end }}
 rules:
   {{- if .Rules }}
     {{- .Rules | yaml | nindent 2 }}
