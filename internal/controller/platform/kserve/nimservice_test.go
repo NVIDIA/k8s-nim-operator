@@ -348,6 +348,14 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				},
 			},
 			{
+				Name: "scratch",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{
+						Medium: corev1.StorageMediumDefault,
+					},
+				},
+			},
+			{
 				Name: "model-store",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
@@ -367,6 +375,10 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			{
 				Name:      "dshm",
 				MountPath: "/dev/shm",
+			},
+			{
+				Name:      "scratch",
+				MountPath: "/scratch",
 			},
 		}
 		nimCache = &appsv1alpha1.NIMCache{
@@ -2509,6 +2521,338 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				}
 				Expect(hfTokenPresent).To(BeFalse(), "HF_TOKEN should not be present for non-HF models")
 			})
+		})
+	})
+
+	Describe("InitContainers and SidecarContainers rendering for InferenceService", func() {
+		BeforeEach(func() {
+			// Create InferenceService ConfigMap if it doesn't exist
+			isvcConfig := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      kserveconstants.InferenceServiceConfigMapName,
+					Namespace: "default",
+				},
+				Data: map[string]string{
+					"deploy": `{"defaultDeploymentMode": "Serverless"}`,
+				},
+			}
+			err := client.Create(context.TODO(), isvcConfig)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				Expect(err).To(Succeed())
+			}
+		})
+
+		It("should render initContainers and sidecarContainers in InferenceService", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-isvc-containers",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim",
+						Tag:        "1.0.0",
+						PullPolicy: "IfNotPresent",
+					},
+					AuthSecret:        "ngc-secret",
+					InferencePlatform: appsv1alpha1.PlatformTypeKServe,
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "isvc-init-setup",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "1.35",
+								PullPolicy: "Always",
+							},
+							Command: []string{"sh", "-c"},
+							Args:    []string{"echo 'Initializing InferenceService...'"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "ISVC_INIT_ENV",
+									Value: "isvc-init-value",
+								},
+							},
+							WorkingDir: "/workspace",
+						},
+						{
+							Name: "isvc-model-loader",
+							Image: appsv1alpha1.Image{
+								Repository: "alpine",
+								Tag:        "3.18",
+							},
+							Command: []string{"wget"},
+							Args:    []string{"-O", "/models/config.json", "https://example.com/config.json"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "MODEL_CONFIG_URL",
+									Value: "https://example.com/config.json",
+								},
+							},
+						},
+					},
+					SidecarContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "isvc-logging-sidecar",
+							Image: appsv1alpha1.Image{
+								Repository: "fluent/fluent-bit",
+								Tag:        "2.0",
+								PullPolicy: "IfNotPresent",
+							},
+							Command: []string{"/fluent-bit/bin/fluent-bit"},
+							Args:    []string{"-c", "/fluent-bit/etc/fluent-bit.conf"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "FLUENT_ISVC_ENV",
+									Value: "production",
+								},
+							},
+						},
+						{
+							Name: "isvc-metrics-agent",
+							Image: appsv1alpha1.Image{
+								Repository: "prom/pushgateway",
+								Tag:        "v1.5.0",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "PUSH_GATEWAY_PORT",
+									Value: "9091",
+								},
+							},
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Get the rendered InferenceService
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify initContainers are rendered correctly
+			Expect(isvc.Spec.Predictor.InitContainers).To(HaveLen(2))
+
+			initContainer1 := isvc.Spec.Predictor.InitContainers[0]
+			Expect(initContainer1.Name).To(Equal("isvc-init-setup"))
+			Expect(initContainer1.Image).To(Equal("busybox:1.35"))
+			Expect(initContainer1.ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(initContainer1.Command).To(Equal([]string{"sh", "-c"}))
+			Expect(initContainer1.Args).To(Equal([]string{"echo 'Initializing InferenceService...'"}))
+			Expect(initContainer1.WorkingDir).To(Equal("/workspace"))
+
+			// Verify environment variables are merged
+			var foundISVCInitEnv, foundGlobalEnv bool
+			for _, env := range initContainer1.Env {
+				if env.Name == "ISVC_INIT_ENV" && env.Value == "isvc-init-value" {
+					foundISVCInitEnv = true
+				}
+				// Global NIM env vars should be present
+				if env.Name == "NIM_CACHE_PATH" {
+					foundGlobalEnv = true
+				}
+			}
+			Expect(foundISVCInitEnv).To(BeTrue(), "Init-specific env var should be present")
+			Expect(foundGlobalEnv).To(BeTrue(), "Global NIM env vars should be merged")
+
+			initContainer2 := isvc.Spec.Predictor.InitContainers[1]
+			Expect(initContainer2.Name).To(Equal("isvc-model-loader"))
+			Expect(initContainer2.Image).To(Equal("alpine:3.18"))
+			Expect(initContainer2.Command).To(Equal([]string{"wget"}))
+			Expect(initContainer2.Args).To(Equal([]string{"-O", "/models/config.json", "https://example.com/config.json"}))
+
+			var foundModelConfigURL bool
+			for _, env := range initContainer2.Env {
+				if env.Name == "MODEL_CONFIG_URL" {
+					foundModelConfigURL = true
+				}
+			}
+			Expect(foundModelConfigURL).To(BeTrue())
+
+			// Verify sidecarContainers are rendered correctly
+			// Main container + 2 sidecars = 3 total
+			Expect(isvc.Spec.Predictor.Containers).To(HaveLen(3))
+
+			// Find the sidecar containers
+			var loggingSidecar, metricsAgent *corev1.Container
+			for i := range isvc.Spec.Predictor.Containers {
+				c := &isvc.Spec.Predictor.Containers[i]
+				if c.Name == "isvc-logging-sidecar" {
+					loggingSidecar = c
+				} else if c.Name == "isvc-metrics-agent" {
+					metricsAgent = c
+				}
+			}
+
+			Expect(loggingSidecar).NotTo(BeNil(), "logging-sidecar should be present in InferenceService")
+			Expect(loggingSidecar.Image).To(Equal("fluent/fluent-bit:2.0"))
+			Expect(loggingSidecar.ImagePullPolicy).To(Equal(corev1.PullIfNotPresent))
+			Expect(loggingSidecar.Command).To(Equal([]string{"/fluent-bit/bin/fluent-bit"}))
+			Expect(loggingSidecar.Args).To(Equal([]string{"-c", "/fluent-bit/etc/fluent-bit.conf"}))
+
+			var foundFluentEnv bool
+			for _, env := range loggingSidecar.Env {
+				if env.Name == "FLUENT_ISVC_ENV" && env.Value == "production" {
+					foundFluentEnv = true
+				}
+			}
+			Expect(foundFluentEnv).To(BeTrue(), "Sidecar-specific env var should be present")
+
+			Expect(metricsAgent).NotTo(BeNil(), "metrics-agent should be present in InferenceService")
+			Expect(metricsAgent.Image).To(Equal("prom/pushgateway:v1.5.0"))
+
+			var foundPushGatewayPort bool
+			for _, env := range metricsAgent.Env {
+				if env.Name == "PUSH_GATEWAY_PORT" && env.Value == "9091" {
+					foundPushGatewayPort = true
+				}
+			}
+			Expect(foundPushGatewayPort).To(BeTrue(), "Metrics agent env var should be present")
+		})
+
+		It("should handle empty initContainers and sidecarContainers in InferenceService", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-isvc-no-containers",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim",
+						Tag:        "1.0.0",
+					},
+					AuthSecret:        "ngc-secret",
+					InferencePlatform: appsv1alpha1.PlatformTypeKServe,
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Should only have system-generated init containers (if any)
+			// No user-defined initContainers
+			for _, ic := range isvc.Spec.Predictor.InitContainers {
+				// All init containers should be system-generated
+				Expect(ic.Name).NotTo(ContainSubstring("isvc-init-"))
+			}
+
+			// Should only have 1 container (the main NIM container)
+			Expect(isvc.Spec.Predictor.Containers).To(HaveLen(1))
+			Expect(isvc.Spec.Predictor.Containers[0].Name).To(Equal(testNimService.GetContainerName()))
+		})
+
+		It("should use custom pull policy for initContainers and sidecarContainers in InferenceService", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-isvc-pullpolicy",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim",
+						Tag:        "1.0.0",
+						PullPolicy: "IfNotPresent",
+					},
+					AuthSecret:        "ngc-secret",
+					InferencePlatform: appsv1alpha1.PlatformTypeKServe,
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "isvc-init-always",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "latest",
+								PullPolicy: "Always",
+							},
+						},
+						{
+							Name: "isvc-init-default",
+							Image: appsv1alpha1.Image{
+								Repository: "alpine",
+								Tag:        "latest",
+								// No PullPolicy specified, should inherit from parent
+							},
+						},
+					},
+					SidecarContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "isvc-sidecar-never",
+							Image: appsv1alpha1.Image{
+								Repository: "nginx",
+								Tag:        "latest",
+								PullPolicy: "Never",
+							},
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify initContainer pull policies
+			Expect(isvc.Spec.Predictor.InitContainers).To(HaveLen(2))
+			Expect(isvc.Spec.Predictor.InitContainers[0].ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(isvc.Spec.Predictor.InitContainers[1].ImagePullPolicy).To(Equal(corev1.PullIfNotPresent))
+
+			// Verify sidecar pull policy
+			var sidecarFound bool
+			for i := range isvc.Spec.Predictor.Containers {
+				if isvc.Spec.Predictor.Containers[i].Name == "isvc-sidecar-never" {
+					Expect(isvc.Spec.Predictor.Containers[i].ImagePullPolicy).To(Equal(corev1.PullNever))
+					sidecarFound = true
+					break
+				}
+			}
+			Expect(sidecarFound).To(BeTrue(), "Sidecar should be present in InferenceService")
 		})
 	})
 })

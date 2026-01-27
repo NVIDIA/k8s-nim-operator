@@ -86,6 +86,7 @@ type DeploymentParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 }
 
@@ -127,6 +128,7 @@ type LeaderWorkerSetParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 }
 
@@ -328,6 +330,7 @@ type InferenceServiceParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 	DeploymentMode     string
 }

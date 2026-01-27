@@ -416,7 +416,6 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	var profileEnv *[]corev1.EnvVar
 	var profile *appsv1alpha1.NIMProfile
 	var gpuResources *corev1.ResourceRequirements
-	var initContainers []corev1.Container
 	var renderFunc func() (client.Object, error)
 	var conType, failedCon string
 	var renderObj client.Object
@@ -453,7 +452,6 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 		// TODO: assign GPU resources and node selector that is required for the selected profile
 	}
 
-	initContainers = nimService.GetInitContainers()
 	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
 	if err != nil {
 		logger.Error(err, "Failed to get named dra resources")
@@ -538,13 +536,14 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	if gpuResources != nil {
 		isvcParams.Resources = gpuResources
 	}
+	initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+	for idx := range isvcParams.InitContainers {
+		isvcParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
+	}
 	renderFunc = func() (client.Object, error) {
 		result, err := r.renderer.InferenceService(isvcParams)
 		if err != nil {
 			return nil, err
-		}
-		if len(initContainers) > 0 {
-			result.Spec.Predictor.InitContainers = initContainers
 		}
 		// Update Container resources with DRA resource claims.
 		namedDraResources.UpdateContainerResourceClaims(result.Spec.Predictor.Containers)

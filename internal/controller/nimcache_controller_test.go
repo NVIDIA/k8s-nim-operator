@@ -808,6 +808,329 @@ var _ = Describe("NIMCache Controller", func() {
 				Name: "my-secret",
 			}))
 		})
+
+		It("should construct a job with initContainers", func() {
+			ctx := context.TODO()
+			profiles := []string{"36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"}
+			profilesJSON, err := json.Marshal(profiles)
+			Expect(err).ToNot(HaveOccurred())
+
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-nimcache-with-init",
+					Namespace:   "default",
+					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "init-download-config",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "1.35",
+								PullPolicy: "Always",
+							},
+							Command: []string{"sh", "-c"},
+							Args:    []string{"wget -O /config/model.yaml https://example.com/model.yaml"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "CONFIG_URL",
+									Value: "https://example.com/model.yaml",
+								},
+							},
+							WorkingDir: "/config",
+						},
+						{
+							Name: "init-setup-permissions",
+							Image: appsv1alpha1.Image{
+								Repository: "alpine",
+								Tag:        "3.18",
+								PullPolicy: "IfNotPresent",
+							},
+							Command: []string{"chmod"},
+							Args:    []string{"-R", "755", "/model-store"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "SETUP_MODE",
+									Value: "755",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			job, err := reconciler.constructJob(ctx, nimCache, k8sutil.K8s)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify initContainers are present
+			Expect(job.Spec.Template.Spec.InitContainers).To(HaveLen(2))
+
+			// Verify first init container
+			initContainer1 := job.Spec.Template.Spec.InitContainers[0]
+			Expect(initContainer1.Name).To(Equal("init-download-config"))
+			Expect(initContainer1.Image).To(Equal("busybox:1.35"))
+			Expect(initContainer1.ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(initContainer1.Command).To(Equal([]string{"sh", "-c"}))
+			Expect(initContainer1.Args).To(Equal([]string{"wget -O /config/model.yaml https://example.com/model.yaml"}))
+			Expect(initContainer1.WorkingDir).To(Equal("/config"))
+
+			// Verify environment variables in first init container
+			var foundConfigURL bool
+			for _, env := range initContainer1.Env {
+				if env.Name == "CONFIG_URL" && env.Value == "https://example.com/model.yaml" {
+					foundConfigURL = true
+					break
+				}
+			}
+			Expect(foundConfigURL).To(BeTrue(), "CONFIG_URL should be present in init container")
+
+			// Verify second init container
+			initContainer2 := job.Spec.Template.Spec.InitContainers[1]
+			Expect(initContainer2.Name).To(Equal("init-setup-permissions"))
+			Expect(initContainer2.Image).To(Equal("alpine:3.18"))
+			Expect(initContainer2.ImagePullPolicy).To(Equal(corev1.PullIfNotPresent))
+			Expect(initContainer2.Command).To(Equal([]string{"chmod"}))
+			Expect(initContainer2.Args).To(Equal([]string{"-R", "755", "/model-store"}))
+
+			// Verify environment variables in second init container
+			var foundSetupMode bool
+			for _, env := range initContainer2.Env {
+				if env.Name == "SETUP_MODE" && env.Value == "755" {
+					foundSetupMode = true
+					break
+				}
+			}
+			Expect(foundSetupMode).To(BeTrue(), "SETUP_MODE should be present in init container")
+		})
+
+		It("should create a job with initContainers and custom CA certificate init container", func() {
+			ctx := context.TODO()
+			profiles := []string{"36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"}
+			profilesJSON, err := json.Marshal(profiles)
+			Expect(err).ToNot(HaveOccurred())
+
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-nimcache-init-proxy",
+					Namespace:   "default",
+					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+					Proxy: &appsv1alpha1.ProxySpec{
+						HttpProxy:     "http://proxy:1000",
+						HttpsProxy:    "https://proxy:1000",
+						NoProxy:       "http://no-proxy",
+						CertConfigMap: "custom-ca-configmap",
+					},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "init-custom",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "latest",
+							},
+							Command: []string{"echo"},
+							Args:    []string{"Custom init"},
+						},
+					},
+				},
+			}
+
+			// Create the ConfigMap for CA certificates
+			configMap := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "custom-ca-configmap",
+					Namespace: "default",
+				},
+				Data: map[string]string{
+					"custom-ca-cert.pem": "fake-cert-data",
+				},
+			}
+			Expect(cli.Create(ctx, configMap)).To(Succeed())
+
+			job, err := reconciler.constructJob(ctx, nimCache, k8sutil.K8s)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Should have 2 init containers: custom + update-ca-certificates
+			Expect(job.Spec.Template.Spec.InitContainers).To(HaveLen(2))
+
+			// Verify custom init container is first
+			Expect(job.Spec.Template.Spec.InitContainers[0].Name).To(Equal("init-custom"))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Image).To(Equal("busybox:latest"))
+
+			// Verify update-ca-certificates init container is second
+			Expect(job.Spec.Template.Spec.InitContainers[1].Name).To(Equal("update-ca-certificates"))
+			Expect(job.Spec.Template.Spec.InitContainers[1].Image).To(Equal("nvcr.io/nim:test"))
+			Expect(job.Spec.Template.Spec.InitContainers[1].Command).To(Equal(k8sutil.GetUpdateCaCertInitContainerCommand()))
+			Expect(job.Spec.Template.Spec.InitContainers[1].SecurityContext).To(Equal(k8sutil.GetUpdateCaCertInitContainerSecurityContext()))
+		})
+
+		It("should construct a job without initContainers when not specified", func() {
+			ctx := context.TODO()
+			profiles := []string{"36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"}
+			profilesJSON, err := json.Marshal(profiles)
+			Expect(err).ToNot(HaveOccurred())
+
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-nimcache-no-init",
+					Namespace:   "default",
+					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+					// No InitContainers specified
+				},
+			}
+
+			job, err := reconciler.constructJob(ctx, nimCache, k8sutil.K8s)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Should have no init containers
+			Expect(job.Spec.Template.Spec.InitContainers).To(BeEmpty())
+		})
+
+		It("should handle multiple initContainers with different configurations", func() {
+			ctx := context.TODO()
+			profiles := []string{"36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"}
+			profilesJSON, err := json.Marshal(profiles)
+			Expect(err).ToNot(HaveOccurred())
+
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-nimcache-multi-init",
+					Namespace:   "default",
+					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "init-1",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "1.35",
+								PullPolicy: "Always",
+							},
+							Command:    []string{"sh"},
+							Args:       []string{"-c", "echo init-1"},
+							WorkingDir: "/tmp",
+						},
+						{
+							Name: "init-2",
+							Image: appsv1alpha1.Image{
+								Repository: "alpine",
+								Tag:        "3.18",
+								PullPolicy: "IfNotPresent",
+							},
+							Command: []string{"ls"},
+							Args:    []string{"-la", "/"},
+						},
+						{
+							Name: "init-3",
+							Image: appsv1alpha1.Image{
+								Repository: "ubuntu",
+								Tag:        "22.04",
+								// No pull policy - should default to empty
+							},
+							Command: []string{"whoami"},
+						},
+					},
+				},
+			}
+
+			job, err := reconciler.constructJob(ctx, nimCache, k8sutil.K8s)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify all init containers are present
+			Expect(job.Spec.Template.Spec.InitContainers).To(HaveLen(3))
+
+			// Verify init-1
+			Expect(job.Spec.Template.Spec.InitContainers[0].Name).To(Equal("init-1"))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Image).To(Equal("busybox:1.35"))
+			Expect(job.Spec.Template.Spec.InitContainers[0].ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Command).To(Equal([]string{"sh"}))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Args).To(Equal([]string{"-c", "echo init-1"}))
+			Expect(job.Spec.Template.Spec.InitContainers[0].WorkingDir).To(Equal("/tmp"))
+
+			// Verify init-2
+			Expect(job.Spec.Template.Spec.InitContainers[1].Name).To(Equal("init-2"))
+			Expect(job.Spec.Template.Spec.InitContainers[1].Image).To(Equal("alpine:3.18"))
+			Expect(job.Spec.Template.Spec.InitContainers[1].ImagePullPolicy).To(Equal(corev1.PullIfNotPresent))
+			Expect(job.Spec.Template.Spec.InitContainers[1].Command).To(Equal([]string{"ls"}))
+			Expect(job.Spec.Template.Spec.InitContainers[1].Args).To(Equal([]string{"-la", "/"}))
+
+			// Verify init-3 (no pull policy specified)
+			Expect(job.Spec.Template.Spec.InitContainers[2].Name).To(Equal("init-3"))
+			Expect(job.Spec.Template.Spec.InitContainers[2].Image).To(Equal("ubuntu:22.04"))
+			Expect(job.Spec.Template.Spec.InitContainers[2].ImagePullPolicy).To(BeEmpty())
+			Expect(job.Spec.Template.Spec.InitContainers[2].Command).To(Equal([]string{"whoami"}))
+		})
+
+		It("should successfully reconcile and create a job with initContainers", func() {
+			ctx := context.TODO()
+			profiles := []string{"36fc1fa4fc35c1d54da115a39323080b08d7937dceb8ba47be44f4da0ec720ff"}
+			profilesJSON, err := json.Marshal(profiles)
+			Expect(err).ToNot(HaveOccurred())
+
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-nimcache-init",
+					Namespace:   "default",
+					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source:  appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+					Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To[bool](true), StorageClass: "standard", Size: "1Gi"}},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "prepare-cache",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "latest",
+							},
+							Command: []string{"mkdir"},
+							Args:    []string{"-p", "/model-store/cache"},
+						},
+					},
+				},
+			}
+			// Create manifest configmap for this specific NIMCache
+			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+			nimparser := nimparserv1.NIMParser{}
+			manifestData, err := nimparser.ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			err = reconciler.createManifestConfigMap(ctx, nimCache, &manifestData)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(cli.Create(ctx, nimCache)).To(Succeed())
+
+			// Reconcile the resource
+			_, err = reconciler.reconcileNIMCache(ctx, nimCache)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Wait for the Job to be created
+			Eventually(func() error {
+				job := &batchv1.Job{}
+				jobName := types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}
+				return cli.Get(ctx, jobName, job)
+			}, time.Second*10).Should(Succeed())
+
+			// Verify the created job has initContainers
+			job := &batchv1.Job{}
+			jobName := types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}
+			Expect(cli.Get(ctx, jobName, job)).To(Succeed())
+
+			Expect(job.Spec.Template.Spec.InitContainers).To(HaveLen(1))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Name).To(Equal("prepare-cache"))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Image).To(Equal("busybox:latest"))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Command).To(Equal([]string{"mkdir"}))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Args).To(Equal([]string{"-p", "/model-store/cache"}))
+		})
+
 	})
 
 	Context("when error reconciling NIMCache resource", func() {
