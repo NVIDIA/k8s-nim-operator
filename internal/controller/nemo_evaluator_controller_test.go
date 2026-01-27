@@ -82,11 +82,12 @@ var _ = Describe("NemoEvaluator Controller", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		reconciler = &NemoEvaluatorReconciler{
-			Client:   client,
-			scheme:   scheme,
-			updater:  conditions.NewUpdater(client),
-			renderer: render.NewRenderer(manifestsDir),
-			recorder: record.NewFakeRecorder(1000),
+			Client:    client,
+			scheme:    scheme,
+			updater:   conditions.NewUpdater(client),
+			renderer:  render.NewRenderer(manifestsDir),
+			recorder:  record.NewFakeRecorder(1000),
+			apiReader: client,
 		}
 
 		nemoEvaluator = &appsv1alpha1.NemoEvaluator{

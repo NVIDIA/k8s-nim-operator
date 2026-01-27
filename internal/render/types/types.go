@@ -186,6 +186,7 @@ type ServiceAccountParams struct {
 type RoleParams struct {
 	Name      string
 	Namespace string
+	Labels    map[string]string
 	Rules     []rbacv1.PolicyRule
 }
 
@@ -193,6 +194,7 @@ type RoleParams struct {
 type RoleBindingParams struct {
 	Name               string
 	Namespace          string
+	Labels             map[string]string
 	RoleName           string
 	ServiceAccountName string
 }
