@@ -55,11 +55,11 @@ spec:
           imagePullPolicy: {{ .ImagePullPolicy }}
           {{- end }}
           {{- if .Command }}
-          command: 
+          command:
             {{ .Command | yaml | nindent 12 }}
           {{- end }}
           {{- if .Args}}
-          args: 
+          args:
             {{ .Args| yaml | nindent 12 }}
           {{- end }}
           {{- if .WorkingDir }}
@@ -72,6 +72,19 @@ spec:
           {{- with .Resources }}
           resources:
             {{ . | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .SecurityContext }}
+          securityContext:
+            {{ .SecurityContext | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .VolumeMounts }}
+          volumeMounts:
+            {{- range .VolumeMounts }}
+            - name: {{ .Name }}
+              mountPath: {{ .MountPath }}
+              subPath: {{ .SubPath }}
+              readOnly: {{ .ReadOnly }}
+            {{- end }}
           {{- end }}
         {{- end }}
         containers:
@@ -108,6 +121,39 @@ spec:
               subPath: {{ .SubPath }}
               readOnly: {{ .ReadOnly }}
             {{- end }}
+        {{- range .SidecarContainers }}
+        - name: {{ .Name }}
+          image: {{ .Image }}
+          {{- if .ImagePullPolicy }}
+          imagePullPolicy: {{ .ImagePullPolicy }}
+          {{- end }}
+          {{- if .Command }}
+          command:
+            {{ .Command | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .Args}}
+          args:
+            {{ .Args| yaml | nindent 12 }}
+          {{- end }}
+          {{- if .WorkingDir }}
+          workingDir: {{ .WorkingDir }}
+          {{- end }}
+          {{- if .Env }}
+          env:
+            {{ .Env | yaml | nindent 12 }}
+          {{- end }}
+          {{- with .Resources }}
+          resources:
+            {{ . | yaml | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- range $.LeaderVolumeMounts }}
+            - name: {{ .Name }}
+              mountPath: {{ .MountPath }}
+              subPath: {{ .SubPath }}
+              readOnly: {{ .ReadOnly }}
+            {{- end }}
+        {{- end }}
         {{- if .Tolerations }}
         tolerations:
           {{- range .Tolerations }}
@@ -191,6 +237,46 @@ spec:
           runAsGroup: {{ .GroupID }}
           fsGroup: {{ .GroupID }}
           {{- end }}
+        initContainers:
+        {{- range .InitContainers }}
+        - name: {{ .Name }}
+          image: {{ .Image }}
+          {{- if .ImagePullPolicy }}
+          imagePullPolicy: {{ .ImagePullPolicy }}
+          {{- end }}
+          {{- if .Command }}
+          command:
+            {{ .Command | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .Args}}
+          args:
+            {{ .Args| yaml | nindent 12 }}
+          {{- end }}
+          {{- if .WorkingDir }}
+          workingDir: {{ .WorkingDir }}
+          {{- end }}
+          {{- if .Env }}
+          env:
+            {{ .Env | yaml | nindent 12 }}
+          {{- end }}
+          {{- with .Resources }}
+          resources:
+            {{ . | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .SecurityContext }}
+          securityContext:
+            {{ .SecurityContext | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .VolumeMounts }}
+          volumeMounts:
+            {{- range .VolumeMounts }}
+            - name: {{ .Name }}
+              mountPath: {{ .MountPath }}
+              subPath: {{ .SubPath }}
+              readOnly: {{ .ReadOnly }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
         containers:
         - name: nim-worker
           {{- if .WorkerEnvs }}
@@ -213,6 +299,39 @@ spec:
             subPath: {{ .SubPath }}
             readOnly: {{ .ReadOnly }}
           {{- end }}
+        {{- range .SidecarContainers }}
+        - name: {{ .Name }}
+          image: {{ .Image }}
+          {{- if .ImagePullPolicy }}
+          imagePullPolicy: {{ .ImagePullPolicy }}
+          {{- end }}
+          {{- if .Command }}
+          command:
+            {{ .Command | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .Args}}
+          args:
+            {{ .Args| yaml | nindent 12 }}
+          {{- end }}
+          {{- if .WorkingDir }}
+          workingDir: {{ .WorkingDir }}
+          {{- end }}
+          {{- if .Env }}
+          env:
+            {{ .Env | yaml | nindent 12 }}
+          {{- end }}
+          {{- with .Resources }}
+          resources:
+            {{ . | yaml | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- range $.WorkerVolumeMounts }}
+            - name: {{ .Name }}
+              mountPath: {{ .MountPath }}
+              subPath: {{ .SubPath }}
+              readOnly: {{ .ReadOnly }}
+            {{- end }}
+        {{- end }}
         {{- if .Tolerations }}
         tolerations:
           {{- range .Tolerations }}
