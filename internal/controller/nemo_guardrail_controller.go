@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -361,7 +360,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -376,7 +375,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -529,7 +528,7 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 
 	namespacedName := types.NamespacedName{Name: nemoGuardrail.GetName(), Namespace: nemoGuardrail.GetNamespace()}
 	getErr := r.Get(ctx, namespacedName, obj)
-	if getErr != nil && !errors.IsNotFound(getErr) {
+	if getErr != nil && !apiErrors.IsNotFound(getErr) {
 		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
 		return getErr
 	}

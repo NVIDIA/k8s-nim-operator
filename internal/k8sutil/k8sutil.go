@@ -31,7 +31,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metaerrors "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
@@ -508,7 +507,6 @@ func BuildByObjectFilteredCache(discoveryClient discovery.DiscoveryInterface, ls
 		&autoscalingv2.HorizontalPodAutoscaler{}: {Label: ls},
 		&batchv1.Job{}:                           {Label: ls},
 		&corev1.Pod{}:                            {Label: ls},
-		&corev1.PersistentVolumeClaim{}:          {Label: ls},
 		&corev1.ConfigMap{}:                      {Label: ls},
 	}
 
@@ -525,12 +523,6 @@ func BuildByObjectFilteredCache(discoveryClient discovery.DiscoveryInterface, ls
 	}
 
 	// Optional CRDs
-	if err := addIfExists(resourcev1.SchemeGroupVersion.WithResource("resourceclaimtemplates"), &resourcev1.ResourceClaimTemplate{}, "ResourceClaimTemplate"); err != nil {
-		return nil, err
-	}
-	if err := addIfExists(resourcev1.SchemeGroupVersion.WithResource("resourceclaims"), &resourcev1.ResourceClaim{}, "ResourceClaim"); err != nil {
-		return nil, err
-	}
 	if err := addIfExists(lwsv1.SchemeGroupVersion.WithResource("leaderworkersets"), &lwsv1.LeaderWorkerSet{}, "LeaderWorkerSet"); err != nil {
 		return nil, err
 	}
