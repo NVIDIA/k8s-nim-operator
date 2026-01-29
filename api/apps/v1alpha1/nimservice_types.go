@@ -123,7 +123,7 @@ type NIMServiceSpec struct {
 	Scale          Autoscaling   `json:"scale,omitempty"`
 	SchedulerName  string        `json:"schedulerName,omitempty"`
 	Metrics        Metrics       `json:"metrics,omitempty"`
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=0
 	Replicas         *int32                     `json:"replicas,omitempty"`
 	UserID           *int64                     `json:"userID,omitempty"`
 	GroupID          *int64                     `json:"groupID,omitempty"`
@@ -1096,9 +1096,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
-	if !n.IsAutoScalingEnabled() {
-		params.Replicas = n.GetReplicas()
-	}
+	params.Replicas = n.GetReplicas()
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
 	params.Affinity = n.GetAffinity()
@@ -1644,26 +1642,32 @@ func (n *NIMService) GetInferenceServiceParams(
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
-	if !n.IsAutoScalingEnabled() || !utils.IsKServeStandardDeploymentMode(deploymentMode) {
-		params.MinReplicas = n.GetReplicas()
-	} else {
-		params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
+	if utils.IsKServeStandardDeploymentMode(deploymentMode) {
+		if n.IsAutoScalingEnabled() {
+			params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
 
-		minReplicas, maxReplicas, metric, metricType, target := n.GetInferenceServiceHPAParams()
-		if minReplicas != nil {
-			params.MinReplicas = minReplicas
-		}
-		if maxReplicas > 0 {
-			params.MaxReplicas = ptr.To[int32](maxReplicas)
-		}
-		if metric != "" {
-			params.ScaleMetric = metric
-		}
-		if metricType != "" {
-			params.ScaleMetricType = metricType
-		}
-		if target > 0 {
-			params.ScaleTarget = ptr.To(target)
+			minReplicas, maxReplicas, metric, metricType, target := n.GetInferenceServiceHPAParams()
+			if minReplicas != nil {
+				params.MinReplicas = minReplicas
+			}
+			if maxReplicas > 0 {
+				params.MaxReplicas = ptr.To[int32](maxReplicas)
+			}
+			if metric != "" {
+				params.ScaleMetric = metric
+			}
+			if metricType != "" {
+				params.ScaleMetricType = metricType
+			}
+			if target > 0 {
+				params.ScaleTarget = ptr.To(target)
+			}
+		} else {
+			params.MinReplicas = ptr.To[int32](0)
+			params.MaxReplicas = ptr.To[int32](0)
+			params.ScaleMetric = ""
+			params.ScaleMetricType = ""
+			params.ScaleTarget = nil
 		}
 	}
 
