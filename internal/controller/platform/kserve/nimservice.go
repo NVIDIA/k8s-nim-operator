@@ -473,8 +473,12 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	}
 
 	// Sync ingress
-	if !nimService.IsIngressEnabled() {
-		isvcParams.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
+	// Only if network visibility is not explicitly configured
+	if _, hasVisibility := isvcParams.Labels[kserveconstants.NetworkVisibility]; !hasVisibility {
+		// User has not explicitly set visibility
+		if !nimService.IsIngressEnabled() {
+			isvcParams.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
+		}
 	}
 
 	isvcParams.OrchestratorType = string(r.orchestratorType)
