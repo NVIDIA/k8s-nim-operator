@@ -909,6 +909,9 @@ func (r *NIMServiceReconciler) isLeaderWorkerSetReady(ctx context.Context, nimSe
 		}
 		return "", false, err
 	}
+	if leaderWorkerSet.Spec.Replicas == nil || *leaderWorkerSet.Spec.Replicas == 0 {
+		return fmt.Sprintf("leaderworkerset %q is scaled down", leaderWorkerSet.Name), false, nil
+	}
 
 	for _, cond := range leaderWorkerSet.Status.Conditions {
 		if cond.Type == string(lws.LeaderWorkerSetAvailable) && cond.Status == metav1.ConditionTrue {

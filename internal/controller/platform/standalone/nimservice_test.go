@@ -1302,6 +1302,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Name:      "test-nimservice-lws",
 					Namespace: "default",
 				},
+				Spec: lwsv1.LeaderWorkerSetSpec{
+					Replicas: ptr.To(int32(1)),
+				},
 				Status: lwsv1.LeaderWorkerSetStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -1324,6 +1327,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Name:      "test-nimservice-lws",
 					Namespace: "default",
 				},
+				Spec: lwsv1.LeaderWorkerSetSpec{
+					Replicas: ptr.To(int32(1)),
+				},
 				Status: lwsv1.LeaderWorkerSetStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -1343,6 +1349,28 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(Equal(false))
 			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is not ready", lws.Name)))
+		})
+		It("should report not ready when LWS is scaled down", func() {
+			lws := &lwsv1.LeaderWorkerSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-lws",
+					Namespace: "default",
+				},
+				Status: lwsv1.LeaderWorkerSetStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(lwsv1.LeaderWorkerSetAvailable),
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			}
+			err := client.Create(context.TODO(), lws)
+			Expect(err).NotTo(HaveOccurred())
+			msg, ready, err := reconciler.isLeaderWorkerSetReady(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(Equal(false))
+			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is scaled down", lws.Name)))
 		})
 	})
 
