@@ -182,6 +182,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			renderer:        render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/kserve"), "manifests")),
 			recorder:        record.NewFakeRecorder(1000),
 			discoveryClient: discoveryClient,
+			apiReader:       client,
 		}
 		pvcName := "test-pvc"
 		nimService = &appsv1alpha1.NIMService{

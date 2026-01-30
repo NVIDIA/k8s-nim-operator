@@ -28,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -65,19 +65,23 @@ type NemoEntitystoreReconciler struct {
 	Config           *rest.Config
 	recorder         record.EventRecorder
 	orchestratorType k8sutil.OrchestratorType
+	// apiReader is used to read objects from the API server directly, bypassing the cache.
+	// this is useful as a fallback to read objects that are not cached due to missing labels for example.
+	apiReader client.Reader
 }
 
 // Ensure NemoEntitystoreReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NemoEntitystoreReconciler{}
 
 // NewNemoEntitystoreReconciler creates a new reconciler for NemoEntitystore with the given platform.
-func NewNemoEntitystoreReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NemoEntitystoreReconciler {
+func NewNemoEntitystoreReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, apiReader client.Reader, log logr.Logger) *NemoEntitystoreReconciler {
 	return &NemoEntitystoreReconciler{
 		Client:          client,
 		scheme:          scheme,
 		updater:         updater,
 		discoveryClient: discoveryClient,
 		renderer:        renderer,
+		apiReader:       apiReader,
 		log:             log,
 	}
 }
@@ -216,6 +220,11 @@ func (r *NemoEntitystoreReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
+// GetAPIReader returns the api reader.
+func (r *NemoEntitystoreReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
+}
+
 // GetOrchestratorType returns the container platform type.
 func (r *NemoEntitystoreReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
@@ -345,7 +354,7 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -360,7 +369,7 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -438,7 +447,7 @@ func (r *NemoEntitystoreReconciler) renderAndSyncResource(ctx context.Context, n
 
 	namespacedName := types.NamespacedName{Name: nemoEntitystore.GetName(), Namespace: nemoEntitystore.GetNamespace()}
 	getErr := r.Get(ctx, namespacedName, obj)
-	if getErr != nil && !errors.IsNotFound(getErr) {
+	if getErr != nil && !apiErrors.IsNotFound(getErr) {
 		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
 		return getErr
 	}
