@@ -92,7 +92,7 @@ const (
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
-// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose) && has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))",message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
