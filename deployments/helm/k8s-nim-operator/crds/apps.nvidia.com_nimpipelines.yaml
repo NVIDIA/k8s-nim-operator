@@ -3730,7 +3730,7 @@ spec:
                       - message: .spec.expose.ingress is deprecated, and will be removed
                           in a future release. If .spec.expose.ingress is set, please
                           do not set .spec.expose.router.ingress.
-                        rule: '!(has(self.expose.ingress) && has(self.expose.ingress.enabled)
+                        rule: '!(has(self.expose) && has(self.expose.ingress) && has(self.expose.ingress.enabled)
                           && self.expose.ingress.enabled && has(self.expose.router)
                           && has(self.expose.router.ingress))'
 >>>>>>> 112458f8 (Integrate GRPCRoute into NIMService (#668))
