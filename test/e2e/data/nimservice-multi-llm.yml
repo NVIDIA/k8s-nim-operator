@@ -9,7 +9,7 @@ spec:
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
-  authSecret: ngc-api-secret
+  authSecret: hf-token-secret
   storage:
     nimCache:
       name: nim-cache-multi-llm

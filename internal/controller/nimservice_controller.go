@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	"github.com/go-logr/logr"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,7 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -90,6 +91,7 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimservices/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimservices/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimcaches,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=resource.nvidia.com,resources=computedomains,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions;proxies,verbs=get;list;watch
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=use,resourceNames=nonroot
@@ -295,16 +297,23 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		)
 
-	nimServiceBuilder, err = k8sutil.ControllerCallbackIfCRDExists(r.discoveryClient,
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
 		nimServiceBuilder,
-		resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"),
-		func(bd *builder.Builder) *builder.Builder {
-			return bd.Watches(
-				&resourcev1beta2.ResourceClaim{},
-				handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
-				builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-			)
-		},
+		resourcev1.SchemeGroupVersion.WithResource("resourceclaimtemplates"),
+		&resourcev1.ResourceClaimTemplate{},
+	)
+	if err != nil {
+		return err
+	}
+
+	nimServiceBuilder, err = k8sutil.ControllerWatchesIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		resourcev1.SchemeGroupVersion.WithResource("resourceclaims"),
+		&resourcev1.ResourceClaim{},
+		handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
 	if err != nil {
 		return err
@@ -333,16 +342,6 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
 		r.discoveryClient,
 		nimServiceBuilder,
-		resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaimtemplates"),
-		&resourcev1beta2.ResourceClaimTemplate{},
-	)
-	if err != nil {
-		return err
-	}
-
-	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		nimServiceBuilder,
 		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
 		&gatewayv1.HTTPRoute{},
 	)
@@ -355,6 +354,30 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		nimServiceBuilder,
 		gatewayv1.SchemeGroupVersion.WithResource("grpcroutes"),
 		&gatewayv1.GRPCRoute{},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Watch ComputeDomain owned by NIMService.
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		nvidiaresourcev1beta1.SchemeGroupVersion.WithResource("computedomains"),
+		&nvidiaresourcev1beta1.ComputeDomain{},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Watch ComputeDomain referenced by NIMService.
+	nimServiceBuilder, err = k8sutil.ControllerWatchesIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		nvidiaresourcev1beta1.SchemeGroupVersion.WithResource("computedomains"),
+		&nvidiaresourcev1beta1.ComputeDomain{},
+		handler.EnqueueRequestsFromMapFunc(r.mapComputeDomainToNIMService),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
 	if err != nil {
 		return err
@@ -389,7 +412,7 @@ func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj 
 }
 
 func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
-	resourceClaim, ok := obj.(*resourcev1beta2.ResourceClaim)
+	resourceClaim, ok := obj.(*resourcev1.ResourceClaim)
 	if !ok {
 		return []ctrl.Request{}
 	}
@@ -403,8 +426,12 @@ func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context,
 	// Enqueue reconciliation for each matching NIMService
 	requests := make([]ctrl.Request, 0)
 	for _, item := range nimServices.Items {
-		namedDraResources := shared.GenerateNamedDRAResources(&item)
-		for _, draResource := range namedDraResources {
+		namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, &item)
+		if err != nil {
+			continue
+		}
+
+		for _, draResource := range namedDraResources.Resources {
 			if shared.ShouldCreateDRAResource(draResource.DRAResource) {
 				continue
 			}
@@ -430,6 +457,45 @@ func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context,
 				break
 			}
 		}
+	}
+	return requests
+}
+
+func (r *NIMServiceReconciler) mapComputeDomainToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
+	computeDomain, ok := obj.(*nvidiaresourcev1beta1.ComputeDomain)
+	if !ok {
+		return []ctrl.Request{}
+	}
+
+	// Get all NIMServices directly requesting computeDomain.
+	var nimServices appsv1alpha1.NIMServiceList
+	if err := r.List(ctx, &nimServices, client.InNamespace(computeDomain.GetNamespace())); err != nil {
+		return []ctrl.Request{}
+	}
+
+	// Enqueue reconciliation for each matching NIMService
+	requests := make([]ctrl.Request, 0)
+	for _, item := range nimServices.Items {
+		// Skip nimservice if compute domain is not requested.
+		if !item.IsComputeDomainEnabled() {
+			continue
+		}
+		// Skip nimservice if nimservice owns a compute domain.
+		if item.Spec.MultiNode.ComputeDomain.Create != nil && *item.Spec.MultiNode.ComputeDomain.Create {
+			continue
+		}
+
+		// Skip nimservice if its compute domain does not match.
+		if item.GetComputeDomainName() != computeDomain.GetName() {
+			continue
+		}
+
+		requests = append(requests, ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.Name,
+				Namespace: item.Namespace,
+			},
+		})
 	}
 	return requests
 }

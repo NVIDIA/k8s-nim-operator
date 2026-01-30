@@ -50,7 +50,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -165,14 +165,14 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		discoveryClient = &discoveryfake.FakeDiscovery{Fake: &testing.Fake{}}
 		discoveryClient.Resources = []*metav1.APIResourceList{
 			{
-				GroupVersion: resourcev1beta2.SchemeGroupVersion.String(),
+				GroupVersion: resourcev1.SchemeGroupVersion.String(),
 				APIResources: []metav1.APIResource{
 					{Name: "resourceclaims"},
 				},
 			},
 		}
 		discoveryClient.FakedServerVersion = &version.Info{
-			GitVersion: "v1.33.0",
+			GitVersion: "v1.34.0",
 		}
 
 		reconciler = &NIMServiceReconciler{
@@ -701,7 +701,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Expect(podSpec.Containers[0].Resources.Claims[1].Request).To(Equal("test-request-2"))
 			})
 
-			It("should mark NIMService as failed when cluster version is less than v1.33.0", func() {
+			It("should mark NIMService as failed when cluster version is less than v1.34.0", func() {
 				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
 					Fake: &testing.Fake{},
 					FakedServerVersion: &version.Info{
@@ -730,37 +730,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Expect(failedCondition).NotTo(BeNil())
 				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
 				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
-				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.33.0' or higher"))
-			})
-
-			It("should mark NIMService as failed when resource claim CRD is not enabled", func() {
-				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
-					Fake: &testing.Fake{},
-					FakedServerVersion: &version.Info{
-						GitVersion: "v1.33.0",
-					},
-				}
-				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
-					{
-						ResourceClaimName: ptr.To("test-resource-claim"),
-					},
-				}
-				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
-				err := client.Create(context.TODO(), nimService)
-				Expect(err).NotTo(HaveOccurred())
-
-				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
-				Expect(err).NotTo(HaveOccurred())
-
-				obj := &appsv1alpha1.NIMService{}
-				err = client.Get(context.TODO(), nimServiceKey, obj)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
-				failedCondition := getCondition(obj, conditions.Failed)
-				Expect(failedCondition).NotTo(BeNil())
-				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
-				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
-				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please ensure resource.k8s.io/v1beta2 API group is enabled"))
+				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.34.0' or higher"))
 			})
 
 			It("should mark NIMService as failed when resource claim name is duplicated", func() {
@@ -850,12 +820,101 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Get(context.TODO(), namespacedName, isvc)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*isvc.Spec.Predictor.MinReplicas).To(Equal(int32(1)))
+			Expect(*isvc.Spec.Predictor.MinReplicas).To(Equal(int32(0)))
 			Expect(isvc.Spec.Predictor.MaxReplicas).To(Equal(int32(0)))
 			Expect(isvc.Spec.Predictor.ScaleMetricType).To(BeNil())
 			Expect(isvc.Spec.Predictor.ScaleMetric).To(BeNil())
 			Expect(isvc.Spec.Predictor.ScaleTarget).To(BeNil())
 
+			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeTrue())
+			Expect(visibility).Should(Equal(kserveconstants.ClusterLocalVisibility))
+		})
+	})
+
+	Context("network visibility configuration", func() {
+		It("should set network visibility to cluster-local when ingress is disabled and not explicitly configured", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Disable ingress and don't set network visibility
+			nimService.Spec.Expose.Router.Ingress = nil
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should have cluster-local visibility
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeTrue())
+			Expect(visibility).Should(Equal(kserveconstants.ClusterLocalVisibility))
+		})
+
+		It("should preserve explicitly set network visibility label when ingress is disabled", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Explicitly set NetworkVisibility to a custom value
+			nimService.Spec.Labels[kserveconstants.NetworkVisibility] = "exposed"
+			// Disable ingress (which would normally set cluster-local)
+			nimService.Spec.Expose.Router.Ingress = nil
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should preserve user-provided visibility, not override with ClusterLocalVisibility
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeTrue())
+			Expect(visibility).Should(Equal("exposed"))
+		})
+
+		It("should not set network visibility when ingress is enabled and not explicitly configured", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Enable ingress
+			nimService.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+				IngressClass: "nginx",
+			}
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should not have network visibility set (external access)
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+			_, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeFalse())
+		})
+
+		It("should preserve explicitly set network visibility when ingress is enabled", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Explicitly set NetworkVisibility to cluster-local
+			nimService.Spec.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
+			// Enable ingress (which would normally not set visibility)
+			nimService.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+				IngressClass: "nginx",
+			}
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should preserve user-provided visibility
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
 			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
 			Expect(found).Should(BeTrue())
 			Expect(visibility).Should(Equal(kserveconstants.ClusterLocalVisibility))
@@ -1019,7 +1078,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.Serverless)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).To(HaveOccurred())
 			Expect(nimService.Status.Model).To(BeNil())
 		})
@@ -1044,7 +1103,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.Serverless)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).To(HaveOccurred())
 			Expect(nimService.Status.Model).To(BeNil())
 		})
@@ -1070,7 +1129,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.Serverless)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(nimService.Status.Model).ToNot(BeNil())
 			Expect(nimService.Status.Model.Name).ToNot(BeEmpty())
@@ -1086,7 +1145,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.Serverless)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).ToNot(HaveOccurred())
 			modelStatus := nimService.Status.Model
 			Expect(modelStatus).ToNot(BeNil())
@@ -1116,7 +1175,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.RawDeployment)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).ToNot(HaveOccurred())
 			modelStatus := nimService.Status.Model
 			Expect(modelStatus).ToNot(BeNil())
@@ -1149,7 +1208,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				err = client.Update(context.TODO(), isvc)
 				Expect(err).ToNot(HaveOccurred())
 
-				err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.RawDeployment)
+				err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyRawDeployment)
 				Expect(err).ToNot(HaveOccurred())
 				modelStatus := nimService.Status.Model
 				Expect(modelStatus).ToNot(BeNil())
@@ -1561,14 +1620,14 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 		It("should return err when InferenceService is missing", func() {
 			_ = client.Delete(context.TODO(), isvc)
-			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.RawDeployment)
+			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 			Expect(err).Should(MatchError("inferenceservices.serving.kserve.io \"test-nimservice\" not found"))
 		})
 
 		It("should return error when external endpoint is not set", func() {
-			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.RawDeployment)
+			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).To(HaveOccurred())
 			Expect(err).Should(MatchError("external endpoint not available, nimservice test-nimservice"))
 		})
@@ -1578,7 +1637,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			isvc.Status.URL, err = knativeapis.ParseURL("external.example.com")
 			Expect(err).ToNot(HaveOccurred())
 			_ = client.Update(context.TODO(), isvc)
-			_, _, err = reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.RawDeployment)
+			_, _, err = reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).To(HaveOccurred())
 			Expect(err).Should(MatchError("cluster endpoint not available, nimservice test-nimservice"))
 		})
@@ -1591,7 +1650,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			isvc.Status.Address.URL, err = knativeapis.ParseURL("cluster.example.com")
 			Expect(err).ToNot(HaveOccurred())
 			_ = client.Update(context.TODO(), isvc)
-			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.Serverless)
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(internal).To(Equal("cluster.example.com"))
 			Expect(external).To(Equal("external.example.com"))
@@ -1605,7 +1664,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			isvc.Status.Address.URL, err = knativeapis.ParseURL("cluster.example.com")
 			Expect(err).ToNot(HaveOccurred())
 			_ = client.Update(context.TODO(), isvc)
-			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.RawDeployment)
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(internal).To(Equal("cluster.example.com"))
 			Expect(external).To(Equal("external.example.com"))

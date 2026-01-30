@@ -35,7 +35,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
@@ -163,7 +163,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	if deploymentMode == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(deploymentMode) {
 		// Sync Service Monitor
 		if nimService.IsServiceMonitorEnabled() {
 			err = r.renderAndSyncResource(ctx, nimService, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
@@ -449,8 +449,12 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	}
 
 	initContainers = nimService.GetInitContainers()
-	namedDraResources := shared.GenerateNamedDRAResources(nimService)
-	err := r.reconcileDRAResources(ctx, nimService, namedDraResources)
+	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
+	if err != nil {
+		logger.Error(err, "Failed to get named dra resources")
+		return err
+	}
+	err = r.reconcileDRAResources(ctx, nimService, namedDraResources)
 	if err != nil {
 		logger.Error(err, "Failed to reconcile DRAResources")
 		return err
@@ -463,14 +467,23 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	isvcParams.Annotations[kserveconstants.EnableMetricAggregation] = "true"
 	isvcParams.Annotations[kserveconstants.SetPrometheusAnnotation] = "true"
 
+	// Ensure deployment mode annotation is always set
+	if _, ok := isvcParams.Annotations[utils.KServeDeploymentModeAnnotationKey]; !ok {
+		isvcParams.Annotations[kserveconstants.DeploymentMode] = string(deploymentMode)
+	}
+
 	// Sync ingress
-	if !nimService.IsIngressEnabled() {
-		isvcParams.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
+	// Only if network visibility is not explicitly configured
+	if _, hasVisibility := isvcParams.Labels[kserveconstants.NetworkVisibility]; !hasVisibility {
+		// User has not explicitly set visibility
+		if !nimService.IsIngressEnabled() {
+			isvcParams.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
+		}
 	}
 
 	isvcParams.OrchestratorType = string(r.orchestratorType)
 
-	isvcParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
+	isvcParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 	if nimCache.IsUniversalNIM() {
 		isvcParams.Env = utils.MergeEnvVars([]corev1.EnvVar{
 			{
@@ -516,7 +529,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 			result.Spec.Predictor.InitContainers = initContainers
 		}
 		// Update Container resources with DRA resource claims.
-		shared.UpdateContainerResourceClaims(result.Spec.Predictor.Containers, namedDraResources)
+		namedDraResources.UpdateContainerResourceClaims(result.Spec.Predictor.Containers)
 		return result, nil
 	}
 	conType = "InferenceService"
@@ -647,8 +660,12 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 		return &ctrl.Result{}, err
 	}
 
-	namedDraResources := shared.GenerateNamedDRAResources(nimService)
-	if len(namedDraResources) > 0 {
+	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
+	if err != nil {
+		logger.Error(err, "Failed to get named dra resources")
+		return &ctrl.Result{}, err
+	}
+	if len(namedDraResources.Resources) > 0 {
 		// Update NIMServiceStatus with resource claims.
 		updateErr := r.updateResourceClaimStatus(ctx, nimService, namedDraResources)
 		if updateErr != nil {
@@ -827,18 +844,6 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 		return false, msg, nil
 	}
 
-	// Check if the resource claim CRD exists
-	crdExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
-	if err != nil {
-		logger.Error(err, "failed to check if resource claim CRD exists")
-		return false, "", err
-	}
-	if !crdExists {
-		msg := "DRA resources are not supported by NIM-Operator on this cluster, please ensure resource.k8s.io/v1beta2 API group is enabled"
-		logger.Error(fmt.Errorf("%s", msg), msg, "nimService", nimService.Name)
-		return false, msg, nil
-	}
-
 	// Check if duplicate resource claim names are provided
 	resourceClaimNames := make(map[string]bool)
 	for idx, resource := range nimService.Spec.DRAResources {
@@ -876,10 +881,10 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 	return true, "", nil
 }
 
-func (r *NIMServiceReconciler) updateResourceClaimStatus(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources []shared.NamedDRAResource) error {
+func (r *NIMServiceReconciler) updateResourceClaimStatus(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources *shared.NamedDRAResourceList) error {
 	logger := log.FromContext(ctx)
 
-	draResourceStatuses, err := shared.GenerateDRAResourceStatuses(ctx, r.Client, nimService.GetNamespace(), namedDraResources)
+	draResourceStatuses, err := namedDraResources.GenerateDRAResourceStatuses(ctx, r.Client, nimService.GetNamespace())
 	if err != nil {
 		logger.Error(err, "Failed to generate DRA resource statuses", "nimservice", nimService.Name)
 		return err
@@ -965,12 +970,12 @@ func (r *NIMServiceReconciler) getKServeDeploymentMode(ctx context.Context,
 		return "", err
 	}
 
-	deploymentMode := isvcutils.GetDeploymentMode(annotations, deployConfig)
+	deploymentMode := isvcutils.GetDeploymentMode("", annotations, deployConfig)
 	return deploymentMode, nil
 }
 
-func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources []shared.NamedDRAResource) error {
-	for _, namedDraResource := range namedDraResources {
+func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources *shared.NamedDRAResourceList) error {
+	for _, namedDraResource := range namedDraResources.Resources {
 		if !shared.ShouldCreateDRAResource(namedDraResource.DRAResource) {
 			continue
 		}
@@ -980,7 +985,7 @@ func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimSer
 		claimAnnotations := nimService.GetNIMServiceAnnotations()
 		delete(claimAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 		// Sync ResourceClaimTemplate
-		err := r.renderAndSyncResource(ctx, nimService, &resourcev1beta2.ResourceClaimTemplate{}, func() (client.Object, error) {
+		err := r.renderAndSyncResource(ctx, nimService, &resourcev1.ResourceClaimTemplate{}, func() (client.Object, error) {
 			resourceClaimTemplateParams := &rendertypes.ResourceClaimTemplateParams{
 				Name:             namedDraResource.ResourceName,
 				Namespace:        nimService.GetNamespace(),

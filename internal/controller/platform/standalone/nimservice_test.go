@@ -39,7 +39,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,10 +61,13 @@ import (
 
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
 
 func sortEnvVars(envVars []corev1.EnvVar) {
@@ -147,8 +150,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(lwsv1.AddToScheme(scheme)).To(Succeed())
-		Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
+		Expect(resourcev1.AddToScheme(scheme)).To(Succeed())
 		Expect(gatewayv1.Install(scheme)).To(Succeed())
+		Expect(nvidiaresourcev1beta1.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -164,14 +168,14 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		discoveryClient = &discoveryfake.FakeDiscovery{Fake: &testing.Fake{}}
 		discoveryClient.Resources = []*metav1.APIResourceList{
 			{
-				GroupVersion: resourcev1beta2.SchemeGroupVersion.String(),
+				GroupVersion: resourcev1.SchemeGroupVersion.String(),
 				APIResources: []metav1.APIResource{
 					{Name: "resourceclaims"},
 				},
 			},
 		}
 		discoveryClient.FakedServerVersion = &version.Info{
-			GitVersion: "v1.33.0",
+			GitVersion: "v1.34.0",
 		}
 
 		reconciler = &NIMServiceReconciler{
@@ -654,7 +658,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Expect(podSpec.Containers[0].Resources.Claims[1].Request).To(Equal("test-request-2"))
 			})
 
-			It("should mark NIMService as failed when cluster version is less than v1.33.0", func() {
+			It("should mark NIMService as failed when cluster version is less than v1.34.0", func() {
 				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
 					Fake: &testing.Fake{},
 					FakedServerVersion: &version.Info{
@@ -683,37 +687,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Expect(failedCondition).NotTo(BeNil())
 				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
 				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
-				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.33.0' or higher"))
-			})
-
-			It("should mark NIMService as failed when resource claim CRD is not enabled", func() {
-				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
-					Fake: &testing.Fake{},
-					FakedServerVersion: &version.Info{
-						GitVersion: "v1.33.0",
-					},
-				}
-				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
-					{
-						ResourceClaimName: ptr.To("test-resource-claim"),
-					},
-				}
-				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
-				err := client.Create(context.TODO(), nimService)
-				Expect(err).NotTo(HaveOccurred())
-
-				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
-				Expect(err).NotTo(HaveOccurred())
-
-				obj := &appsv1alpha1.NIMService{}
-				err = client.Get(context.TODO(), nimServiceKey, obj)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
-				failedCondition := getCondition(obj, conditions.Failed)
-				Expect(failedCondition).NotTo(BeNil())
-				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
-				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
-				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please ensure resource.k8s.io/v1beta2 API group is enabled"))
+				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.34.0' or higher"))
 			})
 
 			It("should mark NIMService as failed when resource claim name is duplicated", func() {
@@ -1328,6 +1302,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Name:      "test-nimservice-lws",
 					Namespace: "default",
 				},
+				Spec: lwsv1.LeaderWorkerSetSpec{
+					Replicas: ptr.To(int32(1)),
+				},
 				Status: lwsv1.LeaderWorkerSetStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -1350,6 +1327,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Name:      "test-nimservice-lws",
 					Namespace: "default",
 				},
+				Spec: lwsv1.LeaderWorkerSetSpec{
+					Replicas: ptr.To(int32(1)),
+				},
 				Status: lwsv1.LeaderWorkerSetStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -1370,7 +1350,123 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(ready).To(Equal(false))
 			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is not ready", lws.Name)))
 		})
+		It("should report not ready when LWS is scaled down", func() {
+			lws := &lwsv1.LeaderWorkerSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-lws",
+					Namespace: "default",
+				},
+				Status: lwsv1.LeaderWorkerSetStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(lwsv1.LeaderWorkerSetAvailable),
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			}
+			err := client.Create(context.TODO(), lws)
+			Expect(err).NotTo(HaveOccurred())
+			msg, ready, err := reconciler.isLeaderWorkerSetReady(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(Equal(false))
+			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is scaled down", lws.Name)))
+		})
 	})
+
+	Describe("ComputeDomain-enabled multi-node NIMService", func() {
+		It("should create compute domain when create is true", func() {
+			mnns := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism:   &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(8)), Pipeline: ptr.To(uint32(2))},
+						ComputeDomain: &appsv1alpha1.ComputeDomain{Create: ptr.To(true)},
+					},
+				},
+			}
+			namedDraResources, err := shared.NewNamedDRAResourceList(context.TODO(), client, mnns)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(namedDraResources.Resources)).To(Equal(1))
+			Expect(namedDraResources.Resources[0].ResourceName).To(Equal("cd-claimtemplate-6bb8bf548c"))
+			Expect(namedDraResources.GetComputeDomainNamedDRAResource()).ToNot(BeNil())
+			Expect(namedDraResources.GetComputeDomainNamedDRAResource().ResourceName).To(Equal("cd-claimtemplate-6bb8bf548c"))
+
+			err = reconciler.reconcileComputeDomain(context.TODO(), mnns, namedDraResources)
+			Expect(err).ToNot(HaveOccurred())
+
+			computeDomain := &nvidiaresourcev1beta1.ComputeDomain{}
+			err = client.Get(context.TODO(), types.NamespacedName{Name: "test-nimservice", Namespace: "default"}, computeDomain)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(computeDomain.Spec.Channel.ResourceClaimTemplate.Name).To(Equal("cd-claimtemplate-6bb8bf548c"))
+			Expect(computeDomain.Spec.Channel.AllocationMode).To(Equal(nvidiaresourcev1beta1.ComputeDomainChannelAllocationModeSingle))
+		})
+
+		It("should use existing compute domain when provided", func() {
+			computeDomain := &nvidiaresourcev1beta1.ComputeDomain{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-cd",
+					Namespace: "default",
+				},
+				Spec: nvidiaresourcev1beta1.ComputeDomainSpec{
+					Channel: &nvidiaresourcev1beta1.ComputeDomainChannelSpec{
+						ResourceClaimTemplate: nvidiaresourcev1beta1.ComputeDomainResourceClaimTemplate{
+							Name: "test-nimservice-cd-claimtemplate",
+						},
+					},
+				},
+				Status: nvidiaresourcev1beta1.ComputeDomainStatus{
+					Status: nvidiaresourcev1beta1.ComputeDomainStatusReady,
+					Nodes: []*nvidiaresourcev1beta1.ComputeDomainNode{
+						{
+							Name:     "test-nimservice-cd-node1",
+							CliqueID: "test-nimservice-cd-clique1",
+							Status:   nvidiaresourcev1beta1.ComputeDomainStatusReady,
+						},
+					},
+				},
+			}
+			err := client.Create(context.TODO(), computeDomain)
+			Expect(err).ToNot(HaveOccurred())
+
+			mnns := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism:   &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(8)), Pipeline: ptr.To(uint32(2))},
+						ComputeDomain: &appsv1alpha1.ComputeDomain{Name: "test-nimservice-cd"},
+					},
+				},
+			}
+			err = client.Create(context.TODO(), mnns)
+			Expect(err).ToNot(HaveOccurred())
+
+			namedDraResources, err := shared.NewNamedDRAResourceList(context.TODO(), client, mnns)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(namedDraResources.Resources)).To(Equal(1))
+			Expect(namedDraResources.Resources[0].ResourceName).To(Equal("test-nimservice-cd-claimtemplate"))
+			err = reconciler.reconcileComputeDomain(context.TODO(), mnns, namedDraResources)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify the compute domain status is updated
+			err = reconciler.updateComputeDomainStatus(context.TODO(), mnns)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(mnns.Status.ComputeDomainStatus).ToNot(BeNil())
+			Expect(mnns.Status.ComputeDomainStatus.Name).To(Equal("test-nimservice-cd"))
+			Expect(mnns.Status.ComputeDomainStatus.Status).To(Equal(nvidiaresourcev1beta1.ComputeDomainStatusReady))
+			Expect(len(mnns.Status.ComputeDomainStatus.Nodes)).To(Equal(1))
+			Expect(mnns.Status.ComputeDomainStatus.Nodes[0].Name).To(Equal("test-nimservice-cd-node1"))
+			Expect(mnns.Status.ComputeDomainStatus.Nodes[0].CliqueID).To(Equal("test-nimservice-cd-clique1"))
+			Expect(mnns.Status.ComputeDomainStatus.Nodes[0].Status).To(Equal(nvidiaresourcev1beta1.ComputeDomainStatusReady))
+		})
+	})
+
 	Describe("update model status on NIMService", func() {
 		BeforeEach(func() {
 			ingress := &networkingv1.Ingress{

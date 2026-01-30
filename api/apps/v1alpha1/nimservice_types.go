@@ -123,7 +123,7 @@ type NIMServiceSpec struct {
 	Scale          Autoscaling   `json:"scale,omitempty"`
 	SchedulerName  string        `json:"schedulerName,omitempty"`
 	Metrics        Metrics       `json:"metrics,omitempty"`
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=0
 	Replicas         *int32                     `json:"replicas,omitempty"`
 	UserID           *int64                     `json:"userID,omitempty"`
 	GroupID          *int64                     `json:"groupID,omitempty"`
@@ -149,6 +149,10 @@ type NimServiceMultiNodeConfig struct {
 
 	// MPI config for NIMService using LeaderWorkerSet
 	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
+
+	// ComputeDomain specifies the compute domain to use for a
+	// multi-node NIMService.
+	ComputeDomain *ComputeDomain `json:"computeDomain,omitempty"`
 }
 
 type ParallelismSpec struct {
@@ -183,6 +187,8 @@ type NIMServiceStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	DRAResourceStatuses []DRAResourceStatus `json:"draResourceStatuses,omitempty"`
+	// ComputeDomainStatus is the status of the ComputeDomain for a multi-node NIMService.
+	ComputeDomainStatus *ComputeDomainStatus `json:"computeDomainStatus,omitempty"`
 }
 
 // ModelStatus defines the configuration of the NIMService model.
@@ -1090,9 +1096,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
-	if !n.IsAutoScalingEnabled() {
-		params.Replicas = n.GetReplicas()
-	}
+	params.Replicas = n.GetReplicas()
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
 	params.Affinity = n.GetAffinity()
@@ -1638,26 +1642,32 @@ func (n *NIMService) GetInferenceServiceParams(
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
-	if !n.IsAutoScalingEnabled() || deploymentMode != kserveconstants.RawDeployment {
-		params.MinReplicas = n.GetReplicas()
-	} else {
-		params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
+	if utils.IsKServeStandardDeploymentMode(deploymentMode) {
+		if n.IsAutoScalingEnabled() {
+			params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
 
-		minReplicas, maxReplicas, metric, metricType, target := n.GetInferenceServiceHPAParams()
-		if minReplicas != nil {
-			params.MinReplicas = minReplicas
-		}
-		if maxReplicas > 0 {
-			params.MaxReplicas = ptr.To[int32](maxReplicas)
-		}
-		if metric != "" {
-			params.ScaleMetric = metric
-		}
-		if metricType != "" {
-			params.ScaleMetricType = metricType
-		}
-		if target > 0 {
-			params.ScaleTarget = ptr.To(target)
+			minReplicas, maxReplicas, metric, metricType, target := n.GetInferenceServiceHPAParams()
+			if minReplicas != nil {
+				params.MinReplicas = minReplicas
+			}
+			if maxReplicas > 0 {
+				params.MaxReplicas = ptr.To[int32](maxReplicas)
+			}
+			if metric != "" {
+				params.ScaleMetric = metric
+			}
+			if metricType != "" {
+				params.ScaleMetricType = metricType
+			}
+			if target > 0 {
+				params.ScaleTarget = ptr.To(target)
+			}
+		} else {
+			params.MinReplicas = ptr.To[int32](0)
+			params.MaxReplicas = ptr.To[int32](0)
+			params.ScaleMetric = ""
+			params.ScaleMetricType = ""
+			params.ScaleTarget = nil
 		}
 	}
 
@@ -1708,7 +1718,7 @@ func (n *NIMService) GetInferenceServiceParams(
 
 // GetInferenceServiceLivenessProbe returns liveness probe for the NIMService container.
 func (n *NIMService) GetInferenceServiceLivenessProbe(modeType kserveconstants.DeploymentModeType) *corev1.Probe {
-	if modeType == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(modeType) {
 		if n.Spec.LivenessProbe.Probe == nil {
 			return n.GetDefaultLivenessProbe()
 		}
@@ -1744,7 +1754,7 @@ func (n *NIMService) GetInferenceServiceLivenessProbe(modeType kserveconstants.D
 
 // GetInferenceServiceReadinessProbe returns readiness probe for the NIMService container.
 func (n *NIMService) GetInferenceServiceReadinessProbe(modeType kserveconstants.DeploymentModeType) *corev1.Probe {
-	if modeType == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(modeType) {
 		if n.Spec.ReadinessProbe.Probe == nil {
 			return n.GetDefaultReadinessProbe()
 		}
@@ -1780,7 +1790,7 @@ func (n *NIMService) GetInferenceServiceReadinessProbe(modeType kserveconstants.
 
 // GetInferenceServiceStartupProbe returns startup probe for the NIMService container.
 func (n *NIMService) GetInferenceServiceStartupProbe(modeType kserveconstants.DeploymentModeType) *corev1.Probe {
-	if modeType == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(modeType) {
 		if n.Spec.StartupProbe.Probe == nil {
 			return n.GetDefaultStartupProbe()
 		}
@@ -1819,7 +1829,7 @@ func (n *NIMService) GetInferenceServicePorts(modeType kserveconstants.Deploymen
 	ports := []corev1.ContainerPort{}
 
 	// Setup container ports for nimservice
-	if modeType == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(modeType) {
 		ports = append(ports, corev1.ContainerPort{
 			Name:          DefaultNamedPortAPI,
 			Protocol:      corev1.ProtocolTCP,
@@ -1898,6 +1908,12 @@ func (n *NIMService) GetInferenceServiceHPAParams() (*int32, int32, string, stri
 	return minReplicas, maxReplicas, metric, metricType, target
 }
 
+// IsMultiNode returns true if the NIMService is a multi-node NIMService.
+func (n *NIMService) IsMultiNode() bool {
+	return n.GetMultiNodePipelineParallelism() > 1
+}
+
+// GetMultiNodeTensorParallelism returns the tensor parallelism size for the multi-node NIMService.
 func (n *NIMService) GetMultiNodeTensorParallelism() uint32 {
 	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Tensor != nil {
 		return *n.Spec.MultiNode.Parallelism.Tensor
@@ -1905,11 +1921,45 @@ func (n *NIMService) GetMultiNodeTensorParallelism() uint32 {
 	return 0
 }
 
+// GetMultiNodePipelineParallelism returns the pipeline parallelism size for the multi-node NIMService.
 func (n *NIMService) GetMultiNodePipelineParallelism() uint32 {
-	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Tensor != nil {
+	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Pipeline != nil {
 		return *n.Spec.MultiNode.Parallelism.Pipeline
 	}
 	return 0
+}
+
+// IsComputeDomainEnabled returns true if the NIMService is a multi-node NIMService and a compute domain is requested.
+func (n *NIMService) IsComputeDomainEnabled() bool {
+	if !n.IsMultiNode() {
+		return false
+	}
+	return n.Spec.MultiNode.ComputeDomain != nil
+}
+
+// GetComputeDomainName returns the name of the ComputeDomain for the multi-node NIMService.
+func (n *NIMService) GetComputeDomainName() string {
+	if n.IsComputeDomainEnabled() {
+		if n.Spec.MultiNode.ComputeDomain.Create == nil || !*n.Spec.MultiNode.ComputeDomain.Create {
+			return n.Spec.MultiNode.ComputeDomain.Name
+		}
+
+		return n.GetName()
+	}
+
+	return ""
+}
+
+// GetComputeDomainParams returns the parameters for rendering the ComputeDomain for the multi-node NIMService.
+func (n *NIMService) GetComputeDomainParams(resourceClaimTemplateName string) *rendertypes.ComputeDomainParams {
+	return &rendertypes.ComputeDomainParams{
+		Name:                      n.GetName(),
+		Namespace:                 n.GetNamespace(),
+		Labels:                    n.GetServiceLabels(),
+		Annotations:               n.GetNIMServiceAnnotations(),
+		NumNodes:                  n.GetMultiNodePipelineParallelism(),
+		ResourceClaimTemplateName: resourceClaimTemplateName,
+	}
 }
 
 func init() {
