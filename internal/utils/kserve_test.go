@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -163,38 +164,43 @@ var _ = Describe("KServe Utilities", func() {
 
 		Describe("Priority chain: status > annotation > config > default", func() {
 			DescribeTable("deployment mode detection",
-				func(annotations map[string]string, expected kserveconstants.DeploymentModeType) {
+				func(annotations map[string]string, expected kserveconstants.DeploymentModeType, expectedErr error) {
 					mode, err := GetKServeDeploymentMode(context.Background(), client, annotations, nil)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(mode).To(Equal(expected))
+					if expectedErr != nil {
+						Expect(err).To(MatchError(expectedErr.Error()))
+						Expect(mode).To(BeEmpty())
+					} else {
+						Expect(err).NotTo(HaveOccurred())
+						Expect(mode).To(Equal(expected))
+					}
 				},
 				// Test annotation-based detection (no ISVC status)
 				Entry("should use LegacyServerless from annotations",
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.LegacyServerless)},
-					kserveconstants.LegacyServerless),
+					kserveconstants.LegacyServerless, nil),
 				Entry("should use Standard from annotations",
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Standard)},
-					kserveconstants.Standard),
+					kserveconstants.Standard, nil),
 				Entry("should use Knative from annotations",
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Knative)},
-					kserveconstants.Knative),
+					kserveconstants.Knative, nil),
 				Entry("should use LegacyRawDeployment from annotations",
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.LegacyRawDeployment)},
-					kserveconstants.LegacyRawDeployment),
+					kserveconstants.LegacyRawDeployment, nil),
 				Entry("should use ModelMesh from annotations",
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.ModelMeshDeployment)},
-					kserveconstants.ModelMeshDeployment),
+					kserveconstants.ModelMeshDeployment, nil),
 				// Test ConfigMap default (no annotations)
 				Entry("should use the default deployment mode from the config map when no annotations",
 					nil,
-					kserveconstants.LegacyRawDeployment),
+					kserveconstants.LegacyRawDeployment, nil),
 				// Test invalid annotation falls back to config default
-				Entry("should fall back to config default when annotation has invalid mode",
+				Entry("should return error when annotation has invalid mode",
 					map[string]string{kserveconstants.DeploymentMode: "InvalidMode"},
-					kserveconstants.LegacyRawDeployment),
+					kserveconstants.DeploymentModeType(""), fmt.Errorf("deployment mode annotation found but value is invalid: %s", "InvalidMode")),
 				Entry("should fall back to config default when annotation is empty string",
 					map[string]string{kserveconstants.DeploymentMode: ""},
-					kserveconstants.LegacyRawDeployment),
+					kserveconstants.LegacyRawDeployment, nil),
 			)
 
 			Context("Status priority tests", func() {
@@ -261,29 +267,34 @@ var _ = Describe("KServe Utilities", func() {
 
 		Describe("Nil client scenarios (webhook validation)", func() {
 			DescribeTable("should handle nil client gracefully",
-				func(annotations map[string]string, expected kserveconstants.DeploymentModeType) {
+				func(annotations map[string]string, expected kserveconstants.DeploymentModeType, expectedErr error) {
 					mode, err := GetKServeDeploymentMode(context.Background(), nil, annotations, nil)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(mode).To(Equal(expected))
+					if expectedErr != nil {
+						Expect(err).To(MatchError(expectedErr.Error()))
+						Expect(mode).To(BeEmpty())
+					} else {
+						Expect(err).NotTo(HaveOccurred())
+						Expect(mode).To(Equal(expected))
+					}
 				},
 				Entry("with Standard annotation",
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Standard)},
-					kserveconstants.Standard),
+					kserveconstants.Standard, nil),
 				Entry("with Knative annotation",
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Knative)},
-					kserveconstants.Knative),
+					kserveconstants.Knative, nil),
 				Entry("with LegacyServerless annotation",
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.LegacyServerless)},
-					kserveconstants.LegacyServerless),
+					kserveconstants.LegacyServerless, nil),
 				Entry("with LegacyRawDeployment annotation",
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.LegacyRawDeployment)},
-					kserveconstants.LegacyRawDeployment),
+					kserveconstants.LegacyRawDeployment, nil),
 				Entry("with no annotations should use default",
 					nil,
-					kserveconstants.DefaultDeployment),
+					kserveconstants.DefaultDeployment, nil),
 				Entry("with invalid annotation should use default",
 					map[string]string{kserveconstants.DeploymentMode: "InvalidMode"},
-					kserveconstants.DefaultDeployment),
+					kserveconstants.DeploymentModeType(""), fmt.Errorf("deployment mode annotation found but value is invalid: %s", "InvalidMode")),
 			)
 		})
 

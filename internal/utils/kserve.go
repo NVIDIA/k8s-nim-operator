@@ -111,8 +111,7 @@ func GetKServeDeploymentMode(ctx context.Context, k8sClient client.Client,
 		annotations = podAnnotations
 	}
 
-	deploymentMode := getDeploymentMode(ctx, statusDeploymentMode, annotations, deployConfig)
-	return deploymentMode, nil
+	return getDeploymentMode(ctx, statusDeploymentMode, annotations, deployConfig)
 }
 
 /*
@@ -130,14 +129,14 @@ ODH 3.0 supports "RawDeployment", "Serverless", and doesn't accept "Standard", "
 Ref: https://github.com/opendatahub-io/kserve/blob/cf2920b4276d97fc2d2d700efe4879749a56b418/pkg/controller/v1beta1/inferenceservice/utils/utils.go#L220
 */
 func getDeploymentMode(ctx context.Context, statusDeploymentMode string, annotations map[string]string,
-	deployConfig *kservev1beta1.DeployConfig) kserveconstants.DeploymentModeType {
+	deployConfig *kservev1beta1.DeployConfig) (kserveconstants.DeploymentModeType, error) {
 	logger := log.FromContext(ctx).WithName("KServe").WithName("Deployment Mode")
 
 	// First priority is the deploymentMode recorded in the status
 	if len(statusDeploymentMode) != 0 {
 		logger.Info("using deployment mode from InferenceService status",
 			"Deployment Mode", statusDeploymentMode)
-		return kserveconstants.DeploymentModeType(statusDeploymentMode)
+		return kserveconstants.DeploymentModeType(statusDeploymentMode), nil
 	}
 
 	if annotations != nil {
@@ -147,36 +146,37 @@ func getDeploymentMode(ctx context.Context, statusDeploymentMode string, annotat
 		// Note: ODH 3.0 requires using "RawDeployment" and "Serverless" directly
 		// without conversion to "Standard" and "Knative". Do not convert legacy modes.
 
-		if ok && (deploymentMode == string(kserveconstants.Standard) ||
-			deploymentMode == string(kserveconstants.Knative) ||
-			deploymentMode == string(kserveconstants.ModelMeshDeployment) ||
-			deploymentMode == string(kserveconstants.LegacyRawDeployment) ||
-			deploymentMode == string(kserveconstants.LegacyServerless)) {
-			logger.Info("using deployment mode from annotations",
+		if ok && deploymentMode != "" { // Explicitly check for non-empty
+			if deploymentMode == string(kserveconstants.Standard) ||
+				deploymentMode == string(kserveconstants.Knative) ||
+				deploymentMode == string(kserveconstants.ModelMeshDeployment) ||
+				deploymentMode == string(kserveconstants.LegacyRawDeployment) ||
+				deploymentMode == string(kserveconstants.LegacyServerless) {
+				logger.Info("using deployment mode from annotations",
+					"Deployment Mode", deploymentMode)
+				return kserveconstants.DeploymentModeType(deploymentMode), nil
+			}
+			// Only error if annotation exists AND is non-empty AND is invalid
+			logger.Error(nil, "deployment mode annotation found but value is invalid",
 				"Deployment Mode", deploymentMode)
-			return kserveconstants.DeploymentModeType(deploymentMode)
+			return "", fmt.Errorf("deployment mode annotation found but value is invalid: %s", deploymentMode)
 		}
 
-		if ok {
-			logger.V(1).Info("warning: deployment mode annotation found but value is invalid",
-				"Deployment Mode", deploymentMode)
-		} else {
-			logger.V(1).Info("warning: deployment mode annotation not found in annotations")
-		}
+		logger.V(1).Info("warning: deployment mode annotation not found or empty in annotations")
 	}
 
 	if deployConfig != nil {
 		// Finally, if an InferenceService is being created and does not explicitly specify a DeploymentMode
 		logger.Info("using the default deployment mode from the inferenceservice-config ConfigMap",
 			"Deployment Mode", deployConfig.DefaultDeploymentMode)
-		return kserveconstants.DeploymentModeType(deployConfig.DefaultDeploymentMode)
+		return kserveconstants.DeploymentModeType(deployConfig.DefaultDeploymentMode), nil
 	}
 
 	// If InferenceServicesConfig doesn't exist, use the default deployment mode
 	// For ODH, InferenceServicesConfig is always bundled, and this line should not be reached
 	logger.Info("deployment mode is not found in any configurations, using default deployment mode",
 		"Deployment Mode", kserveconstants.DefaultDeployment)
-	return kserveconstants.DefaultDeployment
+	return kserveconstants.DefaultDeployment, nil
 }
 
 /*
