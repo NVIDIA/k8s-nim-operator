@@ -90,7 +90,7 @@ func NewNIMServiceCustomValidator(k8sClient client.Client) (*NIMServiceCustomVal
 }
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type NIMService.
-func (v *NIMServiceCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *NIMServiceCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	nimservice, ok := obj.(*appsv1alpha1.NIMService)
 	if !ok {
 		return nil, fmt.Errorf("expected a NIMService object but got %T", obj)
@@ -100,7 +100,7 @@ func (v *NIMServiceCustomValidator) ValidateCreate(_ context.Context, obj runtim
 	fldPath := field.NewPath("nimservice").Child("spec")
 
 	// Perform comprehensive spec validation via helper.
-	warningList, errList := validateNIMServiceSpec(nimservice, fldPath, v.k8sVersion, v.k8sClient)
+	warningList, errList := validateNIMServiceSpec(ctx, nimservice, fldPath, v.k8sVersion, v.k8sClient)
 
 	if len(errList) > 0 {
 		return warningList, errList.ToAggregate()
@@ -110,7 +110,7 @@ func (v *NIMServiceCustomValidator) ValidateCreate(_ context.Context, obj runtim
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NIMService.
-func (v *NIMServiceCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+func (v *NIMServiceCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	oldNIMService, ok := oldObj.(*appsv1alpha1.NIMService)
 	if !ok {
 		return nil, fmt.Errorf("expected a NIMService object for oldObj but got %T", oldObj)
@@ -123,7 +123,7 @@ func (v *NIMServiceCustomValidator) ValidateUpdate(_ context.Context, oldObj, ne
 
 	fldPath := field.NewPath("nimservice").Child("spec")
 	// Start with structural validation to ensure the updated object is well formed.
-	warningList, errList := validateNIMServiceSpec(newNIMService, fldPath, v.k8sVersion, v.k8sClient)
+	warningList, errList := validateNIMServiceSpec(ctx, newNIMService, fldPath, v.k8sVersion, v.k8sClient)
 
 	wList, eList := validateMultiNodeImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("multiNode"))
 	warningList = append(warningList, wList...)

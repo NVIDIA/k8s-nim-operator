@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -24,8 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
+
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
 // TestValidateImageConfiguration covers required field checks on Image.
@@ -1109,7 +1111,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 
 			tc.modify(ns)
 
-			w, errs := validateKServeConfiguration(&ns.Spec, fld, nil, nil)
+			w, errs := validateKServeConfiguration(context.TODO(), &ns.Spec, fld, nil, nil)
 			gotErrs := len(errs)
 			gotWarnings := len(w)
 			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
