@@ -55,9 +55,6 @@ const (
 
 	// DefaultModelStorePath is the default path for model store.
 	DefaultModelStorePath = "/model-store"
-
-	// KServeDeploymentModeAnnotationKey indicates annotation name for the kserve deployment mode of the NIMService.
-	KServeDeploymentModeAnnotationKey = "serving.kserve.io/deploymentMode"
 )
 
 const (
