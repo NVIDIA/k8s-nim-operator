@@ -682,17 +682,11 @@ github.com/kserve/kserve/pkg/agent/storage
 github.com/kserve/kserve/pkg/apis/serving/v1alpha1
 github.com/kserve/kserve/pkg/apis/serving/v1beta1
 github.com/kserve/kserve/pkg/constants
-github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/utils
-github.com/kserve/kserve/pkg/credentials
 github.com/kserve/kserve/pkg/credentials/azure
 github.com/kserve/kserve/pkg/credentials/gcs
-github.com/kserve/kserve/pkg/credentials/hdfs
-github.com/kserve/kserve/pkg/credentials/hf
-github.com/kserve/kserve/pkg/credentials/https
 github.com/kserve/kserve/pkg/credentials/s3
 github.com/kserve/kserve/pkg/types
 github.com/kserve/kserve/pkg/utils
-github.com/kserve/kserve/pkg/webhook/admission/pod
 # github.com/kylelemons/godebug v1.1.0
 ## explicit; go 1.11
 github.com/kylelemons/godebug/diff
