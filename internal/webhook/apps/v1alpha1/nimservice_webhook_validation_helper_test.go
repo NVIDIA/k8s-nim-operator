@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -24,8 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 
+	kserveconstants "github.com/kserve/kserve/pkg/constants"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 // TestValidateImageConfiguration covers required field checks on Image.
@@ -1009,19 +1011,19 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			wantWarnings: 0,
 		},
 		{
-			name: "kserve knative (annotation absent) – valid",
+			name: "kserve standard (annotation absent) – valid",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				// No annotation ⇒ knative by default.
+				// No annotation ⇒ Standard by default.
 			},
 			wantErrs:     0,
 			wantWarnings: 0,
 		},
 		{
-			name: "kserve knative (annotation present) – autoscaling set",
+			name: "kserve knative – autoscaling set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				ns.Spec.Annotations = map[string]string{utils.KServeDeploymentModeAnnotationKey: "Knative"}
+				ns.Spec.Annotations = map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Knative)}
 				ns.Spec.Scale.Enabled = &trueVal
 			},
 			wantErrs:     1,
@@ -1031,6 +1033,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			name: "kserve knative – ingress set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ns.Spec.Annotations = map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Knative)}
 				ns.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
 					IngressClass: "nginx",
 				}
@@ -1042,6 +1045,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			name: "kserve knative – servicemonitor set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ns.Spec.Annotations = map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Knative)}
 				ns.Spec.Metrics.Enabled = &trueVal
 			},
 			wantErrs:     1,
@@ -1051,6 +1055,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			name: "kserve knative – all prohibited set",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ns.Spec.Annotations = map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Knative)}
 				ns.Spec.Scale.Enabled = &trueVal
 				ns.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
 					IngressClass: "nginx",
@@ -1061,10 +1066,23 @@ func TestValidateKServeConfiguration(t *testing.T) {
 			wantWarnings: 0,
 		},
 		{
+			name: "kserve standard (annotation absent) – all set",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
+				ns.Spec.Scale.Enabled = &trueVal
+				ns.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+					IngressClass: "nginx",
+				}
+				ns.Spec.Metrics.Enabled = &trueVal
+			},
+			wantErrs:     0,
+			wantWarnings: 0,
+		},
+		{
 			name: "kserve rawdeployment – allowed autoscaling, but multidnode forbidden",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.InferencePlatform = appsv1alpha1.PlatformTypeKServe
-				ns.Spec.Annotations = map[string]string{utils.KServeDeploymentModeAnnotationKey: "RawDeployment"}
+				ns.Spec.Annotations = map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.LegacyRawDeployment)}
 				ns.Spec.Scale.Enabled = &trueVal // should be fine
 				ns.Spec.MultiNode = &appsv1alpha1.NimServiceMultiNodeConfig{Parallelism: &appsv1alpha1.ParallelismSpec{Pipeline: ptr.To(uint32(1))}}
 			},
@@ -1093,7 +1111,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 
 			tc.modify(ns)
 
-			w, errs := validateKServeConfiguration(&ns.Spec, fld)
+			w, errs := validateKServeConfiguration(context.TODO(), &ns.Spec, fld, nil, nil)
 			gotErrs := len(errs)
 			gotWarnings := len(w)
 			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
