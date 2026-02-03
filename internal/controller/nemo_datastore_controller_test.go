@@ -94,7 +94,7 @@ var _ = Describe("NemoDatastore Controller", func() {
 		Expect(networkingv1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(appsv1.AddToScheme(scheme)).To(Succeed())
-		Expect(gatewayv1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.Install(scheme)).To(Succeed())
 
 		manifestsDir, err := filepath.Abs("../../manifests")
 		Expect(err).ToNot(HaveOccurred())
