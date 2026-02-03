@@ -1,8 +1,6 @@
 module github.com/NVIDIA/k8s-nim-operator/tools
 
-go 1.22.0
-
-toolchain go1.22.2
+go 1.25.6
 
 require (
 	k8s.io/code-generator v0.31.1
