@@ -1356,8 +1356,6 @@ spec:
               expose:
                 description: Expose defines attributes to expose the service.
                 properties:
-<<<<<<< HEAD
-=======
                   ingress:
                     description: 'Deprecated: Use .spec.expose.router instead.'
                     properties:
@@ -1703,7 +1701,6 @@ spec:
                     x-kubernetes-validations:
                     - message: ingress and gateway cannot be specified together
                       rule: '!(has(self.gateway) && has(self.ingress))'
->>>>>>> 112458f8 (Integrate GRPCRoute into NIMService (#668))
                   service:
                     description: Service defines attributes to create a service.
                     properties:
@@ -2626,49 +2623,6 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
-<<<<<<< HEAD
-              router:
-                properties:
-                  annotations:
-                    additionalProperties:
-                      type: string
-                    description: Annotations for the router, e.g. for ingress class
-                      or gateway
-                    type: object
-                  gateway:
-                    description: Gateway is the gateway to use for the created HTTPRoute.
-                    properties:
-                      name:
-                        description: Name of the gateway
-                        minLength: 1
-                        type: string
-                      namespace:
-                        description: Namespace of the gateway
-                        minLength: 1
-                        type: string
-                    required:
-                    - name
-                    - namespace
-                    type: object
-                  hostDomainName:
-                    description: |-
-                      HostDomainName is the domain name of the hostname matched by the router.
-                      The hostname is constructed as "<nimServiceName>.<hostDomainName>", where the <nimServiceName> a subdomain of the matched hostname.
-                      eg. example.com for "<nimServiceName>.example.com"
-                    maxLength: 63
-                    minLength: 1
-                    pattern: ^(([a-z0-9][a-z0-9\-]*[a-z0-9])|[a-z0-9]+\.)*([a-z]+|xn\-\-[a-z0-9]+)\.?$
-                    type: string
-                  ingressClass:
-                    description: IngressClass is the class of the ingress controller
-                      to use for the created ingress.
-                    type: string
-                type: object
-                x-kubernetes-validations:
-                - message: ingressClass and gateway cannot be specified together
-                  rule: '!(has(self.gateway) && has(self.ingressClass))'
-=======
->>>>>>> 112458f8 (Integrate GRPCRoute into NIMService (#668))
               runtimeClassName:
                 type: string
               scale:
@@ -3612,14 +3566,11 @@ spec:
             - message: spec.replicas cannot be set when spec.scale.enabled is true
               rule: '!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled
                 && has(self.replicas))'
-<<<<<<< HEAD
-=======
             - message: .spec.expose.ingress is deprecated, and will be removed in
                 a future release. If .spec.expose.ingress is set, please do not set
                 .spec.expose.router.ingress.
               rule: '!(has(self.expose) && has(self.expose.ingress) && has(self.expose.ingress.enabled)
                 && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))'
->>>>>>> 112458f8 (Integrate GRPCRoute into NIMService (#668))
           status:
             description: NIMServiceStatus defines the observed state of NIMService.
             properties:

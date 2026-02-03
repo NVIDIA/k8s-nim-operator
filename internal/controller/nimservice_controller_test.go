@@ -56,6 +56,7 @@ var _ = Describe("NIMService Controller", func() {
 		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
 		Expect(batchv1.AddToScheme(scheme)).To(Succeed())
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
+		Expect(resourcev1.AddToScheme(scheme)).To(Succeed())
 		Expect(gatewayv1.Install(scheme)).To(Succeed())
 		Expect(nvidiaresourcev1beta1.AddToScheme(scheme)).To(Succeed())
 
