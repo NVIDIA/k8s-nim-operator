@@ -1,6 +1,6 @@
 module github.com/NVIDIA/k8s-nim-operator/deployments/devel
 
-go 1.23.0
+go 1.25.6
 
 require (
 	github.com/golangci/golangci-lint/v2 v2.1.6
