@@ -405,22 +405,6 @@ func (n *NIMCache) GetEnvWithProxy() []corev1.EnvVar {
 func (n *NIMCache) GetInitContainers() []corev1.Container {
 
 	var initContainers []corev1.Container
-	for _, ic := range n.Spec.InitContainers {
-		var pp corev1.PullPolicy
-		if ic.Image.PullPolicy != "" {
-			pp = corev1.PullPolicy(ic.Image.PullPolicy)
-		}
-
-		initContainers = append(initContainers, corev1.Container{
-			Name:            ic.Name,
-			Image:           fmt.Sprintf("%s:%s", ic.Image.Repository, ic.Image.Tag),
-			ImagePullPolicy: pp,
-			Command:         ic.Command,
-			Args:            ic.Args,
-			Env:             ic.Env,
-			WorkingDir:      ic.WorkingDir,
-		})
-	}
 
 	if n.Spec.Proxy != nil {
 		var image string
@@ -438,7 +422,22 @@ func (n *NIMCache) GetInitContainers() []corev1.Container {
 			SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
 			VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
 		})
+	}
+	for _, ic := range n.Spec.InitContainers {
+		var pp corev1.PullPolicy
+		if ic.Image.PullPolicy != "" {
+			pp = corev1.PullPolicy(ic.Image.PullPolicy)
+		}
 
+		initContainers = append(initContainers, corev1.Container{
+			Name:            ic.Name,
+			Image:           fmt.Sprintf("%s:%s", ic.Image.Repository, ic.Image.Tag),
+			ImagePullPolicy: pp,
+			Command:         ic.Command,
+			Args:            ic.Args,
+			Env:             ic.Env,
+			WorkingDir:      ic.WorkingDir,
+		})
 	}
 
 	return initContainers
