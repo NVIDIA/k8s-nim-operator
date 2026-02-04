@@ -1950,7 +1950,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		})
 
 		Context("Hugging Face model handling", func() {
-			It("should replace NGC_API_KEY with HF_TOKEN when NIMCache is a Hugging Face model", func() {
+			It("should make NGC_API_KEY optional and add HF_TOKEN when NIMCache is a Hugging Face model", func() {
 				// Create a Hugging Face NIMCache
 				hfNimCache := &appsv1alpha1.NIMCache{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2058,15 +2058,20 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				// Verify environment variables
 				container := isvc.Spec.Predictor.Containers[0]
 
-				// NGC_API_KEY should NOT be present
-				var ngcKeyPresent bool
+				// NGC_API_KEY should be present with Optional flag set to true
+				var ngcKeyEnv *corev1.EnvVar
 				for _, env := range container.Env {
 					if env.Name == appsv1alpha1.NGCAPIKey {
-						ngcKeyPresent = true
+						ngcKeyEnv = &env
 						break
 					}
 				}
-				Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for HuggingFace models")
+				Expect(ngcKeyEnv).NotTo(BeNil(), "NGC_API_KEY should be present with Optional flag set to true")
+				Expect(ngcKeyEnv.ValueFrom).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To[bool](true)))
 
 				// HF_TOKEN should be present with correct secret reference
 				var hfTokenEnv *corev1.EnvVar
@@ -2094,7 +2099,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Expect(customEnv.Value).To(Equal("custom-value"))
 			})
 
-			It("should replace NGC_API_KEY with HF_TOKEN when NIMCache is a DataStore source", func() {
+			It("should make NGC_API_KEY optional and add HF_TOKEN when NIMCache is a DataStore source", func() {
 				// Create a DataStore NIMCache
 				dsNimCache := &appsv1alpha1.NIMCache{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2202,15 +2207,20 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				// Verify environment variables
 				container := isvc.Spec.Predictor.Containers[0]
 
-				// NGC_API_KEY should NOT be present
-				var ngcKeyPresent bool
+				// NGC_API_KEY should be present with Optional flag set to true
+				var ngcKeyEnv *corev1.EnvVar
 				for _, env := range container.Env {
 					if env.Name == appsv1alpha1.NGCAPIKey {
-						ngcKeyPresent = true
+						ngcKeyEnv = &env
 						break
 					}
 				}
-				Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for DataStore models")
+				Expect(ngcKeyEnv).NotTo(BeNil(), "NGC_API_KEY should be present with Optional flag set to true")
+				Expect(ngcKeyEnv.ValueFrom).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To[bool](true)))
 
 				// HF_TOKEN should be present with correct secret reference
 				var hfTokenEnv *corev1.EnvVar
@@ -2238,7 +2248,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Expect(customEnv.Value).To(Equal("custom-value"))
 			})
 
-			It("should replace NGC_API_KEY with HF_TOKEN when NIMService has HF model name", func() {
+			It("should make NGC_API_KEY optional and add HF_TOKEN when NIMService has HF model name", func() {
 				// Create a regular NGC NIMCache (not HF)
 				regularNimCache := &appsv1alpha1.NIMCache{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2344,15 +2354,20 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				// Verify environment variables
 				container := isvc.Spec.Predictor.Containers[0]
 
-				// NGC_API_KEY should NOT be present
-				var ngcKeyPresent bool
+				// NGC_API_KEY should be present with Optional flag set to true
+				var ngcKeyEnv *corev1.EnvVar
 				for _, env := range container.Env {
 					if env.Name == appsv1alpha1.NGCAPIKey {
-						ngcKeyPresent = true
+						ngcKeyEnv = &env
 						break
 					}
 				}
-				Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for HuggingFace models")
+				Expect(ngcKeyEnv).NotTo(BeNil(), "NGC_API_KEY should be present with Optional flag set to true")
+				Expect(ngcKeyEnv.ValueFrom).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To[bool](true)))
 
 				// HF_TOKEN should be present with correct secret reference
 				var hfTokenEnv *corev1.EnvVar
