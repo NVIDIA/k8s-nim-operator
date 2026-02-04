@@ -422,10 +422,10 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 		kserveDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "kserve-controller-manager",
+				Name:      utils.KServeControllerName,
 				Namespace: "default",
 				Labels: map[string]string{
-					"app.kubernetes.io/name": "kserve-controller-manager",
+					"app.kubernetes.io/name": utils.KServeControllerName,
 				},
 			},
 			Spec: appsv1.DeploymentSpec{
@@ -519,7 +519,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		By("delete the KServe Deployment")
 		kserveDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "kserve-controller-manager",
+				Name:      utils.KServeControllerName,
 				Namespace: "default",
 			},
 		}
@@ -832,12 +832,101 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Get(context.TODO(), namespacedName, isvc)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*isvc.Spec.Predictor.MinReplicas).To(Equal(int32(1)))
+			Expect(*isvc.Spec.Predictor.MinReplicas).To(Equal(int32(0)))
 			Expect(isvc.Spec.Predictor.MaxReplicas).To(Equal(int32(0)))
 			Expect(isvc.Spec.Predictor.ScaleMetricType).To(BeNil())
 			Expect(isvc.Spec.Predictor.ScaleMetric).To(BeNil())
 			Expect(isvc.Spec.Predictor.ScaleTarget).To(BeNil())
 
+			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeTrue())
+			Expect(visibility).Should(Equal(kserveconstants.ClusterLocalVisibility))
+		})
+	})
+
+	Context("network visibility configuration", func() {
+		It("should set network visibility to cluster-local when ingress is disabled and not explicitly configured", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Disable ingress and don't set network visibility
+			nimService.Spec.Expose.Router.Ingress = nil
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should have cluster-local visibility
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeTrue())
+			Expect(visibility).Should(Equal(kserveconstants.ClusterLocalVisibility))
+		})
+
+		It("should preserve explicitly set network visibility label when ingress is disabled", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Explicitly set NetworkVisibility to a custom value
+			nimService.Spec.Labels[kserveconstants.NetworkVisibility] = "exposed"
+			// Disable ingress (which would normally set cluster-local)
+			nimService.Spec.Expose.Router.Ingress = nil
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should preserve user-provided visibility, not override with ClusterLocalVisibility
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeTrue())
+			Expect(visibility).Should(Equal("exposed"))
+		})
+
+		It("should not set network visibility when ingress is enabled and not explicitly configured", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Enable ingress
+			nimService.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+				IngressClass: "nginx",
+			}
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should not have network visibility set (external access)
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+			_, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeFalse())
+		})
+
+		It("should preserve explicitly set network visibility when ingress is enabled", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Explicitly set NetworkVisibility to cluster-local
+			nimService.Spec.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
+			// Enable ingress (which would normally not set visibility)
+			nimService.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+				IngressClass: "nginx",
+			}
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should preserve user-provided visibility
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
 			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
 			Expect(found).Should(BeTrue())
 			Expect(visibility).Should(Equal(kserveconstants.ClusterLocalVisibility))

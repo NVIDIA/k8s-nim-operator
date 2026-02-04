@@ -32,6 +32,8 @@ spec:
   inferencePlatform: kserve
   annotations:
     serving.kserve.io/deploymentMode: 'Standard'
+  labels:
+    networking.kserve.io/visibility: "exposed"
   image:
     repository: nvcr.io/nim/nvidia/llm-nim
     tag: "1.12"

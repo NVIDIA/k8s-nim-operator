@@ -101,7 +101,7 @@ type NIMContainerSpec struct {
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
-// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose) && has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))",message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
@@ -132,7 +132,7 @@ type NIMServiceSpec struct {
 	Scale          Autoscaling   `json:"scale,omitempty"`
 	SchedulerName  string        `json:"schedulerName,omitempty"`
 	Metrics        Metrics       `json:"metrics,omitempty"`
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=0
 	Replicas         *int32                     `json:"replicas,omitempty"`
 	UserID           *int64                     `json:"userID,omitempty"`
 	GroupID          *int64                     `json:"groupID,omitempty"`
@@ -1185,9 +1185,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
-	if !n.IsAutoScalingEnabled() {
-		params.Replicas = n.GetReplicas()
-	}
+	params.Replicas = n.GetReplicas()
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
 	params.Affinity = n.GetAffinity()
@@ -1749,26 +1747,32 @@ func (n *NIMService) GetInferenceServiceParams(
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
-	if !n.IsAutoScalingEnabled() || !utils.IsKServeStandardDeploymentMode(deploymentMode) {
-		params.MinReplicas = n.GetReplicas()
-	} else {
-		params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
+	if utils.IsKServeStandardDeploymentMode(deploymentMode) {
+		if n.IsAutoScalingEnabled() {
+			params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
 
-		minReplicas, maxReplicas, metric, metricType, target := n.GetInferenceServiceHPAParams()
-		if minReplicas != nil {
-			params.MinReplicas = minReplicas
-		}
-		if maxReplicas > 0 {
-			params.MaxReplicas = ptr.To[int32](maxReplicas)
-		}
-		if metric != "" {
-			params.ScaleMetric = metric
-		}
-		if metricType != "" {
-			params.ScaleMetricType = metricType
-		}
-		if target > 0 {
-			params.ScaleTarget = ptr.To(target)
+			minReplicas, maxReplicas, metric, metricType, target := n.GetInferenceServiceHPAParams()
+			if minReplicas != nil {
+				params.MinReplicas = minReplicas
+			}
+			if maxReplicas > 0 {
+				params.MaxReplicas = ptr.To[int32](maxReplicas)
+			}
+			if metric != "" {
+				params.ScaleMetric = metric
+			}
+			if metricType != "" {
+				params.ScaleMetricType = metricType
+			}
+			if target > 0 {
+				params.ScaleTarget = ptr.To(target)
+			}
+		} else {
+			params.MinReplicas = ptr.To[int32](0)
+			params.MaxReplicas = ptr.To[int32](0)
+			params.ScaleMetric = ""
+			params.ScaleMetricType = ""
+			params.ScaleTarget = nil
 		}
 	}
 
