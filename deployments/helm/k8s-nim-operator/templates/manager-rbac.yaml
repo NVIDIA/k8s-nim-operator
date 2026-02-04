@@ -583,8 +583,10 @@ rules:
   - get
   - list
   - watch
-  - patch
+  - create
   - update
+  - patch
+  - delete
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
