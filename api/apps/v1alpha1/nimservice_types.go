@@ -873,10 +873,6 @@ func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.V
 			SubPath:   subPath,
 		},
 		{
-			Name:      "dshm",
-			MountPath: "/dev/shm",
-		},
-		{
 			Name:      "scratch",
 			MountPath: "/scratch",
 		},
@@ -898,10 +894,6 @@ func (n *NIMService) GetInitContainerVolumeMounts(modelPVC *PersistentVolumeClai
 			Name:      "model-store",
 			MountPath: "/model-store",
 			SubPath:   subPath,
-		},
-		{
-			Name:      "dshm",
-			MountPath: "/dev/shm",
 		},
 		{
 			Name:      "scratch",
