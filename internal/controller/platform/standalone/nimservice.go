@@ -372,7 +372,6 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	var profileEnv *[]corev1.EnvVar
 	var profile *appsv1alpha1.NIMProfile
 	var gpuResources *corev1.ResourceRequirements
-	var initContainers []corev1.Container
 	var renderFunc func() (client.Object, error)
 	var conType, failedCon string
 	var renderObj client.Object
@@ -405,7 +404,6 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		// TODO: assign GPU resources and node selector that is required for the selected profile
 	}
 
-	initContainers = nimService.GetInitContainers()
 	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -448,14 +446,14 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		if gpuResources != nil {
 			lwsParams.Resources = gpuResources
 		}
+		initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+		for idx := range lwsParams.InitContainers {
+			lwsParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
+		}
 		renderFunc = func() (client.Object, error) {
 			result, err := renderer.LeaderWorkerSet(lwsParams)
 			if err != nil {
 				return nil, err
-			}
-			if len(initContainers) > 0 {
-				result.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.InitContainers = initContainers
-				result.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.InitContainers = initContainers
 			}
 
 			// Update leader and worker containers with DRA resource claims.
@@ -527,13 +525,14 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		if gpuResources != nil {
 			deploymentParams.Resources = gpuResources
 		}
+		initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+		for idx := range deploymentParams.InitContainers {
+			deploymentParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
+		}
 		renderFunc = func() (client.Object, error) {
 			result, err := renderer.Deployment(deploymentParams)
 			if err != nil {
 				return nil, err
-			}
-			if len(initContainers) > 0 {
-				result.Spec.Template.Spec.InitContainers = initContainers
 			}
 
 			// Update Container resources with DRA resource claims.
