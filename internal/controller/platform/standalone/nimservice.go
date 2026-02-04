@@ -486,7 +486,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			}}, deploymentParams.Env)
 		}
 
-		// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, make NGC_API_KEY optional and add the HF_TOKEN to the environment variables
+		// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, add the HF_TOKEN to the environment variables and make NGC_API_KEY optional
+		// For custom models stored in Datastore, the NIM Container needs to access NGC to download base model. However, NGC_API_KEY is not required for Hugging Face models.
 		if nimCache.IsHFModel() || nimService.IsHFModel() {
 			deploymentParams.Env = utils.RemoveEnvVar(deploymentParams.Env, appsv1alpha1.NGCAPIKey)
 			deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{

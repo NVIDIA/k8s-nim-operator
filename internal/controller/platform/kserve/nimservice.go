@@ -490,7 +490,8 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 			},
 		}, isvcParams.Env)
 	}
-	// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, make NGC_API_KEY optional and add the HF_TOKEN to the environment variables
+	// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, add the HF_TOKEN to the environment variables and make NGC_API_KEY optional
+	// For custom models stored in Datastore, the NIM Container needs to access NGC to download base model. However, NGC_API_KEY is not required for Hugging Face models.
 	if nimCache.IsHFModel() || nimService.IsHFModel() {
 		isvcParams.Env = utils.RemoveEnvVar(isvcParams.Env, appsv1alpha1.NGCAPIKey)
 		isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{
