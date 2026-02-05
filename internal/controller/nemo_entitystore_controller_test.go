@@ -118,11 +118,12 @@ var _ = Describe("NemoEntitystore Controller", func() {
 		Expect(err).ToNot(HaveOccurred())
 		renderer = render.NewRenderer(manifestsDir)
 		reconciler = &NemoEntitystoreReconciler{
-			Client:   client,
-			scheme:   scheme,
-			updater:  updater,
-			renderer: renderer,
-			recorder: record.NewFakeRecorder(1000),
+			Client:    client,
+			scheme:    scheme,
+			updater:   updater,
+			renderer:  renderer,
+			recorder:  record.NewFakeRecorder(1000),
+			apiReader: client,
 		}
 
 		nemoEntitystore = &appsv1alpha1.NemoEntitystore{

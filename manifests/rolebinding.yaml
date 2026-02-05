@@ -3,6 +3,10 @@ kind: RoleBinding
 metadata:
   name: {{ .Name }}
   namespace: {{ .Namespace }}
+  labels:
+  {{- if .Labels }}
+    {{- .Labels | yaml | nindent 4 }}
+  {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

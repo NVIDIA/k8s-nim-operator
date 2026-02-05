@@ -29,7 +29,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -88,17 +88,21 @@ type NIMCacheReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 	updater          conditions.Updater
 	recorder         record.EventRecorder
+	// apiReader is used to read objects from the API server directly, bypassing the cache.
+	// this is useful as a fallback to read objects that are not cached due to missing labels for example.
+	apiReader client.Reader
 }
 
 // Ensure NIMCacheReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NIMCacheReconciler{}
 
 // NewNIMCacheReconciler creates a new reconciler for NIMCache with the given platform.
-func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger) *NIMCacheReconciler {
+func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, apiReader client.Reader, log logr.Logger) *NIMCacheReconciler {
 	return &NIMCacheReconciler{
-		Client: client,
-		scheme: scheme,
-		log:    log,
+		Client:    client,
+		scheme:    scheme,
+		apiReader: apiReader,
+		log:       log,
 	}
 }
 
@@ -233,6 +237,11 @@ func (r *NIMCacheReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
+// GetAPIReader returns the api reader.
+func (r *NIMCacheReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
+}
+
 // GetOrchestratorType returns the container platform type.
 func (r *NIMCacheReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
@@ -326,7 +335,8 @@ func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1
 			Name:      roleName,
 			Namespace: nimCache.GetNamespace(),
 			Labels: map[string]string{
-				"app": "k8s-nim-operator",
+				"app":                          "k8s-nim-operator",
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
 			},
 		},
 	}
@@ -401,7 +411,8 @@ func (r *NIMCacheReconciler) reconcileRoleBinding(ctx context.Context, nimCache 
 			Name:      rbName,
 			Namespace: nimCache.GetNamespace(),
 			Labels: map[string]string{
-				"app": "k8s-nim-operator",
+				"app":                          "k8s-nim-operator",
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -478,7 +489,7 @@ func (r *NIMCacheReconciler) reconcileServiceAccount(ctx context.Context, nimCac
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      saName,
 				Namespace: nimCache.GetNamespace(),
-				Labels:    map[string]string{"app": "k8s-nim-operator"},
+				Labels:    map[string]string{"app.kubernetes.io/managed-by": "k8s-nim-operator"},
 			},
 		}
 
@@ -503,14 +514,23 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nimCache.GetNamespace()}
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, pvcNamespacedName, pvc)
-	if err != nil && client.IgnoreNotFound(err) != nil {
-		return err
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			// might be cache miss: fallback to apiserver (uncached)
+			err = r.apiReader.Get(ctx, pvcNamespacedName, pvc)
+			if err != nil && !apiErrors.IsNotFound(err) {
+				return err
+			}
+		} else {
+			logger.Error(err, "Failed to get pvc", "name", pvcName)
+			return err
+		}
 	}
 
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nimCache.Spec.Storage.PVC.Create != nil && *nimCache.Spec.Storage.PVC.Create {
-			pvc, err = shared.ConstructPVC(nimCache.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimCache.GetNamespace()})
+			pvc, err = shared.ConstructPVC(nimCache.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimCache.GetNamespace(), Labels: nimCache.GetStandardLabels()})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return err
@@ -651,7 +671,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 
 	// Model manifest is successfully extracted, cleanup temporary pod
 	err = r.Delete(ctx, existingPod)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apiErrors.IsNotFound(err) {
 		logger.Error(err, "failed to delete", "pod", pod.Name)
 		// requeue request with delay until the pod is cleaned up
 		// this is required as NIM containers are resource heavy
@@ -812,7 +832,7 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 func (r *NIMCacheReconciler) createPod(ctx context.Context, pod *corev1.Pod) error {
 	// Create pod
 	err := r.Create(ctx, pod)
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil && !apiErrors.IsAlreadyExists(err) {
 		return err
 	}
 	return nil
@@ -1259,7 +1279,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 
 	// Inject custom CA certificates when running in a proxy envronment
 	if nimCache.Spec.CertConfig != nil { //nolint:staticcheck // checking for deprecated field
-		err := errors.NewBadRequest("Deprecated field 'CertConfig' is used. Please migrate to 'Proxy' field on NIMCache.\"")
+		err := apiErrors.NewBadRequest("Deprecated field 'CertConfig' is used. Please migrate to 'Proxy' field on NIMCache.\"")
 		logger.Error(err, err.Error())
 		return nil, err
 	}
@@ -1314,9 +1334,7 @@ func (r *NIMCacheReconciler) createManifestConfigMap(ctx context.Context, nimCac
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getManifestConfigName(nimCache),
 			Namespace: nimCache.GetNamespace(),
-			Labels: map[string]string{
-				"app": nimCache.GetName(),
-			},
+			Labels:    nimCache.GetStandardLabels(),
 		},
 	}
 
