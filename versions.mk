@@ -24,6 +24,6 @@ REGISTRY ?= ghcr.io/nvidia
 
 VERSION ?= v3.0.0
 
-GOLANG_VERSION ?= 1.24.2
+GOLANG_VERSION ?= 1.25.6
 
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")
