@@ -380,9 +380,12 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 			}
 			logger.Info("Created PVC for NIM Service", "pvc", pvcName)
 
-			conditions.UpdateCondition(&nimService.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
-			nimService.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
-			if err := r.Status().Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimService, func(obj client.Object) {
+				ns := obj.(*appsv1alpha1.NIMService)
+				conditions.UpdateCondition(&ns.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
+				ns.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
+
+			}); err != nil {
 				logger.Error(err, "Failed to update status", "NIMService", nimService.Name)
 				return nil, err
 			}

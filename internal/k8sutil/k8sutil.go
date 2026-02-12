@@ -24,6 +24,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,13 +34,12 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 // ErrConfigMapKeyNotFound indicates an error that the given key is missing from the config map.
@@ -179,12 +179,54 @@ func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Objec
 			return err
 		}
 	} else {
-		err := k8sClient.Update(ctx, utils.UpdateObject(obj, desired))
+		err := RetryUpdate(ctx, k8sClient, obj, func(obj client.Object) {
+			obj = utils.UpdateObject(obj, desired)
+		})
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// RetryUpdate fetches the latest object state and retries updates on conflicts.
+func RetryUpdate(
+	ctx context.Context,
+	c client.Client,
+	obj client.Object,
+	mutate func(client.Object),
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		objCopy := obj.DeepCopyObject().(client.Object)
+		err := c.Get(ctx, types.NamespacedName{Name: objCopy.GetName(), Namespace: objCopy.GetNamespace()}, objCopy)
+		if err != nil {
+			return err
+		}
+		if mutate != nil {
+			mutate(objCopy)
+		}
+		return c.Update(ctx, objCopy)
+	})
+}
+
+// RetryStatusUpdate fetches latest object state and retries status updates on conflicts.
+func RetryStatusUpdate(
+	ctx context.Context,
+	c client.Client,
+	obj client.Object,
+	mutate func(client.Object),
+) error {
+	objCopy := obj.DeepCopyObject().(client.Object)
+	err := c.Get(ctx, types.NamespacedName{Name: objCopy.GetName(), Namespace: objCopy.GetNamespace()}, objCopy)
+	if err != nil {
+		return err
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if mutate != nil {
+			mutate(objCopy)
+		}
+		return c.Status().Update(ctx, objCopy)
+	})
 }
 
 // IsDeploymentReady checks if the Deployment is ready.

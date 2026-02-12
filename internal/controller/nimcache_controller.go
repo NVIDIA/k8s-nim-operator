@@ -152,8 +152,9 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if nimCache.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimCache, NIMCacheFinalizer) {
-			controllerutil.AddFinalizer(nimCache, NIMCacheFinalizer)
-			if err = r.Update(ctx, nimCache); err != nil {
+			if err = k8sutil.RetryUpdate(ctx, r.Client, nimCache, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NIMCacheFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -166,8 +167,9 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			}
 
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(nimCache, NIMCacheFinalizer)
-			if err := r.Update(ctx, nimCache); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimCache, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NIMCacheFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -373,7 +375,10 @@ func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1
 		logger.Info("Updating existing Role", "Name", roleName)
 		existingRole.Rules = desiredRole.Rules
 
-		err = r.Update(ctx, existingRole)
+		err = k8sutil.RetryUpdate(ctx, r.Client, existingRole, func(obj client.Object) {
+			r := obj.(*rbacv1.Role)
+			r.Rules = desiredRole.Rules
+		})
 		if err != nil {
 			logger.Error(err, "Failed to update Role", "Name", roleName)
 			return err
@@ -439,10 +444,11 @@ func (r *NIMCacheReconciler) reconcileRoleBinding(ctx context.Context, nimCache 
 		logger.Info("Successfully created RoleBinding", "Name", rbName)
 	} else if !roleBindingEqual(existingRB, desiredRB) { // RoleBinding exists, check if it needs to be updated
 		logger.Info("Updating existing RoleBinding", "Name", rbName)
-		existingRB.RoleRef = desiredRB.RoleRef
-		existingRB.Subjects = desiredRB.Subjects
-
-		err = r.Update(ctx, existingRB)
+		err = k8sutil.RetryUpdate(ctx, r.Client, existingRB, func(obj client.Object) {
+			rb := obj.(*rbacv1.RoleBinding)
+			rb.RoleRef = desiredRB.RoleRef
+			rb.Subjects = desiredRB.Subjects
+		})
 		if err != nil {
 			logger.Error(err, "Failed to update RoleBinding", "Name", rbName)
 			return err
@@ -887,14 +893,9 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 
 func (r *NIMCacheReconciler) updateNIMCacheStatus(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
-	obj := &appsv1alpha1.NIMCache{}
-	errGet := r.Get(ctx, types.NamespacedName{Name: nimCache.Name, Namespace: nimCache.GetNamespace()}, obj)
-	if errGet != nil {
-		logger.Error(errGet, "error getting NIMCache", "name", nimCache.Name)
-		return errGet
-	}
-	obj.Status = nimCache.Status
-	if err := r.Status().Update(ctx, obj); err != nil {
+	if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimCache, func(obj client.Object) {
+		obj.(*appsv1alpha1.NIMCache).Status = nimCache.Status
+	}); err != nil {
 		logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
 		return err
 	}
