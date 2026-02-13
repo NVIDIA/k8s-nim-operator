@@ -373,10 +373,12 @@ func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1
 		logger.Info("Successfully created Role", "Name", roleName)
 	} else if !roleEqual(existingRole, desiredRole) { // Role exists, check if it needs to be updated
 		logger.Info("Updating existing Role", "Name", roleName)
-		existingRole.Rules = desiredRole.Rules
-
 		err = k8sutil.RetryUpdate(ctx, r.Client, existingRole, func(obj client.Object) {
-			r := obj.(*rbacv1.Role)
+			r, ok := obj.(*rbacv1.Role)
+			if !ok {
+				logger.Error(fmt.Errorf("failed to cast object to Role"), "object", obj)
+				return
+			}
 			r.Rules = desiredRole.Rules
 		})
 		if err != nil {
@@ -445,7 +447,11 @@ func (r *NIMCacheReconciler) reconcileRoleBinding(ctx context.Context, nimCache 
 	} else if !roleBindingEqual(existingRB, desiredRB) { // RoleBinding exists, check if it needs to be updated
 		logger.Info("Updating existing RoleBinding", "Name", rbName)
 		err = k8sutil.RetryUpdate(ctx, r.Client, existingRB, func(obj client.Object) {
-			rb := obj.(*rbacv1.RoleBinding)
+			rb, ok := obj.(*rbacv1.RoleBinding)
+			if !ok {
+				logger.Error(fmt.Errorf("failed to cast object to RoleBinding"), "object", obj)
+				return
+			}
 			rb.RoleRef = desiredRB.RoleRef
 			rb.Subjects = desiredRB.Subjects
 		})
@@ -894,7 +900,12 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 func (r *NIMCacheReconciler) updateNIMCacheStatus(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
 	if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimCache, func(obj client.Object) {
-		obj.(*appsv1alpha1.NIMCache).Status = nimCache.Status
+		nc, ok := obj.(*appsv1alpha1.NIMCache)
+		if !ok {
+			logger.Error(fmt.Errorf("failed to cast object to NIMCache"), "object", obj)
+			return
+		}
+		nc.Status = nimCache.Status
 	}); err != nil {
 		logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
 		return err

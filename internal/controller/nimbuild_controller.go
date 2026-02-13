@@ -498,7 +498,11 @@ func (r *NIMBuildReconciler) reconcileEngineBuildPodStatus(ctx context.Context, 
 func (r *NIMBuildReconciler) updateNIMBuildStatus(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild) error {
 	logger := r.GetLogger()
 	err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimBuild, func(obj client.Object) {
-		nb := obj.(*appsv1alpha1.NIMBuild)
+		nb, ok := obj.(*appsv1alpha1.NIMBuild)
+		if !ok {
+			logger.Error(fmt.Errorf("failed to cast object to NIMBuild"), "object", obj)
+			return
+		}
 		nb.Status = nimBuild.Status
 	})
 	if err != nil {
@@ -850,7 +854,12 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 
 	// Update the NIMCache status with the new profiles
 	if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimCache, func(obj client.Object) {
-		obj.(*appsv1alpha1.NIMCache).Status = nimCache.Status
+		nc, ok := obj.(*appsv1alpha1.NIMCache)
+		if !ok {
+			logger.Error(fmt.Errorf("failed to cast object to NIMCache"), "object", obj)
+			return
+		}
+		nc.Status = nimCache.Status
 	}); err != nil {
 		logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
 		return err
@@ -1021,7 +1030,10 @@ func (r *NIMBuildReconciler) updateManifestConfigMap(ctx context.Context, nimCac
 
 	// Create the ConfigMap
 	if err := k8sutil.RetryUpdate(ctx, r.Client, configMap, func(obj client.Object) {
-		cm := obj.(*corev1.ConfigMap)
+		cm, ok := obj.(*corev1.ConfigMap)
+		if !ok {
+			return
+		}
 		if cm.Data == nil {
 			cm.Data = make(map[string]string)
 		}

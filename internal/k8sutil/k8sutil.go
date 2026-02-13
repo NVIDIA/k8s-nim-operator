@@ -24,7 +24,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 // ErrConfigMapKeyNotFound indicates an error that the given key is missing from the config map.
@@ -180,7 +181,7 @@ func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Objec
 		}
 	} else {
 		err := RetryUpdate(ctx, k8sClient, obj, func(obj client.Object) {
-			obj = utils.UpdateObject(obj, desired)
+			obj = utils.UpdateObject(obj, desired) //nolint:ineffassign,staticcheck
 		})
 		if err != nil {
 			return err
@@ -197,7 +198,10 @@ func RetryUpdate(
 	mutate func(client.Object),
 ) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		objCopy := obj.DeepCopyObject().(client.Object)
+		objCopy, ok := obj.DeepCopyObject().(client.Object)
+		if !ok {
+			return fmt.Errorf("failed to cast object to client.Object of kind %s: %s/%s", obj.GetObjectKind().GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
+		}
 		err := c.Get(ctx, types.NamespacedName{Name: objCopy.GetName(), Namespace: objCopy.GetNamespace()}, objCopy)
 		if err != nil {
 			return err
@@ -216,7 +220,10 @@ func RetryStatusUpdate(
 	obj client.Object,
 	mutate func(client.Object),
 ) error {
-	objCopy := obj.DeepCopyObject().(client.Object)
+	objCopy, ok := obj.DeepCopyObject().(client.Object)
+	if !ok {
+		return fmt.Errorf("failed to cast object to client.Object of kind %s: %s/%s", obj.GetObjectKind().GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
+	}
 	err := c.Get(ctx, types.NamespacedName{Name: objCopy.GetName(), Namespace: objCopy.GetNamespace()}, objCopy)
 	if err != nil {
 		return err

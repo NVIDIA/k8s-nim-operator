@@ -20,10 +20,11 @@ import (
 	"context"
 	"fmt"
 
-	k8sutil "github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	k8sutil "github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
@@ -472,42 +473,60 @@ func (u *updater) SetConditionsFailedNemoEvaluator(ctx context.Context, cr *apps
 
 func (u *updater) updateNIMServiceStatus(ctx context.Context, cr *appsv1alpha1.NIMService) error {
 	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
-		ns := obj.(*appsv1alpha1.NIMService)
+		ns, ok := obj.(*appsv1alpha1.NIMService)
+		if !ok {
+			return
+		}
 		ns.Status = cr.Status
 	})
 }
 
 func (u *updater) updateNemoGuardrailStatus(ctx context.Context, cr *appsv1alpha1.NemoGuardrail) error {
 	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
-		ns := obj.(*appsv1alpha1.NemoGuardrail)
+		ns, ok := obj.(*appsv1alpha1.NemoGuardrail)
+		if !ok {
+			return
+		}
 		ns.Status = cr.Status
 	})
 }
 
 func (u *updater) updateNemoEntitystoreStatus(ctx context.Context, cr *appsv1alpha1.NemoEntitystore) error {
 	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
-		ns := obj.(*appsv1alpha1.NemoEntitystore)
+		ns, ok := obj.(*appsv1alpha1.NemoEntitystore)
+		if !ok {
+			return
+		}
 		ns.Status = cr.Status
 	})
 }
 
 func (u *updater) updateNemoDatastoreStatus(ctx context.Context, cr *appsv1alpha1.NemoDatastore) error {
 	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
-		ns := obj.(*appsv1alpha1.NemoDatastore)
+		ns, ok := obj.(*appsv1alpha1.NemoDatastore)
+		if !ok {
+			return
+		}
 		ns.Status = cr.Status
 	})
 }
 
 func (u *updater) updateNemoCustomizerStatus(ctx context.Context, cr *appsv1alpha1.NemoCustomizer) error {
 	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
-		ns := obj.(*appsv1alpha1.NemoCustomizer)
+		ns, ok := obj.(*appsv1alpha1.NemoCustomizer)
+		if !ok {
+			return
+		}
 		ns.Status = cr.Status
 	})
 }
 
 func (u *updater) updateNemoEvaluatorStatus(ctx context.Context, cr *appsv1alpha1.NemoEvaluator) error {
 	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
-		ns := obj.(*appsv1alpha1.NemoEvaluator)
+		ns, ok := obj.(*appsv1alpha1.NemoEvaluator)
+		if !ok {
+			return
+		}
 		ns.Status = cr.Status
 	})
 }

@@ -233,8 +233,12 @@ func (r *NIMPipelineReconciler) syncResource(ctx context.Context, currentNamespa
 		}
 
 		err = k8sutil.RetryUpdate(ctx, r.Client, desired, func(obj client.Object) {
-			existingService := obj.(*appsv1alpha1.NIMService)
-			existingService.ResourceVersion = current.ResourceVersion
+			ns, ok := obj.(*appsv1alpha1.NIMService)
+			if !ok {
+				logger.Error(fmt.Errorf("failed to cast object to NIMService"), "object", obj)
+				return
+			}
+			ns.ResourceVersion = current.ResourceVersion
 		})
 		if err != nil {
 			return err
@@ -344,7 +348,11 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 		"NIMPipeline %s status %s, service states %v", nimPipeline.Name, overallState, serviceStates)
 
 	err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimPipeline, func(obj client.Object) {
-		np := obj.(*appsv1alpha1.NIMPipeline)
+		np, ok := obj.(*appsv1alpha1.NIMPipeline)
+		if !ok {
+			logger.Error(fmt.Errorf("failed to cast object to NIMPipeline"), "object", obj)
+			return
+		}
 		np.Status = nimPipeline.Status
 	})
 	if err != nil {

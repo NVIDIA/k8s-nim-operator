@@ -1021,7 +1021,11 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 			logger.Info("Created PVC for NIM Service", "pvc", pvcName)
 
 			if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimService, func(o client.Object) {
-				ns := o.(*appsv1alpha1.NIMService)
+				ns, ok := o.(*appsv1alpha1.NIMService)
+				if !ok {
+					logger.Error(fmt.Errorf("failed to cast object to NIMService"), "object", o)
+					return
+				}
 				ns.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
 				conditions.UpdateCondition(&ns.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
 			}); err != nil {
