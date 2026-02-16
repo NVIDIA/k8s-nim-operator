@@ -118,6 +118,9 @@ spec:
       resourceClaims:
         {{- .PodResourceClaims | yaml | nindent 10 }}
       {{- end }}
+      {{- if .SidecarContainers }}
+        {{- .SidecarContainers | yaml | nindent 6 }}
+      {{- end }}
       volumes:
       {{- range .Volumes }}
       - name: {{ .Name }}

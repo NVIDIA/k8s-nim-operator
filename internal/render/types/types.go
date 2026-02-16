@@ -86,6 +86,7 @@ type DeploymentParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 }
 
@@ -160,6 +161,7 @@ type StatefulSetParams struct {
 	RuntimeClassName   string
 	OrchestratorType   string
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 }
 
 // ServiceParams holds the parameters for rendering a Service template.

@@ -70,15 +70,16 @@ const (
 // +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
 // +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
 type NemoCustomizerSpec struct {
-	Image        Image               `json:"image"`
-	Command      []string            `json:"command,omitempty"`
-	Args         []string            `json:"args,omitempty"`
-	Env          []corev1.EnvVar     `json:"env,omitempty"`
-	Labels       map[string]string   `json:"labels,omitempty"`
-	Annotations  map[string]string   `json:"annotations,omitempty"`
-	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
-	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
-	Affinity     *corev1.Affinity    `json:"affinity,omitempty"`
+	Image             Image               `json:"image"`
+	Command           []string            `json:"command,omitempty"`
+	Args              []string            `json:"args,omitempty"`
+	Env               []corev1.EnvVar     `json:"env,omitempty"`
+	SidecarContainers []corev1.Container  `json:"sidecarContainers,omitempty"`
+	Labels            map[string]string   `json:"labels,omitempty"`
+	Annotations       map[string]string   `json:"annotations,omitempty"`
+	NodeSelector      map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations       []corev1.Toleration `json:"tolerations,omitempty"`
+	Affinity          *corev1.Affinity    `json:"affinity,omitempty"`
 	// Deprecated: Use Affinity instead.
 	PodAffinity *corev1.PodAffinity          `json:"podAffinity,omitempty"`
 	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
@@ -733,6 +734,7 @@ func (n *NemoCustomizer) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Command = n.GetCommand()
 	params.Resources = n.GetResources()
 	params.Image = n.GetImage()
+	params.SidecarContainers = n.Spec.SidecarContainers
 
 	// Set container probes
 	params.LivenessProbe = n.GetLivenessProbe()
@@ -797,6 +799,7 @@ func (n *NemoCustomizer) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	params.Command = n.GetCommand()
 	params.Resources = n.GetResources()
 	params.Image = n.GetImage()
+	params.SidecarContainers = n.Spec.SidecarContainers
 
 	// Set container probes
 	params.LivenessProbe = n.GetLivenessProbe()
