@@ -130,8 +130,9 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if NemoGuardrail.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(NemoGuardrail, NemoGuardrailFinalizer) {
-			controllerutil.AddFinalizer(NemoGuardrail, NemoGuardrailFinalizer)
-			if err := r.Update(ctx, NemoGuardrail); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoGuardrail, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NemoGuardrailFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -145,8 +146,9 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				return ctrl.Result{}, err
 			}
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(NemoGuardrail, NemoGuardrailFinalizer)
-			if err := r.Update(ctx, NemoGuardrail); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoGuardrail, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NemoGuardrailFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(NemoGuardrail, corev1.EventTypeNormal, "Delete",
 					"NemoGuardrail %s finalizer removed", NemoGuardrail.Name)
 				return ctrl.Result{}, err
