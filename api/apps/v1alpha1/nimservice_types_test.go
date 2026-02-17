@@ -869,3 +869,39 @@ func TestIsAutoScalingEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestStandardModeReplicasWithoutAutoscaling(t *testing.T) {
+	nimService := &NIMService{
+		Spec: NIMServiceSpec{
+			Image: Image{
+				Repository: "test-repo",
+				Tag:        "test-tag",
+			},
+			AuthSecret: "test-secret",
+			Scale: Autoscaling{
+				Enabled: ptr.To(false),
+			},
+			Replicas: ptr.To[int32](3),
+			Expose: Expose{
+				Service: Service{
+					Port: ptr.To[int32](8000),
+				},
+			},
+		},
+	}
+
+	params := nimService.GetInferenceServiceParams("Standard")
+
+	if params.MinReplicas == nil {
+		t.Fatal("expected MinReplicas to be set, got nil")
+	}
+	if *params.MinReplicas != 3 {
+		t.Errorf("MinReplicas = %d, want 3", *params.MinReplicas)
+	}
+	if params.MaxReplicas == nil {
+		t.Fatal("expected MaxReplicas to be set, got nil")
+	}
+	if *params.MaxReplicas != 3 {
+		t.Errorf("MaxReplicas = %d, want 3", *params.MaxReplicas)
+	}
+}

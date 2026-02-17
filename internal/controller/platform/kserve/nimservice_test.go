@@ -820,8 +820,8 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Get(context.TODO(), namespacedName, isvc)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(*isvc.Spec.Predictor.MinReplicas).To(Equal(int32(0)))
-			Expect(isvc.Spec.Predictor.MaxReplicas).To(Equal(int32(0)))
+			Expect(*isvc.Spec.Predictor.MinReplicas).To(Equal(int32(1)))
+			Expect(isvc.Spec.Predictor.MaxReplicas).To(Equal(int32(1)))
 			Expect(isvc.Spec.Predictor.ScaleMetricType).To(BeNil())
 			Expect(isvc.Spec.Predictor.ScaleMetric).To(BeNil())
 			Expect(isvc.Spec.Predictor.ScaleTarget).To(BeNil())
