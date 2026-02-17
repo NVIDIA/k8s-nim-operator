@@ -1663,8 +1663,12 @@ func (n *NIMService) GetInferenceServiceParams(
 				params.ScaleTarget = ptr.To(target)
 			}
 		} else {
-			params.MinReplicas = ptr.To[int32](0)
-			params.MaxReplicas = ptr.To[int32](0)
+			// Use spec.replicas when autoscaling is disabled
+			replicas := n.GetReplicas()
+			if replicas != nil {
+				params.MinReplicas = replicas
+				params.MaxReplicas = replicas
+			}
 			params.ScaleMetric = ""
 			params.ScaleMetricType = ""
 			params.ScaleTarget = nil
