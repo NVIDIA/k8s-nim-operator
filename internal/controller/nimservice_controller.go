@@ -147,8 +147,9 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if nimService.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
-			controllerutil.AddFinalizer(nimService, NIMServiceFinalizer)
-			if err := r.Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimService, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NIMServiceFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -163,8 +164,9 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(nimService, NIMServiceFinalizer)
-			if err := r.Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimService, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NIMServiceFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
 					"NIMService %s finalizer removed", nimService.Name)
 				return ctrl.Result{}, err

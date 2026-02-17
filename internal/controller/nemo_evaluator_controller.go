@@ -130,8 +130,9 @@ func (r *NemoEvaluatorReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if NemoEvaluator.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(NemoEvaluator, NemoEvaluatorFinalizer) {
-			controllerutil.AddFinalizer(NemoEvaluator, NemoEvaluatorFinalizer)
-			if err := r.Update(ctx, NemoEvaluator); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoEvaluator, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NemoEvaluatorFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -145,8 +146,9 @@ func (r *NemoEvaluatorReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				return ctrl.Result{}, err
 			}
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(NemoEvaluator, NemoEvaluatorFinalizer)
-			if err := r.Update(ctx, NemoEvaluator); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoEvaluator, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NemoEvaluatorFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(NemoEvaluator, corev1.EventTypeNormal, "Delete",
 					"NemoEvaluator %s finalizer removed", NemoEvaluator.Name)
 				return ctrl.Result{}, err

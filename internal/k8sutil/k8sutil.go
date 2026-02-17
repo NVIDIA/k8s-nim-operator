@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -179,12 +180,60 @@ func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Objec
 			return err
 		}
 	} else {
-		err := k8sClient.Update(ctx, utils.UpdateObject(obj, desired))
+		err := RetryUpdate(ctx, k8sClient, obj, func(obj client.Object) {
+			obj = utils.UpdateObject(obj, desired) //nolint:ineffassign,staticcheck
+		})
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// RetryUpdate fetches the latest object state and retries updates on conflicts.
+func RetryUpdate(
+	ctx context.Context,
+	c client.Client,
+	obj client.Object,
+	mutate func(client.Object),
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		objCopy, ok := obj.DeepCopyObject().(client.Object)
+		if !ok {
+			return fmt.Errorf("failed to cast object to client.Object of kind %s: %s/%s", obj.GetObjectKind().GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
+		}
+		err := c.Get(ctx, types.NamespacedName{Name: objCopy.GetName(), Namespace: objCopy.GetNamespace()}, objCopy)
+		if err != nil {
+			return err
+		}
+		if mutate != nil {
+			mutate(objCopy)
+		}
+		return c.Update(ctx, objCopy)
+	})
+}
+
+// RetryStatusUpdate fetches latest object state and retries status updates on conflicts.
+func RetryStatusUpdate(
+	ctx context.Context,
+	c client.Client,
+	obj client.Object,
+	mutate func(client.Object),
+) error {
+	objCopy, ok := obj.DeepCopyObject().(client.Object)
+	if !ok {
+		return fmt.Errorf("failed to cast object to client.Object of kind %s: %s/%s", obj.GetObjectKind().GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
+	}
+	err := c.Get(ctx, types.NamespacedName{Name: objCopy.GetName(), Namespace: objCopy.GetNamespace()}, objCopy)
+	if err != nil {
+		return err
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if mutate != nil {
+			mutate(objCopy)
+		}
+		return c.Status().Update(ctx, objCopy)
+	})
 }
 
 // IsDeploymentReady checks if the Deployment is ready.
