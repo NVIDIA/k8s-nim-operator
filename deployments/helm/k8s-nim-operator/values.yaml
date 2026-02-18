@@ -87,3 +87,5 @@ metricsService:
 nfd:
   nodeFeatureRules:
     deviceID: false
+dynamo:
+  enabled: false
