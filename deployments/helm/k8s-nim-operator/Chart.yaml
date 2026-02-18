@@ -30,3 +30,14 @@ keywords:
   - nemo
   - operator
   - ai
+
+dependencies:
+  - name: dynamo-platform
+    alias: dynamo-platform
+    version: "0.9.0"
+    repository: "https://helm.ngc.nvidia.com/nvidia/ai-dynamo"
+    condition: dynamo.enabled
+  - name: dynamo-crds
+    version: "0.9.0"
+    repository: "https://helm.ngc.nvidia.com/nvidia/ai-dynamo"
+    condition: dynamo.enabled
