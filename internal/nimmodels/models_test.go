@@ -128,9 +128,9 @@ func TestReadBearerToken(t *testing.T) {
 			t.Fatalf("failed to write token file: %v", err)
 		}
 
-		token, ok := readBearerToken(tokenFile)
-		if !ok {
-			t.Fatal("readBearerToken() returned false, want true")
+		token, err := readBearerToken(tokenFile)
+		if err != nil {
+			t.Fatalf("readBearerToken() returned error: %v", err)
 		}
 		if token != "my-sa-token-value" {
 			t.Errorf("readBearerToken() = %q, want %q", token, "my-sa-token-value")
@@ -145,9 +145,9 @@ func TestReadBearerToken(t *testing.T) {
 			t.Fatalf("failed to write token file: %v", err)
 		}
 
-		token, ok := readBearerToken(tokenFile)
-		if !ok {
-			t.Fatal("readBearerToken() returned false, want true")
+		token, err := readBearerToken(tokenFile)
+		if err != nil {
+			t.Fatalf("readBearerToken() returned error: %v", err)
 		}
 		if token != "my-token" {
 			t.Errorf("readBearerToken() = %q, want %q", token, "my-token")
@@ -155,9 +155,9 @@ func TestReadBearerToken(t *testing.T) {
 	})
 
 	t.Run("file not found", func(t *testing.T) {
-		_, ok := readBearerToken("/nonexistent/path/token")
-		if ok {
-			t.Fatal("readBearerToken() returned true for missing file, want false")
+		_, err := readBearerToken("/nonexistent/path/token")
+		if err == nil {
+			t.Fatal("readBearerToken() should return error for missing file")
 		}
 	})
 
@@ -169,9 +169,9 @@ func TestReadBearerToken(t *testing.T) {
 			t.Fatalf("failed to write token file: %v", err)
 		}
 
-		_, ok := readBearerToken(tokenFile)
-		if ok {
-			t.Fatal("readBearerToken() returned true for empty file, want false")
+		_, err := readBearerToken(tokenFile)
+		if err == nil {
+			t.Fatal("readBearerToken() should return error for empty file")
 		}
 	})
 
@@ -183,9 +183,9 @@ func TestReadBearerToken(t *testing.T) {
 			t.Fatalf("failed to write token file: %v", err)
 		}
 
-		_, ok := readBearerToken(tokenFile)
-		if ok {
-			t.Fatal("readBearerToken() returned true for whitespace-only file, want false")
+		_, err := readBearerToken(tokenFile)
+		if err == nil {
+			t.Fatal("readBearerToken() should return error for whitespace-only file")
 		}
 	})
 }

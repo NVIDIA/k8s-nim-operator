@@ -111,18 +111,17 @@ func newTLSTransport(caBundlePath string) (*http.Transport, error) {
 }
 
 // readBearerToken reads a bearer token from the given file path.
-// Returns the token string and true if successful, or empty string and false
-// if the file doesn't exist or can't be read.
-func readBearerToken(tokenPath string) (string, bool) {
+// Returns the token string or an error if the file cannot be read or is empty.
+func readBearerToken(tokenPath string) (string, error) {
 	token, err := os.ReadFile(tokenPath)
 	if err != nil {
-		return "", false
+		return "", fmt.Errorf("reading token from %s: %w", tokenPath, err)
 	}
 	t := strings.TrimSpace(string(token))
 	if t == "" {
-		return "", false
+		return "", fmt.Errorf("token file %s is empty", tokenPath)
 	}
-	return t, true
+	return t, nil
 }
 
 func doGetRequest(ctx context.Context, requestURL string) ([]byte, error) {
@@ -154,10 +153,11 @@ func doGetRequest(ctx context.Context, requestURL string) ([]byte, error) {
 	// When going through kube-rbac-proxy (HTTPS), include the ServiceAccount
 	// bearer token for authentication.
 	if parsedURL != nil && parsedURL.Scheme == "https" {
-		if token, ok := readBearerToken(saTokenPath); ok {
-			req.Header.Set("Authorization", "Bearer "+token)
+		token, tokenErr := readBearerToken(saTokenPath)
+		if tokenErr != nil {
+			logger.V(2).Info("ServiceAccount token not available, skipping auth", "error", tokenErr)
 		} else {
-			logger.V(2).Info("ServiceAccount token not available, skipping auth")
+			req.Header.Set("Authorization", "Bearer "+token)
 		}
 	}
 
