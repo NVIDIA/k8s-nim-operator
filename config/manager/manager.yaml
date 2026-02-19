@@ -73,6 +73,10 @@ spec:
           capabilities:
             drop:
             - "ALL"
+        volumeMounts:
+        - mountPath: /etc/pki/tls/service-ca
+          name: service-ca-bundle
+          readOnly: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -96,3 +100,8 @@ spec:
             memory: 64Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: service-ca-bundle
+        configMap:
+          name: nim-service-ca-bundle
+          optional: true
