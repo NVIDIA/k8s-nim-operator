@@ -74,6 +74,19 @@ spec:
       resources:
         {{ . | yaml | nindent 8 }}
       {{- end }}
+      {{- if .SecurityContext }}
+      securityContext:
+        {{ .SecurityContext | yaml | nindent 8 }}
+      {{- end }}
+      {{- if .VolumeMounts }}
+      volumeMounts:
+        {{- range .VolumeMounts }}
+        - name: {{ .Name }}
+          mountPath: {{ .MountPath }}
+          subPath: {{ .SubPath }}
+          readOnly: {{ .ReadOnly }}
+        {{- end }}
+      {{- end }}
     {{- end }}
     containers:
     - name: {{ .ContainerName }}
@@ -110,7 +123,40 @@ spec:
       startupProbe:
         {{ . | yaml | nindent 8 }}
       {{- end }}
-      {{- if .PodResourceClaims }}
+    {{- range .SidecarContainers }}
+    - name: {{ .Name }}
+      image: {{ .Image }}
+      {{- if .ImagePullPolicy }}
+      imagePullPolicy: {{ .ImagePullPolicy }}
+      {{- end }}
+      {{- if .Command }}
+      command:
+        {{ .Command | yaml | nindent 8 }}
+      {{- end }}
+      {{- if .Args}}
+      args:
+        {{ .Args| yaml | nindent 8 }}
+      {{- end }}
+      {{- if .WorkingDir }}
+      workingDir: {{ .WorkingDir }}
+      {{- end }}
+      {{- if .Env }}
+      env:
+        {{ .Env | yaml | nindent 8 }}
+      {{- end }}
+      {{- with .Resources }}
+      resources:
+        {{ . | yaml | nindent 8 }}
+      {{- end }}
+      volumeMounts:
+        {{- range $.VolumeMounts }}
+        - name: {{ .Name }}
+          mountPath: {{ .MountPath }}
+          subPath: {{ .SubPath }}
+          readOnly: {{ .ReadOnly }}
+        {{- end }}
+    {{- end }}
+    {{- if .PodResourceClaims }}
     resourceClaims:
       {{- .PodResourceClaims | yaml | nindent 8 }}
     {{- end }}

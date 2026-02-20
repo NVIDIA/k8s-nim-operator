@@ -1067,6 +1067,14 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 								},
 							},
 						},
+						{
+							Name: "scratch",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{
+									Medium: corev1.StorageMediumDefault,
+								},
+							},
+						},
 					},
 					ImagePullSecrets:   []corev1.LocalObjectReference{},
 					ServiceAccountName: NIMCacheServiceAccount,
@@ -1118,6 +1126,10 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
+					{
+						Name:      "scratch",
+						MountPath: "/scratch",
+					},
 				},
 				Resources: corev1.ResourceRequirements{
 					Limits: map[corev1.ResourceName]apiResource.Quantity{
@@ -1165,6 +1177,10 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						Name:      "nim-cache-volume",
 						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
+					},
+					{
+						Name:      "scratch",
+						MountPath: "/scratch",
 					},
 				},
 				Resources: corev1.ResourceRequirements{
@@ -1236,6 +1252,10 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
+					{
+						Name:      "scratch",
+						MountPath: "/scratch",
+					},
 				},
 				Resources: corev1.ResourceRequirements{
 					Limits: map[corev1.ResourceName]apiResource.Quantity{
@@ -1276,10 +1296,16 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		return nil, err
 	}
 
+	ics := nimCache.GetInitContainers()
+	for idx := range ics {
+		ics[idx].VolumeMounts = append(ics[idx].VolumeMounts, job.Spec.Template.Spec.Containers[0].VolumeMounts...)
+		ics[idx].Env = utils.MergeEnvVars(ics[idx].Env, job.Spec.Template.Spec.Containers[0].Env)
+	}
+	job.Spec.Template.Spec.InitContainers = ics
+
 	if nimCache.GetProxySpec() != nil {
 		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.GetEnvWithProxy())
 		if nimCache.GetProxyCertConfigMap() != "" {
-			job.Spec.Template.Spec.InitContainers = nimCache.GetInitContainers()
 			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
 			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, k8sutil.GetVolumesForUpdatingCaCert(nimCache.Spec.Proxy.CertConfigMap)...)
 		}
