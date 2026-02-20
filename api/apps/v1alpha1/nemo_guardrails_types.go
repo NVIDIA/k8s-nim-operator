@@ -63,11 +63,12 @@ const (
 // +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
 // +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
 type NemoGuardrailSpec struct {
-	Image       Image           `json:"image"`
-	Command     []string        `json:"command,omitempty"`
-	Args        []string        `json:"args,omitempty"`
-	Env         []corev1.EnvVar `json:"env,omitempty"`
-	NIMEndpoint *NIMEndpoint    `json:"nimEndpoint,omitempty"`
+	Image             Image              `json:"image"`
+	Command           []string           `json:"command,omitempty"`
+	Args              []string           `json:"args,omitempty"`
+	Env               []corev1.EnvVar    `json:"env,omitempty"`
+	SidecarContainers []corev1.Container `json:"sidecarContainers,omitempty"`
+	NIMEndpoint       *NIMEndpoint       `json:"nimEndpoint,omitempty"`
 	// ConfigStore stores the config of the guardrail service
 	ConfigStore  GuardrailConfig     `json:"configStore,omitempty"`
 	Labels       map[string]string   `json:"labels,omitempty"`
@@ -701,6 +702,7 @@ func (n *NemoGuardrail) GetDeploymentParams() *rendertypes.DeploymentParams {
 	params.Command = n.GetCommand()
 	params.Resources = n.GetResources()
 	params.Image = n.GetImage()
+	params.SidecarContainers = n.Spec.SidecarContainers
 
 	// Set container probes
 	params.LivenessProbe = n.GetLivenessProbe()
@@ -761,6 +763,7 @@ func (n *NemoGuardrail) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	params.Command = n.GetCommand()
 	params.Resources = n.GetResources()
 	params.Image = n.GetImage()
+	params.SidecarContainers = n.Spec.SidecarContainers
 
 	// Set container probes
 	params.LivenessProbe = n.GetLivenessProbe()
