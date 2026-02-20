@@ -89,15 +89,6 @@ const (
 	PlatformTypeKServe PlatformType = "kserve"
 )
 
-type NIMContainerSpec struct {
-	Name       string          `json:"name"`
-	Image      Image           `json:"image"`
-	Command    []string        `json:"command,omitempty"`
-	Args       []string        `json:"args,omitempty"`
-	Env        []corev1.EnvVar `json:"env,omitempty"`
-	WorkingDir string          `json:"workingDir,omitempty"`
-}
-
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
@@ -728,14 +719,16 @@ func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume
 				},
 			},
 		},
-		{
+	}
+	if n.scratchNeeded() {
+		volumes = append(volumes, corev1.Volume{
 			Name: "scratch",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					Medium: corev1.StorageMediumDefault,
 				},
 			},
-		},
+		})
 	}
 	switch {
 	case modelPVC != nil:
@@ -860,6 +853,14 @@ func (n *NIMService) GetWorkerVolumes(modelPVC *PersistentVolumeClaim) []corev1.
 	return volumes
 }
 
+func (n *NIMService) scratchNeeded() bool {
+	additionalInitContainers := 0
+	if n.GetProxyCertConfigMap() != "" {
+		additionalInitContainers++
+	}
+	return (n.Spec.InitContainers != nil && len(n.Spec.InitContainers) > additionalInitContainers) || (n.Spec.SidecarContainers != nil && len(n.Spec.SidecarContainers) > 0)
+}
+
 // GetVolumeMounts returns volumes for the NIMService container.
 func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
 	subPath := ""
@@ -873,11 +874,17 @@ func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.V
 			SubPath:   subPath,
 		},
 		{
-			Name:      "scratch",
-			MountPath: "/scratch",
+			Name:      "dshm",
+			MountPath: "/dev/shm",
 		},
 	}
 
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "scratch",
+			MountPath: "/scratch",
+		})
+	}
 	if n.GetProxyCertConfigMap() != "" {
 		volumeMounts = append(volumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
 	}
@@ -895,10 +902,12 @@ func (n *NIMService) GetInitContainerVolumeMounts(modelPVC *PersistentVolumeClai
 			MountPath: "/model-store",
 			SubPath:   subPath,
 		},
-		{
+	}
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      "scratch",
 			MountPath: "/scratch",
-		},
+		})
 	}
 	if n.GetProxyCertConfigMap() != "" {
 		volumeMounts = append(volumeMounts, k8sutil.GetUpdateCaCertInitContainerVolumeMounts()...)
