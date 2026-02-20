@@ -957,15 +957,16 @@ var _ = Describe("NIMCache Controller", func() {
 			// Should have 2 init containers: custom + update-ca-certificates
 			Expect(job.Spec.Template.Spec.InitContainers).To(HaveLen(2))
 
-			// Verify custom init container is first
-			Expect(job.Spec.Template.Spec.InitContainers[0].Name).To(Equal("init-custom"))
-			Expect(job.Spec.Template.Spec.InitContainers[0].Image).To(Equal("busybox:latest"))
+			// Verify update-ca-certificates init container is first
+			Expect(job.Spec.Template.Spec.InitContainers[0].Name).To(Equal("update-ca-certificates"))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Image).To(Equal("nvcr.io/nim:test"))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Command).To(Equal(k8sutil.GetUpdateCaCertInitContainerCommand()))
+			Expect(job.Spec.Template.Spec.InitContainers[0].SecurityContext).To(Equal(k8sutil.GetUpdateCaCertInitContainerSecurityContext()))
 
-			// Verify update-ca-certificates init container is second
-			Expect(job.Spec.Template.Spec.InitContainers[1].Name).To(Equal("update-ca-certificates"))
-			Expect(job.Spec.Template.Spec.InitContainers[1].Image).To(Equal("nvcr.io/nim:test"))
-			Expect(job.Spec.Template.Spec.InitContainers[1].Command).To(Equal(k8sutil.GetUpdateCaCertInitContainerCommand()))
-			Expect(job.Spec.Template.Spec.InitContainers[1].SecurityContext).To(Equal(k8sutil.GetUpdateCaCertInitContainerSecurityContext()))
+			// Verify custom init container is second, after certs are updated
+			Expect(job.Spec.Template.Spec.InitContainers[1].Name).To(Equal("init-custom"))
+			Expect(job.Spec.Template.Spec.InitContainers[1].Image).To(Equal("busybox:latest"))
+
 		})
 
 		It("should construct a job without initContainers when not specified", func() {

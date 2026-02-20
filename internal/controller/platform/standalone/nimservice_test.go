@@ -304,6 +304,15 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						},
 					},
 				},
+				InitContainers: []*appsv1alpha1.NIMContainerSpec{
+					{
+						Image: appsv1alpha1.Image{
+							Repository: "fake",
+							Tag:        "latest",
+						},
+						Name: "init",
+					},
+				},
 				Metrics: appsv1alpha1.Metrics{
 					Enabled: &boolTrue,
 					ServiceMonitor: appsv1alpha1.ServiceMonitor{

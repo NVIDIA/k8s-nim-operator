@@ -1846,16 +1846,24 @@ spec:
                           type: string
                         initContainers:
                           items:
+                            description: NIMContainerSpec defines the specification
+                              for a container within a NIM workload.
                             properties:
                               args:
+                                description: Args are the arguments passed to the
+                                  container command at runtime.
                                 items:
                                   type: string
                                 type: array
                               command:
+                                description: Command is the entrypoint array. If not
+                                  specified, the image's default entrypoint is used.
                                 items:
                                   type: string
                                 type: array
                               env:
+                                description: Env is the list of environment variables
+                                  to set in the container.
                                 items:
                                   description: EnvVar represents an environment variable
                                     present in a Container.
@@ -2017,7 +2025,8 @@ spec:
                                   type: object
                                 type: array
                               image:
-                                description: Image defines image attributes.
+                                description: Image specifies the container image to
+                                  run.
                                 properties:
                                   pullPolicy:
                                     type: string
@@ -2034,8 +2043,13 @@ spec:
                                 - tag
                                 type: object
                               name:
+                                description: Name is the unique name of the container
+                                  within the pod.
                                 type: string
                               workingDir:
+                                description: WorkingDir is the container's working
+                                  directory. If unset, the container runtime's default
+                                  is used.
                                 type: string
                             required:
                             - image
@@ -3580,16 +3594,24 @@ spec:
                           type: string
                         sidecarContainers:
                           items:
+                            description: NIMContainerSpec defines the specification
+                              for a container within a NIM workload.
                             properties:
                               args:
+                                description: Args are the arguments passed to the
+                                  container command at runtime.
                                 items:
                                   type: string
                                 type: array
                               command:
+                                description: Command is the entrypoint array. If not
+                                  specified, the image's default entrypoint is used.
                                 items:
                                   type: string
                                 type: array
                               env:
+                                description: Env is the list of environment variables
+                                  to set in the container.
                                 items:
                                   description: EnvVar represents an environment variable
                                     present in a Container.
@@ -3751,7 +3773,8 @@ spec:
                                   type: object
                                 type: array
                               image:
-                                description: Image defines image attributes.
+                                description: Image specifies the container image to
+                                  run.
                                 properties:
                                   pullPolicy:
                                     type: string
@@ -3768,8 +3791,13 @@ spec:
                                 - tag
                                 type: object
                               name:
+                                description: Name is the unique name of the container
+                                  within the pod.
                                 type: string
                               workingDir:
+                                description: WorkingDir is the container's working
+                                  directory. If unset, the container runtime's default
+                                  is used.
                                 type: string
                             required:
                             - image
