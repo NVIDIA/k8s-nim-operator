@@ -348,14 +348,6 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				},
 			},
 			{
-				Name: "scratch",
-				VolumeSource: corev1.VolumeSource{
-					EmptyDir: &corev1.EmptyDirVolumeSource{
-						Medium: corev1.StorageMediumDefault,
-					},
-				},
-			},
-			{
 				Name: "model-store",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
@@ -375,10 +367,6 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			{
 				Name:      "dshm",
 				MountPath: "/dev/shm",
-			},
-			{
-				Name:      "scratch",
-				MountPath: "/scratch",
 			},
 		}
 		nimCache = &appsv1alpha1.NIMCache{
@@ -2692,9 +2680,10 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			var loggingSidecar, metricsAgent *corev1.Container
 			for i := range isvc.Spec.Predictor.Containers {
 				c := &isvc.Spec.Predictor.Containers[i]
-				if c.Name == "isvc-logging-sidecar" {
+				switch c.Name {
+				case "isvc-logging-sidecar":
 					loggingSidecar = c
-				} else if c.Name == "isvc-metrics-agent" {
+				case "isvc-metrics-agent":
 					metricsAgent = c
 				}
 			}

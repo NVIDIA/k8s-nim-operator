@@ -448,6 +448,7 @@ type PersistentVolumeClaim struct {
 	// Annotations for the PVC
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
+
 // NIMContainerSpec defines the specification for a container within a NIM workload.
 type NIMContainerSpec struct {
 	// Name is the unique name of the container within the pod.

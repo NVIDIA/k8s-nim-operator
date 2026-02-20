@@ -858,7 +858,7 @@ func (n *NIMService) scratchNeeded() bool {
 	if n.GetProxyCertConfigMap() != "" {
 		additionalInitContainers++
 	}
-	return (n.Spec.InitContainers != nil && len(n.Spec.InitContainers) > additionalInitContainers) || (n.Spec.SidecarContainers != nil && len(n.Spec.SidecarContainers) > 0)
+	return len(n.Spec.InitContainers) > additionalInitContainers || len(n.Spec.SidecarContainers) > 0
 }
 
 // GetVolumeMounts returns volumes for the NIMService container.

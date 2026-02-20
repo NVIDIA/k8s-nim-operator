@@ -3396,9 +3396,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			var loggingSidecar, metricsSidecar *corev1.Container
 			for i := range deployment.Spec.Template.Spec.Containers {
 				c := &deployment.Spec.Template.Spec.Containers[i]
-				if c.Name == "logging-sidecar" {
+				switch c.Name {
+				case "logging-sidecar":
 					loggingSidecar = c
-				} else if c.Name == "metrics-sidecar" {
+				case "metrics-sidecar":
 					metricsSidecar = c
 				}
 			}
