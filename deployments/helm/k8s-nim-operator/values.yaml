@@ -54,7 +54,7 @@ operator:
       drop:
         - ALL
   admissionController:
-    # Enable the admission controller. 
+    # Enable the admission controller.
     # Note: cert-manager must be installed beforehand, as it is required to generate the TLS certificates.
     enabled: false
     # TLS certificate configuration
