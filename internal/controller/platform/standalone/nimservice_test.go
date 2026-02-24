@@ -154,7 +154,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(resourcev1.AddToScheme(scheme)).To(Succeed())
 		Expect(gatewayv1.Install(scheme)).To(Succeed())
 		Expect(nvidiaresourcev1beta1.AddToScheme(scheme)).To(Succeed())
-		Expect(inferencev1.AddToScheme(scheme)).To(Succeed())
+		Expect(inferencev1.Install(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
