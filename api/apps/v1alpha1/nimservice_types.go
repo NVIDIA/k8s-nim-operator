@@ -37,7 +37,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	apixv1alpha1 "sigs.k8s.io/gateway-api-inference-extension/apix/config/v1alpha1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	sigsyaml "sigs.k8s.io/yaml"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
@@ -2079,6 +2081,281 @@ func (n *NIMService) GetComputeDomainParams(resourceClaimTemplateName string) *r
 		Annotations:               n.GetNIMServiceAnnotations(),
 		NumNodes:                  n.GetMultiNodePipelineParallelism(),
 		ResourceClaimTemplateName: resourceClaimTemplateName,
+	}
+}
+
+const (
+	// EPPGRPCExtProcPort is the gRPC external processing port for the EPP container.
+	EPPGRPCExtProcPort int32 = 9002
+	// EPPHealthPort is the gRPC health check port for the EPP container.
+	EPPHealthPort int32 = 9003
+	// EPPMetricsPort is the HTTP metrics port for the EPP container.
+	EPPMetricsPort int32 = 9090
+	// DefaultEPPImage is the default container image for the EPP deployment.
+	DefaultEPPImage = "registry.k8s.io/gateway-api-inference-extension/epp:v1.3.1"
+	// eppConfigFileName is the filename used when the operator generates an EPP ConfigMap.
+	eppConfigFileName = "default-plugins.yaml"
+)
+
+// IsEPPEnabled returns true if EPP (Endpoint Picker) is configured for this NIMService.
+func (n *NIMService) IsEPPEnabled() bool {
+	return n.Spec.Expose.Router.EPPConfig != nil
+}
+
+// GetEPPName returns the name used for EPP-related resources.
+func (n *NIMService) GetEPPName() string {
+	return fmt.Sprintf("%s-epp", n.GetName())
+}
+
+// GetEPPImage returns the container image for the EPP deployment.
+func (n *NIMService) GetEPPImage() string {
+	if n.Spec.Expose.Router.EPPConfig.Image != "" {
+		return n.Spec.Expose.Router.EPPConfig.Image
+	}
+	return DefaultEPPImage
+}
+
+// GetEPPConfigMapName returns the name of the operator-generated EPP ConfigMap.
+func (n *NIMService) GetEPPConfigMapName() string {
+	return fmt.Sprintf("%s-epp-config", n.GetName())
+}
+
+// GetEPPServiceAccountParams returns params to render the EPP ServiceAccount.
+func (n *NIMService) GetEPPServiceAccountParams() *rendertypes.ServiceAccountParams {
+	return &rendertypes.ServiceAccountParams{
+		Name:      n.GetEPPName(),
+		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
+	}
+}
+
+// GetEPPRoleParams returns params to render the EPP Role.
+func (n *NIMService) GetEPPRoleParams() *rendertypes.RoleParams {
+	return &rendertypes.RoleParams{
+		Name:      n.GetEPPName(),
+		Namespace: n.GetNamespace(),
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"inference.networking.k8s.io"},
+				Resources: []string{"inferencepools", "inferenceobjectives"},
+				Verbs:     []string{"get", "watch", "list"},
+			},
+			{
+				APIGroups: []string{"inference.networking.x-k8s.io"},
+				Resources: []string{"inferencepools", "inferenceobjectives"},
+				Verbs:     []string{"get", "watch", "list"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "watch", "list"},
+			},
+		},
+	}
+}
+
+// GetEPPRoleBindingParams returns params to render the EPP RoleBinding.
+func (n *NIMService) GetEPPRoleBindingParams() *rendertypes.RoleBindingParams {
+	return &rendertypes.RoleBindingParams{
+		Name:               n.GetEPPName(),
+		Namespace:          n.GetNamespace(),
+		RoleName:           n.GetEPPName(),
+		ServiceAccountName: n.GetEPPName(),
+	}
+}
+
+// GetEPPServiceParams returns params to render the EPP Service.
+func (n *NIMService) GetEPPServiceParams() *rendertypes.ServiceParams {
+	return &rendertypes.ServiceParams{
+		Name:      n.GetEPPName(),
+		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
+		SelectorLabels: map[string]string{
+			"app": n.GetEPPName(),
+		},
+		Type: string(corev1.ServiceTypeClusterIP),
+		Ports: []corev1.ServicePort{
+			{
+				Name:       "grpc-ext-proc",
+				Port:       EPPGRPCExtProcPort,
+				TargetPort: intstr.FromInt32(EPPGRPCExtProcPort),
+				Protocol:   corev1.ProtocolTCP,
+			},
+			{
+				Name:       "http-metrics",
+				Port:       EPPMetricsPort,
+				TargetPort: intstr.FromInt32(EPPMetricsPort),
+				Protocol:   corev1.ProtocolTCP,
+			},
+		},
+	}
+}
+
+// GetEPPConfigMapParams returns params to render the EPP ConfigMap from an inline Config.
+// Returns nil if Config is not set (user supplies their own ConfigMap via ConfigMapRef).
+func (n *NIMService) GetEPPConfigMapParams() (*rendertypes.ConfigMapParams, error) {
+	if n.Spec.Expose.Router.EPPConfig.Config == nil {
+		return nil, nil
+	}
+	/*epp := n.Spec.Expose.Router.EPPConfig.Config
+	epp.APIVersion = "inference.networking.x-k8s.io/v1alpha1"
+	epp.Kind = "EndpointPickerConfig"
+	*/
+	epp := apixv1alpha1.EndpointPickerConfig{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "inference.networking.x-k8s.io/v1alpha1",
+			Kind:       "EndpointPickerConfig",
+		},
+		FeatureGates:       n.Spec.Expose.Router.EPPConfig.Config.FeatureGates,
+		Plugins:            n.Spec.Expose.Router.EPPConfig.Config.Plugins,
+		SchedulingProfiles: n.Spec.Expose.Router.EPPConfig.Config.SchedulingProfiles,
+		SaturationDetector: n.Spec.Expose.Router.EPPConfig.Config.SaturationDetector,
+		Data:               n.Spec.Expose.Router.EPPConfig.Config.Data,
+	}
+	configYAML, err := sigsyaml.Marshal(epp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal EPP config: %w", err)
+	}
+	return &rendertypes.ConfigMapParams{
+		Name:      n.GetEPPConfigMapName(),
+		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
+		ConfigMapData: map[string]string{
+			eppConfigFileName: string(configYAML),
+		},
+	}, nil
+}
+
+// GetEPPDeploymentParams returns params to render the EPP Deployment.
+func (n *NIMService) GetEPPDeploymentParams() *rendertypes.DeploymentParams {
+	eppConfig := n.Spec.Expose.Router.EPPConfig
+
+	// Determine config file path and volume source based on config origin.
+	var configFile string
+	var configVolume corev1.Volume
+	if eppConfig.Config != nil {
+		configFile = fmt.Sprintf("/config/%s", eppConfigFileName)
+		configVolume = corev1.Volume{
+			Name: "epp-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.GetEPPConfigMapName(),
+					},
+				},
+			},
+		}
+	} else if eppConfig.ConfigMapRef != nil {
+		configFile = fmt.Sprintf("/config/%s", eppConfig.ConfigMapRef.Key)
+		configVolume = corev1.Volume{
+			Name: "epp-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: eppConfig.ConfigMapRef.Name,
+					},
+				},
+			},
+		}
+	}
+
+	replicas := int32(1)
+	params := &rendertypes.DeploymentParams{
+		Name:      n.GetEPPName(),
+		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
+		SelectorLabels: map[string]string{
+			"app": n.GetEPPName(),
+		},
+		Replicas:           &replicas,
+		ContainerName:      "epp",
+		Image:              n.GetEPPImage(),
+		ImagePullSecrets:   n.GetImagePullSecrets(),
+		ImagePullPolicy:    n.GetImagePullPolicy(),
+		ServiceAccountName: n.GetEPPName(),
+		Env: []corev1.EnvVar{
+			{
+				Name: "NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.namespace",
+					},
+				},
+			},
+		},
+		Args: []string{
+			"--pool-name", n.GetName(),
+			"--pool-namespace", n.GetNamespace(),
+			"--pool-group", "inference.networking.k8s.io",
+			"--zap-encoder", "json",
+			"--config-file", configFile,
+			"--v", "6",
+			"--model-server-metrics-path", "/v1/metrics",
+			"--tracing", "false",
+			"--metrics-endpoint-auth=false",
+		},
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          "grpc-ext-proc",
+				ContainerPort: EPPGRPCExtProcPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+			{
+				Name:          "grpc-health",
+				ContainerPort: EPPHealthPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+			{
+				Name:          "http-metrics",
+				ContainerPort: EPPMetricsPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		},
+		LivenessProbe: &corev1.Probe{
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       10,
+			ProbeHandler: corev1.ProbeHandler{
+				GRPC: &corev1.GRPCAction{
+					Port: EPPHealthPort,
+				},
+			},
+		},
+		ReadinessProbe: &corev1.Probe{
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       10,
+			ProbeHandler: corev1.ProbeHandler{
+				GRPC: &corev1.GRPCAction{
+					Port: EPPHealthPort,
+				},
+			},
+		},
+	}
+
+	if configFile != "" {
+		params.Volumes = []corev1.Volume{configVolume}
+		params.VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      "epp-config",
+				MountPath: "/config",
+				ReadOnly:  true,
+			},
+		}
+	}
+
+	return params
+}
+
+// GetInferencePoolParams returns params to render the InferencePool.
+func (n *NIMService) GetInferencePoolParams() *rendertypes.InferencePoolParams {
+	return &rendertypes.InferencePoolParams{
+		Name:           n.GetName(),
+		Namespace:      n.GetNamespace(),
+		Labels:         n.GetServiceLabels(),
+		SelectorLabels: n.GetSelectorLabels(),
+		TargetPort:     n.GetServicePort(),
+		EPPServiceName: n.GetEPPName(),
+		EPPServicePort: EPPGRPCExtProcPort,
 	}
 }
 

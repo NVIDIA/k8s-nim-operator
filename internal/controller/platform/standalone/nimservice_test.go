@@ -59,6 +59,7 @@ import (
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 
+	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
@@ -153,6 +154,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(resourcev1.AddToScheme(scheme)).To(Succeed())
 		Expect(gatewayv1.Install(scheme)).To(Succeed())
 		Expect(nvidiaresourcev1beta1.AddToScheme(scheme)).To(Succeed())
+		Expect(inferencev1.AddToScheme(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).

@@ -362,3 +362,19 @@ type ComputeDomainParams struct {
 	NumNodes                  uint32
 	ResourceClaimTemplateName string
 }
+
+// InferencePoolParams holds the parameters for rendering an InferencePool template.
+type InferencePoolParams struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	// SelectorLabels are the pod labels used to select model server pods into the pool.
+	SelectorLabels map[string]string
+	// TargetPort is the port number on model server pods (e.g. 8000).
+	TargetPort int32
+	// EPPServiceName is the name of the EPP (Endpoint Picker) Service.
+	EPPServiceName string
+	// EPPServicePort is the gRPC port of the EPP Service (e.g. 9002).
+	EPPServicePort int32
+}

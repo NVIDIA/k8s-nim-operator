@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
+	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -67,6 +68,7 @@ func init() {
 	utilruntime.Must(lwsv1.AddToScheme(scheme))
 	utilruntime.Must(kservev1beta1.AddToScheme(scheme))
 	utilruntime.Must(gatewayv1.Install(scheme))
+	utilruntime.Must(inferencev1.Install(scheme))
 	utilruntime.Must(nvidiaresourcev1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }

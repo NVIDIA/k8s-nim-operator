@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
@@ -286,6 +287,33 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}, "servicemonitor", conditions.ReasonServiceMonitorFailed)
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+	}
+
+	// Sync EPP resources when EPP is configured, otherwise clean them up
+	if nimService.IsEPPEnabled() {
+		if err = r.reconcileEPP(ctx, nimService); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		eppNamespacedName := types.NamespacedName{Name: nimService.GetEPPName(), Namespace: nimService.GetNamespace()}
+		eppCMNamespacedName := types.NamespacedName{Name: nimService.GetEPPConfigMapName(), Namespace: nimService.GetNamespace()}
+		for _, obj := range []client.Object{
+			&corev1.ServiceAccount{},
+			&rbacv1.Role{},
+			&rbacv1.RoleBinding{},
+			&corev1.Service{},
+			&appsv1.Deployment{},
+		} {
+			if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), obj, eppNamespacedName); cleanupErr != nil && !k8serrors.IsNotFound(cleanupErr) {
+				return ctrl.Result{}, cleanupErr
+			}
+		}
+		if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), &corev1.ConfigMap{}, eppCMNamespacedName); cleanupErr != nil && !k8serrors.IsNotFound(cleanupErr) {
+			return ctrl.Result{}, cleanupErr
+		}
+		if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), &inferencev1.InferencePool{}, namespacedName); cleanupErr != nil && !k8serrors.IsNotFound(cleanupErr) {
+			return ctrl.Result{}, cleanupErr
 		}
 	}
 
@@ -1223,6 +1251,74 @@ func (r *NIMServiceReconciler) reconcileComputeDomain(ctx context.Context, nimSe
 			return err
 		}
 	}
+	return nil
+}
+
+func (r *NIMServiceReconciler) reconcileEPP(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
+	renderer := r.GetRenderer()
+
+	// Sync EPP ServiceAccount
+	err := r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
+		return renderer.ServiceAccount(nimService.GetEPPServiceAccountParams())
+	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync EPP Role
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+		return renderer.Role(nimService.GetEPPRoleParams())
+	}, "role", conditions.ReasonRoleFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync EPP RoleBinding
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+		return renderer.RoleBinding(nimService.GetEPPRoleBindingParams())
+	}, "rolebinding", conditions.ReasonRoleBindingFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync EPP ConfigMap only when config is specified inline
+	if nimService.Spec.Expose.Router.EPPConfig.Config != nil {
+		cmParams, err := nimService.GetEPPConfigMapParams()
+		if err != nil {
+			return fmt.Errorf("failed to build EPP ConfigMap params: %w", err)
+		}
+		err = r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ConfigMap{}, func() (client.Object, error) {
+			return renderer.ConfigMap(cmParams)
+		}, "configmap", conditions.ReasonConfigMapFailed)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Sync EPP Service
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.Service{}, func() (client.Object, error) {
+		return renderer.Service(nimService.GetEPPServiceParams())
+	}, "service", conditions.ReasonServiceFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync EPP Deployment
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
+		return renderer.Deployment(nimService.GetEPPDeploymentParams())
+	}, "deployment", conditions.ReasonDeploymentFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync InferencePool
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &inferencev1.InferencePool{}, func() (client.Object, error) {
+		return renderer.InferencePool(nimService.GetInferencePoolParams())
+	}, "inferencepool", conditions.ReasonInferencePoolFailed)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

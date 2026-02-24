@@ -1237,10 +1237,310 @@ spec:
                         description: Annotations for the router, e.g. for ingress
                           class or gateway
                         type: object
+                      eppConfig:
+                        description: EPPConfig is the configuration for the endpoint
+                          picker extension. This is field is currently only supported
+                          for standalone inference platform.
+                        properties:
+                          config:
+                            description: |-
+                              Config allows specifying EPP EndpointPickerConfig directly as a structured object.
+                              The operator will marshal this to YAML and create a ConfigMap automatically.
+                              Mutually exclusive with ConfigMapRef.
+                              One of ConfigMapRef or Config must be specified (no default configuration).
+                              Uses the upstream type from github.com/kubernetes-sigs/gateway-api-inference-extension
+                            properties:
+                              apiVersion:
+                                description: |-
+                                  APIVersion defines the versioned schema of this representation of an object.
+                                  Servers should convert recognized schemas to the latest internal value, and
+                                  may reject unrecognized values.
+                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                                type: string
+                              data:
+                                description: Data configures the DataLayer. It is
+                                  required if the new DataLayer is enabled.
+                                properties:
+                                  sources:
+                                    description: Sources is the list of sources to
+                                      define to the DataLayer
+                                    items:
+                                      description: DataLayerSource contains the configuration
+                                        of a DataSource of the DataLayer feature
+                                      properties:
+                                        extractors:
+                                          description: |-
+                                            Extractors specifies the list of Plugin instances to be associated with
+                                            this Source. The entries are references to the names of entries of the Plugins
+                                            defined in the configuration's Plugins section
+                                          items:
+                                            description: DataLayerExtractor contains
+                                              the configuration of an Extractor of
+                                              the DataLayer feature
+                                            properties:
+                                              pluginRef:
+                                                description: |-
+                                                  PluginRef specifies a partiular Plugin instance to be associated with
+                                                  this Extractor. The reference is to the name of an entry of the Plugins
+                                                  defined in the configuration's Plugins section
+                                                type: string
+                                            required:
+                                            - pluginRef
+                                            type: object
+                                          type: array
+                                        pluginRef:
+                                          description: |-
+                                            PluginRef specifies a partiular Plugin instance to be associated with
+                                            this Source. The reference is to the name of an entry of the Plugins
+                                            defined in the configuration's Plugins section
+                                          type: string
+                                      required:
+                                      - extractors
+                                      - pluginRef
+                                      type: object
+                                    type: array
+                                required:
+                                - sources
+                                type: object
+                              featureGates:
+                                description: |-
+                                  FeatureGates is a set of flags that enable various experimental features with the EPP.
+                                  If omitted non of these experimental features will be enabled.
+                                items:
+                                  type: string
+                                type: array
+                              kind:
+                                description: |-
+                                  Kind is a string value representing the REST resource this object represents.
+                                  Servers may infer this from the endpoint the client submits requests to.
+                                  Cannot be updated.
+                                  In CamelCase.
+                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                                type: string
+                              plugins:
+                                description: Plugins is the list of plugins that will
+                                  be instantiated.
+                                items:
+                                  description: |-
+                                    PluginSpec contains the information that describes a plugin that
+                                    will be instantiated.
+                                  properties:
+                                    name:
+                                      description: |-
+                                        Name provides a name for plugin entries to reference. If
+                                        omitted, the value of the Plugin's Type field will be used.
+                                      type: string
+                                    parameters:
+                                      description: |-
+                                        Parameters are the set of parameters to be passed to the plugin's
+                                        factory function. The factory function is responsible
+                                        to parse the parameters.
+                                      format: byte
+                                      type: string
+                                    type:
+                                      description: Type specifies the plugin type
+                                        to be instantiated.
+                                      type: string
+                                  required:
+                                  - type
+                                  type: object
+                                type: array
+                              saturationDetector:
+                                description: |-
+                                  SaturationDetector when present specifies the configuration of the
+                                  Saturation detector. If not present, default values are used.
+                                properties:
+                                  kvCacheUtilThreshold:
+                                    description: |-
+                                      KVCacheUtilThreshold defines the KV cache utilization (0.0 to 1.0) above
+                                      which a pod is considered to have insufficient capacity.
+                                    type: number
+                                  metricsStalenessThreshold:
+                                    description: |-
+                                      MetricsStalenessThreshold defines how old a pod's metrics can be.
+                                      If a pod's metrics are older than this, it might be excluded from
+                                      "good capacity" considerations or treated as having no capacity for
+                                      safety.
+                                    type: string
+                                  queueDepthThreshold:
+                                    description: |-
+                                      QueueDepthThreshold defines the backend waiting queue size above which a
+                                      pod is considered to have insufficient capacity for new requests.
+                                    type: integer
+                                type: object
+                              schedulingProfiles:
+                                description: |-
+                                  SchedulingProfiles is the list of named SchedulingProfiles
+                                  that will be created.
+                                items:
+                                  description: |-
+                                    SchedulingProfile contains the information to create a SchedulingProfile
+                                    entry to be used by the scheduler.
+                                  properties:
+                                    name:
+                                      description: Name specifies the name of this
+                                        SchedulingProfile
+                                      type: string
+                                    plugins:
+                                      description: |-
+                                        Plugins is the list of plugins for this SchedulingProfile. They are assigned
+                                        to the appropriate "slots" based on their type.
+                                      items:
+                                        description: |-
+                                          SchedulingPlugin describes a plugin that will be associated with a
+                                          SchedulingProfile entry.
+                                        properties:
+                                          pluginRef:
+                                            description: |-
+                                              PluginRef specifies a partiular Plugin instance to be associated with
+                                              this SchedulingProfile. The reference is to the name of an
+                                              entry of the Plugins defined in the configuration's Plugins
+                                              section
+                                            type: string
+                                          weight:
+                                            description: Weight is the weight fo be
+                                              used if this plugin is a Scorer.
+                                            type: integer
+                                        required:
+                                        - pluginRef
+                                        type: object
+                                      type: array
+                                  required:
+                                  - name
+                                  - plugins
+                                  type: object
+                                type: array
+                            required:
+                            - plugins
+                            - schedulingProfiles
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                          configMapRef:
+                            description: |-
+                              ConfigMapRef references a user-provided ConfigMap containing EPP configuration.
+                              The ConfigMap should contain EndpointPickerConfig YAML.
+                              Mutually exclusive with Config.
+                            properties:
+                              key:
+                                description: The key to select.
+                                type: string
+                              name:
+                                default: ""
+                                description: |-
+                                  Name of the referent.
+                                  This field is effectively required, but due to backwards compatibility is
+                                  allowed to be empty. Instances of this type with an empty value here are
+                                  almost certainly wrong.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                type: string
+                              optional:
+                                description: Specify whether the ConfigMap or its
+                                  key must be defined
+                                type: boolean
+                            required:
+                            - key
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          image:
+                            description: Image is the container image for the EPP
+                              (Endpoint Picker) deployment.
+                            type: string
+                        type: object
                       gateway:
                         description: Gateway is the gateway to use for the created
                           HTTPRoute.
                         properties:
+                          backendRef:
+                            description: BackendRef is a reference to a backend to
+                              forward matched requests to.
+                            properties:
+                              group:
+                                default: ""
+                                description: |-
+                                  Group is the group of the referent. For example, "gateway.networking.k8s.io".
+                                  When unspecified or empty string, core API group is inferred.
+                                maxLength: 253
+                                pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                type: string
+                              kind:
+                                default: Service
+                                description: |-
+                                  Kind is the Kubernetes resource kind of the referent. For example
+                                  "Service".
+
+                                  Defaults to "Service" when not specified.
+
+                                  ExternalName services can refer to CNAME DNS records that may live
+                                  outside of the cluster and as such are difficult to reason about in
+                                  terms of conformance. They also may not be safe to forward to (see
+                                  CVE-2021-25740 for more information). Implementations SHOULD NOT
+                                  support ExternalName Services.
+
+                                  Support: Core (Services with a type other than ExternalName)
+
+                                  Support: Implementation-specific (Services with type ExternalName)
+                                maxLength: 63
+                                minLength: 1
+                                pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
+                                type: string
+                              name:
+                                description: Name is the name of the referent.
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                              namespace:
+                                description: |-
+                                  Namespace is the namespace of the backend. When unspecified, the local
+                                  namespace is inferred.
+
+                                  Note that when a namespace different than the local namespace is specified,
+                                  a ReferenceGrant object is required in the referent namespace to allow that
+                                  namespace's owner to accept the reference. See the ReferenceGrant
+                                  documentation for details.
+
+                                  Support: Core
+                                maxLength: 63
+                                minLength: 1
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                                type: string
+                              port:
+                                description: |-
+                                  Port specifies the destination port number to use for this resource.
+                                  Port is required when the referent is a Kubernetes Service. In this
+                                  case, the port number is the service port number, not the target port.
+                                  For other resources, destination port might be derived from the referent
+                                  resource or this field.
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                              weight:
+                                default: 1
+                                description: |-
+                                  Weight specifies the proportion of requests forwarded to the referenced
+                                  backend. This is computed as weight/(sum of all weights in this
+                                  BackendRefs list). For non-zero values, there may be some epsilon from
+                                  the exact proportion defined here depending on the precision an
+                                  implementation supports. Weight is not a percentage and the sum of
+                                  weights does not need to equal 100.
+
+                                  If only one backend is specified and it has a weight greater than 0, 100%
+                                  of the traffic is forwarded to that backend. If weight is set to 0, no
+                                  traffic should be forwarded for this entry. If unspecified, weight
+                                  defaults to 1.
+
+                                  Support for this field varies based on the context where used.
+                                format: int32
+                                maximum: 1000000
+                                minimum: 0
+                                type: integer
+                            required:
+                            - name
+                            type: object
+                            x-kubernetes-validations:
+                            - message: Must have port for Service reference
+                              rule: '(size(self.group) == 0 && self.kind == ''Service'')
+                                ? has(self.port) : true'
                           grpcRoutesEnabled:
                             default: false
                             description: GRPCRoutesEnabled is a flag to enable GRPCRoutes
