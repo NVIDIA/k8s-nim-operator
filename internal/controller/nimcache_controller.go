@@ -88,21 +88,17 @@ type NIMCacheReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 	updater          conditions.Updater
 	recorder         record.EventRecorder
-	// apiReader is used to read objects from the API server directly, bypassing the cache.
-	// this is useful as a fallback to read objects that are not cached due to missing labels for example.
-	apiReader client.Reader
 }
 
 // Ensure NIMCacheReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NIMCacheReconciler{}
 
 // NewNIMCacheReconciler creates a new reconciler for NIMCache with the given platform.
-func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, apiReader client.Reader, log logr.Logger) *NIMCacheReconciler {
+func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger) *NIMCacheReconciler {
 	return &NIMCacheReconciler{
-		Client:    client,
-		scheme:    scheme,
-		apiReader: apiReader,
-		log:       log,
+		Client: client,
+		scheme: scheme,
+		log:    log,
 	}
 }
 
@@ -237,11 +233,6 @@ func (r *NIMCacheReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder.
 func (r *NIMCacheReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
-}
-
-// GetAPIReader returns the api reader.
-func (r *NIMCacheReconciler) GetAPIReader() client.Reader {
-	return r.apiReader
 }
 
 // GetOrchestratorType returns the container platform type.
@@ -526,17 +517,8 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nimCache.GetNamespace()}
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, pvcNamespacedName, pvc)
-	if err != nil {
-		if apiErrors.IsNotFound(err) {
-			// might be cache miss: fallback to apiserver (uncached)
-			err = r.apiReader.Get(ctx, pvcNamespacedName, pvc)
-			if err != nil && !apiErrors.IsNotFound(err) {
-				return err
-			}
-		} else {
-			logger.Error(err, "Failed to get pvc", "name", pvcName)
-			return err
-		}
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return err
 	}
 
 	// If PVC does not exist, create a new one if creation flag is enabled

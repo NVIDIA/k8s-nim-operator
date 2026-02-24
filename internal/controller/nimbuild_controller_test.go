@@ -63,10 +63,9 @@ var _ = Describe("NIMBuild Controller", func() {
 			Build()
 
 		reconciler = &NIMBuildReconciler{
-			Client:    cli,
-			scheme:    scheme,
-			recorder:  record.NewFakeRecorder(1000),
-			apiReader: cli,
+			Client:   cli,
+			scheme:   scheme,
+			recorder: record.NewFakeRecorder(1000),
 		}
 	})
 

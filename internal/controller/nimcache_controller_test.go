@@ -64,10 +64,9 @@ var _ = Describe("NIMCache Controller", func() {
 			WithStatusSubresource(&corev1.ConfigMap{}).
 			Build()
 		reconciler = &NIMCacheReconciler{
-			Client:    cli,
-			scheme:    scheme,
-			recorder:  record.NewFakeRecorder(1000),
-			apiReader: cli,
+			Client:   cli,
+			scheme:   scheme,
+			recorder: record.NewFakeRecorder(1000),
 		}
 
 		nimCache := &appsv1alpha1.NIMCache{
@@ -1160,10 +1159,9 @@ var _ = Describe("NIMCache Controller", func() {
 				Build()
 
 			reconciler = &NIMCacheReconciler{
-				Client:    cli,
-				scheme:    scheme,
-				recorder:  record.NewFakeRecorder(1000),
-				apiReader: cli,
+				Client:   cli,
+				scheme:   scheme,
+				recorder: record.NewFakeRecorder(1000),
 			}
 
 		})

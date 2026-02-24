@@ -72,7 +72,6 @@ type NIMServiceReconciler struct {
 	renderer         render.Renderer
 	recorder         record.EventRecorder
 	orchestratorType k8sutil.OrchestratorType
-	apiReader        client.Reader
 }
 
 // NewNIMServiceReconciler returns NIMServiceReconciler for KServe platform.
@@ -88,7 +87,6 @@ func NewNIMServiceReconciler(ctx context.Context, r shared.Reconciler) *NIMServi
 		renderer:         render.NewRenderer(ManifestsDir),
 		recorder:         r.GetEventRecorder(),
 		orchestratorType: orchestratorType,
-		apiReader:        r.GetAPIReader(),
 	}
 }
 
@@ -225,19 +223,11 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
 
 	err = r.Get(ctx, namespacedName, obj)
-	if err != nil {
-		if apiErrors.IsNotFound(err) {
-			// try to get the object again to avoid potential cache miss
-			err = r.apiReader.Get(ctx, namespacedName, obj)
-			if err != nil && !apiErrors.IsNotFound(err) {
-				logger.Error(err, fmt.Sprintf("Error is not NotFound for %s using the uncached reader: %v", obj.GetObjectKind(), err))
-				return err
-			}
-		} else {
-			logger.Error(err, fmt.Sprintf("Error getting %s: %v", obj.GetObjectKind(), err))
-			return err
-		}
+	if err != nil && !apiErrors.IsNotFound(err) {
+		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
+		return err
 	}
+
 	// Don't do anything if CR is unchanged.
 	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
 		return nil
@@ -369,17 +359,8 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nimService.GetNamespace()}
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, pvcNamespacedName, pvc)
-	if err != nil {
-		if apiErrors.IsNotFound(err) {
-			// might be cache miss: fallback to apiserver (uncached)
-			err = r.apiReader.Get(ctx, pvcNamespacedName, pvc)
-			if err != nil && !apiErrors.IsNotFound(err) {
-				return nil, err
-			}
-		} else {
-			logger.Error(err, "Failed to get pvc", "name", pvcName)
-			return nil, err
-		}
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return nil, err
 	}
 
 	// If PVC does not exist, create a new one if creation flag is enabled

@@ -99,12 +99,11 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		reconciler = &NemoCustomizerReconciler{
-			Client:    client,
-			scheme:    scheme,
-			updater:   conditions.NewUpdater(client),
-			renderer:  render.NewRenderer(manifestsDir),
-			recorder:  record.NewFakeRecorder(1000),
-			apiReader: client,
+			Client:   client,
+			scheme:   scheme,
+			updater:  conditions.NewUpdater(client),
+			renderer: render.NewRenderer(manifestsDir),
+			recorder: record.NewFakeRecorder(1000),
 		}
 
 		// Load test customizer config maps from file

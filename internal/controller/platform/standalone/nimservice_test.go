@@ -185,7 +185,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			renderer:        render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/standalone"), "manifests")),
 			recorder:        record.NewFakeRecorder(1000),
 			discoveryClient: discoveryClient,
-			apiReader:       client,
 		}
 		pvcName := "test-pvc"
 		minReplicas := int32(1)

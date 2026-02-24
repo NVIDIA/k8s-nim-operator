@@ -190,7 +190,6 @@ func main() {
 	if err = controller.NewNIMCacheReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
-		mgr.GetAPIReader(),
 		ctrl.Log.WithName("controllers").WithName("NIMCache"),
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMCache")
@@ -203,7 +202,6 @@ func main() {
 		updater,
 		discoveryClient,
 		render.NewRenderer("/manifests"),
-		mgr.GetAPIReader(),
 		ctrl.Log.WithName("controllers").WithName("NIMService"),
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMService")
@@ -221,7 +219,6 @@ func main() {
 	if err = controller.NewNIMBuildReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
-		mgr.GetAPIReader(),
 		ctrl.Log.WithName("controllers").WithName("NIMBuild"),
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMBuild")
@@ -234,7 +231,6 @@ func main() {
 		updater,
 		discoveryClient,
 		render.NewRenderer("/manifests"),
-		mgr.GetAPIReader(),
 		ctrl.Log.WithName("controllers").WithName("NemoGuardrail"),
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NemoGuardrail")
@@ -247,7 +243,6 @@ func main() {
 		updater,
 		discoveryClient,
 		render.NewRenderer("/manifests"),
-		mgr.GetAPIReader(),
 		ctrl.Log.WithName("controllers").WithName("NemoEvaluator"),
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NemoEvaluator")
@@ -260,7 +255,6 @@ func main() {
 		updater,
 		discoveryClient,
 		render.NewRenderer("/manifests"),
-		mgr.GetAPIReader(),
 		ctrl.Log.WithName("controllers").WithName("NemoEntitystore"),
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NemoEntitystore")
@@ -273,7 +267,6 @@ func main() {
 		updater,
 		discoveryClient,
 		render.NewRenderer("/manifests"),
-		mgr.GetAPIReader(),
 		ctrl.Log.WithName("controllers").WithName("NemoDatastore"),
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NemoDatastore")
@@ -286,7 +279,6 @@ func main() {
 		updater,
 		discoveryClient,
 		render.NewRenderer("/manifests"),
-		mgr.GetAPIReader(),
 		ctrl.Log.WithName("controllers").WithName("NemoCustomizer"),
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NemoCustomizer")

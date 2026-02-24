@@ -866,18 +866,9 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	// e.g. (with LWS resources with suffix)
 	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
 	getErr := r.Get(ctx, namespacedName, obj)
-	if getErr != nil {
-		if apiErrors.IsNotFound(getErr) {
-			// try to get the object again to avoid potential cache miss
-			getErr = r.apiReader.Get(ctx, namespacedName, obj)
-			if getErr != nil && !apiErrors.IsNotFound(getErr) {
-				logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s using the uncached reader: %v", obj.GetObjectKind(), getErr))
-				return getErr
-			}
-		} else {
-			logger.Error(getErr, fmt.Sprintf("Error getting %s: %v", obj.GetObjectKind(), getErr))
-			return getErr
-		}
+	if getErr != nil && !apiErrors.IsNotFound(getErr) {
+		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
+		return getErr
 	}
 
 	// Track an existing resource
@@ -1006,17 +997,8 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nimService.GetNamespace()}
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, pvcNamespacedName, pvc)
-	if err != nil {
-		if apiErrors.IsNotFound(err) {
-			// might be cache miss: fallback to apiserver (uncached)
-			err = r.apiReader.Get(ctx, pvcNamespacedName, pvc)
-			if err != nil && !apiErrors.IsNotFound(err) {
-				return nil, err
-			}
-		} else {
-			logger.Error(err, "Failed to get pvc", "name", pvcName)
-			return nil, err
-		}
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return nil, err
 	}
 
 	// If PVC does not exist, create a new one if creation flag is enabled

@@ -72,10 +72,9 @@ var _ = Describe("NIMService Controller", func() {
 			}).
 			Build()
 		reconciler = &NIMServiceReconciler{
-			Client:    testClient,
-			scheme:    scheme,
-			recorder:  record.NewFakeRecorder(1000),
-			apiReader: testClient,
+			Client:   testClient,
+			scheme:   scheme,
+			recorder: record.NewFakeRecorder(1000),
 		}
 	})
 

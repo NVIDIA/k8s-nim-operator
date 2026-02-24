@@ -492,10 +492,13 @@ func ControllerWatchesIfCRDExists(discoveryClient discovery.DiscoveryInterface,
 	)
 }
 
-// BuildByObjectFilteredCache builds the default ByObject cache selectors and conditionally
-// adds entries for optional CRDs if they exist in the cluster.
-// This will reduce the memory footprint of the informer caches by only watching
-// for objects labeled with the given label selector.
+// BuildByObjectFilteredCache constructs a cache configuration that watches Kubernetes objects
+// matching the provided label selector. It includes built-in resource types and conditionally
+// adds optional CRDs if they are available in the cluster.
+//
+// This reduces memory usage by only caching objects with the specified labels.
+// WARNING: Only include object types that are labeled with the given selector.
+// Objects without matching labels (i.e pre-existing PVCs, ResourceClaims) should not be added here.
 func BuildByObjectFilteredCache(discoveryClient discovery.DiscoveryInterface, ls labels.Selector) (map[client.Object]cache.ByObject, error) {
 	byObject := map[client.Object]cache.ByObject{
 		&appsv1.Deployment{}:                     {Label: ls},

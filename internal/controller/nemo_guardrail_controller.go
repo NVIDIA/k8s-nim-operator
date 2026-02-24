@@ -66,23 +66,19 @@ type NemoGuardrailReconciler struct {
 	Config           *rest.Config
 	recorder         record.EventRecorder
 	orchestratorType k8sutil.OrchestratorType
-	// apiReader is used to read objects from the API server directly, bypassing the cache.
-	// this is useful as a fallback to read objects that are not cached due to missing labels for example.
-	apiReader client.Reader
 }
 
 // Ensure NemoGuardrailReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NemoGuardrailReconciler{}
 
 // NewNemoGuardrailReconciler creates a new reconciler for NemoGuardrail with the given platform.
-func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, apiReader client.Reader, log logr.Logger) *NemoGuardrailReconciler {
+func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NemoGuardrailReconciler {
 	return &NemoGuardrailReconciler{
 		Client:          client,
 		scheme:          scheme,
 		updater:         updater,
 		discoveryClient: discoveryClient,
 		renderer:        renderer,
-		apiReader:       apiReader,
 		log:             log,
 	}
 }
@@ -221,11 +217,6 @@ func (r *NemoGuardrailReconciler) GetRenderer() render.Renderer {
 // GetEventRecorder returns the event recorder.
 func (r *NemoGuardrailReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
-}
-
-// GetAPIReader returns the api reader.
-func (r *NemoGuardrailReconciler) GetAPIReader() client.Reader {
-	return r.apiReader
 }
 
 // GetOrchestratorType returns the container platform type.
@@ -486,17 +477,8 @@ func (r *NemoGuardrailReconciler) reconcilePVC(ctx context.Context, nemoGuardrai
 	pvcNamespacedName := types.NamespacedName{Name: pvcName, Namespace: nemoGuardrail.GetNamespace()}
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, pvcNamespacedName, pvc)
-	if err != nil {
-		if apiErrors.IsNotFound(err) {
-			// might be cache miss: fallback to apiserver (uncached)
-			err = r.apiReader.Get(ctx, pvcNamespacedName, pvc)
-			if err != nil && !apiErrors.IsNotFound(err) {
-				return err
-			}
-		} else {
-			logger.Error(err, "Failed to get pvc", "name", pvcName)
-			return err
-		}
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return err
 	}
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {

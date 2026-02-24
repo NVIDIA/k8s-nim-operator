@@ -38,7 +38,6 @@ type Reconciler interface {
 	GetClient() client.Client
 	GetUpdater() conditions.Updater
 	GetRenderer() render.Renderer
-	GetAPIReader() client.Reader
 	GetEventRecorder() record.EventRecorder
 	GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error)
 	GetDiscoveryClient() discovery.DiscoveryInterface
