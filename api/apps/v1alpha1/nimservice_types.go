@@ -135,6 +135,9 @@ type NIMServiceSpec struct {
 	// +kubebuilder:validation:Enum=standalone;kserve
 	// +kubebuilder:default:="standalone"
 	InferencePlatform PlatformType `json:"inferencePlatform,omitempty"`
+
+	InitContainers    []*NIMContainerSpec `json:"initContainers,omitempty"`
+	SidecarContainers []*NIMContainerSpec `json:"sidecarContainers,omitempty"`
 }
 
 // NimServiceMultiNodeConfig defines the configuration for multi-node NIMService.
@@ -717,6 +720,16 @@ func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume
 			},
 		},
 	}
+	if n.scratchNeeded() {
+		volumes = append(volumes, corev1.Volume{
+			Name: "scratch",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: corev1.StorageMediumDefault,
+				},
+			},
+		})
+	}
 	switch {
 	case modelPVC != nil:
 		volumes = append(volumes, corev1.Volume{
@@ -840,6 +853,14 @@ func (n *NIMService) GetWorkerVolumes(modelPVC *PersistentVolumeClaim) []corev1.
 	return volumes
 }
 
+func (n *NIMService) scratchNeeded() bool {
+	additionalInitContainers := 0
+	if n.GetProxyCertConfigMap() != "" {
+		additionalInitContainers++
+	}
+	return len(n.Spec.InitContainers) > additionalInitContainers || len(n.Spec.SidecarContainers) > 0
+}
+
 // GetVolumeMounts returns volumes for the NIMService container.
 func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
 	subPath := ""
@@ -858,8 +879,38 @@ func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.V
 		},
 	}
 
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "scratch",
+			MountPath: "/scratch",
+		})
+	}
 	if n.GetProxyCertConfigMap() != "" {
 		volumeMounts = append(volumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
+	}
+	return volumeMounts
+}
+
+func (n *NIMService) GetInitContainerVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
+	subPath := ""
+	if modelPVC != nil {
+		subPath = modelPVC.SubPath
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "model-store",
+			MountPath: "/model-store",
+			SubPath:   subPath,
+		},
+	}
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "scratch",
+			MountPath: "/scratch",
+		})
+	}
+	if n.GetProxyCertConfigMap() != "" {
+		volumeMounts = append(volumeMounts, k8sutil.GetUpdateCaCertInitContainerVolumeMounts()...)
 	}
 	return volumeMounts
 }
@@ -965,19 +1016,58 @@ func (n *NIMService) GetDeploymentKind() string {
 
 // GetInitContainers returns the init containers for the NIMService deployment.
 func (n *NIMService) GetInitContainers() []corev1.Container {
+	res := []corev1.Container{}
 	if n.GetProxyCertConfigMap() != "" {
-		return []corev1.Container{
-			{
-				Name:            "update-ca-certificates",
-				Image:           n.GetImage(),
-				ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
-				Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
-				SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
-				VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
-			},
-		}
+		res = append(res, corev1.Container{
+			Name:            "update-ca-certificates",
+			Image:           n.GetImage(),
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
+			SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
+		})
 	}
-	return []corev1.Container{}
+	for _, ic := range n.Spec.InitContainers {
+		var pp corev1.PullPolicy
+		if ic.Image.PullPolicy != "" {
+			pp = corev1.PullPolicy(ic.Image.PullPolicy)
+		} else {
+			pp = corev1.PullPolicy(n.GetImagePullPolicy())
+		}
+
+		res = append(res, corev1.Container{
+			Name:            ic.Name,
+			Image:           fmt.Sprintf("%s:%s", ic.Image.Repository, ic.Image.Tag),
+			ImagePullPolicy: pp,
+			Command:         ic.Command,
+			Args:            ic.Args,
+			Env:             ic.Env,
+			WorkingDir:      ic.WorkingDir,
+		})
+	}
+	return res
+}
+
+func (n *NIMService) GetSidecarContainers() []corev1.Container {
+	res := []corev1.Container{}
+	for _, sc := range n.Spec.SidecarContainers {
+		var pp corev1.PullPolicy
+		if sc.Image.PullPolicy != "" {
+			pp = corev1.PullPolicy(sc.Image.PullPolicy)
+		} else {
+			pp = corev1.PullPolicy(n.GetImagePullPolicy())
+		}
+
+		res = append(res, corev1.Container{
+			Name:            sc.Name,
+			Image:           fmt.Sprintf("%s:%s", sc.Image.Repository, sc.Image.Tag),
+			ImagePullPolicy: pp,
+			Command:         sc.Command,
+			Args:            sc.Args,
+			Env:             sc.Env,
+			WorkingDir:      sc.WorkingDir,
+		})
+	}
+	return res
 }
 
 // IsAutoScalingEnabled returns true if autoscaling is enabled for NIMService deployment.
@@ -1158,6 +1248,14 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 			ContainerPort: *n.Spec.Expose.Service.MetricsPort,
 		})
 	}
+	params.InitContainers = n.GetInitContainers()
+	for idx := range params.InitContainers {
+		params.InitContainers[idx].Env = utils.MergeEnvVars(params.Env, params.InitContainers[idx].Env)
+	}
+	params.SidecarContainers = n.GetSidecarContainers()
+	for idx := range params.SidecarContainers {
+		params.SidecarContainers[idx].Env = utils.MergeEnvVars(params.Env, params.SidecarContainers[idx].Env)
+	}
 	return params
 }
 
@@ -1212,7 +1310,15 @@ func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
 	params.ServiceAccountName = n.GetServiceAccountName()
 	params.SchedulerName = n.GetSchedulerName()
 	params.RuntimeClassName = n.GetRuntimeClassName()
+
 	params.InitContainers = n.GetInitContainers()
+	for idx := range params.InitContainers {
+		params.InitContainers[idx].Env = utils.MergeEnvVars(n.getLWSCommonEnv(), params.InitContainers[idx].Env)
+	}
+	params.SidecarContainers = n.GetSidecarContainers()
+	for idx := range params.SidecarContainers {
+		params.SidecarContainers[idx].Env = utils.MergeEnvVars(n.getLWSCommonEnv(), params.SidecarContainers[idx].Env)
+	}
 	return params
 }
 
@@ -1717,6 +1823,14 @@ func (n *NIMService) GetInferenceServiceParams(
 
 	params.Ports = n.GetInferenceServicePorts(deploymentMode)
 
+	params.InitContainers = n.GetInitContainers()
+	for idx := range params.InitContainers {
+		params.InitContainers[idx].Env = utils.MergeEnvVars(n.getLWSCommonEnv(), params.InitContainers[idx].Env)
+	}
+	params.SidecarContainers = n.GetSidecarContainers()
+	for idx := range params.SidecarContainers {
+		params.SidecarContainers[idx].Env = utils.MergeEnvVars(n.getLWSCommonEnv(), params.SidecarContainers[idx].Env)
+	}
 	return params
 }
 

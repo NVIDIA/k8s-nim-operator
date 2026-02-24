@@ -448,3 +448,19 @@ type PersistentVolumeClaim struct {
 	// Annotations for the PVC
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
+
+// NIMContainerSpec defines the specification for a container within a NIM workload.
+type NIMContainerSpec struct {
+	// Name is the unique name of the container within the pod.
+	Name string `json:"name"`
+	// Image specifies the container image to run.
+	Image Image `json:"image"`
+	// Command is the entrypoint array. If not specified, the image's default entrypoint is used.
+	Command []string `json:"command,omitempty"`
+	// Args are the arguments passed to the container command at runtime.
+	Args []string `json:"args,omitempty"`
+	// Env is the list of environment variables to set in the container.
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// WorkingDir is the container's working directory. If unset, the container runtime's default is used.
+	WorkingDir string `json:"workingDir,omitempty"`
+}
