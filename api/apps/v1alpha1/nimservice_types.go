@@ -37,7 +37,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	apixv1alpha1 "sigs.k8s.io/gateway-api-inference-extension/apix/config/v1alpha1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	sigsyaml "sigs.k8s.io/yaml"
 
@@ -2107,10 +2106,24 @@ func (n *NIMService) GetEPPName() string {
 	return fmt.Sprintf("%s-epp", n.GetName())
 }
 
+func (n *NIMService) GetEPPConfig() *EPPConfig {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig
+}
+
 // GetEPPImage returns the container image for the EPP deployment.
+// If EPPConfig.ContainerSpec.Image is set, it is used (Repository:Tag); otherwise DefaultEPPImage is returned.
 func (n *NIMService) GetEPPImage() string {
-	if n.Spec.Expose.Router.EPPConfig.Image != "" {
-		return n.Spec.Expose.Router.EPPConfig.Image
+	if eppConfig := n.GetEPPConfig(); eppConfig != nil && eppConfig.ContainerSpec != nil {
+		r, t := eppConfig.ContainerSpec.Image.Repository, eppConfig.ContainerSpec.Image.Tag
+		if t == "" {
+			t = "latest"
+		}
+		if r != "" {
+			return fmt.Sprintf("%s:%s", r, t)
+		}
 	}
 	return DefaultEPPImage
 }
@@ -2197,22 +2210,8 @@ func (n *NIMService) GetEPPConfigMapParams() (*rendertypes.ConfigMapParams, erro
 	if n.Spec.Expose.Router.EPPConfig.Config == nil {
 		return nil, nil
 	}
-	/*epp := n.Spec.Expose.Router.EPPConfig.Config
-	epp.APIVersion = "inference.networking.x-k8s.io/v1alpha1"
-	epp.Kind = "EndpointPickerConfig"
-	*/
-	epp := apixv1alpha1.EndpointPickerConfig{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "inference.networking.x-k8s.io/v1alpha1",
-			Kind:       "EndpointPickerConfig",
-		},
-		FeatureGates:       n.Spec.Expose.Router.EPPConfig.Config.FeatureGates,
-		Plugins:            n.Spec.Expose.Router.EPPConfig.Config.Plugins,
-		SchedulingProfiles: n.Spec.Expose.Router.EPPConfig.Config.SchedulingProfiles,
-		SaturationDetector: n.Spec.Expose.Router.EPPConfig.Config.SaturationDetector,
-		Data:               n.Spec.Expose.Router.EPPConfig.Config.Data,
-	}
-	configYAML, err := sigsyaml.Marshal(epp)
+
+	configYAML, err := sigsyaml.Marshal(n.Spec.Expose.Router.EPPConfig.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal EPP config: %w", err)
 	}
@@ -2292,8 +2291,6 @@ func (n *NIMService) GetEPPDeploymentParams() *rendertypes.DeploymentParams {
 			"--config-file", configFile,
 			"--v", "6",
 			"--model-server-metrics-path", "/v1/metrics",
-			"--tracing", "false",
-			"--metrics-endpoint-auth=false",
 		},
 		Ports: []corev1.ContainerPort{
 			{
@@ -2340,6 +2337,26 @@ func (n *NIMService) GetEPPDeploymentParams() *rendertypes.DeploymentParams {
 				MountPath: "/config",
 				ReadOnly:  true,
 			},
+		}
+	}
+
+	// Apply EPPConfig.ContainerSpec overrides when specified.
+	if eppConfig.ContainerSpec != nil {
+		spec := eppConfig.ContainerSpec
+		if len(spec.Command) > 0 {
+			params.Command = spec.Command
+		}
+		if len(spec.Args) > 0 {
+			params.Args = spec.Args
+		}
+		if len(spec.Env) > 0 {
+			params.Env = spec.Env
+		}
+		if spec.Image.PullPolicy != "" {
+			params.ImagePullPolicy = spec.Image.PullPolicy
+		}
+		if len(spec.Image.PullSecrets) > 0 {
+			params.ImagePullSecrets = spec.Image.PullSecrets
 		}
 	}
 

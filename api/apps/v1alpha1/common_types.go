@@ -71,13 +71,14 @@ type Router struct {
 	// Gateway is the gateway to use for the created HTTPRoute.
 	Gateway *Gateway `json:"gateway,omitempty"`
 
-	// EPPConfig is the configuration for the endpoint picker extension. This is field is currently only supported for standalone inference platform.
+	// EPPConfig is the configuration for the endpoint picker extension. This is field is currently only supported for standalone inference platform only on NIMService.
 	EPPConfig *EPPConfig `json:"eppConfig,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!(has(self.configMapRef) && has(self.config))",message="specify either configMapRef or config, not both"
 type EPPConfig struct {
-	// Image is the container image for the EPP (Endpoint Picker) deployment.
-	Image string `json:"image,omitempty"`
+	// ContainerSpec is the specification for the EPP container.
+	ContainerSpec *NIMContainerSpec `json:"containerSpec,omitempty"`
 
 	// ConfigMapRef references a user-provided ConfigMap containing EPP configuration.
 	// The ConfigMap should contain EndpointPickerConfig YAML.
