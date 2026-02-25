@@ -92,14 +92,15 @@ var _ = Describe("NIM Operator", Ordered, func() {
 
 		// Chart spec
 		chartSpec := &helm.ChartSpec{
-			ReleaseName:     helmReleaseName,
-			ChartName:       helmChart,
-			Namespace:       testNamespace.Name,
-			CreateNamespace: true,
-			Wait:            true,
-			Timeout:         10 * time.Minute, // pull time is long
-			ValuesOptions:   values,
-			CleanupOnFail:   true,
+			ReleaseName:      helmReleaseName,
+			ChartName:        helmChart,
+			Namespace:        testNamespace.Name,
+			CreateNamespace:  true,
+			Wait:             true,
+			Timeout:          10 * time.Minute, // pull time is long
+			ValuesOptions:    values,
+			CleanupOnFail:    true,
+			DependencyUpdate: true, // fetch dynamo-platform, dynamo-crds from Chart.yaml into charts/
 		}
 
 		By("Installing k8s-nim-operator Helm chart")
