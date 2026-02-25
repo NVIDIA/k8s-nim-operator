@@ -468,6 +468,21 @@ func (in *EPPConfig) DeepCopyInto(out *EPPConfig) {
 		*out = new(NIMContainerSpec)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ReadinessProbe != nil {
+		in, out := &in.ReadinessProbe, &out.ReadinessProbe
+		*out = new(v1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.LivenessProbe != nil {
+		in, out := &in.LivenessProbe, &out.LivenessProbe
+		*out = new(v1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.StartupProbe != nil {
+		in, out := &in.StartupProbe, &out.StartupProbe
+		*out = new(v1.Probe)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.ConfigMapRef != nil {
 		in, out := &in.ConfigMapRef, &out.ConfigMapRef
 		*out = new(v1.ConfigMapKeySelector)

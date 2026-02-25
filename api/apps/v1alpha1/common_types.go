@@ -80,6 +80,13 @@ type EPPConfig struct {
 	// ContainerSpec is the specification for the EPP container.
 	ContainerSpec *NIMContainerSpec `json:"containerSpec,omitempty"`
 
+	// ReadinessProbe is the readiness probe for the EPP container.
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+	// LivenessProbe is the liveness probe for the EPP container.
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+	// StartupProbe is the startup probe for the EPP container.
+	StartupProbe *corev1.Probe `json:"startupProbe,omitempty"`
+
 	// ConfigMapRef references a user-provided ConfigMap containing EPP configuration.
 	// The ConfigMap should contain EndpointPickerConfig YAML.
 	// Mutually exclusive with Config.

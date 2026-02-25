@@ -2360,6 +2360,17 @@ func (n *NIMService) GetEPPDeploymentParams() *rendertypes.DeploymentParams {
 		}
 	}
 
+	// Override with EPPConfig probes when specified.
+	if eppConfig.ReadinessProbe != nil {
+		params.ReadinessProbe = eppConfig.ReadinessProbe
+	}
+	if eppConfig.LivenessProbe != nil {
+		params.LivenessProbe = eppConfig.LivenessProbe
+	}
+	if eppConfig.StartupProbe != nil {
+		params.StartupProbe = eppConfig.StartupProbe
+	}
+
 	return params
 }
 
