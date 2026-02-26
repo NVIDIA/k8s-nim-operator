@@ -2090,8 +2090,6 @@ const (
 	EPPHealthPort int32 = 9003
 	// EPPMetricsPort is the HTTP metrics port for the EPP container.
 	EPPMetricsPort int32 = 9090
-	// DefaultEPPImage is the default container image for the EPP deployment.
-	DefaultEPPImage = "registry.k8s.io/gateway-api-inference-extension/epp:v1.3.1"
 	// eppConfigFileName is the filename used when the operator generates an EPP ConfigMap.
 	eppConfigFileName = "default-plugins.yaml"
 )
@@ -2113,6 +2111,129 @@ func (n *NIMService) GetEPPConfig() *EPPConfig {
 	return n.Spec.Expose.Router.EPPConfig
 }
 
+// GetEPPContainerSpec returns the container spec for the EPP deployment.
+func (n *NIMService) GetEPPContainerSpec() *NIMContainerSpec {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig.ContainerSpec
+}
+
+// GetEPPContainerArgs returns the arguments for the EPP container.
+// If EPPConfig.ContainerSpec.Args is set, it is used; otherwise the default arguments are returned.
+func (n *NIMService) GetEPPContainerArgs() []string {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	eppContainerSpec := n.GetEPPContainerSpec()
+	if eppContainerSpec == nil {
+		return nil
+	}
+	if eppContainerSpec.Args == nil {
+		return []string{
+			"--pool-name", n.GetName(),
+			"--pool-namespace", n.GetNamespace(),
+			"--pool-group", "inference.networking.k8s.io",
+			"--zap-encoder", "json",
+			"--config-file", n.GetEPPConfigFileName(),
+			"--v", "6",
+			"--model-server-metrics-path", "/v1/metrics",
+		}
+	}
+	return eppContainerSpec.Args
+
+}
+
+// GetEPPContainerCmd returns the command for the EPP container.
+// If EPPConfig.ContainerSpec.Command is set, it is used; otherwise the default command is returned.
+func (n *NIMService) GetEPPContainerCmd() []string {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig.ContainerSpec.Command
+}
+
+// GetEPPReadinessProbe returns the readiness probe for the EPP deployment.
+func (n *NIMService) GetEPPReadinessProbe() *corev1.Probe {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	if n.Spec.Expose.Router.EPPConfig.LivenessProbe == nil {
+		return &corev1.Probe{
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       10,
+			ProbeHandler: corev1.ProbeHandler{
+				GRPC: &corev1.GRPCAction{
+					Port: EPPHealthPort,
+				},
+			},
+		}
+	}
+	return n.Spec.Expose.Router.EPPConfig.ReadinessProbe
+}
+
+// GetEPPLivenessProbe returns the liveness probe for the EPP deployment.
+func (n *NIMService) GetEPPLivenessProbe() *corev1.Probe {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	if n.Spec.Expose.Router.EPPConfig.LivenessProbe == nil {
+		return &corev1.Probe{
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       10,
+			ProbeHandler: corev1.ProbeHandler{
+				GRPC: &corev1.GRPCAction{
+					Port: EPPHealthPort,
+				},
+			},
+		}
+	}
+	return n.Spec.Expose.Router.EPPConfig.LivenessProbe
+}
+
+// GetEPPStartupProbe returns the startup probe for the EPP deployment.
+func (n *NIMService) GetEPPStartupProbe() *corev1.Probe {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig.StartupProbe
+}
+
+func (n *NIMService) GetEPPContainerPorts() []corev1.ContainerPort {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	if n.Spec.Expose.Router.EPPConfig.Ports == nil {
+		return []corev1.ContainerPort{
+			{
+				Name:          "grpc-ext-proc",
+				ContainerPort: EPPGRPCExtProcPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+			{
+				Name:          "grpc-health",
+				ContainerPort: EPPHealthPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+			{
+				Name:          "http-metrics",
+				ContainerPort: EPPMetricsPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		}
+	}
+	return n.Spec.Expose.Router.EPPConfig.Ports
+}
+
+// GetEPPContainerEnv returns the environment variables for the EPP container.
+// If EPPConfig.ContainerSpec.Env is set, it is used; otherwise the default environment variables are returned.
+func (n *NIMService) GetEPPContainerEnv() []corev1.EnvVar {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig.ContainerSpec.Env
+}
+
 // GetEPPImage returns the container image for the EPP deployment.
 // If EPPConfig.ContainerSpec.Image is set, it is used (Repository:Tag); otherwise DefaultEPPImage is returned.
 func (n *NIMService) GetEPPImage() string {
@@ -2125,7 +2246,7 @@ func (n *NIMService) GetEPPImage() string {
 			return fmt.Sprintf("%s:%s", r, t)
 		}
 	}
-	return DefaultEPPImage
+	return ""
 }
 
 // GetEPPConfigMapName returns the name of the operator-generated EPP ConfigMap.
@@ -2225,15 +2346,23 @@ func (n *NIMService) GetEPPConfigMapParams() (*rendertypes.ConfigMapParams, erro
 	}, nil
 }
 
+func (n *NIMService) GetEPPConfigFileName() string {
+	var configFile string
+	if n.Spec.Expose.Router.EPPConfig.Config != nil {
+		configFile = fmt.Sprintf("/config/%s", eppConfigFileName)
+	} else if n.Spec.Expose.Router.EPPConfig.ConfigMapRef != nil {
+		configFile = fmt.Sprintf("/config/%s", n.Spec.Expose.Router.EPPConfig.ConfigMapRef.Key)
+	}
+	return configFile
+}
+
 // GetEPPDeploymentParams returns params to render the EPP Deployment.
 func (n *NIMService) GetEPPDeploymentParams() *rendertypes.DeploymentParams {
 	eppConfig := n.Spec.Expose.Router.EPPConfig
 
-	// Determine config file path and volume source based on config origin.
-	var configFile string
+	// Determine volume source based on config origin.
 	var configVolume corev1.Volume
 	if eppConfig.Config != nil {
-		configFile = fmt.Sprintf("/config/%s", eppConfigFileName)
 		configVolume = corev1.Volume{
 			Name: "epp-config",
 			VolumeSource: corev1.VolumeSource{
@@ -2245,7 +2374,6 @@ func (n *NIMService) GetEPPDeploymentParams() *rendertypes.DeploymentParams {
 			},
 		}
 	} else if eppConfig.ConfigMapRef != nil {
-		configFile = fmt.Sprintf("/config/%s", eppConfig.ConfigMapRef.Key)
 		configVolume = corev1.Volume{
 			Name: "epp-config",
 			VolumeSource: corev1.VolumeSource{
@@ -2258,7 +2386,6 @@ func (n *NIMService) GetEPPDeploymentParams() *rendertypes.DeploymentParams {
 		}
 	}
 
-	replicas := int32(1)
 	params := &rendertypes.DeploymentParams{
 		Name:      n.GetEPPName(),
 		Namespace: n.GetNamespace(),
@@ -2266,111 +2393,27 @@ func (n *NIMService) GetEPPDeploymentParams() *rendertypes.DeploymentParams {
 		SelectorLabels: map[string]string{
 			"app": n.GetEPPName(),
 		},
-		Replicas:           &replicas,
 		ContainerName:      "epp",
 		Image:              n.GetEPPImage(),
 		ImagePullSecrets:   n.GetImagePullSecrets(),
 		ImagePullPolicy:    n.GetImagePullPolicy(),
 		ServiceAccountName: n.GetEPPName(),
-		Env: []corev1.EnvVar{
-			{
-				Name: "NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.namespace",
-					},
-				},
-			},
-		},
-		Args: []string{
-			"--pool-name", n.GetName(),
-			"--pool-namespace", n.GetNamespace(),
-			"--pool-group", "inference.networking.k8s.io",
-			"--zap-encoder", "json",
-			"--config-file", configFile,
-			"--v", "6",
-			"--model-server-metrics-path", "/v1/metrics",
-		},
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          "grpc-ext-proc",
-				ContainerPort: EPPGRPCExtProcPort,
-				Protocol:      corev1.ProtocolTCP,
-			},
-			{
-				Name:          "grpc-health",
-				ContainerPort: EPPHealthPort,
-				Protocol:      corev1.ProtocolTCP,
-			},
-			{
-				Name:          "http-metrics",
-				ContainerPort: EPPMetricsPort,
-				Protocol:      corev1.ProtocolTCP,
-			},
-		},
-		LivenessProbe: &corev1.Probe{
-			InitialDelaySeconds: 5,
-			PeriodSeconds:       10,
-			ProbeHandler: corev1.ProbeHandler{
-				GRPC: &corev1.GRPCAction{
-					Port: EPPHealthPort,
-				},
-			},
-		},
-		ReadinessProbe: &corev1.Probe{
-			InitialDelaySeconds: 5,
-			PeriodSeconds:       10,
-			ProbeHandler: corev1.ProbeHandler{
-				GRPC: &corev1.GRPCAction{
-					Port: EPPHealthPort,
-				},
-			},
-		},
-	}
-
-	if configFile != "" {
-		params.Volumes = []corev1.Volume{configVolume}
-		params.VolumeMounts = []corev1.VolumeMount{
+		Env:                n.GetEPPContainerEnv(),
+		Command:            n.GetEPPContainerCmd(),
+		Args:               n.GetEPPContainerArgs(),
+		Ports:              n.GetEPPContainerPorts(),
+		ReadinessProbe:     n.GetEPPReadinessProbe(),
+		LivenessProbe:      n.GetEPPLivenessProbe(),
+		StartupProbe:       n.GetEPPStartupProbe(),
+		Volumes:            []corev1.Volume{configVolume},
+		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "epp-config",
 				MountPath: "/config",
 				ReadOnly:  true,
 			},
-		}
+		},
 	}
-
-	// Apply EPPConfig.ContainerSpec overrides when specified.
-	if eppConfig.ContainerSpec != nil {
-		spec := eppConfig.ContainerSpec
-		if len(spec.Command) > 0 {
-			params.Command = spec.Command
-		}
-		if len(spec.Args) > 0 {
-			params.Args = spec.Args
-		}
-		if len(spec.Env) > 0 {
-			params.Env = spec.Env
-		}
-		if spec.Image.PullPolicy != "" {
-			params.ImagePullPolicy = spec.Image.PullPolicy
-		}
-		if len(spec.Image.PullSecrets) > 0 {
-			params.ImagePullSecrets = spec.Image.PullSecrets
-		}
-	}
-
-	// Override with EPPConfig probes when specified.
-	if eppConfig.ReadinessProbe != nil {
-		params.ReadinessProbe = eppConfig.ReadinessProbe
-	}
-	if eppConfig.LivenessProbe != nil {
-		params.LivenessProbe = eppConfig.LivenessProbe
-	}
-	if eppConfig.StartupProbe != nil {
-		params.StartupProbe = eppConfig.StartupProbe
-	}
-
 	return params
 }
 

@@ -1826,6 +1826,47 @@ spec:
                                 format: int32
                                 type: integer
                             type: object
+                          ports:
+                            description: Ports is the list of ports to expose for
+                              the EPP container.
+                            items:
+                              description: ContainerPort represents a network port
+                                in a single container.
+                              properties:
+                                containerPort:
+                                  description: |-
+                                    Number of port to expose on the pod's IP address.
+                                    This must be a valid port number, 0 < x < 65536.
+                                  format: int32
+                                  type: integer
+                                hostIP:
+                                  description: What host IP to bind the external port
+                                    to.
+                                  type: string
+                                hostPort:
+                                  description: |-
+                                    Number of port to expose on the host.
+                                    If specified, this must be a valid port number, 0 < x < 65536.
+                                    If HostNetwork is specified, this must match ContainerPort.
+                                    Most containers do not need this.
+                                  format: int32
+                                  type: integer
+                                name:
+                                  description: |-
+                                    If specified, this must be an IANA_SVC_NAME and unique within the pod. Each
+                                    named port in a pod must have a unique name. Name for the port that can be
+                                    referred to by services.
+                                  type: string
+                                protocol:
+                                  default: TCP
+                                  description: |-
+                                    Protocol for port. Must be UDP, TCP, or SCTP.
+                                    Defaults to "TCP".
+                                  type: string
+                              required:
+                              - containerPort
+                              type: object
+                            type: array
                           readinessProbe:
                             description: ReadinessProbe is the readiness probe for
                               the EPP container.
@@ -2136,6 +2177,8 @@ spec:
                                 format: int32
                                 type: integer
                             type: object
+                        required:
+                        - containerSpec
                         type: object
                         x-kubernetes-validations:
                         - message: specify either configMapRef or config, not both
