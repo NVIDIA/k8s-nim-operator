@@ -1025,6 +1025,10 @@ func (r *NIMBuildReconciler) updateManifestConfigMap(ctx context.Context, nimCac
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getManifestConfigName(nimCache),
 			Namespace: nimCache.GetNamespace(),
+			Labels: map[string]string{
+				"app":                          nimCache.GetName(),
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
+			},
 		},
 	}
 

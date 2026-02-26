@@ -368,6 +368,17 @@ func (n *NIMCache) GetProxyCertConfigMap() string {
 	return ""
 }
 
+// GetStandardLabels returns the standard set of labels for NIMCache resources.
+func (n *NIMCache) GetStandardLabels() map[string]string {
+	return map[string]string{
+		"app":                          "k8s-nim-operator",
+		"app.kubernetes.io/name":       n.Name,
+		"app.kubernetes.io/instance":   n.Name,
+		"app.kubernetes.io/part-of":    "nim-cache",
+		"app.kubernetes.io/managed-by": "k8s-nim-operator",
+	}
+}
+
 func (n *NIMCache) GetEnvWithProxy() []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
