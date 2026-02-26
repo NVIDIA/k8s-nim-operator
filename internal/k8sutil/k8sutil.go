@@ -498,7 +498,7 @@ func ControllerWatchesIfCRDExists(discoveryClient discovery.DiscoveryInterface,
 //
 // This reduces memory usage by only caching objects with the specified labels.
 // WARNING: Only include object types that are labeled with the given selector.
-// Objects without matching labels (i.e pre-existing PVCs, ResourceClaims) should not be added here.
+// Objects without matching labels (i.e pre-existing ConfigMaps, PVCs, ResourceClaims) should not be added here.
 func BuildByObjectFilteredCache(discoveryClient discovery.DiscoveryInterface, ls labels.Selector) (map[client.Object]cache.ByObject, error) {
 	byObject := map[client.Object]cache.ByObject{
 		&appsv1.Deployment{}:                     {Label: ls},
@@ -510,7 +510,6 @@ func BuildByObjectFilteredCache(discoveryClient discovery.DiscoveryInterface, ls
 		&autoscalingv2.HorizontalPodAutoscaler{}: {Label: ls},
 		&batchv1.Job{}:                           {Label: ls},
 		&corev1.Pod{}:                            {Label: ls},
-		&corev1.ConfigMap{}:                      {Label: ls},
 	}
 
 	// helper
