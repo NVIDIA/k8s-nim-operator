@@ -318,7 +318,7 @@ func DeepHashObject(objToWrite any) string {
 }
 
 func UpdateObject(obj client.Object, desired client.Object) client.Object {
-	if obj == nil || desired == nil || !reflect.DeepEqual(obj.GetObjectKind(), desired.GetObjectKind()) || obj.GetName() != desired.GetName() || obj.GetNamespace() != desired.GetNamespace() {
+	if obj == nil || desired == nil || obj.GetName() != desired.GetName() || obj.GetNamespace() != desired.GetNamespace() {
 		panic("invalid input to UpdateObject")
 	}
 
