@@ -1346,8 +1346,6 @@ spec:
               - watch
               - create
               - delete
-<<<<<<< HEAD
-=======
             - apiGroups:
               - gateway.networking.k8s.io
               resources:
@@ -1361,7 +1359,6 @@ spec:
               - patch
               - update
               - watch
->>>>>>> 112458f8 (Integrate GRPCRoute into NIMService (#668))
       deployments:
         - name: k8s-nim-operator
           spec:
