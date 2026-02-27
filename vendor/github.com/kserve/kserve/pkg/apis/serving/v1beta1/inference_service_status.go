@@ -51,6 +51,12 @@ type InferenceServiceStatus struct {
 	Components map[ComponentType]ComponentStatusSpec `json:"components,omitempty"`
 	// Model related statuses
 	ModelStatus ModelStatus `json:"modelStatus,omitempty"`
+	// InferenceService DeploymentMode
+	DeploymentMode string `json:"deploymentMode,omitempty"`
+	// ServingRuntimeName is the name of the ServingRuntime that the InferenceService is using
+	ServingRuntimeName string `json:"servingRuntimeName,omitempty"`
+	// ClusterServingRuntimeName is the name of the ClusterServingRuntime that the InferenceService is using
+	ClusterServingRuntimeName string `json:"clusterServingRuntimeName,omitempty"`
 }
 
 // ComponentStatusSpec describes the state of the component
@@ -122,6 +128,8 @@ const (
 	RoutesReady apis.ConditionType = "RoutesReady"
 	// LatestDeploymentReady is set when underlying configurations for all components have reported readiness.
 	LatestDeploymentReady apis.ConditionType = "LatestDeploymentReady"
+	// Stopped is set when the inference service has been stopped and all related objects are deleted
+	Stopped apis.ConditionType = "Stopped"
 )
 
 type ModelStatus struct {
@@ -154,7 +162,7 @@ type ModelCopies struct {
 	// How many copies of this predictor's models failed to load recently
 	// +kubebuilder:default=0
 	FailedCopies int `json:"failedCopies"`
-	// Total number copies of this predictor's models that are currently loaded
+	// Total number of copies of this predictor's models across all states (Pending, Loading, Loaded, FailedToLoad).
 	// +optional
 	TotalCopies int `json:"totalCopies,omitempty"`
 }
@@ -193,6 +201,9 @@ const (
 	FailedToLoad ModelState = "FailedToLoad"
 )
 
+// Stopped Inference Service reason
+const StoppedISVCReason = "Stopped"
+
 // FailureReason enum
 // +kubebuilder:validation:Enum=ModelLoadFailed;RuntimeUnhealthy;RuntimeDisabled;NoSupportingRuntime;RuntimeNotRecognized;InvalidPredictorSpec
 type FailureReason string
@@ -213,6 +224,8 @@ const (
 	InvalidPredictorSpec FailureReason = "InvalidPredictorSpec"
 	// When WorkerSpec is set in InferenceService with a ServingRuntime that does not have a WorkerSpec.
 	InvalidWorkerSpecNotSet = "InvalidWorkerSpecNotSet"
+	// InvalidGPUAllocation indicates an incorrect GPU allocation for the Ray cluster.
+	InvalidGPUAllocation = "InvalidGPUAllocation"
 )
 
 type FailureInfo struct {
@@ -337,13 +350,83 @@ func (ss *InferenceServiceStatus) PropagateRawStatus(
 	if !ok {
 		ss.Components[component] = ComponentStatusSpec{}
 	}
+	readyCondition := readyConditionsMap[component]
+	componentReadyCondition := &apis.Condition{
+		Type:   readyCondition,
+		Status: corev1.ConditionFalse,
+		Reason: "",
+	}
 
-	condition := getDeploymentCondition(deploymentList, appsv1.DeploymentAvailable)
-	if condition != nil && condition.Status == corev1.ConditionTrue {
+	availableCondition := getDeploymentCondition(deploymentList, appsv1.DeploymentAvailable)
+	if availableCondition != nil && availableCondition.Status == corev1.ConditionTrue {
+		componentReadyCondition = &apis.Condition{
+			Type:    readyCondition,
+			Status:  corev1.ConditionTrue,
+			Reason:  availableCondition.Reason,
+			Message: availableCondition.Message,
+		}
+	}
+
+	progressingCondition := getDeploymentCondition(deploymentList, appsv1.DeploymentProgressing)
+	if progressingCondition != nil {
+		if progressingCondition.IsFalse() {
+			if len(progressingCondition.Message) > 0 {
+				// If there is a message, we assume there was a problem, often the time ProgressDeadlineExceeded
+				componentReadyCondition = &apis.Condition{
+					Type:    readyCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  progressingCondition.Reason,
+					Message: progressingCondition.Message,
+				}
+			}
+		} else {
+			// If progressing condition is True, and the reason is set to NewReplicaSetAvailable, override component as ready.
+			// This is because progressing condition doesn't get set to false when deployment is complete.
+			// See https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#complete-deployment
+			if progressingCondition.IsTrue() {
+				if progressingCondition.Reason == "NewReplicaSetAvailable" {
+					componentReadyCondition = &apis.Condition{
+						Type:    readyCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  progressingCondition.Reason,
+						Message: progressingCondition.Message,
+					}
+				} else {
+					componentReadyCondition = &apis.Condition{
+						Type:    readyCondition,
+						Status:  corev1.ConditionUnknown,
+						Reason:  progressingCondition.Reason,
+						Message: progressingCondition.Message,
+					}
+				}
+			}
+		}
+	}
+
+	// The availableCondition being false is a critical signal that your application is not running as expected.
+	if availableCondition != nil && availableCondition.Status == corev1.ConditionFalse {
+		componentReadyCondition = &apis.Condition{
+			Type:    readyCondition,
+			Status:  corev1.ConditionFalse,
+			Reason:  availableCondition.Reason,
+			Message: availableCondition.Message,
+		}
+	}
+
+	replicaFailureCondition := getDeploymentCondition(deploymentList, appsv1.DeploymentReplicaFailure)
+	if replicaFailureCondition != nil && replicaFailureCondition.Status == corev1.ConditionTrue {
+		componentReadyCondition = &apis.Condition{
+			Type:    readyCondition,
+			Status:  corev1.ConditionFalse,
+			Reason:  replicaFailureCondition.Reason,
+			Message: replicaFailureCondition.Message,
+		}
+	}
+	if componentReadyCondition != nil && componentReadyCondition.Status == corev1.ConditionTrue {
 		statusSpec.URL = url
 	}
-	readyCondition := readyConditionsMap[component]
-	ss.SetCondition(readyCondition, condition)
+
+	ss.SetCondition(readyCondition, componentReadyCondition)
 	ss.Components[component] = statusSpec
 	ss.ObservedGeneration = deploymentList[0].Status.ObservedGeneration
 }
@@ -380,7 +463,7 @@ func getDeploymentCondition(deploymentList []*appsv1.Deployment, conditionType a
 			condition.LastTransitionTime = lastTransitionTime[0] // used head node one
 		}
 		condition.Reason = strings.Join(reasons, ", ")
-	} else {
+	} else if len(deploymentList) == 1 {
 		// Usual rawDeployment case
 		for _, con := range deploymentList[0].Status.Conditions {
 			if con.Type == conditionType {
@@ -523,7 +606,7 @@ func (ss *InferenceServiceStatus) ClearCondition(conditionType apis.ConditionTyp
 	}
 }
 
-func (ss *InferenceServiceStatus) UpdateModelRevisionStates(modelState ModelState, totalCopies int, info *FailureInfo) {
+func (ss *InferenceServiceStatus) UpdateModelRevisionStates(modelState ModelState, info *FailureInfo) {
 	if ss.ModelStatus.ModelRevisionStates == nil {
 		ss.ModelStatus.ModelRevisionStates = &ModelRevisionStates{TargetModelState: modelState}
 	} else {
@@ -535,7 +618,6 @@ func (ss *InferenceServiceStatus) UpdateModelRevisionStates(modelState ModelStat
 		ss.ModelStatus.TransitionStatus = InProgress
 	case Loaded:
 		ss.ModelStatus.TransitionStatus = UpToDate
-		ss.ModelStatus.ModelCopies = &ModelCopies{TotalCopies: totalCopies}
 		ss.ModelStatus.ModelRevisionStates.ActiveModelState = Loaded
 	case FailedToLoad:
 		ss.ModelStatus.TransitionStatus = BlockedByFailedLoad
@@ -568,9 +650,33 @@ func (ss *InferenceServiceStatus) SetModelFailureInfo(info *FailureInfo) bool {
 	return true
 }
 
+// countReadyPods counts the number of pods that are in Ready state and can serve inference requests
+func countReadyPods(podList *corev1.PodList) int {
+	if podList == nil {
+		return 0
+	}
+	readyCount := 0
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == corev1.PodRunning {
+			for _, cond := range pod.Status.Conditions {
+				if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
+					readyCount++
+					break
+				}
+			}
+		}
+	}
+	return readyCount
+}
+
 func (ss *InferenceServiceStatus) PropagateModelStatus(statusSpec ComponentStatusSpec, podList *corev1.PodList, rawDeployment bool, serviceStatus *knservingv1.ServiceStatus) bool {
 	// Check at least one pod is running for the latest revision of inferenceservice
+	readyCopies := countReadyPods(podList)
 	totalCopies := len(podList.Items)
+	if ss.ModelStatus.ModelCopies == nil {
+		ss.ModelStatus.ModelCopies = &ModelCopies{}
+	}
+	ss.ModelStatus.ModelCopies.TotalCopies = readyCopies
 	if totalCopies == 0 {
 		if !rawDeployment {
 			// Make sure we haven't scaled down to 0 because of an error
@@ -578,14 +684,15 @@ func (ss *InferenceServiceStatus) PropagateModelStatus(statusSpec ComponentStatu
 				if knativeCond.Status == "False" {
 					// If any of the knative statuses are False, the model failed
 					// Hopefully the lastFailureInfo already has the info we need, so we don't update it here
-					ss.UpdateModelRevisionStates(FailedToLoad, totalCopies, nil)
+					ss.UpdateModelRevisionStates(FailedToLoad, nil)
 					return true
 				}
 			}
 		}
 
 		// If we made it here then hopefully there are 0 pods because we're just getting started and therefore Pending seems appropriate
-		ss.UpdateModelRevisionStates(Pending, totalCopies, nil)
+		ss.UpdateModelRevisionStates(Pending, nil)
+
 		return true
 	}
 
@@ -603,19 +710,19 @@ func (ss *InferenceServiceStatus) PropagateModelStatus(statusSpec ComponentStatu
 					return false
 				} else {
 					// If there is no previous error, we should be okay to move into the Loading state
-					ss.UpdateModelRevisionStates(Loading, totalCopies, nil)
+					ss.UpdateModelRevisionStates(Loading, nil)
 					return true
 				}
 
 			case cs.State.Terminated != nil && cs.State.Terminated.Reason == constants.StateReasonError:
-				ss.UpdateModelRevisionStates(FailedToLoad, totalCopies, &FailureInfo{
+				ss.UpdateModelRevisionStates(FailedToLoad, &FailureInfo{
 					Reason:   ModelLoadFailed,
 					Message:  cs.State.Terminated.Message,
 					ExitCode: cs.State.Terminated.ExitCode,
 				})
 				return true
 			case cs.State.Waiting != nil && cs.State.Waiting.Reason == constants.StateReasonCrashLoopBackOff:
-				ss.UpdateModelRevisionStates(FailedToLoad, totalCopies, &FailureInfo{
+				ss.UpdateModelRevisionStates(FailedToLoad, &FailureInfo{
 					Reason:   ModelLoadFailed,
 					Message:  cs.LastTerminationState.Terminated.Message,
 					ExitCode: cs.LastTerminationState.Terminated.ExitCode,
@@ -629,10 +736,10 @@ func (ss *InferenceServiceStatus) PropagateModelStatus(statusSpec ComponentStatu
 	// For serverless deployment, the latest created revision and the latest ready revision should be equal
 	if ss.IsReady() {
 		if rawDeployment {
-			ss.UpdateModelRevisionStates(Loaded, totalCopies, nil)
+			ss.UpdateModelRevisionStates(Loaded, nil)
 			return true
 		} else if statusSpec.LatestCreatedRevision == statusSpec.LatestReadyRevision {
-			ss.UpdateModelRevisionStates(Loaded, totalCopies, nil)
+			ss.UpdateModelRevisionStates(Loaded, nil)
 			return true
 		}
 	}
@@ -643,19 +750,19 @@ func (ss *InferenceServiceStatus) PropagateModelStatus(statusSpec ComponentStatu
 		if cs.Name == constants.InferenceServiceContainerName {
 			switch {
 			case cs.State.Terminated != nil && cs.State.Terminated.Reason == constants.StateReasonError:
-				ss.UpdateModelRevisionStates(FailedToLoad, totalCopies, &FailureInfo{
+				ss.UpdateModelRevisionStates(FailedToLoad, &FailureInfo{
 					Reason:   ModelLoadFailed,
 					Message:  cs.State.Terminated.Message,
 					ExitCode: cs.State.Terminated.ExitCode,
 				})
 			case cs.State.Waiting != nil && cs.State.Waiting.Reason == constants.StateReasonCrashLoopBackOff:
-				ss.UpdateModelRevisionStates(FailedToLoad, totalCopies, &FailureInfo{
+				ss.UpdateModelRevisionStates(FailedToLoad, &FailureInfo{
 					Reason:   ModelLoadFailed,
 					Message:  cs.LastTerminationState.Terminated.Message,
 					ExitCode: cs.LastTerminationState.Terminated.ExitCode,
 				})
 			default:
-				ss.UpdateModelRevisionStates(Pending, totalCopies, nil)
+				ss.UpdateModelRevisionStates(Pending, nil)
 			}
 		}
 	}

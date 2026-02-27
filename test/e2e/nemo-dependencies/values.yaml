@@ -4,6 +4,7 @@ install:
   entity_store: yes
   evaluator: yes
   jupyter: yes
+  guardrail: yes
 
 uninstall:
   customizer: yes
@@ -11,6 +12,7 @@ uninstall:
   entity_store: yes
   evaluator: yes
   jupyter: yes
+  guardrail: yes
 
 installation_namespace: nemo
 

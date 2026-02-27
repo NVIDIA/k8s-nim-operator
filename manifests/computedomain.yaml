@@ -1,0 +1,19 @@
+apiVersion: resource.nvidia.com/v1beta1
+kind: ComputeDomain
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}  
+  {{- if .Labels }}
+  labels:
+    {{- .Labels | yaml | nindent 4 }}
+  {{- end }}
+  {{- if .Annotations }}
+  annotations:
+    {{- .Annotations | yaml | nindent 4 }}
+  {{- end }}
+spec:
+  numNodes: {{ .NumNodes }}
+  channel:
+    resourceClaimTemplate:
+      name: {{ .ResourceClaimTemplateName }}
+    allocationMode: Single

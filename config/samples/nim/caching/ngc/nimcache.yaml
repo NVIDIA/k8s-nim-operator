@@ -1,0 +1,22 @@
+# NIM Cache with LLM-Specific NIM from NGC
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-nim-operator
+  name: meta-llama-3-2-1b-instruct
+  namespace: nim-service
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.12.0
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: "tensorrt"
+        tensorParallelism: "1"
+  storage:
+    pvc:
+      create: true
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce

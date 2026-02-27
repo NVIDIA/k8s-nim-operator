@@ -20,33 +20,39 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"strconv"
 
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	monitoring "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	discovery "k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
+
+	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/controller"
-	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform"
-	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/kserve"
-	"github.com/NVIDIA/k8s-nim-operator/internal/controller/platform/standalone"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	webhookappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/internal/webhook/apps/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -59,8 +65,11 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(monitoring.AddToScheme(scheme))
-	utilruntime.Must(lws.AddToScheme(scheme))
+	utilruntime.Must(lwsv1.AddToScheme(scheme))
 	utilruntime.Must(kservev1beta1.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1.Install(scheme))
+	utilruntime.Must(inferencev1.Install(scheme))
+	utilruntime.Must(nvidiaresourcev1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -72,8 +81,9 @@ func main() {
 	var enableHTTP2 bool
 	var platformType string
 
-	flag.StringVar(&platformType, "platform", "standalone", "The model-serving inference platform to use."+
-		"E.g., 'standalone (default)', 'kserve'.")
+	flag.StringVar(&platformType, "platform", "", "DEPRECATED: Default platform for all NIMServices. "+
+		"Use the 'platform' field in NIMService CR instead. If specified, this value is used as fallback "+
+		"when NIMService doesn't specify a platform. Valid values: 'standalone', 'kserve'.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metric endpoint binds to. "+
 		"Use the port :8080. If not set, it will be 0 in order to disable the metrics server")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -85,22 +95,23 @@ func main() {
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	opts := zap.Options{
-		Development: true,
+		Development: false,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	var platformImpl platform.Platform
-	switch platformType {
-	case "standalone":
-		platformImpl = &standalone.Standalone{}
-	case "kserve":
-		platformImpl = &kserve.KServe{}
-	default:
-		setupLog.Error(nil, "unsupported model-serving platform type", "platformType", platformType)
-		os.Exit(1)
+	// Validate the deprecated global platform flag if provided
+	if platformType != "" {
+		setupLog.Info("DEPRECATED: Global platform flag is deprecated. Use 'platform' field in NIMService CR instead.", "platform", platformType)
+		switch platformType {
+		case "standalone", "kserve":
+			// Valid platform types for the deprecated global platform flag. No need to throw an error.
+		default:
+			setupLog.Error(nil, "unsupported model-serving platform type", "platformType", platformType)
+			os.Exit(1)
+		}
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -122,6 +133,23 @@ func main() {
 	webhookServer := webhook.NewServer(webhook.Options{
 		TLSOpts: tlsOpts,
 	})
+
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(ctrl.GetConfigOrDie())
+	if err != nil {
+		setupLog.Error(err, "unable to create discovery client")
+		os.Exit(1)
+	}
+
+	// label selector for filtered cache
+	ls := labels.SelectorFromSet(labels.Set{
+		"app.kubernetes.io/managed-by": "k8s-nim-operator",
+	})
+
+	byObject, err := k8sutil.BuildByObjectFilteredCache(discoveryClient, ls)
+	if err != nil {
+		setupLog.Error(err, "unable to build filtered cache")
+		os.Exit(1)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -146,7 +174,14 @@ func main() {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
+		Cache: cache.Options{
+			// Filter the common kinds used by our controllers that should be
+			// labeled as being managed by the nim-operator.
+			// This reduces memory usage by the informer caches.
+			ByObject: byObject,
+		},
 	})
+
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -154,17 +189,10 @@ func main() {
 
 	updater := conditions.NewUpdater(mgr.GetClient())
 
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(ctrl.GetConfigOrDie())
-	if err != nil {
-		setupLog.Error(err, "unable to create discovery client")
-		os.Exit(1)
-	}
-
 	if err = controller.NewNIMCacheReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		ctrl.Log.WithName("controllers").WithName("NIMCache"),
-		platformImpl,
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMCache")
 		os.Exit(1)
@@ -177,7 +205,6 @@ func main() {
 		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NIMService"),
-		platformImpl,
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMService")
 		os.Exit(1)
@@ -195,7 +222,6 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		ctrl.Log.WithName("controllers").WithName("NIMBuild"),
-		platformImpl,
 	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NIMBuild")
 		os.Exit(1)
@@ -205,6 +231,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoGuardrail"),
 	).SetupWithManager(mgr); err != nil {
@@ -216,6 +243,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoEvaluator"),
 	).SetupWithManager(mgr); err != nil {
@@ -227,6 +255,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoEntitystore"),
 	).SetupWithManager(mgr); err != nil {
@@ -238,6 +267,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoDatastore"),
 	).SetupWithManager(mgr); err != nil {
@@ -249,6 +279,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		updater,
+		discoveryClient,
 		render.NewRenderer("/manifests"),
 		ctrl.Log.WithName("controllers").WithName("NemoCustomizer"),
 	).SetupWithManager(mgr); err != nil {
@@ -256,6 +287,29 @@ func main() {
 		os.Exit(1)
 	}
 
+	// nolint:goconst
+	// Parse ENABLE_WEBHOOKS environment variable once as a boolean.
+	var enableWebhooks bool
+	if val, ok := os.LookupEnv("ENABLE_WEBHOOKS"); ok {
+		var err error
+		enableWebhooks, err = strconv.ParseBool(val)
+		if err != nil {
+			setupLog.Error(err, "invalid value for ENABLE_WEBHOOKS, expected boolean")
+			os.Exit(1)
+		}
+	}
+
+	if enableWebhooks {
+		if err := webhookappsv1alpha1.SetupNIMCacheWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "NIMCache")
+			os.Exit(1)
+		}
+
+		if err := webhookappsv1alpha1.SetupNIMServiceWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "NIMService")
+			os.Exit(1)
+		}
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

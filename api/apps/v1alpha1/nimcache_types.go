@@ -48,6 +48,7 @@ type NIMCacheSpec struct {
 	GroupID *int64 `json:"groupID,omitempty"`
 	// CertConfig is the name of the ConfigMap containing the custom certificates.
 	// for secure communication.
+	//
 	// Deprecated: use `Proxy` instead to configure custom certificates for using proxy.
 	// +optional
 	CertConfig *CertConfig `json:"certConfig,omitempty"`
@@ -56,6 +57,8 @@ type NIMCacheSpec struct {
 	// RuntimeClassName is the runtimeclass for the caching job
 	RuntimeClassName string     `json:"runtimeClassName,omitempty"`
 	Proxy            *ProxySpec `json:"proxy,omitempty"`
+
+	InitContainers []*NIMContainerSpec `json:"initContainers,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) + (has(self.hf) ? 1 : 0) == 1",message="Exactly one of ngc, dataStore, or hf must be defined"
@@ -72,19 +75,22 @@ type NIMSource struct {
 
 // +kubebuilder:validation:XValidation:rule="(has(self.modelName) ? 1 : 0) + (has(self.datasetName) ? 1 : 0) == 1",message="Exactly one of modelName or datasetName must be defined"
 type DSHFCommonFields struct {
-	// modelName is the name of the model
+	// ModelName is the name of the model
 	ModelName *string `json:"modelName,omitempty"`
-	// datasetName is the name of the dataset
+	// DatasetName is the name of the dataset
 	DatasetName *string `json:"datasetName,omitempty"`
-	// authSecret is the name of the secret containing the "HF_TOKEN" token
+	// AuthSecret is the name of the secret containing the "HF_TOKEN" token
 	// +kubebuilder:validation:MinLength=1
 	AuthSecret string `json:"authSecret"`
-	// modelPuller is the containerized huggingface-cli image to pull the data
+	// ModelPuller is the containerized huggingface-cli image to pull the data
 	// +kubebuilder:validation:MinLength=1
 	ModelPuller string `json:"modelPuller"`
-	// pullSecret is the name of the image pull secret for the modelPuller image
+	// PullSecret is the name of the image pull secret for the modelPuller image
 	// +kubebuilder:validation:MinLength=1
 	PullSecret string `json:"pullSecret"`
+	// Revision is the revision of the object to be cached. This is either a commit hash, branch name or tag.
+	// +kubebuilder:validation:MinLength=1
+	Revision *string `json:"revision,omitempty"`
 }
 
 type NemoDataStoreSource struct {
@@ -156,6 +162,8 @@ type NIMCacheStorage struct {
 	// PersistentVolumeClaim is the pvc volume used for caching NIM
 	PVC PersistentVolumeClaim `json:"pvc,omitempty"`
 	// HostPath is the host path volume for caching NIM
+	//
+	// Deprecated: use PVC instead.
 	HostPath *string `json:"hostPath,omitempty"`
 }
 
@@ -325,6 +333,11 @@ func (n *NIMCache) IsUniversalNIM() bool {
 	return false
 }
 
+// IsHFModel returns true if the NIMCache is for a Hugging Face model.
+func (n *NIMCache) IsHFModel() bool {
+	return n.Spec.Source.HF != nil || n.Spec.Source.DataStore != nil
+}
+
 // IsOptimizedNIM returns true if the NIMCache is for an optimized NIM.
 func (n *NIMCache) IsOptimizedNIM() bool {
 	// Universal NIM is when the modelEndpoint is set in the NGCSource.
@@ -345,6 +358,25 @@ func (n *NIMCache) GetModelSpec() ModelSpec {
 // GetProxySpec returns the proxy spec for the NIMService deployment.
 func (n *NIMCache) GetProxySpec() *ProxySpec {
 	return n.Spec.Proxy
+}
+
+// GetProxyCertConfigMap returns the cert config map for the NIMCache.
+func (n *NIMCache) GetProxyCertConfigMap() string {
+	if n.GetProxySpec() != nil && n.GetProxySpec().CertConfigMap != "" {
+		return n.GetProxySpec().CertConfigMap
+	}
+	return ""
+}
+
+// GetStandardLabels returns the standard set of labels for NIMCache resources.
+func (n *NIMCache) GetStandardLabels() map[string]string {
+	return map[string]string{
+		"app":                          "k8s-nim-operator",
+		"app.kubernetes.io/name":       n.Name,
+		"app.kubernetes.io/instance":   n.Name,
+		"app.kubernetes.io/part-of":    "nim-cache",
+		"app.kubernetes.io/managed-by": "k8s-nim-operator",
+	}
 }
 
 func (n *NIMCache) GetEnvWithProxy() []corev1.EnvVar {
@@ -382,25 +414,44 @@ func (n *NIMCache) GetEnvWithProxy() []corev1.EnvVar {
 }
 
 func (n *NIMCache) GetInitContainers() []corev1.Container {
+
+	var initContainers []corev1.Container
+
 	if n.Spec.Proxy != nil {
-		initContainerList := []corev1.Container{
-			{
-				Name:            "update-ca-certificates",
-				Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
-				SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
-				VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
-			},
-		}
+		var image string
 		if n.Spec.Source.NGC != nil { // nolint:gocritic
-			initContainerList[0].Image = n.Spec.Source.NGC.ModelPuller
+			image = n.Spec.Source.NGC.ModelPuller
 		} else if n.Spec.Source.DataStore != nil {
-			initContainerList[0].Image = n.Spec.Source.DataStore.ModelPuller
+			image = n.Spec.Source.DataStore.ModelPuller
 		} else if n.Spec.Source.HF != nil {
-			initContainerList[0].Image = n.Spec.Source.HF.ModelPuller
+			image = n.Spec.Source.HF.ModelPuller
 		}
-		return initContainerList
+		initContainers = append(initContainers, corev1.Container{
+			Name:            "update-ca-certificates",
+			Image:           image,
+			Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
+			SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
+			VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
+		})
 	}
-	return []corev1.Container{}
+	for _, ic := range n.Spec.InitContainers {
+		var pp corev1.PullPolicy
+		if ic.Image.PullPolicy != "" {
+			pp = corev1.PullPolicy(ic.Image.PullPolicy)
+		}
+
+		initContainers = append(initContainers, corev1.Container{
+			Name:            ic.Name,
+			Image:           fmt.Sprintf("%s:%s", ic.Image.Repository, ic.Image.Tag),
+			ImagePullPolicy: pp,
+			Command:         ic.Command,
+			Args:            ic.Args,
+			Env:             ic.Env,
+			WorkingDir:      ic.WorkingDir,
+		})
+	}
+
+	return initContainers
 }
 
 func (d *DSHFCommonFields) GetModelName() *string {
@@ -421,6 +472,13 @@ func (d *DSHFCommonFields) GetModelPuller() string {
 
 func (d *DSHFCommonFields) GetPullSecret() string {
 	return d.PullSecret
+}
+
+func (d *DSHFCommonFields) GetRevision() string {
+	if d.Revision == nil {
+		return ""
+	}
+	return *d.Revision
 }
 
 func (d *HuggingFaceHubSource) GetEndpoint() string {

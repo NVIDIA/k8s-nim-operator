@@ -17,11 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/utils/ptr"
+	apixv1alpha1 "sigs.k8s.io/gateway-api-inference-extension/apix/config/v1alpha1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -33,12 +37,110 @@ const (
 	DefaultNamedPortGRPC = "grpc"
 	// DefaultNamedPortMetrics is the default name for metrics port.
 	DefaultNamedPortMetrics = "metrics"
+	// NGCAPIKey is the environment variable name for NGC API key.
+	NGCAPIKey = "NGC_API_KEY"
+	// HFToken is the environment variable name for Hugging Face token.
+	HFToken = "HF_TOKEN"
 )
 
 // Expose defines attributes to expose the service.
 type Expose struct {
 	Service Service `json:"service,omitempty"`
+	// Deprecated: Use .spec.expose.router instead.
 	Ingress Ingress `json:"ingress,omitempty"`
+
+	Router Router `json:"router,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && has(self.ingress))", message="ingress and gateway cannot be specified together"
+type Router struct {
+	// HostDomainName is the domain name of the hostname matched by the router.
+	// The hostname is constructed as "<nimServiceName>.<namespace>.<hostDomainName>", where the <nimServiceName> a subdomain of the matched hostname.
+	// eg. example.com for "<nimServiceName>.<namespace>.example.com"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^(([a-z0-9][a-z0-9\-]*[a-z0-9])|[a-z0-9]+\.)*([a-z]+|xn\-\-[a-z0-9]+)\.?$`
+	HostDomainName string `json:"hostDomainName,omitempty"`
+
+	// Annotations for the router, e.g. for ingress class or gateway
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Ingress is the ingress controller to use for the created ingress.
+	Ingress *RouterIngress `json:"ingress,omitempty"`
+
+	// Gateway is the gateway to use for the created HTTPRoute.
+	Gateway *Gateway `json:"gateway,omitempty"`
+
+	// EPPConfig is the configuration for the endpoint picker extension. This is field is currently only supported for standalone inference platform only on NIMService.
+	EPPConfig *EPPConfig `json:"eppConfig,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!(has(self.configMapRef) && has(self.config))",message="specify either configMapRef or config, not both"
+type EPPConfig struct {
+	// ContainerSpec is the specification for the EPP container.
+	ContainerSpec *NIMContainerSpec `json:"containerSpec"`
+	// ReadinessProbe is the readiness probe for the EPP container.
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+	// LivenessProbe is the liveness probe for the EPP container.
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+	// StartupProbe is the startup probe for the EPP container.
+	StartupProbe *corev1.Probe `json:"startupProbe,omitempty"`
+	// Ports is the list of ports to expose for the EPP container.
+	Ports []corev1.ContainerPort `json:"ports,omitempty"`
+
+	// ConfigMapRef references a user-provided ConfigMap containing EPP configuration.
+	// The ConfigMap should contain EndpointPickerConfig YAML.
+	// Mutually exclusive with Config.
+	// +optional
+	ConfigMapRef *corev1.ConfigMapKeySelector `json:"configMapRef,omitempty"`
+
+	// Config allows specifying EPP EndpointPickerConfig directly as a structured object.
+	// The operator will marshal this to YAML and create a ConfigMap automatically.
+	// Mutually exclusive with ConfigMapRef.
+	// One of ConfigMapRef or Config must be specified (no default configuration).
+	// Uses the upstream type from github.com/kubernetes-sigs/gateway-api-inference-extension
+	// +optional
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Config *apixv1alpha1.EndpointPickerConfig `json:"config,omitempty"`
+}
+
+type RouterIngress struct {
+	// +kubebuilder:validation:MinLength=1
+	// IngressClass is the ingress class to use for the created ingress.
+	IngressClass string `json:"ingressClass"`
+
+	// TLSSecretName is the name of the secret containing the TLS certificate and key.
+	TLSSecretName string `json:"tlsSecretName,omitempty"`
+}
+
+type Gateway struct {
+	// +kubebuilder:validation:MinLength=1
+	// Namespace of the gateway
+	Namespace string `json:"namespace"`
+	// +kubebuilder:validation:MinLength=1
+	// Name of the gateway
+	Name string `json:"name"`
+
+	// +kubebuilder:default:=true
+	// HTTPRoutesEnabled is a flag to enable HTTPRoutes for the created gateway.
+	HTTPRoutesEnabled bool `json:"httpRoutesEnabled,omitempty"`
+
+	// +kubebuilder:default:=false
+	// GRPCRoutesEnabled is a flag to enable GRPCRoutes for the created gateway.
+	GRPCRoutesEnabled bool `json:"grpcRoutesEnabled,omitempty"`
+
+	// BackendRef is a reference to a backend to forward matched requests to.
+	// +optional
+	BackendRef *gatewayv1.BackendRef `json:"backendRef,omitempty"`
+}
+
+// DEPRECATED ExposeV1 defines attributes to expose the service.
+type ExposeV1 struct {
+	Service Service   `json:"service,omitempty"`
+	Ingress IngressV1 `json:"ingress,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="!(has(self.gateway) && self.gateway.grpcRoutesEnabled)", message="unsupported field: spec.expose.router.gateway.grpcRoutesEnabled"
+	Router Router `json:"router,omitempty"`
 }
 
 // Service defines attributes to create a service.
@@ -67,10 +169,13 @@ type Service struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// ExposeV1 defines attributes to expose the service.
-type ExposeV1 struct {
-	Service Service   `json:"service,omitempty"`
-	Ingress IngressV1 `json:"ingress,omitempty"`
+// Deprecated: Use .spec.expose.router.ingress instead.
+// IngressV1 defines attributes for ingress
+// +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
+type IngressV1 struct {
+	Enabled     *bool             `json:"enabled,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Spec        *IngressSpec      `json:"spec,omitempty"`
 }
 
 // Metrics defines attributes to setup metrics collection.
@@ -97,6 +202,8 @@ type Autoscaling struct {
 
 // HorizontalPodAutoscalerSpec defines the parameters required to setup HPA.
 type HorizontalPodAutoscalerSpec struct {
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default:=1
 	MinReplicas *int32                                         `json:"minReplicas,omitempty"`
 	MaxReplicas int32                                          `json:"maxReplicas"`
 	Metrics     []autoscalingv2.MetricSpec                     `json:"metrics,omitempty"`
@@ -117,15 +224,6 @@ type Ingress struct {
 	Enabled     *bool                    `json:"enabled,omitempty"`
 	Annotations map[string]string        `json:"annotations,omitempty"`
 	Spec        networkingv1.IngressSpec `json:"spec,omitempty"`
-}
-
-// IngressV1 defines attributes for ingress
-//
-// +kubebuilder:validation:XValidation:rule="(has(self.spec) && has(self.enabled) && self.enabled) || !has(self.enabled) || !self.enabled", message="spec cannot be nil when ingress is enabled"
-type IngressV1 struct {
-	Enabled     *bool             `json:"enabled,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Spec        *IngressSpec      `json:"spec,omitempty"`
 }
 
 // ResourceRequirements defines the resources required for a container.
@@ -182,6 +280,141 @@ func (i *IngressV1) GenerateNetworkingV1IngressSpec(name string) networkingv1.In
 		})
 	}
 	return ingressSpec
+}
+
+func (r *Router) GenerateGatewayHTTPRouteSpec(namespace, name string, port int32) gatewayv1.HTTPRouteSpec {
+	if r.Gateway == nil || !r.Gateway.HTTPRoutesEnabled {
+		return gatewayv1.HTTPRouteSpec{}
+	}
+
+	httpRouteSpec := gatewayv1.HTTPRouteSpec{
+		CommonRouteSpec: gatewayv1.CommonRouteSpec{
+			ParentRefs: []gatewayv1.ParentReference{
+				{
+					Name:      gatewayv1.ObjectName(r.Gateway.Name),
+					Namespace: ptr.To(gatewayv1.Namespace(r.Gateway.Namespace)),
+				},
+			},
+		},
+		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(r.getHostname(namespace, name))},
+		Rules: []gatewayv1.HTTPRouteRule{
+			{
+				BackendRefs: []gatewayv1.HTTPBackendRef{
+					{
+						BackendRef: gatewayv1.BackendRef{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
+								Name: gatewayv1.ObjectName(name),
+								Port: ptr.To(gatewayv1.PortNumber(port)),
+							},
+						},
+					},
+				},
+				Matches: []gatewayv1.HTTPRouteMatch{
+					{
+						Path: &gatewayv1.HTTPPathMatch{
+							Type:  ptr.To(gatewayv1.PathMatchPathPrefix),
+							Value: ptr.To("/"),
+						},
+					},
+				},
+			},
+		},
+	}
+	if r.Gateway.BackendRef != nil {
+		httpRouteSpec.Rules[0].BackendRefs = []gatewayv1.HTTPBackendRef{
+			{
+				BackendRef: *r.Gateway.BackendRef, //nolint:gosec
+			},
+		}
+	}
+
+	return httpRouteSpec
+}
+
+func (r *Router) GenerateGatewayGRPCRouteSpec(namespace, name string, port int32) gatewayv1.GRPCRouteSpec {
+	if r.Gateway == nil || !r.Gateway.GRPCRoutesEnabled {
+		return gatewayv1.GRPCRouteSpec{}
+	}
+
+	return gatewayv1.GRPCRouteSpec{
+		CommonRouteSpec: gatewayv1.CommonRouteSpec{
+			ParentRefs: []gatewayv1.ParentReference{
+				{
+					Name:      gatewayv1.ObjectName(r.Gateway.Name),
+					Namespace: ptr.To(gatewayv1.Namespace(r.Gateway.Namespace)),
+				},
+			},
+		},
+		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(r.getHostname(namespace, name))},
+		Rules: []gatewayv1.GRPCRouteRule{
+			{
+				BackendRefs: []gatewayv1.GRPCBackendRef{
+					{
+						BackendRef: gatewayv1.BackendRef{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
+								Name: gatewayv1.ObjectName(name),
+								Port: ptr.To(gatewayv1.PortNumber(port)),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (r *Router) getHostname(namespace, name string) string {
+	return fmt.Sprintf("%s.%s.%s", name, namespace, r.HostDomainName)
+}
+
+func (r *Router) GenerateIngressSpec(namespace, name string) networkingv1.IngressSpec {
+	if r.Ingress == nil {
+		return networkingv1.IngressSpec{}
+	}
+
+	ingressSpec := networkingv1.IngressSpec{
+		IngressClassName: ptr.To(r.Ingress.IngressClass),
+		Rules: []networkingv1.IngressRule{
+			{
+				Host: r.getHostname(namespace, name),
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{
+						Paths: []networkingv1.HTTPIngressPath{
+							{
+								Path:     "/",
+								PathType: ptr.To(networkingv1.PathTypePrefix),
+								Backend: networkingv1.IngressBackend{
+									Service: &networkingv1.IngressServiceBackend{
+										Name: name,
+										Port: networkingv1.ServiceBackendPort{
+											Name: DefaultNamedPortAPI,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if r.Ingress.TLSSecretName != "" {
+		ingressSpec.TLS = []networkingv1.IngressTLS{
+			{
+				Hosts:      []string{r.getHostname(namespace, name)},
+				SecretName: r.Ingress.TLSSecretName,
+			},
+		}
+	}
+	return ingressSpec
+}
+
+func (r *Expose) GenerateIngressSpec(name string) networkingv1.IngressSpec {
+	if r.Ingress.Enabled == nil || !*r.Ingress.Enabled {
+		return networkingv1.IngressSpec{}
+	}
+	return r.Ingress.Spec
 }
 
 type IngressSpec struct {
@@ -244,8 +477,6 @@ type HFSecret struct {
 }
 
 // PersistentVolumeClaim defines the attributes of PVC.
-// +kubebuilder:validation:XValidation:rule="!has(self.create) || !self.create || (has(self.size) && self.size != \"\")", message="size is required for pvc creation"
-// +kubebuilder:validation:XValidation:rule="!has(self.create) || !self.create || (has(self.volumeAccessMode) && self.volumeAccessMode != \"\")", message="volumeAccessMode is required for pvc creation"
 type PersistentVolumeClaim struct {
 	// Create specifies whether to create a new PersistentVolumeClaim (PVC).
 	// If set to false, an existing PVC must be referenced via the `Name` field.
@@ -265,82 +496,18 @@ type PersistentVolumeClaim struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// DRAResource references exactly one ResourceClaim, either directly
-// or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim.
-//
-// When creating the NIMService pods, it adds a name (`DNS_LABEL` format) to it
-// that uniquely identifies the DRA resource.
-// +kubebuilder:validation:XValidation:rule="has(self.resourceClaimName) != has(self.resourceClaimTemplateName)",message="exactly one of spec.resourceClaimName and spec.resourceClaimTemplateName must be set."
-type DRAResource struct {
-	// ResourceClaimName is the name of a ResourceClaim object in the same
-	// namespace as the NIMService.
-	//
-	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
-	// be set.
-	//
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=253
-	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
-	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
-
-	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
-	// object in the same namespace as the pods for this NIMService.
-	//
-	// The template will be used to create a new ResourceClaim, which will
-	// be bound to the pods created for this NIMService.
-	//
-	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
-	// be set.
-	//
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=253
-	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`
-	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
-
-	// Requests is the list of requests in the referenced ResourceClaim/ResourceClaimTemplate
-	// to be made available to the model container of the NIMService pods.
-	//
-	// If empty, everything from the claim is made available, otherwise
-	// only the result of this subset of requests.
-	//
-	// +kubebuilder:validation:items:MinLength=1
-	Requests []string `json:"requests,omitempty"`
-}
-
-// DRAResourceStatus defines the status of the DRAResource.
-// +kubebuilder:validation:XValidation:rule="has(self.resourceClaimStatus) != has(self.resourceClaimTemplateStatus)",message="exactly one of resourceClaimStatus and resourceClaimTemplateStatus must be set."
-type DRAResourceStatus struct {
-	// Name is the pod claim name referenced in the pod spec as `spec.resourceClaims[].name` for this DRA resource.
+// NIMContainerSpec defines the specification for a container within a NIM workload.
+type NIMContainerSpec struct {
+	// Name is the unique name of the container within the pod.
 	Name string `json:"name"`
-	// ResourceClaimStatus is the status of the resource claim in this DRA resource.
-	//
-	// Exactly one of resourceClaimStatus and resourceClaimTemplateStatus will be set.
-	ResourceClaimStatus *DRAResourceClaimStatusInfo `json:"resourceClaimStatus,omitempty"`
-	// ResourceClaimTemplateStatus is the status of the resource claim template in this DRA resource.
-	//
-	// Exactly one of resourceClaimStatus and resourceClaimTemplateStatus will be set.
-	ResourceClaimTemplateStatus *DRAResourceClaimTemplateStatusInfo `json:"resourceClaimTemplateStatus,omitempty"`
-}
-
-// DRAResourceClaimStatusInfo defines the status of a ResourceClaim referenced in the DRAResource.
-type DRAResourceClaimStatusInfo struct {
-	// Name is the name of the ResourceClaim.
-	Name string `json:"name"`
-	// State is the state of the ResourceClaim.
-	// * pending: the resource claim is pending allocation.
-	// * deleted: the resource claim has a deletion timestamp set but is not yet finalized.
-	// * allocated: the resource claim is allocated to a pod.
-	// * reserved: the resource claim is consumed by a pod.
-	// This field will have one or more of the above values depending on the status of the resource claim.
-	//
-	// +kubebuilder:validation:default=pending
-	State string `json:"state"`
-}
-
-// DRAResourceClaimTemplateStatusInfo defines the status of a ResourceClaimTemplate referenced in the DRAResource.
-type DRAResourceClaimTemplateStatusInfo struct {
-	// Name is the name of the resource claim template.
-	Name string `json:"name"`
-	// ResourceClaimStatuses is the statuses of the generated resource claims from this resource claim template.
-	ResourceClaimStatuses []DRAResourceClaimStatusInfo `json:"resourceClaimStatuses,omitempty"`
+	// Image specifies the container image to run.
+	Image Image `json:"image"`
+	// Command is the entrypoint array. If not specified, the image's default entrypoint is used.
+	Command []string `json:"command,omitempty"`
+	// Args are the arguments passed to the container command at runtime.
+	Args []string `json:"args,omitempty"`
+	// Env is the list of environment variables to set in the container.
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// WorkingDir is the container's working directory. If unset, the container runtime's default is used.
+	WorkingDir string `json:"workingDir,omitempty"`
 }

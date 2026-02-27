@@ -44,6 +44,7 @@ import (
 	crClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/yaml"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -85,6 +86,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(batchv1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.Install(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NemoCustomizer{}).
@@ -214,7 +216,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 					Port:         5432,
 					DatabaseName: "ncsdb",
 				},
-				Replicas: 1,
+				Replicas: ptr.To(int32(1)),
 				Resources: &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
@@ -242,18 +244,12 @@ var _ = Describe("NemoCustomizer Controller", func() {
 							"annotation-key-specific": "service",
 						},
 					},
-					Ingress: appsv1alpha1.IngressV1{
-						Enabled:     ptr.To[bool](true),
-						Annotations: map[string]string{"annotation-key-specific": "ingress"},
-						Spec: &appsv1alpha1.IngressSpec{
-							IngressClassName: "nginx",
-							Host:             "test-nemocustomizer.default.example.com",
-							Paths: []appsv1alpha1.IngressPath{
-								{
-									Path:     "/",
-									PathType: ptr.To(networkingv1.PathTypePrefix),
-								},
-							},
+					Router: appsv1alpha1.Router{
+						Ingress: &appsv1alpha1.RouterIngress{
+							IngressClass: "nginx",
+						},
+						Annotations: map[string]string{
+							"annotation-key-specific": "ingress",
 						},
 					},
 				},
@@ -676,7 +672,7 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			err = client.Get(context.TODO(), namespacedName, nemoCustomizer)
 			Expect(err).NotTo(HaveOccurred())
 			nemoCustomizer.Spec.Scale.Enabled = ptr.To[bool](false)
-			nemoCustomizer.Spec.Expose.Ingress.Enabled = ptr.To[bool](false)
+			nemoCustomizer.Spec.Expose.Router.Ingress = nil
 			err = client.Update(context.TODO(), nemoCustomizer)
 			Expect(err).NotTo(HaveOccurred())
 

@@ -6,6 +6,8 @@ postgresql:
   auth:
     username: {{ mlflow.postgresql_username }}
     password: {{ mlflow.postgresql_password }}
+  image:
+    repository: bitnamilegacy/postgresql
 
 tracking:
   enabled: true
@@ -18,4 +20,13 @@ tracking:
 
 run:
   enabled: false
-
+image:
+  repository: bitnamilegacy/mlflow
+gitImage:
+  repository: bitnamilegacy/git
+waitContainer:
+  image:
+    repository: bitnamilegacy/os-shell
+minio:
+  image:
+    repository: bitnamilegacy/minio

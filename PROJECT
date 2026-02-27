@@ -5,6 +5,7 @@
 domain: nvidia.com
 layout:
 - go.kubebuilder.io/v4
+multigroup: true
 projectName: k8s-nim-operator
 repo: github.com/NVIDIA/k8s-nim-operator
 resources:
@@ -17,6 +18,9 @@ resources:
   kind: NIMService
   path: github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -26,6 +30,9 @@ resources:
   kind: NIMCache
   path: github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1
   version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true

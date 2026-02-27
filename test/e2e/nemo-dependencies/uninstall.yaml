@@ -50,6 +50,18 @@
   vars_files:
     - values.yaml
   tasks:
+    - name: Uninstall Guardrail
+      include_role:
+        name: guardrail
+        tasks_from: uninstall.yaml  
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: uninstall.guardrail == true
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  tasks:
     - name: Uninstall Jupyter Server
       include_role:
         name: jupyter

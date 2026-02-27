@@ -1,0 +1,43 @@
+---
+# NIM Service with Multi-LLM NIM with LoRAs
+# Refer to https://docs.nvidia.com/nim-operator/latest/cache.html#using-lora-models-and-adapters 
+# for caching lora adapters into the PVC
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-3-2-1b-instruct
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/llm-nim
+    tag: "1.12"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  env:
+    - name: NIM_PEFT_SOURCE
+      value: "/model-store/<lora-dir>" # Update with the absolute <lora-dir> path inside the PVC
+    - name: NIM_PEFT_REFRESH_INTERVAL
+      value: "180"
+    - name: NIM_MAX_CPU_LORAS
+      value: "16"
+    - name: NIM_MAX_GPU_LORAS
+      value: "8"
+  storage:
+    pvc: # Pre-created PVC with downloaded loras
+      name: nim-cache-multi-llm
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      cpu: "12"
+      memory: 32Gi
+    requests:
+      nvidia.com/gpu: 1
+      cpu: "4"
+      memory: 6Gi
+  replicas: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000

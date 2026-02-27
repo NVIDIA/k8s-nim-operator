@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -135,7 +136,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 				Namespace:        "default",
 				Labels:           map[string]string{"app": "test-app"},
 				Annotations:      map[string]string{"annotation-key": "annotation-value"},
-				Replicas:         3,
+				Replicas:         ptr.To(int32(3)),
 				Size:             2,
 				Image:            "nim-llm:latest",
 				ImagePullSecrets: []string{"ngc-secret"},
@@ -286,7 +287,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 				Namespace:     "default",
 				Labels:        map[string]string{"app": "test-app"},
 				Annotations:   map[string]string{"annotation-key": "annotation-value"},
-				Replicas:      3,
+				Replicas:      ptr.To(int32(3)),
 				ContainerName: "test-container",
 				Image:         "nim-llm:latest",
 				Volumes: []corev1.Volume{
@@ -353,7 +354,7 @@ var _ = Describe("K8s Resources Rendering", func() {
 				Namespace:     "default",
 				Labels:        map[string]string{"app": "test-app"},
 				Annotations:   map[string]string{"annotation-key": "annotation-value"},
-				Replicas:      3,
+				Replicas:      ptr.To(int32(3)),
 				ContainerName: "test-container",
 				ServiceName:   "test-app",
 				Image:         "nim-llm:latest",
@@ -587,6 +588,120 @@ var _ = Describe("K8s Resources Rendering", func() {
 			Expect(cm.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			// The data is added as a multi-line string, so verify with newline appended
 			Expect(cm.Data["config.yaml"]).To(Equal("test-data\n"))
+		})
+
+		It("should render InferenceService template correctly", func() {
+			params := types.InferenceServiceParams{
+				Name:            "test-inferenceservice",
+				Namespace:       "default",
+				Labels:          map[string]string{"app": "test-app"},
+				Annotations:     map[string]string{"annotation-key": "annotation-value"},
+				MinReplicas:     ptr.To[int32](3),
+				MaxReplicas:     ptr.To[int32](5),
+				ScaleMetricType: "Value",
+				ScaleMetric:     "cpu",
+				ScaleTarget:     ptr.To[int32](80),
+				UserID:          ptr.To[int64](1000),
+				GroupID:         ptr.To[int64](2000),
+				ContainerName:   "test-container",
+				Image:           "nim-llm:latest",
+				Volumes: []corev1.Volume{
+					{
+						Name: "test-volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "test-pvc",
+							},
+						},
+					},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "test-volume",
+						MountPath: "/data",
+						SubPath:   "subPath",
+					},
+				},
+				Env: []corev1.EnvVar{
+					{
+						Name:  "ENV_VAR",
+						Value: "value",
+					},
+				},
+				Resources: &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+						corev1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("250m"),
+						corev1.ResourceMemory: resource.MustParse("64Mi"),
+					},
+				},
+				NodeSelector: map[string]string{"disktype": "ssd"},
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "key1",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				},
+				DeploymentMode: "RawDeployment",
+			}
+
+			r := render.NewRenderer(templatesDir)
+			inferenceservice, err := r.InferenceService(&params)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(inferenceservice.Name).To(Equal("test-inferenceservice"))
+			Expect(inferenceservice.Namespace).To(Equal("default"))
+			Expect(inferenceservice.Labels["app"]).To(Equal("test-app"))
+			Expect(inferenceservice.Annotations["annotation-key"]).To(Equal("annotation-value"))
+			Expect(*inferenceservice.Spec.Predictor.MinReplicas).To(Equal(int32(3)))
+			Expect(inferenceservice.Spec.Predictor.MaxReplicas).To(Equal(int32(5)))
+			Expect(string(*inferenceservice.Spec.Predictor.ScaleMetricType)).To(Equal("Value"))
+			Expect(string(*inferenceservice.Spec.Predictor.ScaleMetric)).To(Equal("cpu"))
+			Expect(*inferenceservice.Spec.Predictor.ScaleTarget).To(Equal(int32(80)))
+			Expect(string(inferenceservice.Spec.Predictor.DeploymentStrategy.Type)).To(Equal("RollingUpdate"))
+			Expect(inferenceservice.Spec.Predictor.DeploymentStrategy.RollingUpdate.MaxSurge.IntValue()).To(Equal(0))
+			Expect(inferenceservice.Spec.Predictor.DeploymentStrategy.RollingUpdate.MaxUnavailable.String()).To(Equal("25%"))
+
+			Expect(inferenceservice.Spec.Predictor.Containers[0].Name).To(Equal("test-container"))
+			Expect(inferenceservice.Spec.Predictor.Containers[0].Image).To(Equal("nim-llm:latest"))
+			Expect(inferenceservice.Spec.Predictor.Containers[0].VolumeMounts[0].Name).To(Equal("test-volume"))
+			Expect(inferenceservice.Spec.Predictor.Containers[0].VolumeMounts[0].MountPath).To(Equal("/data"))
+			Expect(inferenceservice.Spec.Predictor.Containers[0].VolumeMounts[0].SubPath).To(Equal("subPath"))
+			Expect(inferenceservice.Spec.Predictor.Containers[0].Env[0].Name).To(Equal("ENV_VAR"))
+			Expect(inferenceservice.Spec.Predictor.Containers[0].Env[0].Value).To(Equal("value"))
+
+			nodeSelectorValue, nodeSelectorOk := inferenceservice.Spec.Predictor.NodeSelector["disktype"]
+			Expect(nodeSelectorOk).To(Equal(true))
+			Expect(nodeSelectorValue).To(Equal("ssd"))
+
+			Expect(inferenceservice.Spec.Predictor.Tolerations[0].Key).To(Equal("key1"))
+			Expect(inferenceservice.Spec.Predictor.Tolerations[0].Operator).To(Equal(corev1.TolerationOpExists))
+			Expect(inferenceservice.Spec.Predictor.Tolerations[0].Effect).To(Equal(corev1.TaintEffectNoSchedule))
+
+			cpuLimitValue, cpuLimitOk := inferenceservice.Spec.Predictor.Containers[0].Resources.Limits[corev1.ResourceCPU]
+			Expect(cpuLimitOk).To(Equal(true))
+			Expect(cpuLimitValue).To(Equal(resource.MustParse("500m")))
+			memoryLimitValue, memoryLimitOk := inferenceservice.Spec.Predictor.Containers[0].Resources.Limits[corev1.ResourceMemory]
+			Expect(memoryLimitOk).To(Equal(true))
+			Expect(memoryLimitValue).To(Equal(resource.MustParse("128Mi")))
+
+			cpuRequestValue, cpuRequestOk := inferenceservice.Spec.Predictor.Containers[0].Resources.Requests[corev1.ResourceCPU]
+			Expect(cpuRequestOk).To(Equal(true))
+			Expect(cpuRequestValue).To(Equal(resource.MustParse("250m")))
+			memoryRequestValue, memoryRequestOk := inferenceservice.Spec.Predictor.Containers[0].Resources.Requests[corev1.ResourceMemory]
+			Expect(memoryRequestOk).To(Equal(true))
+			Expect(memoryRequestValue).To(Equal(resource.MustParse("64Mi")))
+
+			Expect(inferenceservice.Spec.Predictor.Volumes[0].Name).To(Equal("test-volume"))
+			Expect(inferenceservice.Spec.Predictor.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName).To(Equal("test-pvc"))
+
+			Expect(*inferenceservice.Spec.Predictor.SecurityContext.RunAsUser).To(Equal(int64(1000)))
+			Expect(*inferenceservice.Spec.Predictor.SecurityContext.RunAsGroup).To(Equal(int64(2000)))
+			Expect(*inferenceservice.Spec.Predictor.SecurityContext.FSGroup).To(Equal(int64(2000)))
+
 		})
 	})
 })

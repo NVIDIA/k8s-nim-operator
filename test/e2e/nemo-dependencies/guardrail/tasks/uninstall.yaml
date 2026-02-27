@@ -1,0 +1,12 @@
+- name: check if Guardrail dependencies are installed
+  shell: helm list -n {{ namespace }} | grep 'guardrail' | awk '{print $1}' | wc -l | tr -d '\n'
+  register: guardrail_installed
+  ignore_errors: true
+
+- name: Uninstall Guardrail dependency helm charts
+  shell: helm list -n {{ namespace }} | awk '{print $1}' | grep -v NAME | egrep 'guardrail' | xargs helm del -n {{ namespace }}
+  ignore_errors: true
+
+- name: Delete Guardrail PVCs
+  shell: kubectl get pvc -n {{ namespace }} | egrep 'guardrail' | awk '{print $1}' | xargs kubectl delete pvc -n {{ namespace }}
+  ignore_errors: true

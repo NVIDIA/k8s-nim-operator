@@ -42,6 +42,7 @@ import (
 const (
 	IsvcNameFmt                         string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 	StorageUriPresentInTransformerError string = "storage uri should not be specified in transformer container"
+	InvalidStorageUriConfigError        string = "Setting both StorageURI and StorageURIs is not supported."
 )
 
 var (
@@ -66,7 +67,7 @@ var _ webhook.CustomValidator = &InferenceServiceValidator{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (v *InferenceServiceValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	isvc, err := convertToInferenceService(obj)
+	isvc, err := utils.Convert[*InferenceService](obj)
 	if err != nil {
 		validatorLogger.Error(err, "Unable to convert object to InferenceService")
 		return nil, err
@@ -77,19 +78,28 @@ func (v *InferenceServiceValidator) ValidateCreate(ctx context.Context, obj runt
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (v *InferenceServiceValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	isvc, err := convertToInferenceService(newObj)
+	isvc, err := utils.Convert[*InferenceService](newObj)
 	if err != nil {
 		validatorLogger.Error(err, "Unable to convert object to InferenceService")
 		return nil, err
 	}
+	oldIsvc, err := utils.Convert[*InferenceService](oldObj)
+	if err != nil {
+		validatorLogger.Error(err, "Unable to convert object to InferenceService")
+	}
 	validatorLogger.Info("validate update", "name", isvc.Name)
-
+	if isvc.GetDeletionTimestamp() == nil {
+		err = validateDeploymentMode(isvc, oldIsvc)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return validateInferenceService(isvc)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (v *InferenceServiceValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	isvc, err := convertToInferenceService(obj)
+	isvc, err := utils.Convert[*InferenceService](obj)
 	if err != nil {
 		validatorLogger.Error(err, "Unable to convert object to InferenceService")
 		return nil, err
@@ -118,6 +128,14 @@ func validateInferenceService(isvc *InferenceService) (admission.Warnings, error
 		return allWarnings, err
 	}
 
+	if err := validatePredictor(isvc); err != nil {
+		return allWarnings, err
+	}
+
+	if err := validateMultipleStorageURIs(isvc); err != nil {
+		return allWarnings, err
+	}
+
 	for _, component := range []Component{
 		&isvc.Spec.Predictor,
 		isvc.Spec.Transformer,
@@ -139,6 +157,40 @@ func validateInferenceService(isvc *InferenceService) (admission.Warnings, error
 	return allWarnings, nil
 }
 
+func validatePredictor(isvc *InferenceService) error {
+	predictor := isvc.Spec.Predictor
+
+	// log predictor
+	validatorLogger.Info("Incoming predictor struct", "predictor", predictor)
+
+	// in most of the case, standard predictors will all be packed into `predictor.model`, and decide the backend process through `modelFormat.name``
+	switch {
+	case predictor.SKLearn != nil && predictor.SKLearn.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.XGBoost != nil && predictor.XGBoost.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.Tensorflow != nil && predictor.Tensorflow.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.PyTorch != nil && predictor.PyTorch.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.Triton != nil && predictor.Triton.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.ONNX != nil && predictor.ONNX.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.HuggingFace != nil && predictor.HuggingFace.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.PMML != nil && predictor.PMML.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.LightGBM != nil && predictor.LightGBM.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.Paddle != nil && predictor.Paddle.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	case predictor.Model != nil && predictor.Model.Name != "":
+		return errors.New("the 'name' field is not allowed in standard predictor")
+	}
+	return nil
+}
+
 // validateMultiNodeVariables validates when there is workerSpec set in isvc
 func validateMultiNodeVariables(isvc *InferenceService) error {
 	if isvc.Spec.Predictor.WorkerSpec != nil {
@@ -146,16 +198,18 @@ func validateMultiNodeVariables(isvc *InferenceService) error {
 			return fmt.Errorf(DisallowedMultipleContainersInWorkerSpecError, isvc.Name)
 		}
 		if isvc.Spec.Predictor.Model != nil {
-			if _, exists := utils.GetEnvVarValue(isvc.Spec.Predictor.Model.PredictorExtensionSpec.Container.Env, constants.PipelineParallelSizeEnvName); exists {
+			if _, exists := utils.GetEnvVarValue(isvc.Spec.Predictor.Model.Env, constants.PipelineParallelSizeEnvName); exists {
 				return fmt.Errorf(DisallowedWorkerSpecPipelineParallelSizeEnvError, isvc.Name)
 			}
-			if _, exists := utils.GetEnvVarValue(isvc.Spec.Predictor.Model.PredictorExtensionSpec.Container.Env, constants.TensorParallelSizeEnvName); exists {
+			if _, exists := utils.GetEnvVarValue(isvc.Spec.Predictor.Model.Env, constants.TensorParallelSizeEnvName); exists {
 				return fmt.Errorf(DisallowedWorkerSpecTensorParallelSizeEnvError, isvc.Name)
 			}
 
-			if isUnknownGPUType, err := utils.IsUnknownGpuResourceType(isvc.Spec.Predictor.Model.Resources, isvc.Annotations); err != nil {
+			hadUnknownGpuType, err := utils.HasUnknownGpuResourceType(isvc.Spec.Predictor.Model.Resources, isvc.Annotations)
+			if err != nil {
 				return err
-			} else if isUnknownGPUType {
+			}
+			if hadUnknownGpuType {
 				return fmt.Errorf(InvalidUnknownGPUTypeError, isvc.Name)
 			}
 
@@ -163,30 +217,32 @@ func validateMultiNodeVariables(isvc *InferenceService) error {
 				return fmt.Errorf(MissingStorageURI, isvc.Name)
 			} else {
 				storageProtocol := strings.Split(*isvc.Spec.Predictor.Model.StorageURI, "://")[0]
-				if storageProtocol != "pvc" {
+				if storageProtocol != "pvc" && storageProtocol != "oci" {
 					return fmt.Errorf(InvalidNotSupportedStorageURIProtocolError, isvc.Name, storageProtocol)
 				}
 			}
-			if isvc.GetAnnotations()[constants.AutoscalerClass] != string(constants.AutoscalerClassExternal) {
+			if isvc.GetAnnotations()[constants.AutoscalerClass] != string(constants.AutoscalerClassNone) {
 				return fmt.Errorf(InvalidAutoScalerError, isvc.Name, isvc.GetAnnotations()[constants.AutoscalerClass])
 			}
 		}
 
-		// WorkerSpec.PipelineParallelSize should not be less than 2 (head + worker)
-		if pps := isvc.Spec.Predictor.WorkerSpec.PipelineParallelSize; pps != nil && *pps < 2 {
+		// WorkerSpec.PipelineParallelSize should not be less than 1
+		if pps := isvc.Spec.Predictor.WorkerSpec.PipelineParallelSize; pps != nil && *pps < constants.DefaultPipelineParallelSize {
 			return fmt.Errorf(InvalidWorkerSpecPipelineParallelSizeValueError, isvc.Name, strconv.Itoa(*pps))
 		}
 
 		// WorkerSpec.TensorParallelSize should not be less than 1.
-		if tps := isvc.Spec.Predictor.WorkerSpec.TensorParallelSize; tps != nil && *tps < 1 {
+		if tps := isvc.Spec.Predictor.WorkerSpec.TensorParallelSize; tps != nil && *tps < constants.DefaultTensorParallelSize {
 			return fmt.Errorf(InvalidWorkerSpecTensorParallelSizeValueError, isvc.Name, strconv.Itoa(*tps))
 		}
 
 		if isvc.Spec.Predictor.WorkerSpec.Containers != nil {
 			for _, container := range isvc.Spec.Predictor.WorkerSpec.Containers {
-				if isUnknownGPUType, err := utils.IsUnknownGpuResourceType(container.Resources, isvc.Annotations); err != nil {
+				hadUnknownGpuType, err := utils.HasUnknownGpuResourceType(container.Resources, isvc.Annotations)
+				if err != nil {
 					return err
-				} else if isUnknownGPUType {
+				}
+				if hadUnknownGpuType {
 					return fmt.Errorf(InvalidUnknownGPUTypeError, isvc.Name)
 				}
 			}
@@ -202,7 +258,7 @@ func validateAutoScalingCompExtension(annotations map[string]string, compExtSpec
 	autoscalerClass := annotations[constants.AutoscalerClass]
 
 	switch deploymentMode {
-	case string(constants.RawDeployment):
+	case string(constants.Standard):
 		switch autoscalerClass {
 		case string(constants.AutoscalerClassHPA):
 			return validateScalingHPACompExtension(compExtSpec)
@@ -228,7 +284,7 @@ func validateInferenceServiceName(isvc *InferenceService) error {
 
 // Validation of isvc autoscaler class
 func validateInferenceServiceAutoscaler(isvc *InferenceService) error {
-	annotations := isvc.ObjectMeta.Annotations
+	annotations := isvc.Annotations
 	value, ok := annotations[constants.AutoscalerClass]
 	class := constants.AutoscalerClassType(value)
 	if ok {
@@ -339,8 +395,11 @@ func validateScalingKedaCompExtension(compExtSpec *ComponentExtensionSpec) error
 					if metric.Resource.Target.Type != AverageValueMetricType && metric.Resource.Target.Type != UtilizationMetricType {
 						return errors.New("the memory target value type should be AverageValue or Utilization")
 					}
-					if metric.Resource.Target.Type == AverageValueMetricType && metric.Resource.Target.AverageValue.Cmp(resource.MustParse("1Mi")) < 0 {
-						return errors.New("the memory target value should be greater than 1 MiB")
+					if metric.Resource.Target.Type == AverageValueMetricType {
+						quantity := metric.Resource.Target.AverageValue.GetQuantity()
+						if quantity.Cmp(resource.MustParse("1Mi")) < 0 {
+							return errors.New("the memory target value should be greater than 1 MiB")
+						}
 					}
 				default:
 					return fmt.Errorf("resource type %s is not supported", metric.Resource.Name)
@@ -432,11 +491,142 @@ func validateCollocationStorageURI(predictorSpec PredictorSpec) error {
 	return nil
 }
 
-// Convert runtime.Object into InferenceService
-func convertToInferenceService(obj runtime.Object) (*InferenceService, error) {
-	isvc, ok := obj.(*InferenceService)
-	if !ok {
-		return nil, fmt.Errorf("expected an InferenceService object but got %T", obj)
+// validates if the deploymentMode specified in the annotation is not different from the one recorded in the status
+func validateDeploymentMode(newIsvc *InferenceService, oldIsvc *InferenceService) error {
+	statusDeploymentMode := oldIsvc.Status.DeploymentMode
+	if len(statusDeploymentMode) != 0 {
+		annotations := newIsvc.Annotations
+		annotationDeploymentMode, ok := annotations[constants.DeploymentMode]
+		if ok && annotationDeploymentMode != statusDeploymentMode {
+			return fmt.Errorf("update rejected: deploymentMode cannot be changed from '%s' to '%s'", statusDeploymentMode, annotationDeploymentMode)
+		}
 	}
-	return isvc, nil
+	return nil
+}
+
+// ValidateStorageURISpec validates that paths are absolute
+func validateStorageURISpec(storageUri *StorageUri) error {
+	// Validate individual storage URI specification
+	if storageUri.Uri == "" {
+		return errors.New("storage URI cannot be empty")
+	}
+
+	if storageUri.MountPath == "/" {
+		return errors.New("storage path cannot be empty")
+	}
+
+	if !strings.HasPrefix(storageUri.MountPath, "/") {
+		return fmt.Errorf("storage path must be absolute: %s", storageUri.MountPath)
+	}
+
+	// Security validation: prevent directory traversal attacks
+	if strings.Contains(storageUri.MountPath, "..") {
+		return fmt.Errorf("storage path cannot contain '..' for security reasons: %s", storageUri.MountPath)
+	}
+
+	return nil
+}
+
+// ValidateMultipleStorageURISpecs validates a list of storage URI specifications.
+// It ensures that:
+// - Each individual URI specification is valid (non-empty URI, absolute path)
+// - All non-PVC paths share a common parent directory (not root)
+// - PVC paths are unique across the list
+//
+// Parameters:
+//   - storageURIs: List of storage URI specifications to validate
+//
+// Returns:
+//   - error: First validation error encountered, or nil if all validations pass
+func validateMultipleStorageURIsSpec(storageUris []StorageUri) error {
+	paths := make([]string, 0, len(storageUris))
+	pvcPaths := make([]string, 0, len(storageUris))
+
+	if len(storageUris) == 0 {
+		return nil
+	}
+
+	// Validate each individual StorageUrisSpec
+	for _, storageUri := range storageUris {
+		if err := validateStorageURISpec(&storageUri); err != nil {
+			return err
+		}
+		if strings.HasPrefix(storageUri.Uri, "pvc://") {
+			pvcPaths = append(pvcPaths, storageUri.MountPath)
+		} else {
+			paths = append(paths, storageUri.MountPath)
+		}
+	}
+
+	// If only one storage URI, no need to check common parent
+	if len(paths) <= 1 {
+		return nil
+	}
+
+	// Check that PVC paths are unique
+	if len(pvcPaths) > 1 {
+		pvcPathSet := make(map[string]bool)
+		for _, path := range pvcPaths {
+			if pvcPathSet[path] {
+				return errors.New("PVC storage paths must be unique")
+			}
+			pvcPathSet[path] = true
+		}
+	}
+
+	// Validate that paths have a common parent path
+	commonParent := utils.FindCommonParentPath(paths)
+	if commonParent == "/" {
+		return fmt.Errorf("storage paths must have a common parent directory. Current paths: %v have no common parent beyond root", paths)
+	}
+
+	return nil
+}
+
+func validateMultipleStorageURIs(isvc *InferenceService) error {
+	if isvc.Spec.Transformer != nil {
+		storageURIs := isvc.Spec.Transformer.StorageUris
+		var storageURI *string
+		if len(isvc.Spec.Transformer.GetImplementations()) > 0 {
+			storageURI = isvc.Spec.Transformer.GetImplementation().GetStorageUri()
+		}
+		if storageURI != nil && storageURIs != nil {
+			return errors.New(InvalidStorageUriConfigError)
+		}
+
+		if err := validateMultipleStorageURIsSpec(storageURIs); err != nil {
+			return err
+		}
+	}
+
+	if isvc.Spec.Explainer != nil {
+		storageURIs := isvc.Spec.Explainer.StorageUris
+		var storageURI *string
+		if len(isvc.Spec.Explainer.GetImplementations()) > 0 {
+			storageURI = isvc.Spec.Explainer.GetImplementation().GetStorageUri()
+		}
+		if storageURI != nil && storageURIs != nil {
+			return errors.New(InvalidStorageUriConfigError)
+		}
+
+		if err := validateMultipleStorageURIsSpec(storageURIs); err != nil {
+			return err
+		}
+	}
+
+	storageURIs := isvc.Spec.Predictor.StorageUris
+	var storageURI *string
+	if len(isvc.Spec.Predictor.GetImplementations()) > 0 {
+		storageURI = isvc.Spec.Predictor.GetImplementation().GetStorageUri()
+	}
+
+	if storageURI != nil && storageURIs != nil {
+		return errors.New(InvalidStorageUriConfigError)
+	}
+
+	if err := validateMultipleStorageURIsSpec(storageURIs); err != nil {
+		return err
+	}
+
+	return nil
 }
