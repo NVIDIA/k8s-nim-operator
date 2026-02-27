@@ -11,7 +11,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/google/cel-go v0.26.0
 	github.com/kserve/kserve v0.0.0-20260219142638-5454cafc1f9f
-	github.com/mittwald/go-helm-client v0.12.13
+	github.com/mittwald/go-helm-client v0.12.18
 	github.com/onsi/ginkgo/v2 v2.27.3
 	github.com/onsi/gomega v1.38.3
 	github.com/openshift/api v0.0.0-20240708071937-c9a91940bf0f
