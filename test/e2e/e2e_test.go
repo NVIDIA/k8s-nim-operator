@@ -78,6 +78,7 @@ var (
 	ImageTag                   string
 	ImagePullPolicy            string
 	CollectLogsFrom            string
+	AdmissionControllerEnabled bool
 	Timeout                    time.Duration
 
 	// k8s clients.
@@ -106,6 +107,7 @@ var (
 		"namespaces",
 		"deployments",
 		"daemonsets",
+		"jobs",
 	}
 
 	// NEMO microservice variables.
@@ -333,6 +335,8 @@ func getTestEnv() {
 
 	CollectLogsFrom = os.Getenv("COLLECT_LOGS_FROM")
 
+	AdmissionControllerEnabled = getBoolEnvVar("ADMISSION_CONTROLLER_ENABLED", false)
+
 	if EnableNemoMicroservices {
 		// Entitystore env variables.
 		NemoEntityStoreRepo = os.Getenv("NEMO_ENTITYSTORE_REPO")
@@ -470,6 +474,24 @@ func createPullSecrets() {
 	}
 
 	_, err := clientSet.CoreV1().Secrets(testNamespace.Name).Create(ctx, ngcAPIsecret, metav1.CreateOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Get the HF_TOKEN
+	HF_TOKEN := os.Getenv("HF_TOKEN")
+
+	// Create a secret for pulling the image
+	hfTokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "hf-token-secret",
+			Namespace: testNamespace.Name,
+		},
+		Type: corev1.SecretTypeOpaque,
+		StringData: map[string]string{
+			"HF_TOKEN": HF_TOKEN,
+		},
+	}
+
+	_, err = clientSet.CoreV1().Secrets(testNamespace.Name).Create(ctx, hfTokenSecret, metav1.CreateOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Create the dockerconfigjson type secret

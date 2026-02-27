@@ -36,10 +36,10 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
-	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
-
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 )
 
 // TODO: Move constants to a separate file and move the UpdateObject functions to k8sutil package.
@@ -59,7 +59,7 @@ const (
 
 const (
 	// MinSupportedClusterVersionForDRA is the minimum supported cluster version for integration with DRA resources.
-	MinSupportedClusterVersionForDRA = "v1.33.0"
+	MinSupportedClusterVersionForDRA = "v1.34.0"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
@@ -318,9 +318,11 @@ func DeepHashObject(objToWrite any) string {
 }
 
 func UpdateObject(obj client.Object, desired client.Object) client.Object {
-	if obj == nil || desired == nil || !reflect.DeepEqual(obj.GetObjectKind(), desired.GetObjectKind()) || obj.GetName() != desired.GetName() || obj.GetNamespace() != desired.GetNamespace() {
+	if obj == nil || desired == nil || obj.GetName() != desired.GetName() || obj.GetNamespace() != desired.GetNamespace() {
 		panic("invalid input to UpdateObject")
 	}
+	// Note: We do not require GetObjectKind() to match because desired objects created in-memory
+	// often have zero TypeMeta, while existing objects from the API have GVK set.
 
 	switch castedObj := obj.(type) {
 	case *appsv1.Deployment:
@@ -349,9 +351,27 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 		return updateLeaderWorkerSet(castedObj, desired.(*lwsv1.LeaderWorkerSet)) //nolint:forcetypeassert
 	case *kservev1beta1.InferenceService:
 		return updateInferenceService(castedObj, desired.(*kservev1beta1.InferenceService)) //nolint:forcetypeassert
+	case *gatewayv1.HTTPRoute:
+		return updateHTTPRoute(castedObj, desired.(*gatewayv1.HTTPRoute)) //nolint:forcetypeassert
+	case *gatewayv1.GRPCRoute:
+		return updateGRPCRoute(castedObj, desired.(*gatewayv1.GRPCRoute)) //nolint:forcetypeassert
 	default:
 		panic("unsupported obj type")
 	}
+}
+
+func updateGRPCRoute(obj, desired *gatewayv1.GRPCRoute) *gatewayv1.GRPCRoute {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
+}
+
+func updateHTTPRoute(obj, desired *gatewayv1.HTTPRoute) *gatewayv1.HTTPRoute {
+	obj.SetAnnotations(desired.GetAnnotations())
+	obj.SetLabels(desired.GetLabels())
+	obj.Spec = *desired.Spec.DeepCopy()
+	return obj
 }
 
 func updateLeaderWorkerSet(obj, desired *lwsv1.LeaderWorkerSet) *lwsv1.LeaderWorkerSet {
@@ -484,4 +504,23 @@ func IsVersionGreaterThanOrEqual(version string, minVersion string) bool {
 		return false
 	}
 	return cv.AtLeast(mv)
+}
+
+func RemoveEnvVar(envs []corev1.EnvVar, name string) []corev1.EnvVar {
+	result := make([]corev1.EnvVar, 0, len(envs))
+	for _, e := range envs {
+		if e.Name != name {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+func FindEnvByValue(envs []corev1.EnvVar, key string) *corev1.EnvVar {
+	for i := range envs {
+		if envs[i].Name == key {
+			return &envs[i]
+		}
+	}
+	return nil
 }

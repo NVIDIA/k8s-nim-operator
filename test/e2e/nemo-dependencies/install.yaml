@@ -79,6 +79,23 @@
   vars_files:
     - values.yaml
   roles:
+    - role: guardrail
+      vars:
+        namespace: "{{ installation_namespace }}"
+      when: install.guardrail == true
+  tasks:
+  - name: Guardrail Details
+    debug:
+      msg: 
+        - "Guardrail DB Password: {{ postgresql.password }}"
+        - "Guardrail DB Username: {{ postgresql.username }}"
+        - "Guardrail DB Name: {{ postgresql.database }}"      
+    when: install.guardrail == true
+
+- hosts: localhost
+  vars_files:
+    - values.yaml
+  roles:
     - role: jupyter
       vars:
         namespace: "{{ installation_namespace }}"

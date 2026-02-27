@@ -1,0 +1,19 @@
+---
+# defaults file for guardrail
+namespace: "guardrail"
+
+postgresql:
+  enabled: true
+  helm_release_name: guardrail-pg
+  helm_oci_registry: oci://registry-1.docker.io/bitnamicharts/postgresql
+  username: guardrailuser
+  password: guardrailpass
+  database: guardraildb
+
+# OpenTelemetry Helm chart details
+opentelemetry:
+  enabled: true
+  helm_repo_name: "open-telemetry"
+  helm_repo_url: "https://open-telemetry.github.io/opentelemetry-helm-charts"
+  chart_name: "open-telemetry/opentelemetry-collector"
+  chart_version: "0.78.1"

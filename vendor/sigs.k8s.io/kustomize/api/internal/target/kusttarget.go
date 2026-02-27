@@ -449,9 +449,6 @@ func (kt *KustTarget) accumulateResources(
 				ra, err = kt.accumulateDirectory(ra, ldr, false)
 			}
 			if err != nil {
-				if kusterr.IsMalformedYAMLError(errF) { // Some error occurred while tyring to decode YAML file
-					return nil, errF
-				}
 				return nil, errors.WrapPrefixf(
 					err, "accumulation err='%s'", errF.Error())
 			}
@@ -460,7 +457,7 @@ func (kt *KustTarget) accumulateResources(
 	return ra, nil
 }
 
-// accumulateResources fills the given resourceAccumulator
+// accumulateComponents fills the given resourceAccumulator
 // with resources read from the given list of paths.
 func (kt *KustTarget) accumulateComponents(
 	ra *accumulator.ResAccumulator, paths []string) (*accumulator.ResAccumulator, error) {
@@ -499,6 +496,11 @@ func (kt *KustTarget) accumulateDirectory(
 	}
 	subKt.kustomization.BuildMetadata = kt.kustomization.BuildMetadata
 	subKt.origin = kt.origin
+	// Propagate namespace to child kustomization if child doesn't have one
+	// This ensures Helm charts in base kustomizations inherit namespace from overlays
+	if subKt.kustomization.Namespace == "" && kt.kustomization.Namespace != "" {
+		subKt.kustomization.Namespace = kt.kustomization.Namespace
+	}
 	var bytes []byte
 	if openApiPath, exists := subKt.Kustomization().OpenAPI["path"]; exists {
 		bytes, err = ldr.Load(openApiPath)

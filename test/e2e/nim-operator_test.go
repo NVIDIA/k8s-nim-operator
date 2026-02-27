@@ -47,7 +47,7 @@ const (
 )
 
 // Actual test suite.
-var _ = Describe("NIM Operator", func() {
+var _ = Describe("NIM Operator", Ordered, func() {
 
 	AfterEach(func(ctx context.Context) {
 		// Run diagnostic collector if test failed
@@ -66,52 +66,54 @@ var _ = Describe("NIM Operator", func() {
 		}
 	})
 
-	When("deploying the K8s-NIM-Operator via Helm", Ordered, func() {
-		It("should be successful", func(ctx context.Context) {
-			// Add or Update Helm repo
-			helmRepo := repo.Entry{
-				Name: "nvidia",
-				URL:  nvidiaHelm,
-			}
-			err := helmClient.AddOrUpdateChartRepo(helmRepo)
-			Expect(err).NotTo(HaveOccurred())
+	BeforeAll(func() {
+		// Add or Update Helm repo
+		helmRepo := repo.Entry{
+			Name: "nvidia",
+			URL:  nvidiaHelm,
+		}
+		err := helmClient.AddOrUpdateChartRepo(helmRepo)
+		Expect(err).NotTo(HaveOccurred())
 
-			err = helmClient.UpdateChartRepos()
-			Expect(err).NotTo(HaveOccurred())
+		err = helmClient.UpdateChartRepos()
+		Expect(err).NotTo(HaveOccurred())
 
-			pullSecrets := []string{"ngc-secret"}
-			// Values
-			values := helmValues.Options{
-				Values: []string{
-					fmt.Sprintf("operator.image.repository=%s", ImageRepo),
-					fmt.Sprintf("operator.image.tag=%s", ImageTag),
-					fmt.Sprintf("operator.image.pullPolicy=%s", ImagePullPolicy),
-					fmt.Sprintf("operator.image.pullSecrets={%s}", strings.Join(pullSecrets, ",")),
-				},
-			}
+		pullSecrets := []string{"ngc-secret"}
+		// Values
+		values := helmValues.Options{
+			Values: []string{
+				fmt.Sprintf("operator.image.repository=%s", ImageRepo),
+				fmt.Sprintf("operator.image.tag=%s", ImageTag),
+				fmt.Sprintf("operator.image.pullPolicy=%s", ImagePullPolicy),
+				fmt.Sprintf("operator.image.pullSecrets={%s}", strings.Join(pullSecrets, ",")),
+				fmt.Sprintf("operator.admissionController.enabled=%t", AdmissionControllerEnabled),
+			},
+		}
 
-			// Chart spec
-			chartSpec := &helm.ChartSpec{
-				ReleaseName:     helmReleaseName,
-				ChartName:       helmChart,
-				Namespace:       testNamespace.Name,
-				CreateNamespace: true,
-				Wait:            true,
-				Timeout:         10 * time.Minute, // pull time is long
-				ValuesOptions:   values,
-				CleanupOnFail:   true,
-			}
+		// Chart spec
+		chartSpec := &helm.ChartSpec{
+			ReleaseName:      helmReleaseName,
+			ChartName:        helmChart,
+			Namespace:        testNamespace.Name,
+			CreateNamespace:  true,
+			Wait:             true,
+			Timeout:          10 * time.Minute, // pull time is long
+			ValuesOptions:    values,
+			CleanupOnFail:    true,
+			DependencyUpdate: true, // fetch dynamo-platform, dynamo-crds from Chart.yaml into charts/
+		}
 
-			By("Installing k8s-nim-operator Helm chart")
-			_, err = helmClient.InstallOrUpgradeChart(ctx, chartSpec, nil)
-			Expect(err).NotTo(HaveOccurred())
-		})
+		By("Installing k8s-nim-operator Helm chart")
+		_, err = helmClient.InstallOrUpgradeChart(ctx, chartSpec, nil)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	When("deploying NIMCache and NIMService", Ordered, func() {
 		AfterEach(func() {
 			// Clean up
-			cleanupNIMCRs()
+			if !CurrentSpecReport().Failed() {
+				cleanupNIMCRs()
+			}
 		})
 
 		It("should go to READY state", func(ctx context.Context) {
@@ -140,6 +142,57 @@ var _ = Describe("NIM Operator", func() {
 			By("Creating a NIMService object")
 			nimService := &v1alpha1.NIMService{}
 			data, err = os.ReadFile(filepath.Join(cwd, "data", "nimservice.yml"))
+			Expect(err).NotTo(HaveOccurred())
+
+			err = yaml.Unmarshal(data, nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = cli.AppsV1alpha1().NIMServices(testNamespace.Name).Create(ctx, nimService, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking the NIMService object state is ready")
+			Eventually(func() bool {
+				nimServiceObject, _ := cli.AppsV1alpha1().NIMServices(testNamespace.Name).Get(ctx, nimService.Name, metav1.GetOptions{})
+				return nimServiceObject.Status.State == v1alpha1.NIMServiceStatusReady
+			}, Timeout, 5*time.Second).Should(BeTrue())
+		})
+	})
+
+	When("deploying Multi LLM NIMCache and NIMService", Ordered, func() {
+
+		AfterEach(func() {
+			// Clean up
+			if !CurrentSpecReport().Failed() {
+				cleanupNIMCRs()
+			}
+		})
+
+		It("should go to READY state", func(ctx context.Context) {
+			// Create a NIMCache object
+			By("Creating a NIMCache object")
+			cli, err := versioned.NewForConfig(clientConfig)
+			Expect(err).NotTo(HaveOccurred())
+
+			nimCache := &v1alpha1.NIMCache{}
+			data, err := os.ReadFile(filepath.Join(cwd, "data", "nimcache-multi-llm.yml"))
+			Expect(err).NotTo(HaveOccurred())
+
+			err = yaml.Unmarshal(data, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Create(ctx, nimCache, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking the NIMCache object state is ready")
+			Eventually(func() bool {
+				nimCacheObject, _ := cli.AppsV1alpha1().NIMCaches(testNamespace.Name).Get(ctx, nimCache.Name, metav1.GetOptions{})
+				return nimCacheObject.Status.State == v1alpha1.NimCacheStatusReady
+			}, Timeout, 5*time.Second).Should(BeTrue())
+
+			// Create a NIMService object
+			By("Creating a NIMService object")
+			nimService := &v1alpha1.NIMService{}
+			data, err = os.ReadFile(filepath.Join(cwd, "data", "nimservice-multi-llm.yml"))
 			Expect(err).NotTo(HaveOccurred())
 
 			err = yaml.Unmarshal(data, nimService)

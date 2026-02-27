@@ -20,18 +20,21 @@ on:
     types:
       - completed
     branches:
-      - "pull-request/[0-9]+"
       - main
       - release-*
 
 jobs:
   e2e-tests:
     runs-on: linux-amd64-cpu4
-    #if: ${{ github.event.workflow_run.conclusion == 'success' }} && ${{ github.event.workflow_run.event == 'push' }}
-    if: false # TODO: Disabled until e2e test infra is fixed
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    permissions:
+      contents: read
+      id-token: write
+      checks: write
+      statuses: write
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         
       - name: Calculate build vars
         id: vars
@@ -41,7 +44,7 @@ jobs:
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION := }" >> $GITHUB_ENV
 
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.2.10
+        uses: NVIDIA/holodeck@v0.2.18
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -49,11 +52,11 @@ jobs:
           holodeck_config: "test/e2e/infra/aws.yml"
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
-      - name: Intall dependencies
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y make
@@ -66,21 +69,37 @@ jobs:
           E2E_IMAGE_TAG: ${{ env.COMMIT_SHORT_SHA }}
           LOG_ARTIFACTS: ${{ github.workspace }}/e2e_logs
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           ./hack/e2e_tests.sh
 
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-test-logs
           path: ./e2e_logs/
           retention-days: 15
 
+     # This makes the result appear on the merged commit's Checks tab
+      - name: Report status on merged commit
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'End-to-end Tests',
+              head_sha: '${{ github.event.workflow_run.head_sha }}',
+              status: 'completed',
+              conclusion: '${{ job.status }}' // success | failure | cancelled
+            })
+
       - name: Send Slack alert notification
         id: slack
         if: false
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: slackapi/slack-github-action@v2.1.1
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SUMMARY_URL: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}

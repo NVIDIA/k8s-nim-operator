@@ -31,7 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/yaml"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -67,6 +68,7 @@ type NemoCustomizerReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
+	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
 	recorder         record.EventRecorder
@@ -77,13 +79,14 @@ type NemoCustomizerReconciler struct {
 var _ shared.Reconciler = &NemoCustomizerReconciler{}
 
 // NewNemoCustomizerReconciler creates a new reconciler for NemoCustomizer with the given platform.
-func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoCustomizerReconciler {
+func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NemoCustomizerReconciler {
 	return &NemoCustomizerReconciler{
-		Client:   client,
-		scheme:   scheme,
-		updater:  updater,
-		renderer: renderer,
-		log:      log,
+		Client:          client,
+		scheme:          scheme,
+		updater:         updater,
+		discoveryClient: discoveryClient,
+		renderer:        renderer,
+		log:             log,
 	}
 }
 
@@ -93,7 +96,7 @@ func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, u
 // +kubebuilder:rbac:groups=run.ai,resources=trainingworkloads;runaijobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=nvidia.com,resources=nemotrainingjobs;nemotrainingjobs/status;nemoentityhandlers,verbs=create;get;list;watch;update;delete;patch
-// +kubebuilder:rbac:groups=batch.volcano.sh,resources=jobs;jobs/status,verbs=get;list;watch
+// +kubebuilder:rbac:groups=batch.volcano.sh,resources=jobs;jobs/status,verbs=get;list;watch;create;update;delete;patch
 // +kubebuilder:rbac:groups=nodeinfo.volcano.sh,resources=numatopologies,verbs=get;list;watch
 // +kubebuilder:rbac:groups=scheduling.incubator.k8s.io;scheduling.volcano.sh,resources=queues;queues/status;podgroups,verbs=get;list;watch
 // +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions;proxies,verbs=get;list;watch
@@ -105,9 +108,10 @@ func NewNemoCustomizerReconciler(client client.Client, scheme *runtime.Scheme, u
 // +kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors;prometheusrules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=get;list;watch;create
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs;jobs/status,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes;grpcroutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalars,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 // +kubebuilder:rbac:groups="nodeinfo.volcano.sh",resources=numatopologies,verbs=get;list;watch
@@ -140,8 +144,9 @@ func (r *NemoCustomizerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if NemoCustomizer.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(NemoCustomizer, NemoCustomizerFinalizer) {
-			controllerutil.AddFinalizer(NemoCustomizer, NemoCustomizerFinalizer)
-			if err := r.Update(ctx, NemoCustomizer); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoCustomizer, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NemoCustomizerFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -151,19 +156,20 @@ func (r *NemoCustomizerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			// Perform platform specific cleanup of resources
 			if err := r.cleanupNemoCustomizer(ctx, NemoCustomizer); err != nil {
 				r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeNormal, "Delete",
-					"NemoCustomizer %s in deleted", NemoCustomizer.Name)
+					"NemoCustomizer %s in being deleted", NemoCustomizer.Name)
 				return ctrl.Result{}, err
 			}
-
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(NemoCustomizer, NemoCustomizerFinalizer)
-			if err := r.Update(ctx, NemoCustomizer); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoCustomizer, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NemoCustomizerFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeNormal, "Delete",
 					"NemoCustomizer %s finalizer removed", NemoCustomizer.Name)
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil
 		}
+		// return as the cr is being deleted and GC will cleanup owned objects
+		return ctrl.Result{}, nil
 	}
 
 	// Fetch container orchestrator type
@@ -243,7 +249,7 @@ func (r *NemoCustomizerReconciler) GetOrchestratorType(ctx context.Context) (k8s
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoCustomizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nemo-customizer-service-controller")
-	return ctrl.NewControllerManagedBy(mgr).
+	bd := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoCustomizer{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -261,7 +267,7 @@ func (r *NemoCustomizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					newNemoCustomizer, ok := e.ObjectNew.(*appsv1alpha1.NemoCustomizer)
 					if ok {
 						// Handle case where object is marked for deletion
-						if !newNemoCustomizer.ObjectMeta.DeletionTimestamp.IsZero() {
+						if !newNemoCustomizer.DeletionTimestamp.IsZero() {
 							return true
 						}
 
@@ -272,8 +278,19 @@ func (r *NemoCustomizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				// For other types we watch, reconcile them
 				return true
 			},
-		}).
-		Complete(r)
+		})
+
+	bd, err := k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		bd,
+		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		&gatewayv1.HTTPRoute{},
+	)
+	if err != nil {
+		return err
+	}
+
+	return bd.Complete(r)
 }
 
 func (r *NemoCustomizerReconciler) refreshMetrics(ctx context.Context) {
@@ -344,7 +361,22 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Sync HTTPRoute
+	if nemoCustomizer.IsHTTPRouteEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &gatewayv1.HTTPRoute{}, func() (client.Object, error) {
+			return renderer.HTTPRoute(nemoCustomizer.GetHTTPRouteParams())
+		}, "httproute", conditions.ReasonHTTPRouteFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -479,7 +511,7 @@ func (r *NemoCustomizerReconciler) reconcilePVC(ctx context.Context, nemoCustomi
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nemoCustomizer.Spec.Training.ModelPVC.Create != nil && *nemoCustomizer.Spec.Training.ModelPVC.Create {
-			pvc, err = shared.ConstructPVC(nemoCustomizer.Spec.Training.ModelPVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoCustomizer.GetNamespace()})
+			pvc, err = shared.ConstructPVC(nemoCustomizer.Spec.Training.ModelPVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoCustomizer.GetNamespace(), Labels: nemoCustomizer.GetServiceLabels()})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return err
@@ -702,8 +734,8 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 	if len(n.Spec.Training.NodeSelector) > 0 {
 		trainingCfg["nodeSelector"] = n.Spec.Training.NodeSelector
 	}
-	if n.Spec.Training.PodAffinity != nil {
-		trainingCfg["affinity"] = n.Spec.Training.PodAffinity
+	if n.Spec.Training.Affinity != nil {
+		trainingCfg["affinity"] = n.Spec.Training.Affinity
 	}
 	if n.Spec.Training.Resources != nil {
 		trainingCfg["resources"] = n.Spec.Training.Resources
@@ -773,19 +805,23 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, ne
 	logger := log.FromContext(ctx)
 
 	namespacedName := types.NamespacedName{Name: nemoCustomizer.GetName(), Namespace: nemoCustomizer.GetNamespace()}
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
-		return err
+	getErr := r.Get(ctx, namespacedName, obj)
+	if getErr != nil && !apiErrors.IsNotFound(getErr) {
+		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
+		return getErr
 	}
+
+	// Track an existing resource
+	found := getErr == nil
+
 	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoCustomizer.Spec)) {
+	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoCustomizer.Spec)) {
 		return nil
 	}
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, nemoCustomizer.GetName(), nemoCustomizer.GetNamespace())
+		logger.Error(err, "failed to render", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
@@ -810,8 +846,20 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, ne
 		return nil
 	}
 
+	// If we found the object and autoscaling is enabled on the Customizer,
+	// copy the current replicas from the existing object into the desired (resource),
+	// so we don't fight the HPA (or external scaler) on each reconcile.
+	if found && nemoCustomizer.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
+				replicas := *curr.Spec.Replicas
+				desired.Spec.Replicas = &replicas
+			}
+		}
+	}
+
 	if err = controllerutil.SetControllerReference(nemoCustomizer, resource, r.GetScheme()); err != nil {
-		logger.Error(err, "failed to set owner", conditionType, namespacedName)
+		logger.Error(err, "failed to set owner", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())
@@ -821,7 +869,7 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, ne
 
 	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
-		logger.Error(err, "failed to sync", conditionType, namespacedName)
+		logger.Error(err, "failed to sync", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoCustomizer, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoCustomizer", nemoCustomizer.GetName())

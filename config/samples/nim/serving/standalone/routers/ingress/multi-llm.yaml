@@ -1,0 +1,61 @@
+---
+# NIM Cache for Multi-LLM NIM
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: nim-cache-multi-llm
+  namespace: nim-service
+spec:
+  source:
+    hf:
+      endpoint: "https://huggingface.co"
+      namespace: "meta-llama"
+      authSecret: hf-api-secret
+      modelPuller: nvcr.io/nim/nvidia/llm-nim:1.12
+      pullSecret: ngc-secret
+      modelName: "Llama-3.2-1B-Instruct"
+  storage:
+    pvc:
+      create: true
+      storageClass: ''
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+
+---
+# NIM Service with Multi-LLM NIM with Autoscaling
+# NOTE: Ingress controller (e.g. nginx) should be deployed as a pre-requisite
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-3-2-1b-instruct
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/llm-nim
+    tag: "1.12"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: nim-cache-multi-llm
+      profile: 'tensorrt_llm'
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      cpu: "12"
+      memory: 32Gi
+    requests:
+      nvidia.com/gpu: 1
+      cpu: "4"
+      memory: 6Gi
+  replicas: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+    router:
+      ingress:
+        ingressClass: nginx
+      hostDomainName: demo.nvidia.example.com

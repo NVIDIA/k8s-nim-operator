@@ -1,0 +1,21 @@
+# NIM Cache with Multi-LLM NIM from HF
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: nim-cache-multi-llm
+  namespace: nim-service
+spec:
+  source:
+    hf:
+      endpoint: "https://huggingface.co"
+      namespace: "meta-llama"
+      authSecret: hf-secret # with HF_TOKEN set
+      modelPuller: nvcr.io/nim/nvidia/llm-nim:1.12
+      pullSecret: ngc-secret
+      modelName: "Llama-3.2-1B-Instruct"
+  storage:
+    pvc:
+      create: true
+      storageClass: ''
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce

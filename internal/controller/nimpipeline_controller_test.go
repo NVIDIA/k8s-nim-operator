@@ -91,7 +91,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 									Repository: "llm-nim-container",
 									Tag:        "latest",
 								},
-								Replicas: 1,
+								Replicas: ptr.To(int32(1)),
 								Resources: &corev1.ResourceRequirements{
 									Requests: corev1.ResourceList{
 										corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -112,7 +112,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 									Repository: "llm-embedding-container",
 									Tag:        "latest",
 								},
-								Replicas: 2,
+								Replicas: ptr.To(int32(2)),
 							},
 						},
 					},
@@ -158,7 +158,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 									Repository: "llm-nim-container",
 									Tag:        "latest",
 								},
-								Replicas: 1,
+								Replicas: ptr.To(int32(1)),
 								Resources: &corev1.ResourceRequirements{
 									Requests: corev1.ResourceList{
 										corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -179,7 +179,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 									Repository: "llm-embedding-container",
 									Tag:        "latest",
 								},
-								Replicas: 2,
+								Replicas: ptr.To(int32(2)),
 							},
 						},
 					},
@@ -212,6 +212,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 
 			// Disable nim-llm-service in the pipeline spec
+			Expect(client.Get(context.TODO(), namespacedName, updatePipeline)).To(Succeed())
 			updatePipeline.Spec.Services[0].Enabled = ptr.To(false)
 			Expect(client.Update(ctx, updatePipeline)).To(Succeed())
 
@@ -245,7 +246,7 @@ var _ = Describe("NIMPipeline Controller", func() {
 									Repository: "llm-nim-container",
 									Tag:        "latest",
 								},
-								Replicas: 1,
+								Replicas: ptr.To(int32(1)),
 								Resources: &corev1.ResourceRequirements{
 									Requests: corev1.ResourceList{
 										corev1.ResourceCPU:    resource.MustParse("100m"),

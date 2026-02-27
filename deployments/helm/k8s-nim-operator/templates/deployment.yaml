@@ -28,11 +28,22 @@ spec:
         {{- end }}
     spec:
       containers:
-      - args: {{- toYaml .Values.operator.args | nindent 8 }}
+      - args:
+        {{- include "k8s-nim-operator.fullArgs" . | nindent 8 }}
         command:
         - /manager
         image: {{ include "k8s-nim-operator.fullimage" . }}
         imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+        {{- if .Values.operator.admissionController.enabled }}
+        ports:
+          - containerPort: 9443
+            name: webhook-server
+            protocol: TCP
+        volumeMounts:
+          - mountPath: /tmp/k8s-webhook-server/serving-certs
+            name: cert
+            readOnly: true
+        {{- end }}
         env:
           - name: WATCH_NAMESPACE
             value: ""
@@ -40,6 +51,8 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          - name: ENABLE_WEBHOOKS
+            value: "{{ .Values.operator.admissionController.enabled }}"
         livenessProbe:
           httpGet:
             path: /healthz
@@ -62,6 +75,17 @@ spec:
       securityContext: {{- toYaml .Values.operator.podSecurityContext | nindent 8 }}
       serviceAccountName: k8s-nim-operator
       terminationGracePeriodSeconds: 10
+      {{- if .Values.operator.admissionController.enabled }}
+      volumes:
+        - name: cert
+          secret:
+            {{- if eq .Values.operator.admissionController.tls.mode "cert-manager" }}
+            secretName: {{ include "k8s-nim-operator.fullname" . }}-webhook-server-cert
+            {{- else }}
+            secretName: {{ required "operator.admissionController.tls.secret.name is required when tls.mode is 'secret'" .Values.operator.admissionController.tls.secret.name }}
+            {{- end }}
+            defaultMode: 420
+      {{- end }}
     {{- with .Values.operator.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

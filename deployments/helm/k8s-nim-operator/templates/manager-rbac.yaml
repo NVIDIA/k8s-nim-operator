@@ -37,6 +37,7 @@ rules:
   - create
   - update
   - patch
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -385,6 +386,8 @@ rules:
   - get
   - list
   - watch
+  - create
+  - delete
 - apiGroups:
   - route.openshift.io
   resources:
@@ -434,6 +437,7 @@ rules:
   resourceNames:
   - nonroot
   - anyuid
+  - hostmount-anyuid
   resources:
   - securitycontextconstraints
   verbs:
@@ -547,6 +551,91 @@ rules:
   - delete
   - patch
   - update
+- apiGroups:
+  - serving.kserve.io
+  resources:
+  - inferenceservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - leaderworkerset.x-k8s.io
+  resources:
+  - leaderworkersets
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+  - patch
+  - update
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - httproutes
+  - grpcroutes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - resource.nvidia.com
+  resources:
+  - computedomains
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inference.networking.k8s.io
+  resources:
+  - inferencepools
+  - inferenceobjectives
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inference.networking.x-k8s.io
+  resources:
+  - inferencepools
+  - inferenceobjectives
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

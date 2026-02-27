@@ -1,0 +1,57 @@
+---
+# NIM Cache with LLM-Specific NIM from NGC
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: meta-llama3-2-1b-instruct
+  namespace: nim-service
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.12.0
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: tensorrt_llm
+        tensorParallelism: "1"
+  storage:
+    pvc:
+      create: true
+      storageClass: ""
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+
+---
+# NIM Service with DRA resource auto-created with CEL expressions
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama3-2-1b-instruct
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
+    tag: "1.12.0"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama3-2-1b-instruct
+      profile: ''
+  replicas: 1
+  draResources:
+  - claimCreationSpec:
+      devices:
+      - name: gpu
+        deviceClassName: gpu.nvidia.com
+        driverName: gpu.nvidia.com
+        celExpressions:
+          - (device.attributes["gpu.nvidia.com"].productName.lowerAscii().matches("^.*a100.*$") ||
+            device.attributes["gpu.nvidia.com"].productName.lowerAscii().matches("^.*h100.*$")) &&
+            device.capacity["gpu.nvidia.com"].memory.compareTo(quantity("40Gi")) >= 0
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000

@@ -20,15 +20,19 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strconv"
+	"strings"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -56,6 +60,8 @@ const (
 )
 
 // NemoGuardrailSpec defines the desired state of NemoGuardrail.
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
+// +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
 type NemoGuardrailSpec struct {
 	Image       Image           `json:"image"`
 	Command     []string        `json:"command,omitempty"`
@@ -63,24 +69,31 @@ type NemoGuardrailSpec struct {
 	Env         []corev1.EnvVar `json:"env,omitempty"`
 	NIMEndpoint *NIMEndpoint    `json:"nimEndpoint,omitempty"`
 	// ConfigStore stores the config of the guardrail service
-	ConfigStore  GuardrailConfig              `json:"configStore,omitempty"`
-	Labels       map[string]string            `json:"labels,omitempty"`
-	Annotations  map[string]string            `json:"annotations,omitempty"`
-	NodeSelector map[string]string            `json:"nodeSelector,omitempty"`
-	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
-	PodAffinity  *corev1.PodAffinity          `json:"podAffinity,omitempty"`
-	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	ConfigStore  GuardrailConfig     `json:"configStore,omitempty"`
+	Labels       map[string]string   `json:"labels,omitempty"`
+	Annotations  map[string]string   `json:"annotations,omitempty"`
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+	Affinity     *corev1.Affinity    `json:"affinity,omitempty"`
+	// Deprecated: Use Affinity instead.
+	PodAffinity *corev1.PodAffinity          `json:"podAffinity,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
 	Expose  ExposeV1    `json:"expose,omitempty"`
 	Scale   Autoscaling `json:"scale,omitempty"`
 	Metrics Metrics     `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default:=1
-	Replicas     int    `json:"replicas,omitempty"`
+	Replicas     *int32 `json:"replicas,omitempty"`
 	UserID       *int64 `json:"userID,omitempty"`
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
+
+	// DatabaseConfig stores the metadata for the guardrail service.
+	DatabaseConfig *DatabaseConfig `json:"databaseConfig,omitempty"`
+	// OpenTelemetry Settings
+	// +kubebuilder:validation:Optional
+	OpenTelemetry *OTelSpec `json:"otel,omitempty"`
 }
 
 type NIMEndpoint struct {
@@ -229,7 +242,137 @@ func (n *NemoGuardrail) GetStandardEnv() []corev1.EnvVar {
 			})
 		}
 	}
+
+	if n.Spec.DatabaseConfig != nil {
+		// Append the environment variables for Postgres
+		envVars = append(envVars, n.GetPostgresEnv()...)
+	}
+
+	// Append the environment variables for OTel
+	envVars = append(envVars, n.GetOtelEnv()...)
 	return envVars
+}
+
+// IsOtelEnabled returns true if Open Telemetry Collector is enabled.
+func (n *NemoGuardrail) IsOtelEnabled() bool {
+	if n.Spec.OpenTelemetry != nil {
+		return n.Spec.OpenTelemetry.Enabled != nil && *n.Spec.OpenTelemetry.Enabled
+	}
+	return false
+}
+
+// GetOtelEnv generates OpenTelemetry-related environment variables.
+func (n *NemoGuardrail) GetOtelEnv() []corev1.EnvVar {
+	if !n.IsOtelEnabled() {
+		return []corev1.EnvVar{
+			{
+				Name:  "OTEL_SDK_DISABLED",
+				Value: "true",
+			},
+		}
+	}
+
+	var otelEnvVars []corev1.EnvVar
+	otelEnvVars = append(otelEnvVars,
+		corev1.EnvVar{Name: "OTEL_EXPORTER_OTLP_ENDPOINT", Value: n.Spec.OpenTelemetry.ExporterOtlpEndpoint},
+		corev1.EnvVar{Name: "OTEL_TRACES_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.TracesExporter},
+		corev1.EnvVar{Name: "OTEL_METRICS_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.MetricsExporter},
+		corev1.EnvVar{Name: "OTEL_LOGS_EXPORTER", Value: n.Spec.OpenTelemetry.ExporterConfig.LogsExporter},
+		corev1.EnvVar{Name: "OTEL_LOG_LEVEL", Value: n.Spec.OpenTelemetry.LogLevel},
+	)
+
+	if len(n.Spec.OpenTelemetry.ExcludedUrls) > 0 {
+		otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+			Name:  "OTEL_PYTHON_EXCLUDED_URLS",
+			Value: strings.Join(n.Spec.OpenTelemetry.ExcludedUrls, ","),
+		})
+	}
+
+	var enableLog = true
+	if n.Spec.OpenTelemetry.DisableLogging != nil {
+		enableLog = !*n.Spec.OpenTelemetry.DisableLogging
+	}
+	otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+		Name:  "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED",
+		Value: strconv.FormatBool(enableLog),
+	})
+
+	otelEnvVars = append(otelEnvVars, corev1.EnvVar{
+		Name:  "OTEL_RESOURCE_ATTRIBUTES",
+		Value: "deployment.environment=$(NAMESPACE)",
+	})
+
+	return otelEnvVars
+}
+
+// GetPostgresEnv returns the PostgreSQL environment variables for a Kubernetes pod.
+func (n *NemoGuardrail) GetPostgresEnv() []corev1.EnvVar {
+	envVars := []corev1.EnvVar{
+		{
+			Name: "POSTGRES_DB_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: n.Spec.DatabaseConfig.Credentials.PasswordKey,
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.DatabaseConfig.Credentials.SecretName,
+					},
+				},
+			},
+		},
+		{
+			Name: "POSTGRES_URI",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "uri",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Name,
+					},
+				},
+			},
+		},
+		{
+			Name: "DB_URI", // guardrails requires this env for external DB
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: "uri",
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Name,
+					},
+				},
+			},
+		},
+	}
+
+	return envVars
+}
+
+// GeneratePostgresConnString generates a PostgreSQL connection string using the database config.
+func (n *NemoGuardrail) GeneratePostgresConnString(secretValue string) string {
+	// Construct the connection string
+	connString := fmt.Sprintf(
+		"postgresql://%s:%s@%s:%d/%s",
+		n.Spec.DatabaseConfig.Credentials.User,
+		secretValue,
+		n.Spec.DatabaseConfig.Host,
+		n.Spec.DatabaseConfig.Port,
+		n.Spec.DatabaseConfig.DatabaseName,
+	)
+
+	return connString
+}
+
+func (n *NemoGuardrail) GetSecretParams(secretMapData map[string]string) *rendertypes.SecretParams {
+	params := &rendertypes.SecretParams{}
+
+	// Set metadata
+	params.Name = n.Name
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetLabels()
+	params.Annotations = n.GetAnnotations()
+
+	params.SecretMapData = secretMapData
+
+	return params
 }
 
 // GetStandardAnnotations returns default annotations to apply to the NemoGuardrail instance.
@@ -278,9 +421,9 @@ func (n *NemoGuardrail) GetTolerations() []corev1.Toleration {
 	return n.Spec.Tolerations
 }
 
-// GetPodAffinity returns pod affinity for the NemoGuardrail instance.
-func (n *NemoGuardrail) GetPodAffinity() *corev1.PodAffinity {
-	return n.Spec.PodAffinity
+// GetAffinity returns affinity for the NemoGuardrail instance.
+func (n *NemoGuardrail) GetAffinity() *corev1.Affinity {
+	return n.Spec.Affinity
 }
 
 // GetContainerName returns name of the container for NemoGuardrail deployment.
@@ -440,9 +583,9 @@ func (n *NemoGuardrail) GetServiceMonitor() ServiceMonitor {
 }
 
 // GetReplicas returns replicas for the NemoGuardrail deployment.
-func (n *NemoGuardrail) GetReplicas() int {
+func (n *NemoGuardrail) GetReplicas() *int32 {
 	if n.IsAutoScalingEnabled() {
-		return 0
+		return n.Spec.Scale.HPA.MinReplicas
 	}
 	return n.Spec.Replicas
 }
@@ -459,12 +602,25 @@ func (n *NemoGuardrail) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NemoGuardrail deployment.
 func (n *NemoGuardrail) IsIngressEnabled() bool {
-	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
+	return (n.Spec.Expose.Router.Ingress != nil && n.Spec.Expose.Router.Ingress.IngressClass != "") ||
+		(n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled) // TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
 }
 
 // GetIngressSpec returns the Ingress spec NemoGuardrail deployment.
 func (n *NemoGuardrail) GetIngressSpec() networkingv1.IngressSpec {
-	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
+		return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	}
+	return n.Spec.Expose.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
+}
+
+func (n *NemoGuardrail) IsHTTPRouteEnabled() bool {
+	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
+}
+
+func (n *NemoGuardrail) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
+	return n.Spec.Expose.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoGuardrail deployment.
@@ -531,7 +687,7 @@ func (n *NemoGuardrail) GetDeploymentParams() *rendertypes.DeploymentParams {
 	}
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
-	params.Affinity = n.GetPodAffinity()
+	params.Affinity = n.GetAffinity()
 	params.ImagePullSecrets = n.GetImagePullSecrets()
 	params.ImagePullPolicy = n.GetImagePullPolicy()
 
@@ -591,7 +747,7 @@ func (n *NemoGuardrail) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	params.ServiceName = n.GetName()
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
-	params.Affinity = n.GetPodAffinity()
+	params.Affinity = n.GetAffinity()
 	params.ImagePullSecrets = n.GetImagePullSecrets()
 	params.ImagePullPolicy = n.GetImagePullPolicy()
 
@@ -662,6 +818,20 @@ func (n *NemoGuardrail) GetIngressParams() *rendertypes.IngressParams {
 	return params
 }
 
+// GetHTTPRouteParams returns params to render HTTPRoute from templates.
+func (n *NemoGuardrail) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
+	params := &rendertypes.HTTPRouteParams{}
+	params.Enabled = n.IsHTTPRouteEnabled()
+
+	// Set metadata
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetHTTPRouteAnnotations()
+	params.Spec = n.GetHTTPRouteSpec()
+	return params
+}
+
 // GetRoleParams returns params to render Role from templates.
 func (n *NemoGuardrail) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
@@ -669,6 +839,7 @@ func (n *NemoGuardrail) GetRoleParams() *rendertypes.RoleParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	// Set rules to use SCC
 	params.Rules = []rbacv1.PolicyRule{
@@ -690,6 +861,7 @@ func (n *NemoGuardrail) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	params.ServiceAccountName = n.GetServiceAccountName()
 	params.RoleName = n.GetName()
@@ -763,11 +935,24 @@ func (n *NemoGuardrail) GetServiceMonitorParams() *rendertypes.ServiceMonitorPar
 	return params
 }
 
+func (n *NemoGuardrail) GetHTTPRouteAnnotations() map[string]string {
+	annotations := n.GetNemoGuardrailAnnotations()
+
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(annotations, n.Spec.Expose.Router.Annotations)
+	}
+	return annotations
+}
+
 func (n *NemoGuardrail) GetIngressAnnotations() map[string]string {
 	NemoGuardrailAnnotations := n.GetNemoGuardrailAnnotations()
 
-	if n.Spec.Expose.Ingress.Annotations != nil {
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Expose.Ingress.Annotations)
+	}
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Expose.Router.Annotations)
 	}
 	return NemoGuardrailAnnotations
 }
@@ -797,6 +982,65 @@ func (n *NemoGuardrail) GetServiceMonitorAnnotations() map[string]string {
 		return utils.MergeMaps(NemoGuardrailAnnotations, n.Spec.Metrics.ServiceMonitor.Annotations)
 	}
 	return NemoGuardrailAnnotations
+}
+
+// GetInitContainers returns the init containers for the NemoGuardrail.
+//
+// It creates and returns a slice of corev1.Container.
+// The init containers include a busybox container to wait for Postgres to start,
+// and an guardrail-db-migration container to run the database migration.
+//
+// Returns a slice of corev1.Container.
+func (n *NemoGuardrail) GetInitContainers() []corev1.Container {
+
+	connCmd := fmt.Sprintf(
+		"until nc -z %s %d; do echo \"Waiting for Postgres to start \"; sleep 5; done",
+		n.Spec.DatabaseConfig.Host,
+		n.Spec.DatabaseConfig.Port)
+
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "NAMESPACE",
+			Value: n.Namespace,
+		},
+		{
+			Name:  "PYTHONPATH",
+			Value: "/app/services/guardrails",
+		},
+	}
+	// Append the environment variables for Postgres
+	envVars = append(envVars, n.GetPostgresEnv()...)
+
+	return []corev1.Container{
+		{
+			Name:            "wait-for-postgres",
+			Image:           "busybox",
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"sh", "-c", connCmd,
+			},
+		},
+		{
+			Name:            "guardrail-db-migration",
+			Image:           n.GetImage(),
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command: []string{
+				"/app/.venv/bin/alembic",
+			},
+			Args: []string{
+				"upgrade",
+				"head",
+			},
+			Env:        envVars,
+			WorkingDir: "/app/services/guardrails",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
 }
 
 func init() {

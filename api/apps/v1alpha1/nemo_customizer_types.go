@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -66,17 +67,21 @@ const (
 )
 
 // NemoCustomizerSpec defines the desired state of NemoCustomizer.
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
+// +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
 type NemoCustomizerSpec struct {
-	Image        Image                        `json:"image"`
-	Command      []string                     `json:"command,omitempty"`
-	Args         []string                     `json:"args,omitempty"`
-	Env          []corev1.EnvVar              `json:"env,omitempty"`
-	Labels       map[string]string            `json:"labels,omitempty"`
-	Annotations  map[string]string            `json:"annotations,omitempty"`
-	NodeSelector map[string]string            `json:"nodeSelector,omitempty"`
-	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
-	PodAffinity  *corev1.PodAffinity          `json:"podAffinity,omitempty"`
-	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Image        Image               `json:"image"`
+	Command      []string            `json:"command,omitempty"`
+	Args         []string            `json:"args,omitempty"`
+	Env          []corev1.EnvVar     `json:"env,omitempty"`
+	Labels       map[string]string   `json:"labels,omitempty"`
+	Annotations  map[string]string   `json:"annotations,omitempty"`
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+	Affinity     *corev1.Affinity    `json:"affinity,omitempty"`
+	// Deprecated: Use Affinity instead.
+	PodAffinity *corev1.PodAffinity          `json:"podAffinity,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
 	Expose  ExposeV1    `json:"expose,omitempty"`
@@ -84,8 +89,7 @@ type NemoCustomizerSpec struct {
 	Metrics Metrics     `json:"metrics,omitempty"`
 
 	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default:=1
-	Replicas     int    `json:"replicas,omitempty"`
+	Replicas     *int32 `json:"replicas,omitempty"`
 	UserID       *int64 `json:"userID,omitempty"`
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
@@ -151,6 +155,9 @@ type TrainingConfig struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// Tolerations for the training jobs
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	// Affinity for the training jobs
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+	// Deprecated: Use Affinity instead.
 	// PodAffinity for the training jobs
 	PodAffinity *corev1.PodAffinity `json:"podAffinity,omitempty"`
 	// SharedMemorySizeLimit sets the max size of the shared memory volume (emptyDir) used by the training jobs for fast model runtime I/O.
@@ -396,6 +403,10 @@ func (n *NemoCustomizer) GetPostgresEnv() []corev1.EnvVar {
 				},
 			},
 		},
+		{
+			Name:  "POSTGRES_SECRET_NAME",
+			Value: n.Spec.DatabaseConfig.Credentials.SecretName,
+		},
 	}
 
 	return envVars
@@ -495,9 +506,9 @@ func (n *NemoCustomizer) GetTolerations() []corev1.Toleration {
 	return n.Spec.Tolerations
 }
 
-// GetPodAffinity returns pod affinity for the NemoCustomizer instance.
-func (n *NemoCustomizer) GetPodAffinity() *corev1.PodAffinity {
-	return n.Spec.PodAffinity
+// GetAffinity returns affinity for the NemoCustomizer instance.
+func (n *NemoCustomizer) GetAffinity() *corev1.Affinity {
+	return n.Spec.Affinity
 }
 
 // GetContainerName returns name of the container for NemoCustomizer deployment.
@@ -612,9 +623,9 @@ func (n *NemoCustomizer) GetServiceMonitor() ServiceMonitor {
 }
 
 // GetReplicas returns replicas for the NemoCustomizer deployment.
-func (n *NemoCustomizer) GetReplicas() int {
+func (n *NemoCustomizer) GetReplicas() *int32 {
 	if n.IsAutoScalingEnabled() {
-		return 0
+		return n.Spec.Scale.HPA.MinReplicas
 	}
 	return n.Spec.Replicas
 }
@@ -631,12 +642,25 @@ func (n *NemoCustomizer) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NemoCustomizer deployment.
 func (n *NemoCustomizer) IsIngressEnabled() bool {
-	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
+	return (n.Spec.Expose.Router.Ingress != nil && n.Spec.Expose.Router.Ingress.IngressClass != "") ||
+		(n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled) // TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
 }
 
 // GetIngressSpec returns the Ingress spec NemoCustomizer deployment.
 func (n *NemoCustomizer) GetIngressSpec() networkingv1.IngressSpec {
-	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
+		return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	}
+	return n.Spec.Expose.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
+}
+
+func (n *NemoCustomizer) IsHTTPRouteEnabled() bool {
+	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
+}
+
+func (n *NemoCustomizer) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
+	return n.Spec.Expose.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoCustomizer deployment.
@@ -695,7 +719,7 @@ func (n *NemoCustomizer) GetDeploymentParams() *rendertypes.DeploymentParams {
 	}
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
-	params.Affinity = n.GetPodAffinity()
+	params.Affinity = n.GetAffinity()
 	params.ImagePullSecrets = n.GetImagePullSecrets()
 	params.ImagePullPolicy = n.GetImagePullPolicy()
 
@@ -759,7 +783,7 @@ func (n *NemoCustomizer) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 	params.ServiceName = n.GetName()
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
-	params.Affinity = n.GetPodAffinity()
+	params.Affinity = n.GetAffinity()
 	params.ImagePullSecrets = n.GetImagePullSecrets()
 	params.ImagePullPolicy = n.GetImagePullPolicy()
 
@@ -835,6 +859,20 @@ func (n *NemoCustomizer) GetIngressParams() *rendertypes.IngressParams {
 	return params
 }
 
+// GetHTTPRouteParams returns params to render HTTPRoute from templates.
+func (n *NemoCustomizer) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
+	params := &rendertypes.HTTPRouteParams{}
+	params.Enabled = n.IsHTTPRouteEnabled()
+
+	// Set metadata
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetHTTPRouteAnnotations()
+	params.Spec = n.GetHTTPRouteSpec()
+	return params
+}
+
 // GetRoleParams returns params to render Role from templates.
 func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
@@ -842,6 +880,7 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	// Set rules for customizer
 	params.Rules = []rbacv1.PolicyRule{
@@ -927,6 +966,7 @@ func (n *NemoCustomizer) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	params.ServiceAccountName = n.GetServiceAccountName()
 	params.RoleName = n.GetName()
@@ -1013,10 +1053,23 @@ func (n *NemoCustomizer) GetServicePort() int32 {
 func (n *NemoCustomizer) GetIngressAnnotations() map[string]string {
 	NemoCustomizerAnnotations := n.GetNemoCustomizerAnnotations()
 
-	if n.Spec.Expose.Ingress.Annotations != nil {
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return utils.MergeMaps(NemoCustomizerAnnotations, n.Spec.Expose.Ingress.Annotations)
 	}
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(NemoCustomizerAnnotations, n.Spec.Expose.Router.Annotations)
+	}
 	return NemoCustomizerAnnotations
+}
+
+func (n *NemoCustomizer) GetHTTPRouteAnnotations() map[string]string {
+	annotations := n.GetNemoCustomizerAnnotations()
+
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(annotations, n.Spec.Expose.Router.Annotations)
+	}
+	return annotations
 }
 
 // GetServiceAnnotations return standard and customized service annotations.
@@ -1058,7 +1111,7 @@ func (n *NemoCustomizer) GetConfigMapParams(customizerConfigYAML []byte) *render
 	return &rendertypes.ConfigMapParams{
 		Name:        n.Name,
 		Namespace:   n.Namespace,
-		Labels:      n.GetLabels(),
+		Labels:      n.GetServiceLabels(),
 		Annotations: n.GetAnnotations(),
 		ConfigMapData: map[string]string{
 			"config.yaml": config.String(),
@@ -1072,7 +1125,7 @@ func (n *NemoCustomizer) GetSecretParams(secretMapData map[string]string) *rende
 	// Set metadata
 	params.Name = n.Name
 	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetLabels()
+	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetAnnotations()
 
 	params.SecretMapData = secretMapData

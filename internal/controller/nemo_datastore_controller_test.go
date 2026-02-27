@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -24,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -56,7 +58,7 @@ var _ = Describe("NemoDatastore Controller", func() {
 					Repository: "test-repo",
 					Tag:        "test-tag",
 				},
-				Replicas: 1,
+				Replicas: ptr.To(int32(1)),
 				DatabaseConfig: appsv1alpha1.DatabaseConfig{
 					Host:         "test-pg-host",
 					DatabaseName: "test-pg-database",
@@ -92,6 +94,7 @@ var _ = Describe("NemoDatastore Controller", func() {
 		Expect(networkingv1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(appsv1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.Install(scheme)).To(Succeed())
 
 		manifestsDir, err := filepath.Abs("../../manifests")
 		Expect(err).ToNot(HaveOccurred())
