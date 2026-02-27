@@ -305,14 +305,14 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			&corev1.Service{},
 			&appsv1.Deployment{},
 		} {
-			if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), obj, eppNamespacedName); cleanupErr != nil && !k8serrors.IsNotFound(cleanupErr) {
+			if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), obj, eppNamespacedName); cleanupErr != nil && !apiErrors.IsNotFound(cleanupErr) {
 				return ctrl.Result{}, cleanupErr
 			}
 		}
-		if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), &corev1.ConfigMap{}, eppCMNamespacedName); cleanupErr != nil && !k8serrors.IsNotFound(cleanupErr) {
+		if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), &corev1.ConfigMap{}, eppCMNamespacedName); cleanupErr != nil && !apiErrors.IsNotFound(cleanupErr) {
 			return ctrl.Result{}, cleanupErr
 		}
-		if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), &inferencev1.InferencePool{}, namespacedName); cleanupErr != nil && !k8serrors.IsNotFound(cleanupErr) {
+		if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), &inferencev1.InferencePool{}, namespacedName); cleanupErr != nil && !apiErrors.IsNotFound(cleanupErr) {
 			return ctrl.Result{}, cleanupErr
 		}
 	}

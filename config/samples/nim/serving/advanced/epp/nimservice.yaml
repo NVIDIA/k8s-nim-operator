@@ -14,7 +14,6 @@ spec:
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
-      - gitlab-secret
   authSecret: ngc-api-secret
   storage:
     nimCache:
@@ -45,7 +44,6 @@ spec:
             tag: "v1.3.1"
         config:
           plugins:
-            # Required: tells EPP which profile to use (even if you only have one)
             - type: kv-cache-utilization-scorer
           schedulingProfiles:
             - name: default
