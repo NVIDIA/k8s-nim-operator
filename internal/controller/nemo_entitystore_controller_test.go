@@ -42,6 +42,7 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -106,6 +107,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(networkingv1.AddToScheme(scheme)).To(Succeed())
 		Expect(rbacv1.AddToScheme(scheme)).To(Succeed())
+		Expect(gatewayv1.Install(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NemoEntitystore{}).
@@ -151,7 +153,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 				Datastore: appsv1alpha1.Datastore{
 					Endpoint: "http://nemo-datastore:8000",
 				},
-				Replicas: 1,
+				Replicas: ptr.To(int32(1)),
 				Resources: &corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
@@ -179,18 +181,12 @@ var _ = Describe("NemoEntitystore Controller", func() {
 							"annotation-key-specific": "service",
 						},
 					},
-					Ingress: appsv1alpha1.IngressV1{
-						Enabled:     ptr.To(true),
-						Annotations: map[string]string{"annotation-key-specific": "ingress"},
-						Spec: &appsv1alpha1.IngressSpec{
-							IngressClassName: "nginx",
-							Host:             "full-nemoentitystore.default.example.com",
-							Paths: []appsv1alpha1.IngressPath{
-								{
-									Path:     "/",
-									PathType: ptr.To(networkingv1.PathTypePrefix),
-								},
-							},
+					Router: appsv1alpha1.Router{
+						Ingress: &appsv1alpha1.RouterIngress{
+							IngressClass: "nginx",
+						},
+						Annotations: map[string]string{
+							"annotation-key-specific": "ingress",
 						},
 					},
 				},
@@ -546,7 +542,7 @@ var _ = Describe("NemoEntitystore Controller", func() {
 						Repository: "test-repo",
 						Tag:        "test-tag",
 					},
-					Replicas: 1,
+					Replicas: ptr.To(int32(1)),
 					DatabaseConfig: &appsv1alpha1.DatabaseConfig{
 						Host:         "test-pg-host",
 						DatabaseName: "test-pg-database",

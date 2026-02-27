@@ -1,0 +1,20 @@
+# Caching NIM from the NeMo Datastore service
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: meta-llama3-1b-instruct
+  namespace: nim-service
+spec:
+  source:
+    dataStore:
+      endpoint: http://nemodatastore-sample.nemo.svc.cluster.local:8000/v1/hf
+      modelName: "llama-3-1b-instruct"  # default/llama-3-1b-instruct model must be present in NeMo DataStore
+      authSecret: hf-auth
+      modelPuller: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.06
+      pullSecret: ngc-secret
+  storage:
+    pvc:
+      create: true
+      storageClass: ""
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce

@@ -18,468 +18,1001 @@ metadata:
   namespace: nemo
 data:
   customizationTargets: |
+    # Allow model downloads from Hugging Face
+    hfTargetDownload:
+      # -- set this to true to allow model downloads from Hugging Face. If enabled=false, models are not allwed to be downloaded from any Hugging Face org and allowedHfOrgs is disregarded
+      enabled: false
+      # -- List of allowed organizations for model downloads from Hugging Face. Empty list allows all organizations.
+      # Example:
+      # allowedHfOrgs:
+      #   - "nvidia"
+      allowedHfOrgs: []
+
+    # -- Whether to have this values file override targets in the database on application start
     overrideExistingTargets: true
+    # -- The default targets to populate the database with
+    # @default -- This object has the following default values.
     targets:
-      meta/llama-3.1-8b-instruct@2.0:
-        base_model: meta/llama-3.1-8b-instruct
-        enabled: true
-        model_path: llama-3_1-8b-instruct_2_0
-        model_uri: ngc://nvidia/nemo/llama-3_1-8b-instruct-nemo:2.0
-        name: llama-3.1-8b-instruct@2.0
-        namespace: meta
-        num_parameters: 8000000000
-        precision: bf16-mixed
-      meta/llama-3.1-70b-instruct@2.0:
-        base_model: meta/llama-3.1-70b-instruct
-        enabled: false
-        model_path: llama-3_1-70b-instruct_2_0
-        model_uri: ngc://nvidia/nemo/llama-3_1-70b-instruct-nemo:2.0
-        name: llama-3.1-70b-instruct@2.0
-        namespace: meta
-        num_parameters: 70000000000
-        precision: bf16-mixed
-      meta/llama-3.2-1b-embedding@0.0.1:
-        base_model: meta/llama-3.2-1b-embedding
-        enabled: false
-        model_path: llama32_1b-embedding
-        model_uri: ngc://nvidia/nemo/llama-3_2-1b-embedding-base:0.0.1
-        name: llama-3.2-1b-embedding@0.0.1
-        namespace: meta
-        num_parameters: 1000000000
-        precision: bf16-mixed
-      meta/llama-3.2-1b-instruct@2.0:
-        base_model: meta/llama-3.2-1b-instruct
-        enabled: true
-        model_path: llama32_1b-instruct_2_0
-        model_uri: ngc://nvidia/nemo/llama-3_2-1b-instruct:2.0
-        name: llama-3.2-1b-instruct@2.0
-        namespace: meta
-        num_parameters: 1000000000
-        precision: bf16-mixed
+      # -- Llama 3.2 1B target model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B model.
       meta/llama-3.2-1b@2.0:
-        base_model: meta/llama-3.2-1b
-        enabled: false
-        model_path: llama32_1b_2_0
-        model_uri: ngc://nvidia/nemo/llama-3_2-1b:2.0
+      # -- The name for target model.
         name: llama-3.2-1b@2.0
+        # -- The namespace for target model.
         namespace: meta
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI for Llama 3.2 1B model.
+        model_uri: ngc://nvidia/nemo/llama-3_2-1b:2.0
+        # -- Path where model files are stored.
+        model_path: llama32_1b_2_0
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: meta/llama-3.2-1b
+        # -- Number of model parameters.
         num_parameters: 1000000000
+        # -- Model precision format.
         precision: bf16-mixed
+
+      # -- Llama 3.2 1B Instruct model target configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B Instruct model.
+      meta/llama-3.2-1b-instruct@2.0:
+        # -- The name for target model.
+        name: llama-3.2-1b-instruct@2.0
+        # -- The namespace for target model.
+        namespace: meta
+        # -- Whether to enable the model.
+        enabled: true
+        # -- NGC model URI
+        model_uri: ngc://nvidia/nemo/llama-3_2-1b-instruct:2.0
+        # -- Path where model files are stored.
+        model_path: llama32_1b-instruct_2_0
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: meta/llama-3.2-1b-instruct
+        # -- Number of model parameters.
+        num_parameters: 1000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+
+      # -- Llama 3.2 3B Instruct model target configuration.
+      # @default -- This object has the following default values for the Llama 3.2 3B Instruct model.
       meta/llama-3.2-3b-instruct@2.0:
-        base_model: meta/llama-3.2-3b-instruct
-        enabled: false
-        model_path: llama32_3b-instruct_2_0
-        model_uri: ngc://nvidia/nemo/llama-3_2-3b-instruct:2.0
+        # -- The name for target model.
         name: llama-3.2-3b-instruct@2.0
+        # -- The namespace for target model.
         namespace: meta
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI.
+        model_uri: ngc://nvidia/nemo/llama-3_2-3b-instruct:2.0
+        # -- Path where model files are stored.
+        model_path: llama32_3b-instruct_2_0
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: meta/llama-3.2-3b-instruct
+        # -- Number of model parameters.
         num_parameters: 3000000000
+        # -- Model precision format.
         precision: bf16-mixed
-      meta/llama-3.3-70b-instruct@2.0:
-        base_model: meta/llama-3.3-70b-instruct
-        enabled: false
-        model_path: llama-3_3-70b-instruct_2_0
-        model_uri: ngc://nvidia/nemo/llama-3_3-70b-instruct:2.0
-        name: llama-3.3-70b-instruct@2.0
-        namespace: meta
-        num_parameters: 70000000000
-        precision: bf16-mixed
+
+      # -- Llama 3 70B Instruct model target configuration.
+      # @default -- This object has the following default values for the Llama 3 70B Instruct model.
       meta/llama3-70b-instruct@2.0:
-        base_model: meta/llama3-70b-instruct
-        enabled: false
-        model_path: llama-3-70b-bf16_2_0
-        model_uri: ngc://nvidia/nemo/llama-3-70b-instruct-nemo:2.0
+        # -- The name for target model.
         name: llama3-70b-instruct@2.0
+        # -- The namespace for target model.
         namespace: meta
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI for Llama 3 70B Instruct model.
+        model_uri: ngc://nvidia/nemo/llama-3-70b-instruct-nemo:2.0
+        # -- Path where model files are stored.
+        model_path: llama-3-70b-bf16_2_0
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: meta/llama3-70b-instruct
+        # -- Number of model parameters.
         num_parameters: 70000000000
+        # -- Model precision format.
         precision: bf16-mixed
+
+      # -- Llama 3.1 8B Instruct model target configuration.
+      # @default -- This object has the following default values for the Llama 3.1 8B Instruct model.
+      meta/llama-3.1-8b-instruct@2.0:
+        # -- The name for target model.
+        name: llama-3.1-8b-instruct@2.0
+        # -- The namespace for target model.
+        namespace: meta
+        # -- Whether to enable the model.
+        enabled: true
+        # -- NGC model URI for Llama 3.1 8B Instruct model.
+        model_uri: ngc://nvidia/nemo/llama-3_1-8b-instruct-nemo:2.0
+        # -- Path where model files are stored.
+        model_path: llama-3_1-8b-instruct_2_0
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: meta/llama-3.1-8b-instruct
+        # -- Number of model parameters.
+        num_parameters: 8000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+
+      # -- Llama 3.1 70B Instruct model target configuration.
+      # @default -- This object has the following default values for the Llama 3.1 70B Instruct model.
+      meta/llama-3.1-70b-instruct@2.0:
+        # -- The name for target model.
+        name: llama-3.1-70b-instruct@2.0
+        # -- The namespace for target model.
+        namespace: meta
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI for Llama 3.1 70B Instruct model.
+        model_uri: ngc://nvidia/nemo/llama-3_1-70b-instruct-nemo:2.0
+        # -- Path where model files are stored.
+        model_path: llama-3_1-70b-instruct_2_0
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: meta/llama-3.1-70b-instruct
+        # -- Number of model parameters.
+        num_parameters: 70000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+
+      # -- Phi-4 model target configuration.
+      # @default -- This object has the following default values for the Phi-4.
       microsoft/phi-4@1.0:
-        base_model: microsoft/phi-4
-        enabled: false
-        model_path: phi-4_1_0
-        model_uri: ngc://nvidia/nemo/phi-4:1.0
+        # -- The name for target model.
         name: phi-4@1.0
+        # -- The namespace for target model.
         namespace: microsoft
-        num_parameters: 14659507200
-        precision: bf16
+        # -- The version for target model.
         version: "1.0"
-      nvidia/nemotron-nano-llama-3.1-8b@1.0:
-        base_model: nvidia/nemotron-nano-llama-3.1-8b
+        # -- Whether to enable the model.
         enabled: false
-        model_path: nemotron-nano-3_1-8b_0_0_1
-        model_uri: ngc://nvidia/nemo/nemotron-nano-3_1-8b:0.0.1
-        name: nemotron-nano-llama-3.1-8b@1.0
-        namespace: nvidia
-        num_parameters: 8000000000
+        # -- NGC model URI for Phi-4 model.
+        model_uri: ngc://nvidia/nemo/phi-4:1.0
+        # -- Path where model files are stored.
+        model_path: phi-4_1_0
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: microsoft/phi-4
+        # -- Number of model parameters.
+        num_parameters: 14659507200
+        # -- Model precision format.
+        precision: bf16
+
+      # -- Llama 3.3 70B Instruct model target configuration.
+      # @default -- This object has the following default values for the Llama 3.3 70B Instruct model.
+      meta/llama-3.3-70b-instruct@2.0:
+        # -- The name for target model.
+        name: llama-3.3-70b-instruct@2.0
+        # -- The namespace for target model.
+        namespace: meta
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI for Llama 3.3 70B Instruct model.
+        model_uri: ngc://nvidia/nemo/llama-3_3-70b-instruct:2.0
+        # -- Path where model files are stored.
+        model_path: llama-3_3-70b-instruct_2_0
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: meta/llama-3.3-70b-instruct
+        # -- Number of model parameters.
+        num_parameters: 70000000000
+        # -- Model precision format.
         precision: bf16-mixed
-      nvidia/nemotron-super-llama-3.3-49b@1.0:
-        base_model: nvidia/nemotron-super-llama-3.3-49b
-        enabled: false
-        model_path: nemotron-super-3_3-49b_v1
-        model_uri: ngc://nvidia/nemo/nemotron-super-3_3-49b:v1
-        name: nemotron-super-llama-3.3-49b@1.0
+
+      # -- Nemotron Nano Llama 3.1 8B Instruct model target configuration.
+      # @default -- This object has the following default values for the Nemotron Nano Llama 3.1 8B Instruct model.
+      nvidia/nemotron-nano-llama-3.1-8b@1.0:
+        # -- The name for target model.
+        name: nemotron-nano-llama-3.1-8b@1.0
+        # -- The namespace for target model.
         namespace: nvidia
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI
+        model_uri: ngc://nvidia/nemo/nemotron-nano-3_1-8b:0.0.1
+        # -- Path where model files are stored.
+        model_path: nemotron-nano-3_1-8b_0_0_1
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: nvidia/nemotron-nano-llama-3.1-8b
+        # -- Number of model parameters.
         num_parameters: 8000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+
+      # -- Nemotron Super Llama 3.3 49B Instruct model target configuration.
+      # @default -- This object has the following default values for the Nemotron Super Llama 3.3 49B Instruct model.
+      nvidia/nemotron-super-llama-3.3-49b@1.0:
+        # -- The name for target model.
+        name: nemotron-super-llama-3.3-49b@1.0
+        # -- The namespace for target model.
+        namespace: nvidia
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI
+        model_uri: ngc://nvidia/nemo/nemotron-super-3_3-49b:v1
+        # -- Path where model files are stored.
+        model_path: nemotron-super-3_3-49b_v1
+        # -- Mapping to the model name in NIM. Defaults to being the same as the the configuration entry namespace/name.
+        base_model: nvidia/nemotron-super-llama-3.3-49b
+        # -- Number of model parameters.
+        num_parameters: 8000000000
+        # -- Model precision format.
+        precision: bf16-mixed
+
+      # -- Llama 3.2 1B embedding target model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B embedding model.
+      nvidia/llama-3.2-nv-embedqa-1b@v2:
+        # -- The name for target model.
+        name: llama-3.2-nv-embedqa-1b@v2
+        # -- The namespace for target model.
+        namespace: nvidia
+        # -- Whether to enable the model.
+        enabled: false
+        # -- NGC model URI
+        model_uri: ngc://nvidia/nemo/llama-3_2-1b-embedding-base:0.0.1
+        # -- Path where model files are stored.
+        model_path: llama32_1b-embedding
+        # -- Mapping to the model name to the optimized llama embedding training script and NIM
+        base_model: nvidia/llama-3.2-nv-embedqa-1b-v2
+        # -- Number of model parameters.
+        num_parameters: 1000000000
+        # -- Model precision format.
         precision: bf16-mixed
 
   customizationConfigTemplates: |
+    # -- Whether to have this values file override templates in the database on application start
     overrideExistingTemplates: true
+    # -- The default templates to populate the database with
+    # @default -- This object has the following default values.
     templates:
-      meta/llama-3.1-8b-instruct@v1.0.0+A100:
-        max_seq_length: 4096
-        name: llama-3.1-8b-instruct@v1.0.0+A100
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.1-8b-instruct@2.0
-        training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 1
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 8
-          num_nodes: 1
-          tensor_parallel_size: 4
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 1
-          tensor_parallel_size: 4
-          training_type: distillation
-      meta/llama-3.1-8b-instruct@v1.0.0+L40:
-        max_seq_length: 4096
-        name: llama-3.1-8b-instruct@v1.0.0+L40
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.1-8b-instruct@2.0
-        training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 2
-          tensor_parallel_size: 2
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 2
-          tensor_parallel_size: 4
-          training_type: sft
-      meta/llama-3.1-70b-instruct@v1.0.0+A100:
-        max_seq_length: 4096
-        name: llama-3.1-70b-instruct@v1.0.0+A100
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.1-70b-instruct@2.0
-        training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 1
-          tensor_parallel_size: 4
-          training_type: sft
-      meta/llama-3.1-70b-instruct@v1.0.0+L40:
-        max_seq_length: 4096
-        name: llama-3.1-70b-instruct@v1.0.0+L40
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.1-70b-instruct@2.0
-        training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 2
-          pipeline_parallel_size: 2
-          tensor_parallel_size: 4
-          training_type: sft
-      meta/llama-3.2-1b-embedding@0.0.1+A100:
-        max_seq_length: 2048
-        name: llama-3.2-1b-embedding@0.0.1+A100
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.2-1b-embedding@0.0.1
-        training_options:
-        - finetuning_type: all_weights
-          micro_batch_size: 8
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-      meta/llama-3.2-1b-embedding@0.0.1+L40:
-        max_seq_length: 2048
-        name: llama-3.2-1b-embedding@0.0.1+L40
-        namespace: meta
-        target: meta/llama-3.2-1b-embedding@0.0.1
-        training_options:
-        - finetuning_type: all_weights
-          micro_batch_size: 4
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-      meta/llama-3.2-1b-instruct@v1.0.0+A100:
-        max_seq_length: 4096
-        name: llama-3.2-1b-instruct@v1.0.0+A100
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.2-1b-instruct@2.0
-        training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: distillation
-      meta/llama-3.2-1b-instruct@v1.0.0+L40:
-        max_seq_length: 4096
-        name: llama-3.2-1b-instruct@v1.0.0+L40
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.2-1b-instruct@2.0
-        training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-      meta/llama-3.2-1b@v1.0.0+A100:
-        max_seq_length: 4096
-        name: llama-3.2-1b@v1.0.0+A100
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.2-1b@2.0
-        training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: distillation
-      meta/llama-3.2-1b@v1.0.0+L40:
-        max_seq_length: 4096
-        name: llama-3.2-1b@v1.0.0+L40
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.2-1b@2.0
-        training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
+      # -- Llama 3.2 3B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 3B Instruct model.
       meta/llama-3.2-3b-instruct@v1.0.0+A100:
-        max_seq_length: 4096
+        # -- The name for training config template.
         name: llama-3.2-3b-instruct@v1.0.0+A100
+        # -- The namespace for training config template.
         namespace: meta
-        prompt_template: '{prompt} {completion}'
+        # -- The target to perform the customization on.
         target: meta/llama-3.2-3b-instruct@2.0
+        # -- Resource configuration for each training option for the target model.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 2
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: distillation
-      meta/llama-3.2-3b-instruct@v1.0.0+L40:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
         max_seq_length: 4096
-        name: llama-3.2-3b-instruct@v1.0.0+L40
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.2 1B model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B model.
+      meta/llama-3.2-1b@v1.0.0+A100:
+        # -- The name for training config template.
+        name: llama-3.2-1b@v1.0.0+A100
+        # -- The namespace for training config template.
         namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.2-3b-instruct@2.0
+        # -- The target to perform the customization on.
+        target: meta/llama-3.2-1b@2.0
+        # -- Resource configuration for each training option for the target model.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-      meta/llama-3.3-70b-instruct@v1.0.0+A100:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+              # -- Training method.1
+          - training_type: sft
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
         max_seq_length: 4096
-        name: llama-3.3-70b-instruct@v1.0.0+A100
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.2 1B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B Instruct model.
+      meta/llama-3.2-1b-instruct@v1.0.0+A100:
+        # -- The name for training config template.
+        name: llama-3.2-1b-instruct@v1.0.0+A100
+        # -- The namespace for training config template.
         namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.3-70b-instruct@2.0
+        # -- The target to perform the customization on.
+        target: meta/llama-3.2-1b-instruct@2.0
+        # -- Resource configuration for each training option for the target model.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 1
-          tensor_parallel_size: 4
-          training_type: sft
-      meta/llama-3.3-70b-instruct@v1.0.0+L40:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+              # -- Training method.1
+          - training_type: sft
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+          - training_type: dpo
+            # -- The type of fine-tuning method.
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
         max_seq_length: 4096
-        name: llama-3.3-70b-instruct@v1.0.0+L40
-        namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama-3.3-70b-instruct@2.0
-        training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 2
-          pipeline_parallel_size: 2
-          tensor_parallel_size: 4
-          training_type: sft
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3 70B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3 70B Instruct model.
       meta/llama3-70b-instruct@v1.0.0+A100:
-        max_seq_length: 4096
+        # -- The name for training config template.
         name: llama3-70b-instruct@v1.0.0+A100
+        # -- The namespace for training config template.
         namespace: meta
-        prompt_template: '{prompt} {completion}'
+        # -- Resource configuration for each training option for the target model.
         target: meta/llama3-70b-instruct@2.0
+        # -- Training options for different fine-tuning methods.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 1
-          tensor_parallel_size: 4
-          training_type: sft
-      meta/llama3-70b-instruct@v1.0.0+L40:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
         max_seq_length: 4096
-        name: llama3-70b-instruct@v1.0.0+L40
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.1 8B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.1 8B Instruct model.
+      meta/llama-3.1-8b-instruct@v1.0.0+A100:
+        # -- The name for training config template.
+        name: llama-3.1-8b-instruct@v1.0.0+A100
+        # -- The namespace for training config template.
         namespace: meta
-        prompt_template: '{prompt} {completion}'
-        target: meta/llama3-70b-instruct@2.0
+        # -- Resource configuration for each training option for the target model.
+        target: meta/llama-3.1-8b-instruct@2.0
+        # -- Training options for different fine-tuning methods.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 2
-          pipeline_parallel_size: 2
-          tensor_parallel_size: 4
-          training_type: sft
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+              # -- Training method.1
+          - training_type: sft
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 8
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of GPUs among which the model’s layers are distributed.
+            pipeline_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+          - training_type: dpo
+            # -- The type of fine-tuning method.
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 8
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 8
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.1 70B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.1 70B Instruct model.
+      meta/llama-3.1-70b-instruct@v1.0.0+A100:
+        # -- The name for training config template.
+        name: llama-3.1-70b-instruct@v1.0.0+A100
+        # -- The namespace for training config template.
+        namespace: meta
+        # -- Resource configuration for each training option for the target model.
+        target: meta/llama-3.1-70b-instruct@2.0
+        # -- Training options for different fine-tuning methods.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Phi-4 model configuration.
+      # @default -- This object has the following default values for the Phi-4.
       microsoft/phi-4@v1.0.0+A100:
-        max_seq_length: 4096
+        # -- The name for training config template.
         name: phi-4@v1.0.0+A100
+        # -- The namespace for training config template.
         namespace: microsoft
-        prompt_template: '{prompt} {completion}'
+        # -- The target to perform the customization on.
         target: microsoft/phi-4@1.0
+        # -- Resource configuration for each training option for the target model.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          training_type: sft
-      microsoft/phi-4@v1.0.0+L40:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
         max_seq_length: 4096
-        name: phi-4@v1.0.0+L40
-        namespace: microsoft
-        prompt_template: '{prompt} {completion}'
-        target: microsoft/phi-4@1.0
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.3 70B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.3 70B Instruct model.
+      meta/llama-3.3-70b-instruct@v1.0.0+A100:
+        # -- The name for training config template.
+        name: llama-3.3-70b-instruct@v1.0.0+A100
+        # -- The namespace for training config template.
+        namespace: meta
+        # -- The target to perform the customization on.
+        target: meta/llama-3.3-70b-instruct@2.0
+        # -- Resource configuration for each training option for the target model.
         training_options:
-        - data_parallel_size: 2
-          finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 2
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Nemotron Nano Llama 3.1 8B Instruct model configuration.
+      # @default -- This object has the following default values for the Nemotron Nano Llama 3.1 8B Instruct model.
       nvidia/nemotron-nano-llama-3.1-8b@v1.0.0+A100:
-        max_seq_length: 4096
+        # -- The name for training config template.
         name: nemotron-nano-llama-3.1-8b@v1.0.0+A100
+        # -- The namespace for training config template.
         namespace: nvidia
-        prompt_template: '{prompt} {completion}'
+        # -- The target to perform the customization on.
         target: nvidia/nemotron-nano-llama-3.1-8b@1.0
+        # -- Resource configuration for each training option for the target model.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 1
-          num_nodes: 1
-          tensor_parallel_size: 1
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 8
-          num_nodes: 1
-          tensor_parallel_size: 4
-          training_type: sft
-      nvidia/nemotron-nano-llama-3.1-8b@v1.0.0+L40:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 8
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of GPUs among which the model’s layers are distributed.
+            pipeline_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
         max_seq_length: 4096
-        name: nemotron-nano-llama-3.1-8b@v1.0.0+L40
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      nvidia/llama-3.2-nv-embedqa-1b@v2+A100:
+        # -- The name for training config template.
+        name: llama-3.2-nv-embedqa-1b@v2+A100
+        # -- The namespace for training config template.
         namespace: nvidia
-        prompt_template: '{prompt} {completion}'
-        target: nvidia/nemotron-nano-llama-3.1-8b@1.0
+        # -- The target to perform the customization on.
+        target: nvidia/llama-3.2-nv-embedqa-1b@v2
+        # -- Resource configuration for each training option for the target model.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 2
-          num_nodes: 1
-          tensor_parallel_size: 2
-          training_type: sft
-        - finetuning_type: all_weights
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 2
-          pipeline_parallel_size: 2
-          tensor_parallel_size: 4
-          training_type: sft
+        # -- Training method.
+        # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 2048
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Nemotron Super Llama 3.3 49B Instruct model configuration.
+      # @default -- This object has the following default values for the Nemotron Super Llama 3.3 49B Instruct model.
       nvidia/nemotron-super-llama-3.3-49b@v1.0.0+A100:
-        max_seq_length: 4096
+        # -- The name for training config template.
         name: nemotron-super-llama-3.3-49b@v1.0.0+A100
+        # -- The namespace for training config template.
         namespace: nvidia
-        prompt_template: '{prompt} {completion}'
+        # -- The target to perform the customization on.
         target: nvidia/nemotron-super-llama-3.3-49b@1.0
+        # -- Resource configuration for each training option for the target model.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 1
-          tensor_parallel_size: 4
-          training_type: sft
-      nvidia/nemotron-super-llama-3.3-49b@v1.0.0+L40:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
         max_seq_length: 4096
-        name: nemotron-super-llama-3.3-49b@v1.0.0+L40
-        namespace: nvidia
-        prompt_template: '{prompt} {completion}'
-        target: nvidia/nemotron-super-llama-3.3-49b@1.0
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      #### ------------------------------ Nvidia L40 GPU default configurations ------------------------------ ####
+      # -- Llama 3.2 1B model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B model.
+      meta/llama-3.2-1b@v1.0.0+L40:
+        # -- The name for training config template.
+        name: llama-3.2-1b@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: meta
+        # -- The target to perform the customization on.
+        target: meta/llama-3.2-1b@2.0
+        # -- Resource configuration for each training option for the target model.
         training_options:
-        - finetuning_type: lora
-          micro_batch_size: 1
-          num_gpus: 4
-          num_nodes: 2
-          pipeline_parallel_size: 2
-          tensor_parallel_size: 4
-          training_type: sft
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+            # -- Training method.1
+          - training_type: sft
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.2 1B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 1B Instruct model.
+      meta/llama-3.2-1b-instruct@v1.0.0+L40:
+        # -- The name for training config template.
+        name: llama-3.2-1b-instruct@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: meta
+        # -- The target to perform the customization on.
+        target: meta/llama-3.2-1b-instruct@2.0
+        # -- Resource configuration for each training option for the target model.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+            # -- Training method.1
+          - training_type: sft
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+          - training_type: dpo
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 2
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      nvidia/llama-3.2-nv-embedqa-1b@v2+L40:
+        # -- The name for training config template.
+        name: llama-3.2-nv-embedqa-1b@v2+L40
+        # -- The namespace for training config template.
+        namespace: nvidia
+        # -- The target to perform the customization on.
+        target: nvidia/llama-3.2-nv-embedqa-1b@v2
+        # -- Resource configuration for each training option for the target model.
+        training_options:
+        # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 2048
+
+      # -- Llama 3.2 3B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.2 3B Instruct model.
+      meta/llama-3.2-3b-instruct@v1.0.0+L40:
+        # -- The name for training config template.
+        name: llama-3.2-3b-instruct@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: meta
+        # -- The target to perform the customization on.
+        target: meta/llama-3.2-3b-instruct@2.0
+        # -- Resource configuration for each training option for the target model.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 1
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.1 8B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.1 8B Instruct model.
+      meta/llama-3.1-8b-instruct@v1.0.0+L40:
+        # -- The name for training config template.
+        name: llama-3.1-8b-instruct@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: meta
+        # -- Resource configuration for each training option for the target model.
+        target: meta/llama-3.1-8b-instruct@2.0
+        # -- Training options for different fine-tuning methods.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 2
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+            # -- Training method.1
+          - training_type: sft
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 2
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of GPUs among which the model’s layers are distributed.
+            pipeline_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+          - training_type: dpo
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 2
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 8
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+
+      # -- Llama 3 70B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3 70B Instruct model.
+      meta/llama3-70b-instruct@v1.0.0+L40:
+        # -- The name for training config template.
+        name: llama3-70b-instruct@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: meta
+        # -- Resource configuration for each training option for the target model.
+        target: meta/llama3-70b-instruct@2.0
+        # -- Training options for different fine-tuning methods.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 2
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of GPUs among which the model’s layers are distributed.
+            pipeline_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Llama 3.1 70B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.1 70B Instruct model.
+      meta/llama-3.1-70b-instruct@v1.0.0+L40:
+        # -- The name for training config template.
+        name: llama-3.1-70b-instruct@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: meta
+        # -- Resource configuration for each training option for the target model.
+        target: meta/llama-3.1-70b-instruct@2.0
+        # -- Training options for different fine-tuning methods.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 2
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of GPUs among which the model’s layers are distributed.
+            pipeline_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+
+      # -- Llama 3.3 70B Instruct model configuration.
+      # @default -- This object has the following default values for the Llama 3.3 70B Instruct model.
+      meta/llama-3.3-70b-instruct@v1.0.0+L40:
+        # -- The name for training config template.
+        name: llama-3.3-70b-instruct@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: meta
+        # -- The target to perform the customization on.
+        target: meta/llama-3.3-70b-instruct@2.0
+        # -- Resource configuration for each training option for the target model.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 2
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of GPUs among which the model’s layers are distributed.
+            pipeline_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Nemotron Nano Llama 3.1 8B Instruct model configuration.
+      # @default -- This object has the following default values for the Nemotron Nano Llama 3.1 8B Instruct model.
+      nvidia/nemotron-nano-llama-3.1-8b@v1.0.0+L40:
+        # -- The name for training config template.
+        name: nemotron-nano-llama-3.1-8b@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: nvidia
+        # -- The target to perform the customization on.
+        target: nvidia/nemotron-nano-llama-3.1-8b@1.0
+        # -- Resource configuration for each training option for the target model.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 2
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: all_weights
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 2
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of GPUs among which the model’s layers are distributed.
+            pipeline_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Nemotron Super Llama 3.3 49B Instruct model configuration.
+      # @default -- This object has the following default values for the Nemotron Super Llama 3.3 49B Instruct model.
+      nvidia/nemotron-super-llama-3.3-49b@v1.0.0+L40:
+        # -- The name for training config template.
+        name: nemotron-super-llama-3.3-49b@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: nvidia
+        # -- The target to perform the customization on.
+        target: nvidia/nemotron-super-llama-3.3-49b@1.0
+        # -- Resource configuration for each training option for the target model.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 4
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 2
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 4
+            # -- The number of GPUs among which the model’s layers are distributed.
+            pipeline_parallel_size: 2
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"
+
+      # -- Phi-4 model configuration.
+      # @default -- This object has the following default values for the Phi-4.
+      microsoft/phi-4@v1.0.0+L40:
+        # -- The name for training config template.
+        name: phi-4@v1.0.0+L40
+        # -- The namespace for training config template.
+        namespace: microsoft
+        # -- The target to perform the customization on.
+        target: microsoft/phi-4@1.0
+        # -- Resource configuration for each training option for the target model.
+        training_options:
+          # -- Training method.
+          - training_type: sft
+            # -- The type of fine-tuning method.
+            finetuning_type: lora
+            # -- The number of GPUs per node to use for the specified training.
+            num_gpus: 2
+            # -- The number of nodes to use for the specified training.
+            num_nodes: 1
+            # -- The number of GPUs among which the model’s tensors are partitioned.
+            tensor_parallel_size: 1
+            # -- The number of training examples processed in parallel by each individual GPU.
+            micro_batch_size: 1
+        # -- The largest context used for training. Datasets are truncated based on the maximum sequence length.
+        max_seq_length: 4096
+        # -- Prompt template used to extract keys from the dataset.
+        prompt_template: "{prompt} {completion}"

@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -275,7 +274,6 @@ var _ = Describe("NIMBuild Controller", func() {
 			// Check status
 			updatedNIMBuild := &appsv1alpha1.NIMBuild{}
 			Expect(cli.Get(ctx, types.NamespacedName{Name: nimBuild.Name, Namespace: nimBuild.Namespace}, updatedNIMBuild)).To(Succeed())
-			fmt.Println("HEHRHEHEHupdatedNIMBuild", updatedNIMBuild.Status.Conditions)
 			Expect(meta.IsStatusConditionTrue(updatedNIMBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCreated)).To(BeTrue())
 		})
 
@@ -655,6 +653,565 @@ var _ = Describe("NIMBuild Controller", func() {
 			Expect(pod.Spec.Containers[0].Image).To(Equal(nimBuild.GetImage()))
 			Expect(pod.Spec.Volumes).To(HaveLen(1))
 			Expect(pod.Spec.Volumes[0].Name).To(Equal("nim-cache-volume"))
+		})
+	})
+
+	Context("Environment variable handling", func() {
+		var nimCache *appsv1alpha1.NIMCache
+
+		BeforeEach(func() {
+			nimCache = &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller: "nvcr.io/nim/test",
+							AuthSecret:  "my-secret",
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create:       ptr.To[bool](true),
+							StorageClass: "standard",
+							Size:         "1Gi",
+							SubPath:      "test-subpath",
+						},
+					},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusReady,
+					Profiles: []appsv1alpha1.NIMProfile{
+						{
+							Name:   "test-profile",
+							Model:  "test-model",
+							Config: map[string]string{"trtllm_buildable": "true"},
+						},
+					},
+				},
+			}
+		})
+
+		It("should set default environment variables correctly", func() {
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+				},
+			}
+
+			// Test pod construction with default environment variables
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, nimCache.Status.Profiles[0])
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that default environment variables are set
+			envVars := pod.Spec.Containers[0].Env
+			Expect(envVars).NotTo(BeEmpty())
+
+			// Check for required environment variables
+			var nimCachePathFound, nimServerPortFound, nimHttpApiPortFound, nimCustomModelNameFound, nimModelProfileFound, ngcApiKeyFound bool
+			for _, env := range envVars {
+				switch env.Name {
+				case "NIM_CACHE_PATH":
+					Expect(env.Value).To(Equal("/model-store"))
+					nimCachePathFound = true
+				case "NIM_SERVER_PORT":
+					Expect(env.Value).To(Equal("8000"))
+					nimServerPortFound = true
+				case "NIM_HTTP_API_PORT":
+					Expect(env.Value).To(Equal("8000"))
+					nimHttpApiPortFound = true
+				case "NIM_CUSTOM_MODEL_NAME":
+					Expect(env.Value).To(Equal(nimBuild.GetModelName()))
+					nimCustomModelNameFound = true
+				case "NIM_MODEL_PROFILE":
+					Expect(env.Value).To(Equal(nimCache.Status.Profiles[0].Name))
+					nimModelProfileFound = true
+				case "NGC_API_KEY":
+					Expect(env.ValueFrom).NotTo(BeNil())
+					Expect(env.ValueFrom.SecretKeyRef).NotTo(BeNil())
+					Expect(env.ValueFrom.SecretKeyRef.Name).To(Equal(nimCache.Spec.Source.NGC.AuthSecret))
+					Expect(env.ValueFrom.SecretKeyRef.Key).To(Equal("NGC_API_KEY"))
+					ngcApiKeyFound = true
+				}
+			}
+			Expect(nimCachePathFound).To(BeTrue(), "NIM_CACHE_PATH should be set")
+			Expect(nimServerPortFound).To(BeTrue(), "NIM_SERVER_PORT should be set")
+			Expect(nimHttpApiPortFound).To(BeTrue(), "NIM_HTTP_API_PORT should be set")
+			Expect(nimCustomModelNameFound).To(BeTrue(), "NIM_CUSTOM_MODEL_NAME should be set")
+			Expect(nimModelProfileFound).To(BeTrue(), "NIM_MODEL_PROFILE should be set")
+			Expect(ngcApiKeyFound).To(BeTrue(), "NGC_API_KEY should be set")
+		})
+
+		It("should merge user-provided environment variables", func() {
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "CUSTOM_VAR",
+							Value: "custom-value",
+						},
+						{
+							Name:  "NIM_CACHE_PATH",
+							Value: "overridden-path",
+						},
+						{
+							Name:  "ANOTHER_VAR",
+							Value: "another-value",
+						},
+					},
+				},
+			}
+
+			// Test pod construction with user-provided environment variables
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, nimCache.Status.Profiles[0])
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that all environment variables are present
+			envVars := pod.Spec.Containers[0].Env
+			Expect(envVars).NotTo(BeEmpty())
+
+			// Check for user-provided environment variables
+			var customVarFound, overriddenVarFound, anotherVarFound bool
+			for _, env := range envVars {
+				switch env.Name {
+				case "CUSTOM_VAR":
+					Expect(env.Value).To(Equal("custom-value"))
+					customVarFound = true
+				case "NIM_CACHE_PATH":
+					Expect(env.Value).To(Equal("overridden-path"))
+					overriddenVarFound = true
+				case "ANOTHER_VAR":
+					Expect(env.Value).To(Equal("another-value"))
+					anotherVarFound = true
+				}
+			}
+			Expect(customVarFound).To(BeTrue(), "CUSTOM_VAR should be set")
+			Expect(overriddenVarFound).To(BeTrue(), "NIM_CACHE_PATH should be overridden")
+			Expect(anotherVarFound).To(BeTrue(), "ANOTHER_VAR should be set")
+		})
+
+		It("should handle environment variables with valueFrom", func() {
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name: "SECRET_VAR",
+							ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "my-secret",
+									},
+									Key: "secret-key",
+								},
+							},
+						},
+						{
+							Name: "CONFIG_VAR",
+							ValueFrom: &corev1.EnvVarSource{
+								ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "my-config",
+									},
+									Key: "config-key",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			// Test pod construction with environment variables using valueFrom
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, nimCache.Status.Profiles[0])
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that environment variables with valueFrom are preserved
+			envVars := pod.Spec.Containers[0].Env
+			var secretVarFound, configVarFound bool
+			for _, env := range envVars {
+				switch env.Name {
+				case "SECRET_VAR":
+					Expect(env.ValueFrom).NotTo(BeNil())
+					Expect(env.ValueFrom.SecretKeyRef).NotTo(BeNil())
+					Expect(env.ValueFrom.SecretKeyRef.Name).To(Equal("my-secret"))
+					Expect(env.ValueFrom.SecretKeyRef.Key).To(Equal("secret-key"))
+					secretVarFound = true
+				case "CONFIG_VAR":
+					Expect(env.ValueFrom).NotTo(BeNil())
+					Expect(env.ValueFrom.ConfigMapKeyRef).NotTo(BeNil())
+					Expect(env.ValueFrom.ConfigMapKeyRef.Name).To(Equal("my-config"))
+					Expect(env.ValueFrom.ConfigMapKeyRef.Key).To(Equal("config-key"))
+					configVarFound = true
+				}
+			}
+			Expect(secretVarFound).To(BeTrue(), "SECRET_VAR should be set with valueFrom")
+			Expect(configVarFound).To(BeTrue(), "CONFIG_VAR should be set with valueFrom")
+		})
+
+		It("should preserve default environment variables when user provides additional ones", func() {
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "USER_VAR",
+							Value: "user-value",
+						},
+					},
+				},
+			}
+
+			// Test pod construction
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, nimCache.Status.Profiles[0])
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that both default and user environment variables are present
+			envVars := pod.Spec.Containers[0].Env
+			var nimCachePathFound, userVarFound bool
+			for _, env := range envVars {
+				switch env.Name {
+				case "NIM_CACHE_PATH":
+					Expect(env.Value).To(Equal("/model-store"))
+					nimCachePathFound = true
+				case "USER_VAR":
+					Expect(env.Value).To(Equal("user-value"))
+					userVarFound = true
+				}
+			}
+			Expect(nimCachePathFound).To(BeTrue(), "Default NIM_CACHE_PATH should be preserved")
+			Expect(userVarFound).To(BeTrue(), "User-provided USER_VAR should be set")
+		})
+
+		It("should handle empty environment variables list", func() {
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+					Env: []corev1.EnvVar{}, // Empty environment variables
+				},
+			}
+
+			// Test pod construction with empty environment variables
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, nimCache.Status.Profiles[0])
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that default environment variables are still set
+			envVars := pod.Spec.Containers[0].Env
+			Expect(envVars).NotTo(BeEmpty())
+
+			var nimCachePathFound bool
+			for _, env := range envVars {
+				if env.Name == "NIM_CACHE_PATH" {
+					Expect(env.Value).To(Equal("/model-store"))
+					nimCachePathFound = true
+					break
+				}
+			}
+			Expect(nimCachePathFound).To(BeTrue(), "Default NIM_CACHE_PATH should be set even with empty user env vars")
+		})
+
+		It("should handle environment variables in end-to-end reconciliation", func() {
+			Expect(cli.Create(ctx, nimCache)).To(Succeed())
+
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "BUILD_VAR",
+							Value: "build-value",
+						},
+						{
+							Name:  "NIM_MODEL_PATH",
+							Value: "custom-model-path",
+						},
+					},
+				},
+			}
+
+			Expect(cli.Create(ctx, nimBuild)).To(Succeed())
+
+			// Reconcile
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      nimBuild.Name,
+					Namespace: nimBuild.Namespace,
+				},
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check if pod was created with correct environment variables
+			pod := &corev1.Pod{}
+			podName := types.NamespacedName{
+				Name:      nimBuild.GetEngineBuildPodName(),
+				Namespace: nimBuild.Namespace,
+			}
+			Expect(cli.Get(ctx, podName, pod)).To(Succeed())
+
+			// Verify environment variables in the created pod
+			envVars := pod.Spec.Containers[0].Env
+			var buildVarFound, customModelPathFound, defaultCachePathFound bool
+			for _, env := range envVars {
+				switch env.Name {
+				case "BUILD_VAR":
+					Expect(env.Value).To(Equal("build-value"))
+					buildVarFound = true
+				case "NIM_MODEL_PATH":
+					Expect(env.Value).To(Equal("custom-model-path"))
+					customModelPathFound = true
+				case "NIM_CACHE_PATH":
+					Expect(env.Value).To(Equal("/model-store"))
+					defaultCachePathFound = true
+				}
+			}
+			Expect(buildVarFound).To(BeTrue(), "BUILD_VAR should be set in created pod")
+			Expect(customModelPathFound).To(BeTrue(), "NIM_MODEL_PATH should be overridden in created pod")
+			Expect(defaultCachePathFound).To(BeTrue(), "Default NIM_CACHE_PATH should be preserved in created pod")
+		})
+
+		It("should set NIM_PEFT_SOURCE when LORA is enabled in profile", func() {
+			// Create a profile with LORA enabled
+			loraProfile := appsv1alpha1.NIMProfile{
+				Name:   "lora-profile",
+				Model:  "test-model",
+				Config: map[string]string{"feat_lora": "true", "trtllm_buildable": "true"},
+			}
+
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+				},
+			}
+
+			// Test pod construction with LORA-enabled profile
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, loraProfile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that NIM_PEFT_SOURCE environment variable is set
+			envVars := pod.Spec.Containers[0].Env
+			var nimPeftSourceFound bool
+			for _, env := range envVars {
+				if env.Name == "NIM_PEFT_SOURCE" {
+					Expect(env.Value).To(Equal("/tmp"))
+					nimPeftSourceFound = true
+					break
+				}
+			}
+			Expect(nimPeftSourceFound).To(BeTrue(), "NIM_PEFT_SOURCE should be set when LORA is enabled")
+		})
+
+		It("should not set NIM_PEFT_SOURCE when LORA is disabled in profile", func() {
+			// Create a profile with LORA disabled
+			noLoraProfile := appsv1alpha1.NIMProfile{
+				Name:   "no-lora-profile",
+				Model:  "test-model",
+				Config: map[string]string{"feat_lora": "false", "trtllm_buildable": "true"},
+			}
+
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+				},
+			}
+
+			// Test pod construction with LORA-disabled profile
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, noLoraProfile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that NIM_PEFT_SOURCE environment variable is NOT set
+			envVars := pod.Spec.Containers[0].Env
+			for _, env := range envVars {
+				Expect(env.Name).NotTo(Equal("NIM_PEFT_SOURCE"), "NIM_PEFT_SOURCE should not be set when LORA is disabled")
+			}
+		})
+
+		It("should not set NIM_PEFT_SOURCE when LORA config is missing from profile", func() {
+			// Create a profile without LORA config
+			noLoraConfigProfile := appsv1alpha1.NIMProfile{
+				Name:   "no-lora-config-profile",
+				Model:  "test-model",
+				Config: map[string]string{"trtllm_buildable": "true"},
+			}
+
+			nimBuild := &appsv1alpha1.NIMBuild{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimbuild",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMBuildSpec{
+					NIMCache: appsv1alpha1.NIMCacheReference{
+						Name: nimCache.Name,
+					},
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/test",
+						Tag:        "latest",
+					},
+					Resources: &appsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+						Limits: corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("8"),
+						},
+					},
+				},
+			}
+
+			// Test pod construction with profile missing LORA config
+			pod, err := reconciler.constructEngineBuildPod(nimBuild, nimCache, k8sutil.K8s, noLoraConfigProfile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Check that NIM_PEFT_SOURCE environment variable is NOT set
+			envVars := pod.Spec.Containers[0].Env
+			for _, env := range envVars {
+				Expect(env.Name).NotTo(Equal("NIM_PEFT_SOURCE"), "NIM_PEFT_SOURCE should not be set when LORA config is missing")
+			}
 		})
 	})
 })

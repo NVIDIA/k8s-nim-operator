@@ -34,6 +34,7 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	securityv1 "github.com/openshift/api/security/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -42,9 +43,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
+	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 	yamlConverter "sigs.k8s.io/yaml"
 
@@ -73,11 +77,16 @@ type Renderer interface {
 	RoleBinding(params *types.RoleBindingParams) (*rbacv1.RoleBinding, error)
 	SCC(params *types.SCCParams) (*securityv1.SecurityContextConstraints, error)
 	Ingress(params *types.IngressParams) (*networkingv1.Ingress, error)
+	HTTPRoute(params *types.HTTPRouteParams) (*gatewayv1.HTTPRoute, error)
+	GRPCRoute(params *types.GRPCRouteParams) (*gatewayv1.GRPCRoute, error)
 	HPA(params *types.HPAParams) (*autoscalingv2.HorizontalPodAutoscaler, error)
 	ServiceMonitor(params *types.ServiceMonitorParams) (*monitoringv1.ServiceMonitor, error)
 	ConfigMap(params *types.ConfigMapParams) (*corev1.ConfigMap, error)
 	Secret(params *types.SecretParams) (*corev1.Secret, error)
 	InferenceService(params *types.InferenceServiceParams) (*kservev1beta1.InferenceService, error)
+	ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1.ResourceClaimTemplate, error)
+	ComputeDomain(params *types.ComputeDomainParams) (*nvidiaresourcev1beta1.ComputeDomain, error)
+	InferencePool(params *types.InferencePoolParams) (*inferencev1.InferencePool, error)
 }
 
 // TemplateData is used by the templating engine to render templates.
@@ -341,6 +350,40 @@ func (r *textTemplateRenderer) SCC(params *types.SCCParams) (*securityv1.Securit
 	return scc, nil
 }
 
+// HTTPRoute renders an HTTPRoute spec with the given template data.
+func (r *textTemplateRenderer) HTTPRoute(params *types.HTTPRouteParams) (*gatewayv1.HTTPRoute, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "httproute.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	httpRoute := &gatewayv1.HTTPRoute{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, httpRoute)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to HTTPRoute: %w", err)
+	}
+	return httpRoute, nil
+}
+
+// GRPCRoute renders a GRPCRoute spec with the given templating data.
+func (r *textTemplateRenderer) GRPCRoute(params *types.GRPCRouteParams) (*gatewayv1.GRPCRoute, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "grpcroute.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	grpcRoute := &gatewayv1.GRPCRoute{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, grpcRoute)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to GRPCRoute: %w", err)
+	}
+	return grpcRoute, nil
+}
+
 // Ingress renders an Ingress spec with the given templating data.
 func (r *textTemplateRenderer) Ingress(params *types.IngressParams) (*networkingv1.Ingress, error) {
 	objs, err := r.renderFile(path.Join(r.directory, "ingress.yaml"), &TemplateData{Data: params})
@@ -445,4 +488,55 @@ func (r *textTemplateRenderer) InferenceService(params *types.InferenceServicePa
 		return nil, fmt.Errorf("error converting unstructured object to InferenceService: %w", err)
 	}
 	return inferenceService, nil
+}
+
+// ResourceClaimTemplate renders a ResourceClaimTemplate spec with given templating data.
+func (r *textTemplateRenderer) ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1.ResourceClaimTemplate, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "resourceclaimtemplate.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	resourceClaimTemplate := &resourcev1.ResourceClaimTemplate{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, resourceClaimTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to ResourceClaimTemplate: %w", err)
+	}
+	return resourceClaimTemplate, nil
+}
+
+// ComputeDomain renders a ComputeDomain spec with given templating data.
+func (r *textTemplateRenderer) ComputeDomain(params *types.ComputeDomainParams) (*nvidiaresourcev1beta1.ComputeDomain, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "computedomain.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	computeDomain := &nvidiaresourcev1beta1.ComputeDomain{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, computeDomain)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to ComputeDomain: %w", err)
+	}
+	return computeDomain, nil
+}
+
+// InferencePool renders an InferencePool spec with given templating data.
+func (r *textTemplateRenderer) InferencePool(params *types.InferencePoolParams) (*inferencev1.InferencePool, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "inferencepool.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	inferencePool := &inferencev1.InferencePool{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, inferencePool)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to InferencePool: %w", err)
+	}
+	return inferencePool, nil
 }

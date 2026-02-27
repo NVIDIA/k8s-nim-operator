@@ -17,17 +17,11 @@ name: "CodeQL"
 on:
   schedule:
     - cron: "0 0 * * 0" # Run every Sunday at midnight
-  pull_request:
-    types:
-      - opened
-      - synchronize
-    branches:
-      - main
-      - release-*
   push:
     branches:
       - main
       - release-*
+      - "pull-request/[0-9]+"
 
 jobs:
   analyze:
@@ -39,9 +33,9 @@ jobs:
       packages: read
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: go
         build-mode: manual
@@ -49,6 +43,6 @@ jobs:
       run: |
         make build
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
       with:
         category: "/language:go"

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	"github.com/go-logr/logr"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,7 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -43,6 +44,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
+
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -65,7 +68,6 @@ type NIMServiceReconciler struct {
 	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
-	Platform         platform.Platform
 	orchestratorType k8sutil.OrchestratorType
 	recorder         record.EventRecorder
 }
@@ -73,8 +75,8 @@ type NIMServiceReconciler struct {
 // Ensure NIMServiceReconciler implements the Reconciler interface.
 var _ shared.Reconciler = &NIMServiceReconciler{}
 
-// NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform.
-func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger, platform platform.Platform) *NIMServiceReconciler {
+// NewNIMServiceReconciler creates a new reconciler for NIMService with the given platform factory.
+func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NIMServiceReconciler {
 	return &NIMServiceReconciler{
 		Client:          client,
 		scheme:          scheme,
@@ -82,7 +84,6 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 		discoveryClient: discoveryClient,
 		renderer:        renderer,
 		log:             log,
-		Platform:        platform,
 	}
 }
 
@@ -90,6 +91,7 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimservices/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimservices/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps.nvidia.com,resources=nimcaches,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=resource.nvidia.com,resources=computedomains,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions;proxies,verbs=get;list;watch
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=use,resourceNames=nonroot
@@ -103,11 +105,13 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes;grpcroutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
 // +kubebuilder:rbac:groups=leaderworkerset.x-k8s.io,resources=leaderworkersets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list
 // +kubebuilder:rbac:groups=serving.kserve.io,resources=inferenceservices,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=inference.networking.k8s.io,resources=inferencepools,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -133,12 +137,20 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	logger.Info("Reconciling", "NIMService", nimService.Name)
 
+	// Get platform implementation based on NIMService's platform field
+	platformImpl, err := platform.GetInferencePlatform(nimService.Spec.InferencePlatform)
+	if err != nil {
+		logger.Error(err, "failed to get platform implementation", "platform", nimService.Spec.InferencePlatform)
+		return ctrl.Result{}, err
+	}
+
 	// Check if the instance is marked for deletion
 	if nimService.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
-			controllerutil.AddFinalizer(nimService, NIMServiceFinalizer)
-			if err := r.Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimService, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NIMServiceFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -146,31 +158,33 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// The instance is being deleted
 		if controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
 			// Perform platform specific cleanup of resources
-			if err := r.Platform.Delete(ctx, r, nimService); err != nil {
+			if err := platformImpl.Delete(ctx, r, nimService); err != nil {
 				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
-					"NIMService %s in deleted", nimService.Name)
+					"NIMService %s is being deleted", nimService.Name)
 				return ctrl.Result{}, err
 			}
 
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(nimService, NIMServiceFinalizer)
-			if err := r.Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimService, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NIMServiceFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
 					"NIMService %s finalizer removed", nimService.Name)
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil
 		}
+		// return as the cr is being deleted and GC will cleanup owned objects
+		return ctrl.Result{}, nil
 	}
 
 	// Fetch container orchestrator type
-	_, err := r.GetOrchestratorType(ctx)
+	_, err = r.GetOrchestratorType(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to get container orchestrator type, %v", err)
 	}
 
 	// Handle platform-specific reconciliation
-	result, err := r.Platform.Sync(ctx, r, nimService)
+	result, err := platformImpl.Sync(ctx, r, nimService)
 	if err != nil {
 		logger.Error(err, "error reconciling NIMService", "name", nimService.Name)
 		return result, err
@@ -286,32 +300,90 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		)
 
-	resourceClaimCRDExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		resourcev1.SchemeGroupVersion.WithResource("resourceclaimtemplates"),
+		&resourcev1.ResourceClaimTemplate{},
+	)
 	if err != nil {
 		return err
-	}
-	if resourceClaimCRDExists {
-		nimServiceBuilder = nimServiceBuilder.Watches(
-			&resourcev1beta2.ResourceClaim{},
-			handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		)
 	}
 
-	lwsCRDExists, err := k8sutil.CRDExists(r.discoveryClient, lwsv1.SchemeGroupVersion.WithResource("leaderworkersets"))
+	nimServiceBuilder, err = k8sutil.ControllerWatchesIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		resourcev1.SchemeGroupVersion.WithResource("resourceclaims"),
+		&resourcev1.ResourceClaim{},
+		handler.EnqueueRequestsFromMapFunc(r.mapResourceClaimToNIMService),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
 	if err != nil {
 		return err
-	}
-	if lwsCRDExists {
-		nimServiceBuilder = nimServiceBuilder.Owns(&lwsv1.LeaderWorkerSet{})
 	}
 
-	isvcCRDExists, err := k8sutil.CRDExists(r.discoveryClient, kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"))
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		lwsv1.SchemeGroupVersion.WithResource("leaderworkersets"),
+		&lwsv1.LeaderWorkerSet{},
+	)
 	if err != nil {
 		return err
 	}
-	if isvcCRDExists {
-		nimServiceBuilder = nimServiceBuilder.Owns(&kservev1beta1.InferenceService{})
+
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"),
+		&kservev1beta1.InferenceService{},
+	)
+	if err != nil {
+		return err
+	}
+
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		&gatewayv1.HTTPRoute{},
+	)
+	if err != nil {
+		return err
+	}
+
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		gatewayv1.SchemeGroupVersion.WithResource("grpcroutes"),
+		&gatewayv1.GRPCRoute{},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Watch ComputeDomain owned by NIMService.
+	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		nvidiaresourcev1beta1.SchemeGroupVersion.WithResource("computedomains"),
+		&nvidiaresourcev1beta1.ComputeDomain{},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Watch ComputeDomain referenced by NIMService.
+	nimServiceBuilder, err = k8sutil.ControllerWatchesIfCRDExists(
+		r.discoveryClient,
+		nimServiceBuilder,
+		nvidiaresourcev1beta1.SchemeGroupVersion.WithResource("computedomains"),
+		&nvidiaresourcev1beta1.ComputeDomain{},
+		handler.EnqueueRequestsFromMapFunc(r.mapComputeDomainToNIMService),
+		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+	)
+	if err != nil {
+		return err
 	}
 
 	return nimServiceBuilder.Complete(r)
@@ -343,7 +415,7 @@ func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj 
 }
 
 func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
-	resourceClaim, ok := obj.(*resourcev1beta2.ResourceClaim)
+	resourceClaim, ok := obj.(*resourcev1.ResourceClaim)
 	if !ok {
 		return []ctrl.Request{}
 	}
@@ -357,21 +429,19 @@ func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context,
 	// Enqueue reconciliation for each matching NIMService
 	requests := make([]ctrl.Request, 0)
 	for _, item := range nimServices.Items {
-		nameCache := make(map[string]int)
-		for _, draResource := range item.Spec.DRAResources {
-			if draResource.ResourceClaimName != nil && *draResource.ResourceClaimName == resourceClaim.GetName() {
-				requests = append(requests, ctrl.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      item.Name,
-						Namespace: item.Namespace,
-					},
-				})
-				break
+		namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, &item)
+		if err != nil {
+			continue
+		}
+
+		for _, draResource := range namedDraResources.Resources {
+			if shared.ShouldCreateDRAResource(draResource.DRAResource) {
+				continue
 			}
-			if draResource.ResourceClaimTemplateName != nil {
-				draResourceName := shared.GenerateUniquePodClaimName(nameCache, item.Name, &draResource)
+
+			if !draResource.IsClaim() {
 				podClaimName, ok := resourceClaim.GetAnnotations()[utils.DRAPodClaimNameAnnotationKey]
-				if ok && podClaimName == draResourceName {
+				if ok && podClaimName == draResource.Name {
 					requests = append(requests, ctrl.Request{
 						NamespacedName: types.NamespacedName{
 							Name:      item.Name,
@@ -380,8 +450,55 @@ func (r *NIMServiceReconciler) mapResourceClaimToNIMService(ctx context.Context,
 					})
 					break
 				}
+			} else if draResource.ResourceName == resourceClaim.GetName() {
+				requests = append(requests, ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      item.Name,
+						Namespace: item.Namespace,
+					},
+				})
+				break
 			}
 		}
+	}
+	return requests
+}
+
+func (r *NIMServiceReconciler) mapComputeDomainToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
+	computeDomain, ok := obj.(*nvidiaresourcev1beta1.ComputeDomain)
+	if !ok {
+		return []ctrl.Request{}
+	}
+
+	// Get all NIMServices directly requesting computeDomain.
+	var nimServices appsv1alpha1.NIMServiceList
+	if err := r.List(ctx, &nimServices, client.InNamespace(computeDomain.GetNamespace())); err != nil {
+		return []ctrl.Request{}
+	}
+
+	// Enqueue reconciliation for each matching NIMService
+	requests := make([]ctrl.Request, 0)
+	for _, item := range nimServices.Items {
+		// Skip nimservice if compute domain is not requested.
+		if !item.IsComputeDomainEnabled() {
+			continue
+		}
+		// Skip nimservice if nimservice owns a compute domain.
+		if item.Spec.MultiNode.ComputeDomain.Create != nil && *item.Spec.MultiNode.ComputeDomain.Create {
+			continue
+		}
+
+		// Skip nimservice if its compute domain does not match.
+		if item.GetComputeDomainName() != computeDomain.GetName() {
+			continue
+		}
+
+		requests = append(requests, ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.Name,
+				Namespace: item.Namespace,
+			},
+		})
 	}
 	return requests
 }

@@ -21,15 +21,15 @@ import (
 	"sort"
 	"strings"
 
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
-func ListResourceClaimsByPodClaimName(ctx context.Context, k8sclient client.Client, namespace string, podClaimName string) ([]resourcev1beta2.ResourceClaim, error) {
-	resourceClaims := make([]resourcev1beta2.ResourceClaim, 0)
-	var claimList resourcev1beta2.ResourceClaimList
+func ListResourceClaimsByPodClaimName(ctx context.Context, k8sclient client.Client, namespace string, podClaimName string) ([]resourcev1.ResourceClaim, error) {
+	resourceClaims := make([]resourcev1.ResourceClaim, 0)
+	var claimList resourcev1.ResourceClaimList
 	if err := k8sclient.List(ctx, &claimList, client.InNamespace(namespace)); err != nil {
 		return nil, err
 	}
@@ -49,15 +49,15 @@ func ListResourceClaimsByPodClaimName(ctx context.Context, k8sclient client.Clie
 	return resourceClaims, nil
 }
 
-func GetResourceClaim(ctx context.Context, k8sclient client.Client, name string, namespace string) (*resourcev1beta2.ResourceClaim, error) {
-	claim := &resourcev1beta2.ResourceClaim{}
+func GetResourceClaim(ctx context.Context, k8sclient client.Client, name string, namespace string) (*resourcev1.ResourceClaim, error) {
+	claim := &resourcev1.ResourceClaim{}
 	if err := k8sclient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, claim); err != nil {
 		return nil, err
 	}
 	return claim, nil
 }
 
-func GetResourceClaimState(claim *resourcev1beta2.ResourceClaim) string {
+func GetResourceClaimState(claim *resourcev1.ResourceClaim) string {
 	var states []string
 	if claim.GetDeletionTimestamp() != nil {
 		states = append(states, "deleted")

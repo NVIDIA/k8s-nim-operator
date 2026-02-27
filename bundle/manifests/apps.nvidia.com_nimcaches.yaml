@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.2
+    controller-gen.kubebuilder.io/version: v0.20.0
   name: nimcaches.apps.nvidia.com
 spec:
   group: apps.nvidia.com
@@ -54,6 +54,7 @@ spec:
                 description: |-
                   CertConfig is the name of the ConfigMap containing the custom certificates.
                   for secure communication.
+
                   Deprecated: use `Proxy` instead to configure custom certificates for using proxy.
                 properties:
                   mountPath:
@@ -76,7 +77,9 @@ spec:
                     a Container.
                   properties:
                     name:
-                      description: Name of the environment variable. Must be a C_IDENTIFIER.
+                      description: |-
+                        Name of the environment variable.
+                        May consist of any printable ASCII characters except '='.
                       type: string
                     value:
                       description: |-
@@ -132,6 +135,43 @@ spec:
                               type: string
                           required:
                           - fieldPath
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        fileKeyRef:
+                          description: |-
+                            FileKeyRef selects a key of the env file.
+                            Requires the EnvFiles feature gate to be enabled.
+                          properties:
+                            key:
+                              description: |-
+                                The key within the env file. An invalid key will prevent the pod from starting.
+                                The keys defined within a source may consist of any printable ASCII characters except '='.
+                                During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+                              type: string
+                            optional:
+                              default: false
+                              description: |-
+                                Specify whether the file or its key must be defined. If the file or key
+                                does not exist, then the env var is not published.
+                                If optional is set to true and the specified key does not exist,
+                                the environment variable will not be set in the Pod's containers.
+
+                                If optional is set to false and the specified key does not exist,
+                                an error will be returned during Pod creation.
+                              type: boolean
+                            path:
+                              description: |-
+                                The path within the volume from which to select the file.
+                                Must be relative and may not contain the '..' path or start with '..'.
+                              type: string
+                            volumeName:
+                              description: The name of the volume mount containing
+                                the env file.
+                              type: string
+                          required:
+                          - key
+                          - path
+                          - volumeName
                           type: object
                           x-kubernetes-map-type: atomic
                         resourceFieldRef:
@@ -191,6 +231,212 @@ spec:
                 description: GroupID is the group ID for the caching job
                 format: int64
                 type: integer
+              initContainers:
+                items:
+                  description: NIMContainerSpec defines the specification for a container
+                    within a NIM workload.
+                  properties:
+                    args:
+                      description: Args are the arguments passed to the container
+                        command at runtime.
+                      items:
+                        type: string
+                      type: array
+                    command:
+                      description: Command is the entrypoint array. If not specified,
+                        the image's default entrypoint is used.
+                      items:
+                        type: string
+                      type: array
+                    env:
+                      description: Env is the list of environment variables to set
+                        in the container.
+                      items:
+                        description: EnvVar represents an environment variable present
+                          in a Container.
+                        properties:
+                          name:
+                            description: |-
+                              Name of the environment variable.
+                              May consist of any printable ASCII characters except '='.
+                            type: string
+                          value:
+                            description: |-
+                              Variable references $(VAR_NAME) are expanded
+                              using the previously defined environment variables in the container and
+                              any service environment variables. If a variable cannot be resolved,
+                              the reference in the input string will be unchanged. Double $$ are reduced
+                              to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                              "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                              Escaped references will never be expanded, regardless of whether the variable
+                              exists or not.
+                              Defaults to "".
+                            type: string
+                          valueFrom:
+                            description: Source for the environment variable's value.
+                              Cannot be used if value is not empty.
+                            properties:
+                              configMapKeyRef:
+                                description: Selects a key of a ConfigMap.
+                                properties:
+                                  key:
+                                    description: The key to select.
+                                    type: string
+                                  name:
+                                    default: ""
+                                    description: |-
+                                      Name of the referent.
+                                      This field is effectively required, but due to backwards compatibility is
+                                      allowed to be empty. Instances of this type with an empty value here are
+                                      almost certainly wrong.
+                                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
+                                  optional:
+                                    description: Specify whether the ConfigMap or
+                                      its key must be defined
+                                    type: boolean
+                                required:
+                                - key
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fieldRef:
+                                description: |-
+                                  Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                  spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                                properties:
+                                  apiVersion:
+                                    description: Version of the schema the FieldPath
+                                      is written in terms of, defaults to "v1".
+                                    type: string
+                                  fieldPath:
+                                    description: Path of the field to select in the
+                                      specified API version.
+                                    type: string
+                                required:
+                                - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fileKeyRef:
+                                description: |-
+                                  FileKeyRef selects a key of the env file.
+                                  Requires the EnvFiles feature gate to be enabled.
+                                properties:
+                                  key:
+                                    description: |-
+                                      The key within the env file. An invalid key will prevent the pod from starting.
+                                      The keys defined within a source may consist of any printable ASCII characters except '='.
+                                      During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+                                    type: string
+                                  optional:
+                                    default: false
+                                    description: |-
+                                      Specify whether the file or its key must be defined. If the file or key
+                                      does not exist, then the env var is not published.
+                                      If optional is set to true and the specified key does not exist,
+                                      the environment variable will not be set in the Pod's containers.
+
+                                      If optional is set to false and the specified key does not exist,
+                                      an error will be returned during Pod creation.
+                                    type: boolean
+                                  path:
+                                    description: |-
+                                      The path within the volume from which to select the file.
+                                      Must be relative and may not contain the '..' path or start with '..'.
+                                    type: string
+                                  volumeName:
+                                    description: The name of the volume mount containing
+                                      the env file.
+                                    type: string
+                                required:
+                                - key
+                                - path
+                                - volumeName
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              resourceFieldRef:
+                                description: |-
+                                  Selects a resource of the container: only resources limits and requests
+                                  (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                                properties:
+                                  containerName:
+                                    description: 'Container name: required for volumes,
+                                      optional for env vars'
+                                    type: string
+                                  divisor:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: Specifies the output format of the
+                                      exposed resources, defaults to "1"
+                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                    x-kubernetes-int-or-string: true
+                                  resource:
+                                    description: 'Required: resource to select'
+                                    type: string
+                                required:
+                                - resource
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              secretKeyRef:
+                                description: Selects a key of a secret in the pod's
+                                  namespace
+                                properties:
+                                  key:
+                                    description: The key of the secret to select from.  Must
+                                      be a valid secret key.
+                                    type: string
+                                  name:
+                                    default: ""
+                                    description: |-
+                                      Name of the referent.
+                                      This field is effectively required, but due to backwards compatibility is
+                                      allowed to be empty. Instances of this type with an empty value here are
+                                      almost certainly wrong.
+                                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
+                                  optional:
+                                    description: Specify whether the Secret or its
+                                      key must be defined
+                                    type: boolean
+                                required:
+                                - key
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            type: object
+                        required:
+                        - name
+                        type: object
+                      type: array
+                    image:
+                      description: Image specifies the container image to run.
+                      properties:
+                        pullPolicy:
+                          type: string
+                        pullSecrets:
+                          items:
+                            type: string
+                          type: array
+                        repository:
+                          type: string
+                        tag:
+                          type: string
+                      required:
+                      - repository
+                      - tag
+                      type: object
+                    name:
+                      description: Name is the unique name of the container within
+                        the pod.
+                      type: string
+                    workingDir:
+                      description: WorkingDir is the container's working directory.
+                        If unset, the container runtime's default is used.
+                      type: string
+                  required:
+                  - image
+                  - name
+                  type: object
+                type: array
               nodeSelector:
                 additionalProperties:
                   type: string
@@ -243,12 +489,12 @@ spec:
                       DataStore service
                     properties:
                       authSecret:
-                        description: authSecret is the name of the secret containing
+                        description: AuthSecret is the name of the secret containing
                           the "HF_TOKEN" token
                         minLength: 1
                         type: string
                       datasetName:
-                        description: datasetName is the name of the dataset
+                        description: DatasetName is the name of the dataset
                         type: string
                       endpoint:
                         description: Endpoint is the HuggingFace endpoint from NeMo
@@ -256,10 +502,10 @@ spec:
                         pattern: ^https?://.*/v1/hf/?$
                         type: string
                       modelName:
-                        description: modelName is the name of the model
+                        description: ModelName is the name of the model
                         type: string
                       modelPuller:
-                        description: modelPuller is the containerized huggingface-cli
+                        description: ModelPuller is the containerized huggingface-cli
                           image to pull the data
                         minLength: 1
                         type: string
@@ -268,8 +514,13 @@ spec:
                         description: Namespace is the namespace within NeMo DataStore
                         type: string
                       pullSecret:
-                        description: pullSecret is the name of the image pull secret
+                        description: PullSecret is the name of the image pull secret
                           for the modelPuller image
+                        minLength: 1
+                        type: string
+                      revision:
+                        description: Revision is the revision of the object to be
+                          cached. This is either a commit hash, branch name or tag.
                         minLength: 1
                         type: string
                     required:
@@ -288,22 +539,22 @@ spec:
                       Hub
                     properties:
                       authSecret:
-                        description: authSecret is the name of the secret containing
+                        description: AuthSecret is the name of the secret containing
                           the "HF_TOKEN" token
                         minLength: 1
                         type: string
                       datasetName:
-                        description: datasetName is the name of the dataset
+                        description: DatasetName is the name of the dataset
                         type: string
                       endpoint:
                         description: Endpoint is the HuggingFace endpoint
                         pattern: ^https?://.*$
                         type: string
                       modelName:
-                        description: modelName is the name of the model
+                        description: ModelName is the name of the model
                         type: string
                       modelPuller:
-                        description: modelPuller is the containerized huggingface-cli
+                        description: ModelPuller is the containerized huggingface-cli
                           image to pull the data
                         minLength: 1
                         type: string
@@ -313,8 +564,13 @@ spec:
                         minLength: 1
                         type: string
                       pullSecret:
-                        description: pullSecret is the name of the image pull secret
+                        description: PullSecret is the name of the image pull secret
                           for the modelPuller image
+                        minLength: 1
+                        type: string
+                      revision:
+                        description: Revision is the revision of the object to be
+                          cached. This is either a commit hash, branch name or tag.
                         minLength: 1
                         type: string
                     required:
@@ -421,7 +677,10 @@ spec:
                 description: Storage is the target storage for caching NIM model
                 properties:
                   hostPath:
-                    description: HostPath is the host path volume for caching NIM
+                    description: |-
+                      HostPath is the host path volume for caching NIM
+
+                      Deprecated: use PVC instead.
                     type: string
                   pvc:
                     description: PersistentVolumeClaim is the pvc volume used for
@@ -459,13 +718,6 @@ spec:
                           the PVC
                         type: string
                     type: object
-                    x-kubernetes-validations:
-                    - message: size is required for pvc creation
-                      rule: '!has(self.create) || !self.create || (has(self.size)
-                        && self.size != "")'
-                    - message: volumeAccessMode is required for pvc creation
-                      rule: '!has(self.create) || !self.create || (has(self.volumeAccessMode)
-                        && self.volumeAccessMode != "")'
                 type: object
               tolerations:
                 description: Tolerations for running the job to cache the NIM model

@@ -38,6 +38,10 @@ spec:
       {{- if .SchedulerName }}
       schedulerName: {{ .SchedulerName }}
       {{- end }}
+      {{- if .Affinity }}
+      affinity:
+        {{ .Affinity | yaml | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ .ServiceAccountName }}
       runtimeClassName: {{ .RuntimeClassName }}
       initContainers:
@@ -48,11 +52,11 @@ spec:
         imagePullPolicy: {{ .ImagePullPolicy }}
         {{- end }}
         {{- if .Command }}
-        command: 
+        command:
           {{ .Command | yaml | nindent 10 }}
         {{- end }}
         {{- if .Args}}
-        args: 
+        args:
           {{ .Args| yaml | nindent 10 }}
         {{- end }}
         {{- if .WorkingDir }}
@@ -66,6 +70,19 @@ spec:
         resources:
           {{ . | yaml | nindent 10 }}
         {{- end }}
+        {{- if .SecurityContext }}
+        securityContext:
+          {{ .SecurityContext | yaml | nindent 10 }}
+        {{- end }}
+        {{- if .VolumeMounts }}
+        volumeMounts:
+          {{- range .VolumeMounts }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            subPath: {{ .SubPath }}
+            readOnly: {{ .ReadOnly }}
+          {{- end }}
+        {{- end }}
       {{- end }}
       containers:
       - name: {{ .ContainerName }}
@@ -75,6 +92,14 @@ spec:
         {{- end }}
         image: {{ .Image }}
         imagePullPolicy: {{ .ImagePullPolicy }}
+        {{- if .Command }}
+        command:
+          {{ .Command | yaml | nindent 10 }}
+        {{- end }}
+        {{- if .Args}}
+        args:
+          {{ .Args| yaml | nindent 10 }}
+        {{- end }}
         volumeMounts:
         {{- range .VolumeMounts }}
         - name: {{ .Name }}
@@ -102,7 +127,40 @@ spec:
         startupProbe:
           {{ . | yaml | nindent 10 }}
         {{- end }}
-        {{- if .PodResourceClaims }}
+      {{- range .SidecarContainers }}
+      - name: {{ .Name }}
+        image: {{ .Image }}
+        {{- if .ImagePullPolicy }}
+        imagePullPolicy: {{ .ImagePullPolicy }}
+        {{- end }}
+        {{- if .Command }}
+        command:
+          {{ .Command | yaml | nindent 10 }}
+        {{- end }}
+        {{- if .Args}}
+        args:
+          {{ .Args| yaml | nindent 10 }}
+        {{- end }}
+        {{- if .WorkingDir }}
+        workingDir: {{ .WorkingDir }}
+        {{- end }}
+        {{- if .Env }}
+        env:
+          {{ .Env | yaml | nindent 10 }}
+        {{- end }}
+        {{- with .Resources }}
+        resources:
+          {{ . | yaml | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+          {{- range $.VolumeMounts }}
+          - name: {{ .Name }}
+            mountPath: {{ .MountPath }}
+            subPath: {{ .SubPath }}
+            readOnly: {{ .ReadOnly }}
+          {{- end }}
+      {{- end }}
+      {{- if .PodResourceClaims }}
       resourceClaims:
         {{- .PodResourceClaims | yaml | nindent 10 }}
       {{- end }}

@@ -1,0 +1,39 @@
+---
+# NIM Service with Multi-LLM NIM with model not pre-cached
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-3-2-1b-instruct
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/llm-nim
+    tag: "1.12"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  env:
+    - name: NIM_MODEL_NAME
+      value: nvidia/nemo/llama-3_2-1b-instruct
+  storage:
+    pvc:
+      create: true
+      storageClass: ''
+      size: 10Gi
+      volumeAccessMode: ReadWriteOnce
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      cpu: "12"
+      memory: 32Gi
+    requests:
+      nvidia.com/gpu: 1
+      cpu: "4"
+      memory: 6Gi
+  replicas: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+

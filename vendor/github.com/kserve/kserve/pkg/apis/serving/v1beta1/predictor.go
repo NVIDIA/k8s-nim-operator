@@ -54,6 +54,11 @@ type PredictorSpec struct {
 	// Model spec for any arbitrary framework.
 	Model *ModelSpec `json:"model,omitempty"`
 
+	// Spec for multiple storage uris.
+	// +listType=atomic
+	// +kubebuilder:validation:MinItems=1
+	StorageUris []StorageUri `json:"storageUris,omitempty"`
+
 	// WorkerSpec for enabling multi-node/multi-gpu
 	WorkerSpec *WorkerSpec `json:"workerSpec,omitempty"`
 
@@ -66,6 +71,22 @@ type PredictorSpec struct {
 	PodSpec `json:",inline"`
 	// Component extension defines the deployment configurations for a predictor
 	ComponentExtensionSpec `json:",inline"`
+}
+
+type StorageUri struct {
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Uri string `json:"uri"`
+
+	// MountPath is the path where the model will be mounted inside the container.
+	// If not specified, it defaults to /mnt/models.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/mnt/models"
+	// +kubebuilder:validation:Pattern="^/.*"
+	// +kubebuilder:validation:MaxLength=255
+	// +optional
+	MountPath string `json:"mountPath"`
 }
 
 type WorkerSpec struct {
@@ -101,23 +122,14 @@ type PredictorExtensionSpec struct {
 	corev1.Container `json:",inline"`
 	// Storage Spec for model location
 	// +optional
-	Storage *StorageSpec `json:"storage,omitempty"`
+	Storage *ModelStorageSpec `json:"storage,omitempty"`
 }
 
-type StorageSpec struct {
-	// The path to the model object in the storage. It cannot co-exist
-	// with the storageURI.
-	// +optional
-	Path *string `json:"path,omitempty"`
+type ModelStorageSpec struct {
+	StorageSpec `json:",inline"`
 	// The path to the model schema file in the storage.
 	// +optional
 	SchemaPath *string `json:"schemaPath,omitempty"`
-	// Parameters to override the default storage credentials and config.
-	// +optional
-	Parameters *map[string]string `json:"parameters,omitempty"`
-	// The Storage Key in the secret for this model.
-	// +optional
-	StorageKey *string `json:"key,omitempty"`
 }
 
 // GetImplementations returns the implementations for the component
@@ -136,8 +148,8 @@ func (s *PredictorSpec) GetImplementations() []ComponentImplementation {
 		s.Model,
 	})
 	// This struct is not a pointer, so it will never be nil; include if containers are specified
-	if len(s.PodSpec.Containers) != 0 {
-		for _, container := range s.PodSpec.Containers {
+	if len(s.Containers) != 0 {
+		for _, container := range s.Containers {
 			if container.Name == constants.InferenceServiceContainerName {
 				implementations = append(implementations, NewCustomPredictor(&s.PodSpec))
 			}
@@ -176,6 +188,6 @@ func (p *PredictorExtensionSpec) GetStorageUri() *string {
 }
 
 // GetStorageSpec returns the predictor storage spec object
-func (p *PredictorExtensionSpec) GetStorageSpec() *StorageSpec {
+func (p *PredictorExtensionSpec) GetStorageSpec() *ModelStorageSpec {
 	return p.Storage
 }

@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -58,25 +59,28 @@ const (
 )
 
 // NemoEntitystoreSpec defines the desired state of NemoEntitystore.
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
+// +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
 type NemoEntitystoreSpec struct {
-	Image        Image                        `json:"image"`
-	Command      []string                     `json:"command,omitempty"`
-	Args         []string                     `json:"args,omitempty"`
-	Env          []corev1.EnvVar              `json:"env,omitempty"`
-	Labels       map[string]string            `json:"labels,omitempty"`
-	Annotations  map[string]string            `json:"annotations,omitempty"`
-	NodeSelector map[string]string            `json:"nodeSelector,omitempty"`
-	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
-	PodAffinity  *corev1.PodAffinity          `json:"podAffinity,omitempty"`
-	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Image        Image               `json:"image"`
+	Command      []string            `json:"command,omitempty"`
+	Args         []string            `json:"args,omitempty"`
+	Env          []corev1.EnvVar     `json:"env,omitempty"`
+	Labels       map[string]string   `json:"labels,omitempty"`
+	Annotations  map[string]string   `json:"annotations,omitempty"`
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+	Affinity     *corev1.Affinity    `json:"affinity,omitempty"`
+	// Deprecated: Use Affinity instead.
+	PodAffinity *corev1.PodAffinity          `json:"podAffinity,omitempty"`
+	Resources   *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.grpcPort))", message="unsupported field: spec.expose.service.grpcPort"
 	// +kubebuilder:validation:XValidation:rule="!(has(self.service.metricsPort))", message="unsupported field: spec.expose.service.metricsPort"
 	Expose  ExposeV1    `json:"expose,omitempty"`
 	Scale   Autoscaling `json:"scale,omitempty"`
 	Metrics Metrics     `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default:=1
-	Replicas     int    `json:"replicas,omitempty"`
+	Replicas     *int32 `json:"replicas,omitempty"`
 	UserID       *int64 `json:"userID,omitempty"`
 	GroupID      *int64 `json:"groupID,omitempty"`
 	RuntimeClass string `json:"runtimeClass,omitempty"`
@@ -245,9 +249,9 @@ func (n *NemoEntitystore) GetTolerations() []corev1.Toleration {
 	return n.Spec.Tolerations
 }
 
-// GetPodAffinity returns pod affinity for the NemoEntitystore instance.
-func (n *NemoEntitystore) GetPodAffinity() *corev1.PodAffinity {
-	return n.Spec.PodAffinity
+// GetAffinity returns affinity for the NemoEntitystore instance.
+func (n *NemoEntitystore) GetAffinity() *corev1.Affinity {
+	return n.Spec.Affinity
 }
 
 // GetContainerName returns name of the container for NemoEntitystore deployment.
@@ -372,9 +376,9 @@ func (n *NemoEntitystore) GetServiceMonitor() ServiceMonitor {
 }
 
 // GetReplicas returns replicas for the NemoEntitystore deployment.
-func (n *NemoEntitystore) GetReplicas() int {
+func (n *NemoEntitystore) GetReplicas() *int32 {
 	if n.IsAutoScalingEnabled() {
-		return 0
+		return n.Spec.Scale.HPA.MinReplicas
 	}
 	return n.Spec.Replicas
 }
@@ -391,12 +395,25 @@ func (n *NemoEntitystore) IsAutoScalingEnabled() bool {
 
 // IsIngressEnabled returns true if ingress is enabled for NemoEntitystore deployment.
 func (n *NemoEntitystore) IsIngressEnabled() bool {
-	return n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled
+	return (n.Spec.Expose.Router.Ingress != nil && n.Spec.Expose.Router.Ingress.IngressClass != "") ||
+		(n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled) // TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
 }
 
 // GetIngressSpec returns the Ingress spec NemoEntitystore deployment.
 func (n *NemoEntitystore) GetIngressSpec() networkingv1.IngressSpec {
-	return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
+		return n.Spec.Expose.Ingress.GenerateNetworkingV1IngressSpec(n.GetName())
+	}
+	return n.Spec.Expose.Router.GenerateIngressSpec(n.GetNamespace(), n.GetName())
+}
+
+func (n *NemoEntitystore) IsHTTPRouteEnabled() bool {
+	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
+}
+
+func (n *NemoEntitystore) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
+	return n.Spec.Expose.Router.GenerateGatewayHTTPRouteSpec(n.GetNamespace(), n.GetName(), n.GetServicePort())
 }
 
 // IsServiceMonitorEnabled returns true if servicemonitor is enabled for NemoEntitystore deployment.
@@ -464,7 +481,7 @@ func (n *NemoEntitystore) GetDeploymentParams() *rendertypes.DeploymentParams {
 	}
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
-	params.Affinity = n.GetPodAffinity()
+	params.Affinity = n.GetAffinity()
 	params.ImagePullSecrets = n.GetImagePullSecrets()
 	params.ImagePullPolicy = n.GetImagePullPolicy()
 
@@ -527,7 +544,7 @@ func (n *NemoEntitystore) GetStatefulSetParams() *rendertypes.StatefulSetParams 
 	params.ServiceName = n.GetName()
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
-	params.Affinity = n.GetPodAffinity()
+	params.Affinity = n.GetAffinity()
 	params.ImagePullSecrets = n.GetImagePullSecrets()
 	params.ImagePullPolicy = n.GetImagePullPolicy()
 
@@ -601,6 +618,20 @@ func (n *NemoEntitystore) GetIngressParams() *rendertypes.IngressParams {
 	return params
 }
 
+// GetHTTPRouteParams returns params to render HTTPRoute from templates.
+func (n *NemoEntitystore) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
+	params := &rendertypes.HTTPRouteParams{}
+	params.Enabled = n.IsHTTPRouteEnabled()
+
+	// Set metadata
+	params.Name = n.GetName()
+	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
+	params.Annotations = n.GetHTTPRouteAnnotations()
+	params.Spec = n.GetHTTPRouteSpec()
+	return params
+}
+
 // GetRoleParams returns params to render Role from templates.
 func (n *NemoEntitystore) GetRoleParams() *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
@@ -608,6 +639,7 @@ func (n *NemoEntitystore) GetRoleParams() *rendertypes.RoleParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	// Set rules to use SCC
 	params.Rules = []rbacv1.PolicyRule{
@@ -629,6 +661,7 @@ func (n *NemoEntitystore) GetRoleBindingParams() *rendertypes.RoleBindingParams 
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	params.ServiceAccountName = n.GetServiceAccountName()
 	params.RoleName = n.GetName()
@@ -705,10 +738,23 @@ func (n *NemoEntitystore) GetServiceMonitorParams() *rendertypes.ServiceMonitorP
 func (n *NemoEntitystore) GetIngressAnnotations() map[string]string {
 	NemoEntitystoreAnnotations := n.GetNemoEntitystoreAnnotations()
 
-	if n.Spec.Expose.Ingress.Annotations != nil {
+	// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+	if n.Spec.Expose.Ingress.Enabled != nil && *n.Spec.Expose.Ingress.Enabled {
 		return utils.MergeMaps(NemoEntitystoreAnnotations, n.Spec.Expose.Ingress.Annotations)
 	}
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(NemoEntitystoreAnnotations, n.Spec.Expose.Router.Annotations)
+	}
 	return NemoEntitystoreAnnotations
+}
+
+func (n *NemoEntitystore) GetHTTPRouteAnnotations() map[string]string {
+	annotations := n.GetNemoEntitystoreAnnotations()
+
+	if n.Spec.Expose.Router.Annotations != nil {
+		return utils.MergeMaps(annotations, n.Spec.Expose.Router.Annotations)
+	}
+	return annotations
 }
 
 func (n *NemoEntitystore) GetServiceAnnotations() map[string]string {

@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // DaemonsetParams holds the parameters for rendering a Daemonset template.
@@ -59,7 +60,7 @@ type DeploymentParams struct {
 	Annotations        map[string]string
 	PodAnnotations     map[string]string
 	SelectorLabels     map[string]string
-	Replicas           int
+	Replicas           *int32
 	ContainerName      string
 	Args               []string
 	Command            []string
@@ -73,7 +74,7 @@ type DeploymentParams struct {
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
-	Affinity           *corev1.PodAffinity
+	Affinity           *corev1.Affinity
 	LivenessProbe      *corev1.Probe
 	ReadinessProbe     *corev1.Probe
 	StartupProbe       *corev1.Probe
@@ -85,6 +86,7 @@ type DeploymentParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 }
 
@@ -96,7 +98,7 @@ type LeaderWorkerSetParams struct {
 	Annotations        map[string]string
 	PodAnnotations     map[string]string
 	SelectorLabels     map[string]string
-	Replicas           int
+	Replicas           *int32
 	Size               int
 	ContainerName      string
 	Args               []string
@@ -114,7 +116,7 @@ type LeaderWorkerSetParams struct {
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
-	Affinity           *corev1.PodAffinity
+	Affinity           *corev1.Affinity
 	LivenessProbe      *corev1.Probe
 	ReadinessProbe     *corev1.Probe
 	StartupProbe       *corev1.Probe
@@ -126,6 +128,7 @@ type LeaderWorkerSetParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 }
 
@@ -136,7 +139,7 @@ type StatefulSetParams struct {
 	Labels             map[string]string
 	Annotations        map[string]string
 	SelectorLabels     map[string]string
-	Replicas           int
+	Replicas           *int32
 	ContainerName      string
 	ServiceName        string
 	Image              string
@@ -150,7 +153,7 @@ type StatefulSetParams struct {
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
-	Affinity           *corev1.PodAffinity
+	Affinity           *corev1.Affinity
 	ServiceAccountName string
 	LivenessProbe      *corev1.Probe
 	ReadinessProbe     *corev1.Probe
@@ -185,6 +188,7 @@ type ServiceAccountParams struct {
 type RoleParams struct {
 	Name      string
 	Namespace string
+	Labels    map[string]string
 	Rules     []rbacv1.PolicyRule
 }
 
@@ -192,6 +196,7 @@ type RoleParams struct {
 type RoleBindingParams struct {
 	Name               string
 	Namespace          string
+	Labels             map[string]string
 	RoleName           string
 	ServiceAccountName string
 }
@@ -200,6 +205,25 @@ type RoleBindingParams struct {
 type SCCParams struct {
 	Name               string
 	ServiceAccountName string
+}
+
+// IngressParams holds the parameters for rendering an Ingress template.
+type HTTPRouteParams struct {
+	Enabled     bool
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	Spec        gatewayv1.HTTPRouteSpec
+}
+
+type GRPCRouteParams struct {
+	Enabled     bool
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	Spec        gatewayv1.GRPCRouteSpec
 }
 
 // IngressParams holds the parameters for rendering an Ingress template.
@@ -296,7 +320,7 @@ type InferenceServiceParams struct {
 	Resources          *corev1.ResourceRequirements
 	NodeSelector       map[string]string
 	Tolerations        []corev1.Toleration
-	Affinity           *corev1.PodAffinity
+	Affinity           *corev1.Affinity
 	LivenessProbe      *corev1.Probe
 	ReadinessProbe     *corev1.Probe
 	StartupProbe       *corev1.Probe
@@ -308,6 +332,49 @@ type InferenceServiceParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 	DeploymentMode     string
+}
+
+type DRADeviceParams struct {
+	Name            string
+	Count           uint32
+	DeviceClassName string
+	CELExpressions  []string
+}
+
+type ResourceClaimTemplateParams struct {
+	Name             string
+	Namespace        string
+	Labels           map[string]string
+	Annotations      map[string]string
+	ClaimAnnotations map[string]string
+	Devices          []DRADeviceParams
+}
+
+// ComputeDomainParams holds the parameters for rendering a ComputeDomain template.
+type ComputeDomainParams struct {
+	Name                      string
+	Namespace                 string
+	Labels                    map[string]string
+	Annotations               map[string]string
+	NumNodes                  uint32
+	ResourceClaimTemplateName string
+}
+
+// InferencePoolParams holds the parameters for rendering an InferencePool template.
+type InferencePoolParams struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	// SelectorLabels are the pod labels used to select model server pods into the pool.
+	SelectorLabels map[string]string
+	// TargetPort is the port number on model server pods (e.g. 8000).
+	TargetPort int32
+	// EPPServiceName is the name of the EPP (Endpoint Picker) Service.
+	EPPServiceName string
+	// EPPServicePort is the gRPC port of the EPP Service (e.g. 9002).
+	EPPServicePort int32
 }

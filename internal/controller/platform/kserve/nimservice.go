@@ -23,19 +23,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
-	isvcutils "github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/utils"
-	kserveutils "github.com/kserve/kserve/pkg/utils"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	knativeapis "knative.dev/pkg/apis"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,6 +51,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
@@ -89,6 +88,10 @@ func NewNIMServiceReconciler(ctx context.Context, r shared.Reconciler) *NIMServi
 		recorder:         r.GetEventRecorder(),
 		orchestratorType: orchestratorType,
 	}
+}
+
+func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
+	return r.renderer
 }
 
 func (r *NIMServiceReconciler) cleanupNIMService(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
@@ -146,18 +149,19 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	modelPVC, modelProfile, nimCache, err = r.renderAndSyncCache(ctx, nimService)
 	if err != nil {
 		return ctrl.Result{}, err
-	} else if modelPVC == nil {
+	} else if nimCache == nil {
 		return ctrl.Result{}, nil
 	}
 
 	var deploymentMode kserveconstants.DeploymentModeType
 	// Check KServe deployment mode
-	deploymentMode, err = r.getKServeDeploymentMode(ctx, nimService.Spec.Annotations)
+	namespacedName := client.ObjectKeyFromObject(nimService)
+	deploymentMode, err = utils.GetKServeDeploymentMode(ctx, r.Client, nimService.Spec.Annotations, &namespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if deploymentMode == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(deploymentMode) {
 		// Sync Service Monitor
 		if nimService.IsServiceMonitorEnabled() {
 			err = r.renderAndSyncResource(ctx, nimService, &monitoringv1.ServiceMonitor{}, func() (client.Object, error) {
@@ -175,9 +179,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	var result *ctrl.Result
-	result, err = r.checkInferenceServiceStatus(ctx,
-		&types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()},
-		nimService, deploymentMode)
+	result, err = r.checkInferenceServiceStatus(ctx, nimService, deploymentMode)
 
 	if err != nil {
 		r.log.Error(err, "Unable to update status")
@@ -221,10 +223,11 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
 
 	err = r.Get(ctx, namespacedName, obj)
-	if err != nil && !k8serrors.IsNotFound(err) {
+	if err != nil && !apiErrors.IsNotFound(err) {
 		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
 		return err
 	}
+
 	// Don't do anything if CR is unchanged.
 	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
 		return nil
@@ -264,7 +267,7 @@ func (r *NIMServiceReconciler) renderAndSyncCache(ctx context.Context,
 	if nimCacheName != "" { // nolint:gocritic
 		if err := r.Get(ctx, types.NamespacedName{Name: nimCacheName, Namespace: nimService.GetNamespace()}, nimCache); err != nil {
 			// Fail the NIMService if the NIMCache is not found
-			if k8serrors.IsNotFound(err) {
+			if apiErrors.IsNotFound(err) {
 				msg := fmt.Sprintf("NIMCache %s not found", nimCacheName)
 				statusUpdateErr := r.updater.SetConditionsFailed(ctx, nimService, conditions.ReasonNIMCacheNotFound, msg)
 				r.recorder.Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, msg)
@@ -336,9 +339,13 @@ func (r *NIMServiceReconciler) renderAndSyncCache(ctx context.Context,
 	} else if nimService.Spec.Storage.PVC.Name != "" {
 		// Use an existing PVC
 		modelPVC = &nimService.Spec.Storage.PVC
+	} else if nimService.Spec.Storage.EmptyDir != nil {
+		modelPVC = nil
+	} else if nimService.Spec.Storage.HostPath != nil && *nimService.Spec.Storage.HostPath != "" {
+		modelPVC = nil
 	} else {
-		err := fmt.Errorf("neither external PVC name or NIMCache volume is provided")
-		logger.Error(err, "failed to determine PVC for model-store")
+		err := fmt.Errorf("neither external PVC name, NIMCache volume, empty dir or local host path should be provided")
+		logger.Error(err, "failed to determine PVC , NIMCache volume, empty dir or local host path for model-store")
 		return nil, "", nil, err
 	}
 
@@ -359,7 +366,12 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
-			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace()})
+			labels := map[string]string{
+				"app":                          "k8s-nim-operator",
+				"app.kubernetes.io/name":       nimService.Name,
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
+			}
+			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace(), Labels: labels})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return nil, err
@@ -374,9 +386,16 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 			}
 			logger.Info("Created PVC for NIM Service", "pvc", pvcName)
 
-			conditions.UpdateCondition(&nimService.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
-			nimService.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
-			if err := r.Status().Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimService, func(obj client.Object) {
+				ns, ok := obj.(*appsv1alpha1.NIMService)
+				if !ok {
+					logger.Error(fmt.Errorf("failed to cast object to NIMService"), "object", obj)
+					return
+				}
+				conditions.UpdateCondition(&ns.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
+				ns.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
+
+			}); err != nil {
 				logger.Error(err, "Failed to update status", "NIMService", nimService.Name)
 				return nil, err
 			}
@@ -400,19 +419,20 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 	logger := r.log
 
-	var profileEnv *corev1.EnvVar
+	var profileEnv *[]corev1.EnvVar
 	var profile *appsv1alpha1.NIMProfile
 	var gpuResources *corev1.ResourceRequirements
-	var initContainers []corev1.Container
 	var renderFunc func() (client.Object, error)
 	var conType, failedCon string
 	var renderObj client.Object
 
 	// Setup env for explicit override profile is specified
 	if modelProfile != "" {
-		profileEnv = &corev1.EnvVar{
-			Name:  "NIM_MODEL_PROFILE",
-			Value: modelProfile,
+		profileEnv = &[]corev1.EnvVar{
+			{
+				Name:  "NIM_MODEL_PROFILE",
+				Value: modelProfile,
+			},
 		}
 
 		// Only assign GPU resources if the NIMCache is for optimized NIM
@@ -438,8 +458,16 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 		// TODO: assign GPU resources and node selector that is required for the selected profile
 	}
 
-	initContainers = nimService.GetInitContainers()
-	namedDraResources := shared.GenerateNamedDRAResources(nimService)
+	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
+	if err != nil {
+		logger.Error(err, "Failed to get named dra resources")
+		return err
+	}
+	err = r.reconcileDRAResources(ctx, nimService, namedDraResources)
+	if err != nil {
+		logger.Error(err, "Failed to reconcile DRAResources")
+		return err
+	}
 
 	isvcParams := nimService.GetInferenceServiceParams(deploymentMode)
 	isvcParams.DeploymentMode = string(deploymentMode)
@@ -448,47 +476,90 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	isvcParams.Annotations[kserveconstants.EnableMetricAggregation] = "true"
 	isvcParams.Annotations[kserveconstants.SetPrometheusAnnotation] = "true"
 
+	// Ensure deployment mode annotation is always set
+	if _, ok := isvcParams.Annotations[kserveconstants.DeploymentMode]; !ok {
+		isvcParams.Annotations[kserveconstants.DeploymentMode] = string(deploymentMode)
+	}
+
 	// Sync ingress
-	if !nimService.IsIngressEnabled() {
-		isvcParams.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
+	// Only if network visibility is not explicitly configured
+	if _, hasVisibility := isvcParams.Labels[kserveconstants.NetworkVisibility]; !hasVisibility {
+		// User has not explicitly set visibility
+		if !nimService.IsIngressEnabled() {
+			isvcParams.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
+		}
 	}
 
 	isvcParams.OrchestratorType = string(r.orchestratorType)
 
-	isvcParams.PodResourceClaims = shared.GetPodResourceClaims(namedDraResources)
+	isvcParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 	if nimCache.IsUniversalNIM() {
-		isvcParams.Env = append(isvcParams.Env, corev1.EnvVar{
-			Name:  "NIM_MODEL_NAME",
-			Value: utils.DefaultModelStorePath,
+		isvcParams.Env = utils.MergeEnvVars([]corev1.EnvVar{
+			{
+				Name:  "NIM_MODEL_NAME",
+				Value: utils.DefaultModelStorePath,
+			},
+		}, isvcParams.Env)
+	}
+	// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, add the HF_TOKEN to the environment variables and make NGC_API_KEY optional
+	// For custom models stored in Datastore, the NIM Container needs to access NGC to download base model. However, NGC_API_KEY is not required for Hugging Face models.
+	if nimCache.IsHFModel() || nimService.IsHFModel() {
+		isvcParams.Env = utils.RemoveEnvVar(isvcParams.Env, appsv1alpha1.NGCAPIKey)
+		isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{
+			{
+				Name: appsv1alpha1.NGCAPIKey,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: nimService.Spec.AuthSecret,
+						},
+						Key:      appsv1alpha1.NGCAPIKey,
+						Optional: &[]bool{true}[0],
+					},
+				},
+			},
+			{
+				Name: appsv1alpha1.HFToken,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: nimService.Spec.AuthSecret,
+						},
+						Key: appsv1alpha1.HFToken,
+					},
+				},
+			},
 		})
 	}
+
 	// Setup volume mounts with model store
-	isvcParams.Volumes = nimService.GetVolumes(*modelPVC)
-	isvcParams.VolumeMounts = nimService.GetVolumeMounts(*modelPVC)
+	isvcParams.Volumes = nimService.GetVolumes(modelPVC)
+	isvcParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
 	if profileEnv != nil {
-		isvcParams.Env = append(isvcParams.Env, *profileEnv)
+		isvcParams.Env = utils.MergeEnvVars(*profileEnv, isvcParams.Env)
 	}
 	// Auto assign GPU resources in case of the optimized profile
 	if gpuResources != nil {
 		isvcParams.Resources = gpuResources
+	}
+	initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+	for idx := range isvcParams.InitContainers {
+		isvcParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
 	}
 	renderFunc = func() (client.Object, error) {
 		result, err := r.renderer.InferenceService(isvcParams)
 		if err != nil {
 			return nil, err
 		}
-		if len(initContainers) > 0 {
-			result.Spec.Predictor.InitContainers = initContainers
-		}
 		// Update Container resources with DRA resource claims.
-		shared.UpdateContainerResourceClaims(result.Spec.Predictor.Containers, namedDraResources)
+		namedDraResources.UpdateContainerResourceClaims(result.Spec.Predictor.Containers)
 		return result, nil
 	}
 	conType = "InferenceService"
 	failedCon = conditions.ReasonDeploymentFailed
 	renderObj = &kservev1beta1.InferenceService{}
 
-	err := r.renderAndSyncResource(ctx, nimService, renderObj, renderFunc, conType, failedCon)
+	err = r.renderAndSyncResource(ctx, nimService, renderObj, renderFunc, conType, failedCon)
 	if err != nil {
 		return err
 	}
@@ -565,7 +636,7 @@ func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *
 	// if deployed as multi-node, use the GPU per worker value to assign GPU resources to each worker
 	// TODO auto determine base on tp*pp/(.spec.multiNode.size)
 	if nimService.Spec.MultiNode != nil {
-		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", nimService.Spec.MultiNode.GPUSPerPod))
+		gpuQuantity, err = apiResource.ParseQuantity(fmt.Sprintf("%d", nimService.GetMultiNodeTensorParallelism()))
 		if err != nil {
 			logger.Error(err, "Failed to parse GPU per worker value")
 			return nil, err
@@ -602,18 +673,22 @@ func (r *NIMServiceReconciler) addGPUResources(ctx context.Context, nimService *
 	return resources, nil
 }
 
-func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, namespacedName *types.NamespacedName,
-	nimService *appsv1alpha1.NIMService, deploymentMode kserveconstants.DeploymentModeType) (*ctrl.Result, error) {
+func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, nimService *appsv1alpha1.NIMService,
+	deploymentMode kserveconstants.DeploymentModeType) (*ctrl.Result, error) {
 	logger := r.log
 
 	// Check if InferenceService is ready
-	msg, ready, err := r.isInferenceServiceReady(ctx, namespacedName)
+	msg, ready, err := r.isInferenceServiceReady(ctx, nimService)
 	if err != nil {
 		return &ctrl.Result{}, err
 	}
 
-	namedDraResources := shared.GenerateNamedDRAResources(nimService)
-	if len(namedDraResources) > 0 {
+	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
+	if err != nil {
+		logger.Error(err, "Failed to get named dra resources")
+		return &ctrl.Result{}, err
+	}
+	if len(namedDraResources.Resources) > 0 {
 		// Update NIMServiceStatus with resource claims.
 		updateErr := r.updateResourceClaimStatus(ctx, nimService, namedDraResources)
 		if updateErr != nil {
@@ -632,7 +707,7 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
 	} else {
 		// Update NIMServiceStatus with model config.
-		updateErr := r.updateModelStatus(ctx, nimService, namespacedName, deploymentMode)
+		updateErr := r.updateModelStatus(ctx, nimService, deploymentMode)
 		if updateErr != nil {
 			logger.Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
 			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
@@ -653,37 +728,46 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 }
 
 // isInferenceServiceReady checks if the InferenceService is ready.
-func (r *NIMServiceReconciler) isInferenceServiceReady(ctx context.Context, namespacedName *types.NamespacedName) (string, bool, error) {
+func (r *NIMServiceReconciler) isInferenceServiceReady(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, bool, error) {
 	logger := r.log
 
 	isvc := &kservev1beta1.InferenceService{}
-	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, isvc)
+	err := r.Get(ctx, client.ObjectKey{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)
 	if err != nil {
 		logger.Error(err, "failed to fetch inferenceservice")
-		if k8serrors.IsNotFound(err) {
-			return "", false, nil
+		if apiErrors.IsNotFound(err) {
+			return fmt.Sprintf("Waiting for InferenceService %q creation", nimService.Name), false, nil
 		}
 		return "", false, err
 	}
 
-	var cond knativeapis.Condition
+	var cond *knativeapis.Condition
 	for i := range isvc.Status.Conditions {
 		c := isvc.Status.Conditions[i]
 		if c.Type == kservev1beta1.PredictorReady {
-			cond = c
+			cond = &c
 			break
 		}
 	}
-	return cond.GetMessage(), cond.IsTrue(), nil
+	if cond != nil {
+		return cond.GetMessage(), cond.IsTrue(), nil
+	}
+	return fmt.Sprintf("Waiting for InferenceService %q reporting Predictor readiness", isvc.Name), false, nil
 }
 
 func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService *appsv1alpha1.NIMService,
-	namespacedName *types.NamespacedName, deploymentMode kserveconstants.DeploymentModeType) error {
-	clusterEndpoint, externalEndpoint, err := r.getNIMModelEndpoints(ctx, nimService, namespacedName, deploymentMode)
+	deploymentMode kserveconstants.DeploymentModeType) error {
+	clusterEndpoint, externalEndpoint, err := r.getNIMModelEndpoints(ctx, nimService, deploymentMode)
 	if err != nil {
 		return err
 	}
 
+	// KServe RawDeployment mode creates headless services (clusterIP: None) by default, which prevents
+	// standard service-based access for model endpoints. To enable regular ClusterIP services:
+	//   - Upstream KServe: Set "serviceClusterIPNone: false" in the "deploy" section of the
+	//     "inferenceservice-config" ConfigMap (in the KServe controller namespace)
+	//   - OpenDataHub: Set "rawDeploymentServiceConfig: Headed" (not "Headless") in the
+	//     kserve spec of the DataScienceCluster object
 	modelName, err := r.getNIMModelName(ctx, clusterEndpoint)
 	if err != nil {
 		return err
@@ -698,11 +782,11 @@ func (r *NIMServiceReconciler) updateModelStatus(ctx context.Context, nimService
 }
 
 func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimService *appsv1alpha1.NIMService,
-	namespacedName *types.NamespacedName, deploymentMode kserveconstants.DeploymentModeType) (string, string, error) {
+	deploymentMode kserveconstants.DeploymentModeType) (string, string, error) {
 	logger := r.log
 
 	isvc := &kservev1beta1.InferenceService{}
-	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, isvc)
+	err := r.Get(ctx, client.ObjectKey{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)
 	if err != nil {
 		logger.Error(err, "unable to fetch k8s service", "nimservice", nimService.GetName())
 		return "", "", err
@@ -717,17 +801,16 @@ func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimServ
 		return "", "", err
 	}
 
-	if deploymentMode == kserveconstants.RawDeployment {
-		if isvc.Status.Address != nil && isvc.Status.Address.URL != nil {
-			clusterEndpoint := isvc.Status.Address.URL.String()
-			return clusterEndpoint, externalEndpoint, nil
-		} else {
-			err := fmt.Errorf("cluster endpoint not available, nimservice %s", nimService.GetName())
-			logger.Error(err, "unable to get cluster endpoint", "nimservice", nimService.GetName(), "inferenceservice", isvc.GetName())
-			return "", "", err
-		}
+	var clusterEndpoint string
+	if isvc.Status.Address != nil && isvc.Status.Address.URL != nil {
+		clusterEndpoint = isvc.Status.Address.URL.String()
+	} else {
+		err := fmt.Errorf("cluster endpoint not available, nimservice %s", nimService.GetName())
+		logger.Error(err, "unable to get cluster endpoint", "nimservice", nimService.GetName(), "inferenceservice", isvc.GetName())
+		return "", "", err
 	}
-	return externalEndpoint, externalEndpoint, nil
+
+	return clusterEndpoint, externalEndpoint, nil
 }
 
 func (r *NIMServiceReconciler) getNIMModelName(ctx context.Context, nimServiceEndpoint string) (string, error) {
@@ -790,18 +873,6 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 		return false, msg, nil
 	}
 
-	// Check if the resource claim CRD exists
-	crdExists, err := k8sutil.CRDExists(r.discoveryClient, resourcev1beta2.SchemeGroupVersion.WithResource("resourceclaims"))
-	if err != nil {
-		logger.Error(err, "failed to check if resource claim CRD exists")
-		return false, "", err
-	}
-	if !crdExists {
-		msg := "DRA resources are not supported by NIM-Operator on this cluster, please ensure resource.k8s.io/v1beta2 API group is enabled"
-		logger.Error(fmt.Errorf("%s", msg), msg, "nimService", nimService.Name)
-		return false, msg, nil
-	}
-
 	// Check if duplicate resource claim names are provided
 	resourceClaimNames := make(map[string]bool)
 	for idx, resource := range nimService.Spec.DRAResources {
@@ -816,13 +887,33 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 		}
 		resourceClaimNames[*resource.ResourceClaimName] = true
 	}
+
+	// Check AttributeSelector version values.
+	for idx, resource := range nimService.Spec.DRAResources {
+		if resource.ClaimCreationSpec == nil {
+			continue
+		}
+		for deviceIdx, device := range resource.ClaimCreationSpec.Devices {
+			for attributeIdx, attribute := range device.AttributeSelectors {
+				if attribute.Value.VersionValue == nil {
+					continue
+				}
+				_, err := semver.Parse(*attribute.Value.VersionValue)
+				if err != nil {
+					msg := fmt.Sprintf("spec.draResources[%d].claimCreationSpec.devices[%d].attributeSelectors[%d].value.versionValue.version: invalid version %q: %v", idx, deviceIdx, attributeIdx, *attribute.Value.VersionValue, err)
+					logger.Error(err, msg, "nimService", nimService.Name)
+					return false, msg, nil
+				}
+			}
+		}
+	}
 	return true, "", nil
 }
 
-func (r *NIMServiceReconciler) updateResourceClaimStatus(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources []shared.NamedDRAResource) error {
+func (r *NIMServiceReconciler) updateResourceClaimStatus(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources *shared.NamedDRAResourceList) error {
 	logger := log.FromContext(ctx)
 
-	draResourceStatuses, err := shared.GenerateDRAResourceStatuses(ctx, r.Client, nimService.GetNamespace(), namedDraResources)
+	draResourceStatuses, err := namedDraResources.GenerateDRAResourceStatuses(ctx, r.Client, nimService.GetNamespace())
 	if err != nil {
 		logger.Error(err, "Failed to generate DRA resource statuses", "nimservice", nimService.Name)
 		return err
@@ -864,50 +955,43 @@ func getModelNameFromModelsList(modelsList *nimmodels.ModelsV1List) (string, err
 	return "", fmt.Errorf("no valid model found")
 }
 
-func (r *NIMServiceReconciler) getKServeDeploymentMode(ctx context.Context,
-	podAnnotations map[string]string) (kserveconstants.DeploymentModeType, error) {
+func (r *NIMServiceReconciler) reconcileDRAResources(ctx context.Context, nimService *appsv1alpha1.NIMService, namedDraResources *shared.NamedDRAResourceList) error {
+	for _, namedDraResource := range namedDraResources.Resources {
+		if !shared.ShouldCreateDRAResource(namedDraResource.DRAResource) {
+			continue
+		}
 
-	var namespace string
-	deploymentList := &appsv1.DeploymentList{}
-	if err := r.List(ctx, deploymentList, client.HasLabels{"app.kubernetes.io/name: kserve-controller-manager"}); err != nil {
-		return "", err
-	}
-	for _, deployment := range deploymentList.Items {
-		if deployment.GetName() == "kserve-controller-manager" {
-			namespace = deployment.Namespace
-			break
+		labels := nimService.GetServiceLabels()
+		annotations := nimService.GetNIMServiceAnnotations()
+		claimAnnotations := nimService.GetNIMServiceAnnotations()
+		delete(claimAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
+		// Sync ResourceClaimTemplate
+		err := r.renderAndSyncResource(ctx, nimService, &resourcev1.ResourceClaimTemplate{}, func() (client.Object, error) {
+			resourceClaimTemplateParams := &rendertypes.ResourceClaimTemplateParams{
+				Name:             namedDraResource.ResourceName,
+				Namespace:        nimService.GetNamespace(),
+				Labels:           labels,
+				Annotations:      annotations,
+				ClaimAnnotations: claimAnnotations,
+			}
+			for _, device := range namedDraResource.ClaimCreationSpec.Devices {
+				exprs, err := shared.GetDRADeviceCELExpressions(device)
+				if err != nil {
+					return nil, err
+				}
+				resourceClaimTemplateParams.Devices = append(resourceClaimTemplateParams.Devices, rendertypes.DRADeviceParams{
+					Name:            device.Name,
+					Count:           device.Count,
+					DeviceClassName: device.DeviceClassName,
+					CELExpressions:  exprs,
+				})
+			}
+			return r.renderer.ResourceClaimTemplate(resourceClaimTemplateParams)
+		}, "resourceclaimtemplate", conditions.ReasonResourceClaimTemplateFailed)
+
+		if err != nil {
+			return fmt.Errorf("failed to reconcile DRAResource %s: %w", namedDraResource.ResourceName, err)
 		}
 	}
-
-	if namespace == "" {
-		return "", fmt.Errorf("failed to find the namespace of KServe Deployment")
-	}
-
-	isvcConfigMap := &corev1.ConfigMap{}
-	err := r.Get(ctx,
-		types.NamespacedName{
-			Name:      kserveconstants.InferenceServiceConfigMapName,
-			Namespace: namespace},
-		isvcConfigMap)
-	if err != nil {
-		return "", err
-	}
-
-	isvcConfig, err := kservev1beta1.NewInferenceServicesConfig(isvcConfigMap)
-	if err != nil {
-		return "", err
-	}
-
-	// get annotations from isvc
-	annotations := kserveutils.Filter(podAnnotations, func(key string) bool {
-		return !kserveutils.Includes(isvcConfig.ServiceAnnotationDisallowedList, key)
-	})
-
-	deployConfig, err := kservev1beta1.NewDeployConfig(isvcConfigMap)
-	if err != nil {
-		return "", err
-	}
-
-	deploymentMode := isvcutils.GetDeploymentMode(annotations, deployConfig)
-	return deploymentMode, nil
+	return nil
 }

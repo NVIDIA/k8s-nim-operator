@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 
@@ -28,7 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -59,6 +61,7 @@ type NemoGuardrailReconciler struct {
 	scheme           *runtime.Scheme
 	log              logr.Logger
 	updater          conditions.Updater
+	discoveryClient  discovery.DiscoveryInterface
 	renderer         render.Renderer
 	Config           *rest.Config
 	recorder         record.EventRecorder
@@ -69,13 +72,14 @@ type NemoGuardrailReconciler struct {
 var _ shared.Reconciler = &NemoGuardrailReconciler{}
 
 // NewNemoGuardrailReconciler creates a new reconciler for NemoGuardrail with the given platform.
-func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, renderer render.Renderer, log logr.Logger) *NemoGuardrailReconciler {
+func NewNemoGuardrailReconciler(client client.Client, scheme *runtime.Scheme, updater conditions.Updater, discoveryClient discovery.DiscoveryInterface, renderer render.Renderer, log logr.Logger) *NemoGuardrailReconciler {
 	return &NemoGuardrailReconciler{
-		Client:   client,
-		scheme:   scheme,
-		updater:  updater,
-		renderer: renderer,
-		log:      log,
+		Client:          client,
+		scheme:          scheme,
+		updater:         updater,
+		discoveryClient: discoveryClient,
+		renderer:        renderer,
+		log:             log,
 	}
 }
 
@@ -126,8 +130,9 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if NemoGuardrail.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(NemoGuardrail, NemoGuardrailFinalizer) {
-			controllerutil.AddFinalizer(NemoGuardrail, NemoGuardrailFinalizer)
-			if err := r.Update(ctx, NemoGuardrail); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoGuardrail, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NemoGuardrailFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -137,19 +142,20 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			// Perform platform specific cleanup of resources
 			if err := r.cleanupNemoGuardrail(ctx, NemoGuardrail); err != nil {
 				r.GetEventRecorder().Eventf(NemoGuardrail, corev1.EventTypeNormal, "Delete",
-					"NemoGuardrail %s in deleted", NemoGuardrail.Name)
+					"NemoGuardrail %s is being deleted", NemoGuardrail.Name)
 				return ctrl.Result{}, err
 			}
-
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(NemoGuardrail, NemoGuardrailFinalizer)
-			if err := r.Update(ctx, NemoGuardrail); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoGuardrail, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NemoGuardrailFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(NemoGuardrail, corev1.EventTypeNormal, "Delete",
 					"NemoGuardrail %s finalizer removed", NemoGuardrail.Name)
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil
 		}
+		// return as the cr is being deleted and GC will cleanup owned objects
+		return ctrl.Result{}, nil
 	}
 
 	// Fetch container orchestrator type
@@ -229,7 +235,7 @@ func (r *NemoGuardrailReconciler) GetOrchestratorType(ctx context.Context) (k8su
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nemo-guardrail-service-controller")
-	return ctrl.NewControllerManagedBy(mgr).
+	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoGuardrail{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -246,7 +252,7 @@ func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					newNemoGuardrail, ok := e.ObjectNew.(*appsv1alpha1.NemoGuardrail)
 					if ok {
 						// Handle case where object is marked for deletion
-						if !newNemoGuardrail.ObjectMeta.DeletionTimestamp.IsZero() {
+						if !newNemoGuardrail.DeletionTimestamp.IsZero() {
 							return true
 						}
 
@@ -257,8 +263,17 @@ func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				// For other types we watch, reconcile them
 				return true
 			},
-		}).
-		Complete(r)
+		})
+	builder, err := k8sutil.ControllerOwnsIfCRDExists(
+		r.discoveryClient,
+		builder,
+		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		&gatewayv1.HTTPRoute{},
+	)
+	if err != nil {
+		return err
+	}
+	return builder.Complete(r)
 }
 
 func (r *NemoGuardrailReconciler) refreshMetrics(ctx context.Context) {
@@ -336,7 +351,22 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Sync HTTPRoute
+	if nemoGuardrail.IsHTTPRouteEnabled() {
+		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &gatewayv1.HTTPRoute{}, func() (client.Object, error) {
+			return renderer.HTTPRoute(nemoGuardrail.GetHTTPRouteParams())
+		}, "httproute", conditions.ReasonHTTPRouteFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -367,6 +397,28 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 		}
 	}
 
+	if nemoGuardrail.Spec.DatabaseConfig != nil {
+		secretValue, err := r.getValueFromSecret(ctx, nemoGuardrail.GetNamespace(), nemoGuardrail.Spec.DatabaseConfig.Credentials.SecretName, nemoGuardrail.Spec.DatabaseConfig.Credentials.PasswordKey)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		data := nemoGuardrail.GeneratePostgresConnString(secretValue)
+		// Encode to base64
+		encoded := base64.StdEncoding.EncodeToString([]byte(data))
+
+		secretMapData := map[string]string{
+			"uri": encoded,
+		}
+
+		// Sync Evaluator Secret
+		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &corev1.Secret{}, func() (client.Object, error) {
+			return renderer.Secret(nemoGuardrail.GetSecretParams(secretMapData))
+		}, "secret", conditions.ReasonSecretFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	deploymentParams := nemoGuardrail.GetDeploymentParams()
 
 	// Setup volume mounts with model store
@@ -377,7 +429,17 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
-		return renderer.Deployment(deploymentParams)
+		result, err := renderer.Deployment(deploymentParams)
+		if err != nil {
+			return nil, err
+		}
+		if nemoGuardrail.Spec.DatabaseConfig != nil {
+			initContainers := nemoGuardrail.GetInitContainers()
+			if len(initContainers) > 0 {
+				result.Spec.Template.Spec.InitContainers = initContainers
+			}
+		}
+		return result, err
 	}, "deployment", conditions.ReasonDeploymentFailed)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -418,11 +480,10 @@ func (r *NemoGuardrailReconciler) reconcilePVC(ctx context.Context, nemoGuardrai
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return err
 	}
-
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nemoGuardrail.Spec.ConfigStore.PVC.Create != nil && *nemoGuardrail.Spec.ConfigStore.PVC.Create {
-			pvc, err = shared.ConstructPVC(*nemoGuardrail.Spec.ConfigStore.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoGuardrail.GetNamespace()})
+			pvc, err = shared.ConstructPVC(*nemoGuardrail.Spec.ConfigStore.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoGuardrail.GetNamespace(), Labels: nemoGuardrail.GetServiceLabels()})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return err
@@ -448,19 +509,23 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 	logger := log.FromContext(ctx)
 
 	namespacedName := types.NamespacedName{Name: nemoGuardrail.GetName(), Namespace: nemoGuardrail.GetNamespace()}
-	err := r.Get(ctx, namespacedName, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
-		return err
+	getErr := r.Get(ctx, namespacedName, obj)
+	if getErr != nil && !apiErrors.IsNotFound(getErr) {
+		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
+		return getErr
 	}
+
+	// Track an existing resource
+	found := getErr == nil
+
 	// Don't do anything if CR is unchanged.
-	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoGuardrail.Spec)) {
+	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nemoGuardrail.Spec)) {
 		return nil
 	}
 
 	resource, err := renderFunc()
 	if err != nil {
-		logger.Error(err, "failed to render", conditionType, namespacedName)
+		logger.Error(err, "failed to render", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoGuardrail, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoGuardrail", nemoGuardrail.GetName())
@@ -485,8 +550,20 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 		return nil
 	}
 
+	// If we found the object and autoscaling is enabled on the Guardrails,
+	// copy the current replicas from the existing object into the desired (resource),
+	// so we don't fight the HPA (or external scaler) on each reconcile.
+	if found && nemoGuardrail.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
+				replicas := *curr.Spec.Replicas
+				desired.Spec.Replicas = &replicas
+			}
+		}
+	}
+
 	if err = controllerutil.SetControllerReference(nemoGuardrail, resource, r.GetScheme()); err != nil {
-		logger.Error(err, "failed to set owner", conditionType, namespacedName)
+		logger.Error(err, "failed to set owner", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoGuardrail, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoGuardrail", nemoGuardrail.GetName())
@@ -496,7 +573,7 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 
 	err = k8sutil.SyncResource(ctx, r.GetClient(), obj, resource)
 	if err != nil {
-		logger.Error(err, "failed to sync", conditionType, namespacedName)
+		logger.Error(err, "failed to sync", "conditionType", conditionType)
 		statusError := r.updater.SetConditionsFailed(ctx, nemoGuardrail, reason, err.Error())
 		if statusError != nil {
 			logger.Error(statusError, "failed to update status", "NemoGuardrail", nemoGuardrail.GetName())
@@ -504,4 +581,21 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 		return err
 	}
 	return nil
+}
+
+func (r *NemoGuardrailReconciler) getValueFromSecret(ctx context.Context, namespace, secretName, key string) (string, error) {
+	// Get the secret
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: namespace}, secret)
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret: %w", err)
+	}
+
+	// Extract the secret value
+	value, exists := secret.Data[key]
+
+	if !exists {
+		return "", fmt.Errorf("key '%s' not found in secret '%s'", key, secretName)
+	}
+	return string(value), nil
 }

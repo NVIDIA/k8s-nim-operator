@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,8 +83,9 @@ func (r *NIMPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if nimPipeline.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimPipeline, NIMPipelineFinalizer) {
-			controllerutil.AddFinalizer(nimPipeline, NIMPipelineFinalizer)
-			if err := r.Update(ctx, nimPipeline); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimPipeline, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NIMPipelineFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -94,14 +96,15 @@ func (r *NIMPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			if err := r.cleanupNIMPipeline(ctx, nimPipeline); err != nil {
 				return ctrl.Result{}, err
 			}
-
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(nimPipeline, NIMPipelineFinalizer)
-			if err := r.Update(ctx, nimPipeline); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimPipeline, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NIMPipelineFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil
 		}
+		// return as the cr is being deleted and GC will cleanup owned objects
+		return ctrl.Result{}, nil
 	}
 
 	// Handle nim-cache reconciliation
@@ -193,7 +196,7 @@ func (r *NIMPipelineReconciler) reconcileNIMService(ctx context.Context, nimPipe
 
 	// Sync NIMService with the desired spec
 	namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
-	err := r.syncResource(ctx, namespacedName, nimService)
+	err := r.syncResource(ctx, namespacedName, nimPipeline, nimService)
 	if err != nil {
 		logger.Error(err, "Failed to sync NIMService", "name", nimService.Name)
 		return err
@@ -202,7 +205,7 @@ func (r *NIMPipelineReconciler) reconcileNIMService(ctx context.Context, nimPipe
 	return nil
 }
 
-func (r *NIMPipelineReconciler) syncResource(ctx context.Context, currentNamespacedName types.NamespacedName, desired *appsv1alpha1.NIMService) error {
+func (r *NIMPipelineReconciler) syncResource(ctx context.Context, currentNamespacedName types.NamespacedName, nimPipeline *appsv1alpha1.NIMPipeline, desired *appsv1alpha1.NIMService) error {
 	logger := log.FromContext(ctx)
 
 	current := &appsv1alpha1.NIMService{}
@@ -224,11 +227,19 @@ func (r *NIMPipelineReconciler) syncResource(ctx context.Context, currentNamespa
 			return err
 		}
 	} else {
-		// Resource exists, so update it
-		// Ensure the resource version is carried over to the desired object
-		desired.ResourceVersion = current.ResourceVersion
+		// Resource exists, so update it only if the current nimservice is owned by the pipeline
+		if owned, _ := controllerutil.HasOwnerReference(current.GetOwnerReferences(), nimPipeline, r.Scheme); !owned {
+			return fmt.Errorf("NIMservice %s already exists and is not owned by the NIMPipeline %s", current.Name, nimPipeline.Name)
+		}
 
-		err = r.Update(ctx, desired)
+		err = k8sutil.RetryUpdate(ctx, r.Client, desired, func(obj client.Object) {
+			ns, ok := obj.(*appsv1alpha1.NIMService)
+			if !ok {
+				logger.Error(fmt.Errorf("failed to cast object to NIMService"), "object", obj)
+				return
+			}
+			ns.ResourceVersion = current.ResourceVersion
+		})
 		if err != nil {
 			return err
 		}
@@ -248,21 +259,13 @@ func (r *NIMPipelineReconciler) cleanupDisabledNIMs(ctx context.Context, nimPipe
 	var allErrors []error
 
 	for _, svc := range serviceList.Items {
-		owned := false
-		for _, ownerRef := range svc.GetOwnerReferences() {
-			if ownerRef.Kind == "NIMPipeline" && ownerRef.UID == nimPipeline.UID {
-				owned = true
-				break
-			}
-		}
-
 		// Ignore NIM services not owned by the NIM pipeline
-		if !owned {
+		if owned, _ := controllerutil.HasOwnerReference(svc.GetOwnerReferences(), nimPipeline, r.Scheme); !owned {
 			continue
 		}
 
-		// Cleanup any stale NIM services if they are part of the pipeline but are disabled
-		if enabled, exists := enabledServices[svc.Name]; exists && !enabled {
+		// Cleanup any stale NIM services if they were previously part of the pipeline but are removed/disabled
+		if enabled, exists := enabledServices[svc.Name]; !exists || !enabled {
 			if err := r.deleteService(ctx, &svc); err != nil {
 				logger.Error(err, "Unable to delete disabled NIM service", "Name", svc.Name)
 				allErrors = append(allErrors, fmt.Errorf("failed to delete service %s: %w", svc.Name, err))
@@ -297,15 +300,10 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 	foundServices := make(map[string]bool)
 
 	for _, svc := range serviceList.Items {
-		owned := false
-		for _, ownerRef := range svc.GetOwnerReferences() {
-			if ownerRef.Kind == "NIMPipeline" && ownerRef.UID == nimPipeline.UID {
-				owned = true
-				break
-			}
+		if enabled, exists := enabledServices[svc.Name]; !exists || !enabled {
+			continue
 		}
-
-		if enabled, exists := enabledServices[svc.Name]; !owned || !exists || !enabled {
+		if owned, _ := controllerutil.HasOwnerReference(svc.GetOwnerReferences(), nimPipeline, r.Scheme); !owned {
 			continue
 		}
 
@@ -316,19 +314,21 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 		serviceStates[svc.Name] = svc.Status.State
 
 		switch svc.Status.State {
+		case appsv1alpha1.NIMServiceStatusReady:
+			// Leave the overall status as is
 		case appsv1alpha1.NIMServiceStatusFailed:
 			// If any service has failed, set the overall state to "Failed"
 			overallState = appsv1alpha1.NIMServiceStatusFailed
 			allServicesReady = false
-		case appsv1alpha1.NIMServiceStatusNotReady, appsv1alpha1.NIMServiceStatusPending:
-			// If any service is not ready or pending, set overall readiness to false
+		default:
+			// If any service is not ready, set overall readiness to false
 			allServicesReady = false
 		}
 	}
 
 	// Check if any enabled services are missing
-	for serviceName := range enabledServices {
-		if !foundServices[serviceName] {
+	for serviceName, enabled := range enabledServices {
+		if enabled && !foundServices[serviceName] {
 			// A required service is missing, mark as "NotReady"
 			allServicesReady = false
 			serviceStates[serviceName] = appsv1alpha1.NIMServiceStatusNotReady
@@ -347,18 +347,25 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 	r.GetEventRecorder().Eventf(nimPipeline, corev1.EventTypeNormal, overallState,
 		"NIMPipeline %s status %s, service states %v", nimPipeline.Name, overallState, serviceStates)
 
-	if err := r.Status().Update(ctx, nimPipeline); err != nil {
-		logger.Error(err, "Failed to update NIMPipeline status")
+	err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimPipeline, func(obj client.Object) {
+		np, ok := obj.(*appsv1alpha1.NIMPipeline)
+		if !ok {
+			logger.Error(fmt.Errorf("failed to cast object to NIMPipeline"), "object", obj)
+			return
+		}
+		np.Status = nimPipeline.Status
+	})
+	if err != nil {
+		logger.Error(err, "Failed to update status", "NIMPipeline", nimPipeline.Name)
 		return err
 	}
-
 	return nil
 }
 
 func (r *NIMPipelineReconciler) deleteService(ctx context.Context, svc *appsv1alpha1.NIMService) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Deleting NIMService", "name", svc.Name, "namespace", svc.Namespace)
-	if err := r.Delete(ctx, svc); err != nil {
+	if err := r.Delete(ctx, svc); err != nil && !errors.IsNotFound(err) {
 		logger.Error(err, "Failed to delete NIMService", "name", svc.Name)
 		return err
 	}

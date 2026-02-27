@@ -82,7 +82,7 @@ fi
 mkdir -p "$ARTIFACT_DIR/operator"
 
 echo "Gathering NIM Operator pods from $OPERATOR_NAMESPACE"
-for pod in $(   ); do
+for pod in $($K get pods -n "$OPERATOR_NAMESPACE" -l "app.kubernetes.io/name=k8s-nim-operator" -oname); do
   pod_name=$(basename "$pod")
   $K logs "$pod" -n "$OPERATOR_NAMESPACE" --all-containers --prefix > "$ARTIFACT_DIR/operator/${pod_name}.log" || true
   $K describe "$pod" -n "$OPERATOR_NAMESPACE" > "$ARTIFACT_DIR/operator/${pod_name}.descr" || true
