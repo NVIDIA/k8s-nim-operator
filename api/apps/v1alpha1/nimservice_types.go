@@ -2158,7 +2158,7 @@ func (n *NIMService) GetEPPReadinessProbe() *corev1.Probe {
 	if n.Spec.Expose.Router.EPPConfig == nil {
 		return nil
 	}
-	if n.Spec.Expose.Router.EPPConfig.LivenessProbe == nil {
+	if n.Spec.Expose.Router.EPPConfig.ReadinessProbe == nil {
 		return &corev1.Probe{
 			InitialDelaySeconds: 5,
 			PeriodSeconds:       10,

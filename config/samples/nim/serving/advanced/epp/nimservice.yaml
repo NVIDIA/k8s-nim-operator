@@ -1,0 +1,53 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-nim-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: meta-llama3-8b-instruct
+spec:
+  # You need >1 replica for endpoint picking to matter
+  replicas: 2
+  image:
+    repository: nvcr.io/nvstaging/nim-internal/vllm-oss-nim-llm-4-devel-llama3.1-8b-instruct
+    tag: "2.0.0-rc.20260203175658-38778af4c5e1fc45"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+      - gitlab-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama3-8b-instruct 
+      profile: ''
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+    router:
+      gateway:
+        name: inference-gateway
+        namespace: nim-service
+        httpRoutesEnabled: true
+        backendRef:
+          group: inference.networking.k8s.io
+          kind: InferencePool
+          name: meta-llama3-8b-instruct
+      hostDomainName: demo.nvidia.example.com
+      eppConfig:
+        containerSpec:
+          name: "epp"
+          image: 
+            repository: "registry.k8s.io/gateway-api-inference-extension/epp"
+            tag: "v1.3.1"
+        config:
+          plugins:
+            # Required: tells EPP which profile to use (even if you only have one)
+            - type: kv-cache-utilization-scorer
+          schedulingProfiles:
+            - name: default
+              plugins:
+                - pluginRef: kv-cache-utilization-scorer
