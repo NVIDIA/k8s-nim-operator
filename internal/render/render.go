@@ -47,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
+	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 	yamlConverter "sigs.k8s.io/yaml"
@@ -85,6 +86,7 @@ type Renderer interface {
 	InferenceService(params *types.InferenceServiceParams) (*kservev1beta1.InferenceService, error)
 	ResourceClaimTemplate(params *types.ResourceClaimTemplateParams) (*resourcev1.ResourceClaimTemplate, error)
 	ComputeDomain(params *types.ComputeDomainParams) (*nvidiaresourcev1beta1.ComputeDomain, error)
+	InferencePool(params *types.InferencePoolParams) (*inferencev1.InferencePool, error)
 }
 
 // TemplateData is used by the templating engine to render templates.
@@ -520,4 +522,21 @@ func (r *textTemplateRenderer) ComputeDomain(params *types.ComputeDomainParams) 
 		return nil, fmt.Errorf("error converting unstructured object to ComputeDomain: %w", err)
 	}
 	return computeDomain, nil
+}
+
+// InferencePool renders an InferencePool spec with given templating data.
+func (r *textTemplateRenderer) InferencePool(params *types.InferencePoolParams) (*inferencev1.InferencePool, error) {
+	objs, err := r.renderFile(path.Join(r.directory, "inferencepool.yaml"), &TemplateData{Data: params})
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	inferencePool := &inferencev1.InferencePool{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs[0].Object, inferencePool)
+	if err != nil {
+		return nil, fmt.Errorf("error converting unstructured object to InferencePool: %w", err)
+	}
+	return inferencePool, nil
 }

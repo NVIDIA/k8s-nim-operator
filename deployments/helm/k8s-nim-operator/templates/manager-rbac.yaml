@@ -610,6 +610,32 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - inference.networking.k8s.io
+  resources:
+  - inferencepools
+  - inferenceobjectives
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inference.networking.x-k8s.io
+  resources:
+  - inferencepools
+  - inferenceobjectives
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

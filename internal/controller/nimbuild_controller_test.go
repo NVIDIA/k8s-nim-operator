@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -275,7 +274,6 @@ var _ = Describe("NIMBuild Controller", func() {
 			// Check status
 			updatedNIMBuild := &appsv1alpha1.NIMBuild{}
 			Expect(cli.Get(ctx, types.NamespacedName{Name: nimBuild.Name, Namespace: nimBuild.Namespace}, updatedNIMBuild)).To(Succeed())
-			fmt.Println("HEHRHEHEHupdatedNIMBuild", updatedNIMBuild.Status.Conditions)
 			Expect(meta.IsStatusConditionTrue(updatedNIMBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCreated)).To(BeTrue())
 		})
 

@@ -321,6 +321,8 @@ func UpdateObject(obj client.Object, desired client.Object) client.Object {
 	if obj == nil || desired == nil || obj.GetName() != desired.GetName() || obj.GetNamespace() != desired.GetNamespace() {
 		panic("invalid input to UpdateObject")
 	}
+	// Note: We do not require GetObjectKind() to match because desired objects created in-memory
+	// often have zero TypeMeta, while existing objects from the API have GVK set.
 
 	switch castedObj := obj.(type) {
 	case *appsv1.Deployment:

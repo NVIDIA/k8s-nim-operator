@@ -84,6 +84,8 @@ const (
 	ReasonResourceClaimTemplateFailed = "ResourceClaimTemplateFailed"
 	// ReasonComputeDomainFailed indicates that the creation of computedomain has failed.
 	ReasonComputeDomainFailed = "ComputeDomainFailed"
+	// ReasonInferencePoolFailed indicates that the creation of InferencePool has failed.
+	ReasonInferencePoolFailed = "InferencePoolFailed"
 )
 
 // Updater is the condition updater.
