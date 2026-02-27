@@ -2298,17 +2298,12 @@ func (n *NIMService) GetEPPRoleBindingParams() *rendertypes.RoleBindingParams {
 	}
 }
 
-// GetEPPServiceParams returns params to render the EPP Service.
-func (n *NIMService) GetEPPServiceParams() *rendertypes.ServiceParams {
-	return &rendertypes.ServiceParams{
-		Name:      n.GetEPPName(),
-		Namespace: n.GetNamespace(),
-		Labels:    n.GetServiceLabels(),
-		SelectorLabels: map[string]string{
-			"app": n.GetEPPName(),
-		},
-		Type: string(corev1.ServiceTypeClusterIP),
-		Ports: []corev1.ServicePort{
+func (n *NIMService) GetEPPServicePorts() []corev1.ServicePort {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	if n.Spec.Expose.Router.EPPConfig.Ports == nil {
+		return []corev1.ServicePort{
 			{
 				Name:       "grpc-ext-proc",
 				Port:       EPPGRPCExtProcPort,
@@ -2321,7 +2316,33 @@ func (n *NIMService) GetEPPServiceParams() *rendertypes.ServiceParams {
 				TargetPort: intstr.FromInt32(EPPMetricsPort),
 				Protocol:   corev1.ProtocolTCP,
 			},
+		}
+	} else {
+		servicePorts := []corev1.ServicePort{}
+		for _, port := range n.Spec.Expose.Router.EPPConfig.Ports {
+			servicePorts = append(servicePorts, corev1.ServicePort{
+				Name:       port.Name,
+				Port:       port.ContainerPort,
+				TargetPort: intstr.FromInt32(port.ContainerPort),
+				Protocol:   port.Protocol,
+			})
+		}
+		return servicePorts
+	}
+
+}
+
+// GetEPPServiceParams returns params to render the EPP Service.
+func (n *NIMService) GetEPPServiceParams() *rendertypes.ServiceParams {
+	return &rendertypes.ServiceParams{
+		Name:      n.GetEPPName(),
+		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
+		SelectorLabels: map[string]string{
+			"app": n.GetEPPName(),
 		},
+		Type:  string(corev1.ServiceTypeClusterIP),
+		Ports: n.GetEPPServicePorts(),
 	}
 }
 
