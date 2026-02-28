@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -127,8 +126,9 @@ func (r *NIMBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if nimBuild.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimBuild, NIMBuildFinalizer) {
-			controllerutil.AddFinalizer(nimBuild, NIMBuildFinalizer)
-			if err = r.Update(ctx, nimBuild); err != nil {
+			if err = k8sutil.RetryUpdate(ctx, r.Client, nimBuild, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NIMBuildFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -140,8 +140,9 @@ func (r *NIMBuildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 				return ctrl.Result{}, err
 			}
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(nimBuild, NIMBuildFinalizer)
-			if err := r.Update(ctx, nimBuild); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimBuild, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NIMBuildFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -496,21 +497,19 @@ func (r *NIMBuildReconciler) reconcileEngineBuildPodStatus(ctx context.Context, 
 
 func (r *NIMBuildReconciler) updateNIMBuildStatus(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild) error {
 	logger := r.GetLogger()
-
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		obj := &appsv1alpha1.NIMBuild{}
-		errGet := r.Get(ctx, types.NamespacedName{Name: nimBuild.Name, Namespace: nimBuild.GetNamespace()}, obj)
-		if errGet != nil {
-			logger.Error(errGet, "error getting NIMBuild", "name", nimBuild.Name)
-			return errGet
+	err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimBuild, func(obj client.Object) {
+		nb, ok := obj.(*appsv1alpha1.NIMBuild)
+		if !ok {
+			logger.Error(fmt.Errorf("failed to cast object to NIMBuild"), "object", obj)
+			return
 		}
-		obj.Status = nimBuild.Status
-		if err := r.Status().Update(ctx, obj); err != nil {
-			logger.Error(err, "Failed to update status", "NIMBuild", nimBuild.Name)
-			return err
-		}
-		return nil
+		nb.Status = nimBuild.Status
 	})
+	if err != nil {
+		logger.Error(err, "Failed to update status", "NIMBuild", nimBuild.Name)
+		return err
+	}
+	return nil
 }
 
 func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache, platformType k8sutil.OrchestratorType, inputNimProfile appsv1alpha1.NIMProfile) (*corev1.Pod, error) {
@@ -854,14 +853,14 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 	}
 
 	// Update the NIMCache status with the new profiles
-	obj := &appsv1alpha1.NIMCache{}
-	errGet := r.Get(ctx, types.NamespacedName{Name: nimCache.Name, Namespace: nimCache.GetNamespace()}, obj)
-	if errGet != nil {
-		logger.Error(errGet, "error getting NIMCache", "name", nimCache.Name)
-		return errGet
-	}
-	obj.Status = nimCache.Status
-	if err := r.Status().Update(ctx, obj); err != nil {
+	if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimCache, func(obj client.Object) {
+		nc, ok := obj.(*appsv1alpha1.NIMCache)
+		if !ok {
+			logger.Error(fmt.Errorf("failed to cast object to NIMCache"), "object", obj)
+			return
+		}
+		nc.Status = nimCache.Status
+	}); err != nil {
 		logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
 		return err
 	}
@@ -1027,22 +1026,27 @@ func (r *NIMBuildReconciler) updateManifestConfigMap(ctx context.Context, nimCac
 			Name:      getManifestConfigName(nimCache),
 			Namespace: nimCache.GetNamespace(),
 			Labels: map[string]string{
-				"app": nimCache.GetName(),
+				"app":                          nimCache.GetName(),
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
 			},
 		},
 	}
 
-	// Fetch the existing ConfigMap if it exists
-	err = r.Get(ctx, client.ObjectKey{Name: configMap.Name, Namespace: configMap.Namespace}, configMap)
-	if err != nil {
-		return fmt.Errorf("failed to get ConfigMap %s: %w", configMap.Name, err)
-	}
-
-	// Update the data
-	configMap.Data["local_model_manifest.yaml"] = string(prettyManifestBytes)
-
 	// Create the ConfigMap
-	if err := r.Update(ctx, configMap); err != nil {
+	if err := k8sutil.RetryUpdate(ctx, r.Client, configMap, func(obj client.Object) {
+		cm, ok := obj.(*corev1.ConfigMap)
+		if !ok {
+			return
+		}
+		if cm.Data == nil {
+			cm.Data = make(map[string]string)
+		}
+		cm.Data["local_model_manifest.yaml"] = string(prettyManifestBytes)
+		if cm.Labels == nil {
+			cm.Labels = make(map[string]string)
+		}
+		cm.Labels["app"] = nimCache.GetName()
+	}); err != nil {
 		return fmt.Errorf("failed to create manifest ConfigMap %s: %w", configMap.Name, err)
 	}
 	return nil

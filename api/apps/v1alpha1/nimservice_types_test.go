@@ -124,6 +124,39 @@ func TestGetVolumes(t *testing.T) {
 			},
 		},
 		{
+			name: "Init Container provided adds scratch",
+			nimService: &NIMService{
+				Spec: NIMServiceSpec{
+					InitContainers: []*NIMContainerSpec{
+						{Image: Image{Repository: "fake", Tag: "latest"}, Name: "init"},
+					},
+					Proxy: &ProxySpec{CertConfigMap: "proxy-ca-cert"},
+				},
+			},
+			desired: []corev1.Volume{
+				{
+					Name: "proxy-ca-cert",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "proxy-ca-cert",
+							},
+						},
+					},
+				},
+				{
+					Name: "scratch",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "scratch",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:       "Proxy Spec is set and cert config map is empty",
 			nimService: &NIMService{Spec: NIMServiceSpec{Proxy: &ProxySpec{CertConfigMap: ""}}},
 			desired:    []corev1.Volume{},
@@ -407,6 +440,32 @@ func TestGetVolumeMounts(t *testing.T) {
 			},
 			modelPVC: &PersistentVolumeClaim{Name: "test-pvc"},
 			desired: []corev1.VolumeMount{
+				{
+					Name:      "model-store",
+					MountPath: "/model-store",
+				},
+				{
+					Name:      "dshm",
+					MountPath: "/dev/shm",
+				},
+			},
+		},
+		{
+			name: "Volume mounts includes scratch when sidecar containers present",
+			nimService: &NIMService{
+				Spec: NIMServiceSpec{
+					SidecarContainers: []*NIMContainerSpec{
+						{Image: Image{Repository: "fake", Tag: "latest"}, Name: "init"},
+					},
+					Proxy: &ProxySpec{CertConfigMap: "proxy-ca-cert"},
+				},
+			},
+			modelPVC: &PersistentVolumeClaim{Name: "test-pvc"},
+			desired: []corev1.VolumeMount{
+				{
+					Name:      "proxy-ca-cert",
+					MountPath: "/etc/ssl/certs",
+				},
 				{
 					Name:      "model-store",
 					MountPath: "/model-store",
@@ -867,5 +926,41 @@ func TestIsAutoScalingEnabled(t *testing.T) {
 				t.Errorf("IsAutoScalingEnabled() = %v, want %v", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestStandardModeReplicasWithoutAutoscaling(t *testing.T) {
+	nimService := &NIMService{
+		Spec: NIMServiceSpec{
+			Image: Image{
+				Repository: "test-repo",
+				Tag:        "test-tag",
+			},
+			AuthSecret: "test-secret",
+			Scale: Autoscaling{
+				Enabled: ptr.To(false),
+			},
+			Replicas: ptr.To[int32](3),
+			Expose: Expose{
+				Service: Service{
+					Port: ptr.To[int32](8000),
+				},
+			},
+		},
+	}
+
+	params := nimService.GetInferenceServiceParams("Standard")
+
+	if params.MinReplicas == nil {
+		t.Fatal("expected MinReplicas to be set, got nil")
+	}
+	if *params.MinReplicas != 3 {
+		t.Errorf("MinReplicas = %d, want 3", *params.MinReplicas)
+	}
+	if params.MaxReplicas == nil {
+		t.Fatal("expected MaxReplicas to be set, got nil")
+	}
+	if *params.MaxReplicas != 3 {
+		t.Errorf("MaxReplicas = %d, want 3", *params.MaxReplicas)
 	}
 }

@@ -33,7 +33,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
@@ -228,7 +229,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !k8serrors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -243,7 +244,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
-		if err != nil && !k8serrors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -258,7 +259,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.GRPCRoute{}, namespacedName)
-		if err != nil && !k8serrors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -289,6 +290,33 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	}
 
+	// Sync EPP resources when EPP is configured, otherwise clean them up
+	if nimService.IsEPPEnabled() {
+		if err = r.reconcileEPP(ctx, nimService); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		eppNamespacedName := types.NamespacedName{Name: nimService.GetEPPName(), Namespace: nimService.GetNamespace()}
+		eppCMNamespacedName := types.NamespacedName{Name: nimService.GetEPPConfigMapName(), Namespace: nimService.GetNamespace()}
+		for _, obj := range []client.Object{
+			&corev1.ServiceAccount{},
+			&rbacv1.Role{},
+			&rbacv1.RoleBinding{},
+			&corev1.Service{},
+			&appsv1.Deployment{},
+		} {
+			if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), obj, eppNamespacedName); cleanupErr != nil && !apiErrors.IsNotFound(cleanupErr) {
+				return ctrl.Result{}, cleanupErr
+			}
+		}
+		if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), &corev1.ConfigMap{}, eppCMNamespacedName); cleanupErr != nil && !apiErrors.IsNotFound(cleanupErr) {
+			return ctrl.Result{}, cleanupErr
+		}
+		if cleanupErr := k8sutil.CleanupResource(ctx, r.GetClient(), &inferencev1.InferencePool{}, namespacedName); cleanupErr != nil && !apiErrors.IsNotFound(cleanupErr) {
+			return ctrl.Result{}, cleanupErr
+		}
+	}
+
 	var modelPVC *appsv1alpha1.PersistentVolumeClaim
 	modelProfile := ""
 
@@ -298,7 +326,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	if nimCacheName != "" { // nolint:gocritic
 		if err := r.Get(ctx, types.NamespacedName{Name: nimCacheName, Namespace: nimService.GetNamespace()}, &nimCache); err != nil {
 			// Fail the NIMService if the NIMCache is not found
-			if k8serrors.IsNotFound(err) {
+			if apiErrors.IsNotFound(err) {
 				msg := fmt.Sprintf("NIMCache %s not found", nimCacheName)
 				statusUpdateErr := r.updater.SetConditionsFailed(ctx, nimService, conditions.ReasonNIMCacheNotFound, msg)
 				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, msg)
@@ -372,7 +400,6 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	var profileEnv *[]corev1.EnvVar
 	var profile *appsv1alpha1.NIMProfile
 	var gpuResources *corev1.ResourceRequirements
-	var initContainers []corev1.Container
 	var renderFunc func() (client.Object, error)
 	var conType, failedCon string
 	var renderObj client.Object
@@ -405,7 +432,6 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		// TODO: assign GPU resources and node selector that is required for the selected profile
 	}
 
-	initContainers = nimService.GetInitContainers()
 	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -448,14 +474,14 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		if gpuResources != nil {
 			lwsParams.Resources = gpuResources
 		}
+		initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+		for idx := range lwsParams.InitContainers {
+			lwsParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
+		}
 		renderFunc = func() (client.Object, error) {
 			result, err := renderer.LeaderWorkerSet(lwsParams)
 			if err != nil {
 				return nil, err
-			}
-			if len(initContainers) > 0 {
-				result.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.InitContainers = initContainers
-				result.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.InitContainers = initContainers
 			}
 
 			// Update leader and worker containers with DRA resource claims.
@@ -527,13 +553,14 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		if gpuResources != nil {
 			deploymentParams.Resources = gpuResources
 		}
+		initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+		for idx := range deploymentParams.InitContainers {
+			deploymentParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
+		}
 		renderFunc = func() (client.Object, error) {
 			result, err := renderer.Deployment(deploymentParams)
 			if err != nil {
 				return nil, err
-			}
-			if len(initContainers) > 0 {
-				result.Spec.Template.Spec.InitContainers = initContainers
 			}
 
 			// Update Container resources with DRA resource claims.
@@ -867,7 +894,7 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	// e.g. (with LWS resources with suffix)
 	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
 	getErr := r.Get(ctx, namespacedName, obj)
-	if getErr != nil && !k8serrors.IsNotFound(getErr) {
+	if getErr != nil && !apiErrors.IsNotFound(getErr) {
 		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
 		return getErr
 	}
@@ -917,7 +944,7 @@ func (r *NIMServiceReconciler) isLeaderWorkerSetReady(ctx context.Context, nimSe
 	leaderWorkerSet := &lws.LeaderWorkerSet{}
 	err := r.Get(ctx, client.ObjectKey{Name: nimService.GetLWSName(), Namespace: nimService.GetNamespace()}, leaderWorkerSet)
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if apiErrors.IsNotFound(err) {
 			return "", false, nil
 		}
 		return "", false, err
@@ -939,7 +966,7 @@ func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespaced
 	deployment := &appsv1.Deployment{}
 	err := r.Get(ctx, client.ObjectKey{Name: namespacedName.Name, Namespace: namespacedName.Namespace}, deployment)
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if apiErrors.IsNotFound(err) {
 			return "", false, nil
 		}
 		return "", false, err
@@ -1005,7 +1032,12 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
-			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace()})
+			labels := map[string]string{
+				"app":                          "k8s-nim-operator",
+				"app.kubernetes.io/name":       nimService.Name,
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
+			}
+			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace(), Labels: labels})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return nil, err
@@ -1020,9 +1052,15 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 			}
 			logger.Info("Created PVC for NIM Service", "pvc", pvcName)
 
-			conditions.UpdateCondition(&nimService.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
-			nimService.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
-			if err := r.Status().Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimService, func(o client.Object) {
+				ns, ok := o.(*appsv1alpha1.NIMService)
+				if !ok {
+					logger.Error(fmt.Errorf("failed to cast object to NIMService"), "object", o)
+					return
+				}
+				ns.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
+				conditions.UpdateCondition(&ns.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
+			}); err != nil {
 				logger.Error(err, "Failed to update status", "NIMService", nimService.Name)
 				return nil, err
 			}
@@ -1213,6 +1251,74 @@ func (r *NIMServiceReconciler) reconcileComputeDomain(ctx context.Context, nimSe
 			return err
 		}
 	}
+	return nil
+}
+
+func (r *NIMServiceReconciler) reconcileEPP(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
+	renderer := r.GetRenderer()
+
+	// Sync EPP ServiceAccount
+	err := r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
+		return renderer.ServiceAccount(nimService.GetEPPServiceAccountParams())
+	}, "serviceaccount", conditions.ReasonServiceAccountFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync EPP Role
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+		return renderer.Role(nimService.GetEPPRoleParams())
+	}, "role", conditions.ReasonRoleFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync EPP RoleBinding
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+		return renderer.RoleBinding(nimService.GetEPPRoleBindingParams())
+	}, "rolebinding", conditions.ReasonRoleBindingFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync EPP ConfigMap only when config is specified inline
+	if nimService.Spec.Expose.Router.EPPConfig.Config != nil {
+		cmParams, err := nimService.GetEPPConfigMapParams()
+		if err != nil {
+			return fmt.Errorf("failed to build EPP ConfigMap params: %w", err)
+		}
+		err = r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.ConfigMap{}, func() (client.Object, error) {
+			return renderer.ConfigMap(cmParams)
+		}, "configmap", conditions.ReasonConfigMapFailed)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Sync EPP Service
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &corev1.Service{}, func() (client.Object, error) {
+		return renderer.Service(nimService.GetEPPServiceParams())
+	}, "service", conditions.ReasonServiceFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync EPP Deployment
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {
+		return renderer.Deployment(nimService.GetEPPDeploymentParams())
+	}, "deployment", conditions.ReasonDeploymentFailed)
+	if err != nil {
+		return err
+	}
+
+	// Sync InferencePool
+	err = r.renderAndSyncResource(ctx, nimService, &renderer, &inferencev1.InferencePool{}, func() (client.Object, error) {
+		return renderer.InferencePool(nimService.GetInferencePoolParams())
+	}, "inferencepool", conditions.ReasonInferencePoolFailed)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

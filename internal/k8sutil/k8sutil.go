@@ -24,20 +24,30 @@ import (
 	"io"
 	"strings"
 
+	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
+	monitoring "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metaerrors "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
@@ -179,12 +189,60 @@ func SyncResource(ctx context.Context, k8sClient client.Client, obj client.Objec
 			return err
 		}
 	} else {
-		err := k8sClient.Update(ctx, utils.UpdateObject(obj, desired))
+		err := RetryUpdate(ctx, k8sClient, obj, func(obj client.Object) {
+			obj = utils.UpdateObject(obj, desired) //nolint:ineffassign,staticcheck
+		})
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// RetryUpdate fetches the latest object state and retries updates on conflicts.
+func RetryUpdate(
+	ctx context.Context,
+	c client.Client,
+	obj client.Object,
+	mutate func(client.Object),
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		objCopy, ok := obj.DeepCopyObject().(client.Object)
+		if !ok {
+			return fmt.Errorf("failed to cast object to client.Object of kind %s: %s/%s", obj.GetObjectKind().GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
+		}
+		err := c.Get(ctx, types.NamespacedName{Name: objCopy.GetName(), Namespace: objCopy.GetNamespace()}, objCopy)
+		if err != nil {
+			return err
+		}
+		if mutate != nil {
+			mutate(objCopy)
+		}
+		return c.Update(ctx, objCopy)
+	})
+}
+
+// RetryStatusUpdate fetches latest object state and retries status updates on conflicts.
+func RetryStatusUpdate(
+	ctx context.Context,
+	c client.Client,
+	obj client.Object,
+	mutate func(client.Object),
+) error {
+	objCopy, ok := obj.DeepCopyObject().(client.Object)
+	if !ok {
+		return fmt.Errorf("failed to cast object to client.Object of kind %s: %s/%s", obj.GetObjectKind().GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
+	}
+	err := c.Get(ctx, types.NamespacedName{Name: objCopy.GetName(), Namespace: objCopy.GetNamespace()}, objCopy)
+	if err != nil {
+		return err
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if mutate != nil {
+			mutate(objCopy)
+		}
+		return c.Status().Update(ctx, objCopy)
+	})
 }
 
 // IsDeploymentReady checks if the Deployment is ready.
@@ -432,4 +490,56 @@ func ControllerWatchesIfCRDExists(discoveryClient discovery.DiscoveryInterface,
 			)
 		},
 	)
+}
+
+// BuildByObjectFilteredCache constructs a cache configuration that watches Kubernetes objects
+// matching the provided label selector. It includes built-in resource types and conditionally
+// adds optional CRDs if they are available in the cluster.
+//
+// This reduces memory usage by only caching objects with the specified labels.
+// WARNING: Only include object types that are labeled with the given selector.
+// Objects without matching labels (i.e pre-existing ConfigMaps, PVCs, ResourceClaims) should not be added here.
+func BuildByObjectFilteredCache(discoveryClient discovery.DiscoveryInterface, ls labels.Selector) (map[client.Object]cache.ByObject, error) {
+	byObject := map[client.Object]cache.ByObject{
+		&appsv1.Deployment{}:                     {Label: ls},
+		&appsv1.StatefulSet{}:                    {Label: ls},
+		&corev1.Service{}:                        {Label: ls},
+		&corev1.ServiceAccount{}:                 {Label: ls},
+		&rbacv1.Role{}:                           {Label: ls},
+		&rbacv1.RoleBinding{}:                    {Label: ls},
+		&autoscalingv2.HorizontalPodAutoscaler{}: {Label: ls},
+		&batchv1.Job{}:                           {Label: ls},
+		&corev1.Pod{}:                            {Label: ls},
+	}
+
+	// helper
+	addIfExists := func(gvr schema.GroupVersionResource, obj client.Object, name string) error {
+		exists, err := CRDExists(discoveryClient, gvr)
+		if err != nil {
+			return fmt.Errorf("check CRD exists for %s (%s): %w", name, gvr.String(), err)
+		}
+		if exists {
+			byObject[obj] = cache.ByObject{Label: ls}
+		}
+		return nil
+	}
+
+	// Optional CRDs
+	if err := addIfExists(lwsv1.SchemeGroupVersion.WithResource("leaderworkersets"), &lwsv1.LeaderWorkerSet{}, "LeaderWorkerSet"); err != nil {
+		return nil, err
+	}
+	if err := addIfExists(monitoring.SchemeGroupVersion.WithResource("servicemonitors"), &monitoring.ServiceMonitor{}, "ServiceMonitor"); err != nil {
+		return nil, err
+	}
+	if err := addIfExists(gatewayv1.SchemeGroupVersion.WithResource("grpcroutes"), &gatewayv1.GRPCRoute{}, "GRPCRoute"); err != nil {
+		return nil, err
+	}
+	if err := addIfExists(gatewayv1.SchemeGroupVersion.WithResource("httproutes"), &gatewayv1.HTTPRoute{}, "HTTPRoute"); err != nil {
+		return nil, err
+	}
+	if err := addIfExists(kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"), &kservev1beta1.InferenceService{}, "InferenceService"); err != nil {
+		return nil, err
+	}
+
+	return byObject, nil
 }

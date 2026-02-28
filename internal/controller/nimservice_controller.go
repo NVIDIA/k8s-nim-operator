@@ -111,6 +111,7 @@ func NewNIMServiceReconciler(client client.Client, scheme *runtime.Scheme, updat
 // +kubebuilder:rbac:groups=leaderworkerset.x-k8s.io,resources=leaderworkersets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list
 // +kubebuilder:rbac:groups=serving.kserve.io,resources=inferenceservices,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=inference.networking.k8s.io,resources=inferencepools,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -147,8 +148,9 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if nimService.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimService, NIMServiceFinalizer) {
-			controllerutil.AddFinalizer(nimService, NIMServiceFinalizer)
-			if err := r.Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimService, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NIMServiceFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -163,8 +165,9 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(nimService, NIMServiceFinalizer)
-			if err := r.Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimService, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NIMServiceFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, "Delete",
 					"NIMService %s finalizer removed", nimService.Name)
 				return ctrl.Result{}, err

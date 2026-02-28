@@ -1359,6 +1359,32 @@ spec:
               - patch
               - update
               - watch
+            - apiGroups:
+              - inference.networking.k8s.io
+              resources:
+              - inferencepools
+              - inferenceobjectives
+              verbs:
+              - create
+              - delete
+              - get
+              - list
+              - patch
+              - update
+              - watch
+            - apiGroups:
+              - inference.networking.x-k8s.io
+              resources:
+              - inferencepools
+              - inferenceobjectives
+              verbs:
+              - create
+              - delete
+              - get
+              - list
+              - patch
+              - update
+              - watch
       deployments:
         - name: k8s-nim-operator
           spec:
@@ -1449,6 +1475,10 @@ spec:
                       allowPrivilegeEscalation: false
                     terminationMessagePath: /dev/termination-log
                     terminationMessagePolicy: File
+                    volumeMounts:
+                      - mountPath: /etc/pki/tls/service-ca
+                        name: service-ca-bundle
+                        readOnly: true
                 dnsPolicy: ClusterFirst
                 imagePullSecrets: []
                 restartPolicy: Always
@@ -1456,6 +1486,11 @@ spec:
                 securityContext:
                   runAsNonRoot: true
                 terminationGracePeriodSeconds: 10
+                volumes:
+                  - configMap:
+                      name: nim-service-ca-bundle
+                      optional: true
+                    name: service-ca-bundle
                 tolerations:
                   - effect: NoSchedule
                     key: node-role.kubernetes.io/master

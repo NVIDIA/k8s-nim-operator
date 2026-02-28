@@ -22,8 +22,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	k8sutil "github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
@@ -83,6 +84,8 @@ const (
 	ReasonResourceClaimTemplateFailed = "ResourceClaimTemplateFailed"
 	// ReasonComputeDomainFailed indicates that the creation of computedomain has failed.
 	ReasonComputeDomainFailed = "ComputeDomainFailed"
+	// ReasonInferencePoolFailed indicates that the creation of InferencePool has failed.
+	ReasonInferencePoolFailed = "InferencePoolFailed"
 )
 
 // Updater is the condition updater.
@@ -471,82 +474,63 @@ func (u *updater) SetConditionsFailedNemoEvaluator(ctx context.Context, cr *apps
 }
 
 func (u *updater) updateNIMServiceStatus(ctx context.Context, cr *appsv1alpha1.NIMService) error {
-
-	obj := &appsv1alpha1.NIMService{}
-	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := u.client.Status().Update(ctx, obj); err != nil {
-		return err
-	}
-	return nil
+	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
+		ns, ok := obj.(*appsv1alpha1.NIMService)
+		if !ok {
+			return
+		}
+		ns.Status = cr.Status
+	})
 }
 
 func (u *updater) updateNemoGuardrailStatus(ctx context.Context, cr *appsv1alpha1.NemoGuardrail) error {
-	obj := &appsv1alpha1.NemoGuardrail{}
-	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := u.client.Status().Update(ctx, obj); err != nil {
-		return err
-	}
-	return nil
+	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
+		ns, ok := obj.(*appsv1alpha1.NemoGuardrail)
+		if !ok {
+			return
+		}
+		ns.Status = cr.Status
+	})
 }
 
 func (u *updater) updateNemoEntitystoreStatus(ctx context.Context, cr *appsv1alpha1.NemoEntitystore) error {
-	obj := &appsv1alpha1.NemoEntitystore{}
-	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := u.client.Status().Update(ctx, obj); err != nil {
-		return err
-	}
-	return nil
+	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
+		ns, ok := obj.(*appsv1alpha1.NemoEntitystore)
+		if !ok {
+			return
+		}
+		ns.Status = cr.Status
+	})
 }
 
 func (u *updater) updateNemoDatastoreStatus(ctx context.Context, cr *appsv1alpha1.NemoDatastore) error {
-	obj := &appsv1alpha1.NemoDatastore{}
-	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := u.client.Status().Update(ctx, obj); err != nil {
-		return err
-	}
-	return nil
+	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
+		ns, ok := obj.(*appsv1alpha1.NemoDatastore)
+		if !ok {
+			return
+		}
+		ns.Status = cr.Status
+	})
 }
 
 func (u *updater) updateNemoCustomizerStatus(ctx context.Context, cr *appsv1alpha1.NemoCustomizer) error {
-	obj := &appsv1alpha1.NemoCustomizer{}
-	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := u.client.Status().Update(ctx, obj); err != nil {
-		return err
-	}
-	return nil
+	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
+		ns, ok := obj.(*appsv1alpha1.NemoCustomizer)
+		if !ok {
+			return
+		}
+		ns.Status = cr.Status
+	})
 }
 
 func (u *updater) updateNemoEvaluatorStatus(ctx context.Context, cr *appsv1alpha1.NemoEvaluator) error {
-	obj := &appsv1alpha1.NemoEvaluator{}
-	errGet := u.client.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}, obj)
-	if errGet != nil {
-		return errGet
-	}
-	obj.Status = cr.Status
-	if err := u.client.Status().Update(ctx, obj); err != nil {
-		return err
-	}
-	return nil
+	return k8sutil.RetryStatusUpdate(ctx, u.client, cr, func(obj client.Object) {
+		ns, ok := obj.(*appsv1alpha1.NemoEvaluator)
+		if !ok {
+			return
+		}
+		ns.Status = cr.Status
+	})
 }
 
 // UpdateCondition updates the given condition into the conditions list.

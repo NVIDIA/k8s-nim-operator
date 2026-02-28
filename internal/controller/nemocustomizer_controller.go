@@ -31,7 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -144,8 +144,9 @@ func (r *NemoCustomizerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if NemoCustomizer.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(NemoCustomizer, NemoCustomizerFinalizer) {
-			controllerutil.AddFinalizer(NemoCustomizer, NemoCustomizerFinalizer)
-			if err := r.Update(ctx, NemoCustomizer); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoCustomizer, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NemoCustomizerFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -159,8 +160,9 @@ func (r *NemoCustomizerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return ctrl.Result{}, err
 			}
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(NemoCustomizer, NemoCustomizerFinalizer)
-			if err := r.Update(ctx, NemoCustomizer); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoCustomizer, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NemoCustomizerFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(NemoCustomizer, corev1.EventTypeNormal, "Delete",
 					"NemoCustomizer %s finalizer removed", NemoCustomizer.Name)
 				return ctrl.Result{}, err
@@ -359,7 +361,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -374,7 +376,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -509,7 +511,7 @@ func (r *NemoCustomizerReconciler) reconcilePVC(ctx context.Context, nemoCustomi
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nemoCustomizer.Spec.Training.ModelPVC.Create != nil && *nemoCustomizer.Spec.Training.ModelPVC.Create {
-			pvc, err = shared.ConstructPVC(nemoCustomizer.Spec.Training.ModelPVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoCustomizer.GetNamespace()})
+			pvc, err = shared.ConstructPVC(nemoCustomizer.Spec.Training.ModelPVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoCustomizer.GetNamespace(), Labels: nemoCustomizer.GetServiceLabels()})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return err
@@ -804,7 +806,7 @@ func (r *NemoCustomizerReconciler) renderAndSyncResource(ctx context.Context, ne
 
 	namespacedName := types.NamespacedName{Name: nemoCustomizer.GetName(), Namespace: nemoCustomizer.GetNamespace()}
 	getErr := r.Get(ctx, namespacedName, obj)
-	if getErr != nil && !errors.IsNotFound(getErr) {
+	if getErr != nil && !apiErrors.IsNotFound(getErr) {
 		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
 		return getErr
 	}

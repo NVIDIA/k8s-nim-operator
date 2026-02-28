@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -34,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	utils "github.com/NVIDIA/k8s-nim-operator/internal/utils"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,8 +83,9 @@ func (r *NIMPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if nimPipeline.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimPipeline, NIMPipelineFinalizer) {
-			controllerutil.AddFinalizer(nimPipeline, NIMPipelineFinalizer)
-			if err := r.Update(ctx, nimPipeline); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimPipeline, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NIMPipelineFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -96,8 +97,9 @@ func (r *NIMPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				return ctrl.Result{}, err
 			}
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(nimPipeline, NIMPipelineFinalizer)
-			if err := r.Update(ctx, nimPipeline); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimPipeline, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NIMPipelineFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -230,10 +232,14 @@ func (r *NIMPipelineReconciler) syncResource(ctx context.Context, currentNamespa
 			return fmt.Errorf("NIMservice %s already exists and is not owned by the NIMPipeline %s", current.Name, nimPipeline.Name)
 		}
 
-		// Ensure the resource version is carried over to the desired object
-		desired.ResourceVersion = current.ResourceVersion
-
-		err = r.Update(ctx, desired)
+		err = k8sutil.RetryUpdate(ctx, r.Client, desired, func(obj client.Object) {
+			ns, ok := obj.(*appsv1alpha1.NIMService)
+			if !ok {
+				logger.Error(fmt.Errorf("failed to cast object to NIMService"), "object", obj)
+				return
+			}
+			ns.ResourceVersion = current.ResourceVersion
+		})
 		if err != nil {
 			return err
 		}
@@ -341,20 +347,19 @@ func (r *NIMPipelineReconciler) updateStatus(ctx context.Context, nimPipeline *a
 	r.GetEventRecorder().Eventf(nimPipeline, corev1.EventTypeNormal, overallState,
 		"NIMPipeline %s status %s, service states %v", nimPipeline.Name, overallState, serviceStates)
 
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		obj := &appsv1alpha1.NIMPipeline{}
-		errGet := r.Get(ctx, types.NamespacedName{Name: nimPipeline.Name, Namespace: nimPipeline.GetNamespace()}, obj)
-		if errGet != nil {
-			logger.Error(errGet, "error getting NIMPipeline", "name", nimPipeline.Name)
-			return errGet
+	err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimPipeline, func(obj client.Object) {
+		np, ok := obj.(*appsv1alpha1.NIMPipeline)
+		if !ok {
+			logger.Error(fmt.Errorf("failed to cast object to NIMPipeline"), "object", obj)
+			return
 		}
-		obj.Status = nimPipeline.Status
-		if err := r.Status().Update(ctx, obj); err != nil {
-			logger.Error(err, "Failed to update status", "NIMPipeline", nimPipeline.Name)
-			return err
-		}
-		return nil
+		np.Status = nimPipeline.Status
 	})
+	if err != nil {
+		logger.Error(err, "Failed to update status", "NIMPipeline", nimPipeline.Name)
+		return err
+	}
+	return nil
 }
 
 func (r *NIMPipelineReconciler) deleteService(ctx context.Context, svc *appsv1alpha1.NIMService) error {

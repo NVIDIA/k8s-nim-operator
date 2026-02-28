@@ -86,6 +86,7 @@ type DeploymentParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 }
 
@@ -127,6 +128,7 @@ type LeaderWorkerSetParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 }
 
@@ -186,6 +188,7 @@ type ServiceAccountParams struct {
 type RoleParams struct {
 	Name      string
 	Namespace string
+	Labels    map[string]string
 	Rules     []rbacv1.PolicyRule
 }
 
@@ -193,6 +196,7 @@ type RoleParams struct {
 type RoleBindingParams struct {
 	Name               string
 	Namespace          string
+	Labels             map[string]string
 	RoleName           string
 	ServiceAccountName string
 }
@@ -328,6 +332,7 @@ type InferenceServiceParams struct {
 	OrchestratorType   string
 	Ports              []corev1.ContainerPort
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
 	DeploymentMode     string
 }
@@ -356,4 +361,20 @@ type ComputeDomainParams struct {
 	Annotations               map[string]string
 	NumNodes                  uint32
 	ResourceClaimTemplateName string
+}
+
+// InferencePoolParams holds the parameters for rendering an InferencePool template.
+type InferencePoolParams struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	// SelectorLabels are the pod labels used to select model server pods into the pool.
+	SelectorLabels map[string]string
+	// TargetPort is the port number on model server pods (e.g. 8000).
+	TargetPort int32
+	// EPPServiceName is the name of the EPP (Endpoint Picker) Service.
+	EPPServiceName string
+	// EPPServicePort is the gRPC port of the EPP Service (e.g. 9002).
+	EPPServicePort int32
 }

@@ -29,7 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -130,8 +130,9 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if NemoGuardrail.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(NemoGuardrail, NemoGuardrailFinalizer) {
-			controllerutil.AddFinalizer(NemoGuardrail, NemoGuardrailFinalizer)
-			if err := r.Update(ctx, NemoGuardrail); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoGuardrail, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NemoGuardrailFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -145,8 +146,9 @@ func (r *NemoGuardrailReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				return ctrl.Result{}, err
 			}
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(NemoGuardrail, NemoGuardrailFinalizer)
-			if err := r.Update(ctx, NemoGuardrail); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoGuardrail, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NemoGuardrailFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(NemoGuardrail, corev1.EventTypeNormal, "Delete",
 					"NemoGuardrail %s finalizer removed", NemoGuardrail.Name)
 				return ctrl.Result{}, err
@@ -349,7 +351,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -364,7 +366,7 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -478,11 +480,10 @@ func (r *NemoGuardrailReconciler) reconcilePVC(ctx context.Context, nemoGuardrai
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return err
 	}
-
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nemoGuardrail.Spec.ConfigStore.PVC.Create != nil && *nemoGuardrail.Spec.ConfigStore.PVC.Create {
-			pvc, err = shared.ConstructPVC(*nemoGuardrail.Spec.ConfigStore.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoGuardrail.GetNamespace()})
+			pvc, err = shared.ConstructPVC(*nemoGuardrail.Spec.ConfigStore.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nemoGuardrail.GetNamespace(), Labels: nemoGuardrail.GetServiceLabels()})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return err
@@ -509,7 +510,7 @@ func (r *NemoGuardrailReconciler) renderAndSyncResource(ctx context.Context, nem
 
 	namespacedName := types.NamespacedName{Name: nemoGuardrail.GetName(), Namespace: nemoGuardrail.GetNamespace()}
 	getErr := r.Get(ctx, namespacedName, obj)
-	if getErr != nil && !errors.IsNotFound(getErr) {
+	if getErr != nil && !apiErrors.IsNotFound(getErr) {
 		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
 		return getErr
 	}

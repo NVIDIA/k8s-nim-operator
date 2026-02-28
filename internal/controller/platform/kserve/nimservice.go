@@ -28,12 +28,12 @@ import (
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	knativeapis "knative.dev/pkg/apis"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/api/resource/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -223,10 +223,11 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	namespacedName := types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}
 
 	err = r.Get(ctx, namespacedName, obj)
-	if err != nil && !k8serrors.IsNotFound(err) {
+	if err != nil && !apiErrors.IsNotFound(err) {
 		logger.Error(err, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), err))
 		return err
 	}
+
 	// Don't do anything if CR is unchanged.
 	if err == nil && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
 		return nil
@@ -266,7 +267,7 @@ func (r *NIMServiceReconciler) renderAndSyncCache(ctx context.Context,
 	if nimCacheName != "" { // nolint:gocritic
 		if err := r.Get(ctx, types.NamespacedName{Name: nimCacheName, Namespace: nimService.GetNamespace()}, nimCache); err != nil {
 			// Fail the NIMService if the NIMCache is not found
-			if k8serrors.IsNotFound(err) {
+			if apiErrors.IsNotFound(err) {
 				msg := fmt.Sprintf("NIMCache %s not found", nimCacheName)
 				statusUpdateErr := r.updater.SetConditionsFailed(ctx, nimService, conditions.ReasonNIMCacheNotFound, msg)
 				r.recorder.Eventf(nimService, corev1.EventTypeWarning, conditions.Failed, msg)
@@ -365,7 +366,12 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nimService.Spec.Storage.PVC.Create != nil && *nimService.Spec.Storage.PVC.Create {
-			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace()})
+			labels := map[string]string{
+				"app":                          "k8s-nim-operator",
+				"app.kubernetes.io/name":       nimService.Name,
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
+			}
+			pvc, err = shared.ConstructPVC(nimService.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimService.GetNamespace(), Labels: labels})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return nil, err
@@ -380,9 +386,16 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 			}
 			logger.Info("Created PVC for NIM Service", "pvc", pvcName)
 
-			conditions.UpdateCondition(&nimService.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
-			nimService.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
-			if err := r.Status().Update(ctx, nimService); err != nil {
+			if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimService, func(obj client.Object) {
+				ns, ok := obj.(*appsv1alpha1.NIMService)
+				if !ok {
+					logger.Error(fmt.Errorf("failed to cast object to NIMService"), "object", obj)
+					return
+				}
+				conditions.UpdateCondition(&ns.Status.Conditions, appsv1alpha1.NimCacheConditionPVCCreated, metav1.ConditionTrue, "PVCCreated", "The PVC has been created for storing NIM")
+				ns.Status.State = appsv1alpha1.NimCacheStatusPVCCreated
+
+			}); err != nil {
 				logger.Error(err, "Failed to update status", "NIMService", nimService.Name)
 				return nil, err
 			}
@@ -409,7 +422,6 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	var profileEnv *[]corev1.EnvVar
 	var profile *appsv1alpha1.NIMProfile
 	var gpuResources *corev1.ResourceRequirements
-	var initContainers []corev1.Container
 	var renderFunc func() (client.Object, error)
 	var conType, failedCon string
 	var renderObj client.Object
@@ -446,7 +458,6 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 		// TODO: assign GPU resources and node selector that is required for the selected profile
 	}
 
-	initContainers = nimService.GetInitContainers()
 	namedDraResources, err := shared.NewNamedDRAResourceList(ctx, r.Client, nimService)
 	if err != nil {
 		logger.Error(err, "Failed to get named dra resources")
@@ -531,13 +542,14 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	if gpuResources != nil {
 		isvcParams.Resources = gpuResources
 	}
+	initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+	for idx := range isvcParams.InitContainers {
+		isvcParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
+	}
 	renderFunc = func() (client.Object, error) {
 		result, err := r.renderer.InferenceService(isvcParams)
 		if err != nil {
 			return nil, err
-		}
-		if len(initContainers) > 0 {
-			result.Spec.Predictor.InitContainers = initContainers
 		}
 		// Update Container resources with DRA resource claims.
 		namedDraResources.UpdateContainerResourceClaims(result.Spec.Predictor.Containers)
@@ -723,7 +735,7 @@ func (r *NIMServiceReconciler) isInferenceServiceReady(ctx context.Context, nimS
 	err := r.Get(ctx, client.ObjectKey{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)
 	if err != nil {
 		logger.Error(err, "failed to fetch inferenceservice")
-		if k8serrors.IsNotFound(err) {
+		if apiErrors.IsNotFound(err) {
 			return fmt.Sprintf("Waiting for InferenceService %q creation", nimService.Name), false, nil
 		}
 		return "", false, err

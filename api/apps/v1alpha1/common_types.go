@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/utils/ptr"
+	apixv1alpha1 "sigs.k8s.io/gateway-api-inference-extension/apix/config/v1alpha1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -69,6 +70,39 @@ type Router struct {
 
 	// Gateway is the gateway to use for the created HTTPRoute.
 	Gateway *Gateway `json:"gateway,omitempty"`
+
+	// EPPConfig is the configuration for the endpoint picker extension. This is field is currently only supported for standalone inference platform only on NIMService.
+	EPPConfig *EPPConfig `json:"eppConfig,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!(has(self.configMapRef) && has(self.config))",message="specify either configMapRef or config, not both"
+type EPPConfig struct {
+	// ContainerSpec is the specification for the EPP container.
+	ContainerSpec *NIMContainerSpec `json:"containerSpec"`
+	// ReadinessProbe is the readiness probe for the EPP container.
+	ReadinessProbe *corev1.Probe `json:"readinessProbe,omitempty"`
+	// LivenessProbe is the liveness probe for the EPP container.
+	LivenessProbe *corev1.Probe `json:"livenessProbe,omitempty"`
+	// StartupProbe is the startup probe for the EPP container.
+	StartupProbe *corev1.Probe `json:"startupProbe,omitempty"`
+	// Ports is the list of ports to expose for the EPP container.
+	Ports []corev1.ContainerPort `json:"ports,omitempty"`
+
+	// ConfigMapRef references a user-provided ConfigMap containing EPP configuration.
+	// The ConfigMap should contain EndpointPickerConfig YAML.
+	// Mutually exclusive with Config.
+	// +optional
+	ConfigMapRef *corev1.ConfigMapKeySelector `json:"configMapRef,omitempty"`
+
+	// Config allows specifying EPP EndpointPickerConfig directly as a structured object.
+	// The operator will marshal this to YAML and create a ConfigMap automatically.
+	// Mutually exclusive with ConfigMapRef.
+	// One of ConfigMapRef or Config must be specified (no default configuration).
+	// Uses the upstream type from github.com/kubernetes-sigs/gateway-api-inference-extension
+	// +optional
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Config *apixv1alpha1.EndpointPickerConfig `json:"config,omitempty"`
 }
 
 type RouterIngress struct {
@@ -95,6 +129,10 @@ type Gateway struct {
 	// +kubebuilder:default:=false
 	// GRPCRoutesEnabled is a flag to enable GRPCRoutes for the created gateway.
 	GRPCRoutesEnabled bool `json:"grpcRoutesEnabled,omitempty"`
+
+	// BackendRef is a reference to a backend to forward matched requests to.
+	// +optional
+	BackendRef *gatewayv1.BackendRef `json:"backendRef,omitempty"`
 }
 
 // DEPRECATED ExposeV1 defines attributes to expose the service.
@@ -249,7 +287,7 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(namespace, name string, port int32
 		return gatewayv1.HTTPRouteSpec{}
 	}
 
-	return gatewayv1.HTTPRouteSpec{
+	httpRouteSpec := gatewayv1.HTTPRouteSpec{
 		CommonRouteSpec: gatewayv1.CommonRouteSpec{
 			ParentRefs: []gatewayv1.ParentReference{
 				{
@@ -282,6 +320,15 @@ func (r *Router) GenerateGatewayHTTPRouteSpec(namespace, name string, port int32
 			},
 		},
 	}
+	if r.Gateway.BackendRef != nil {
+		httpRouteSpec.Rules[0].BackendRefs = []gatewayv1.HTTPBackendRef{
+			{
+				BackendRef: *r.Gateway.BackendRef, //nolint:gosec
+			},
+		}
+	}
+
+	return httpRouteSpec
 }
 
 func (r *Router) GenerateGatewayGRPCRouteSpec(namespace, name string, port int32) gatewayv1.GRPCRouteSpec {
@@ -447,4 +494,20 @@ type PersistentVolumeClaim struct {
 	SubPath string `json:"subPath,omitempty"`
 	// Annotations for the PVC
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// NIMContainerSpec defines the specification for a container within a NIM workload.
+type NIMContainerSpec struct {
+	// Name is the unique name of the container within the pod.
+	Name string `json:"name"`
+	// Image specifies the container image to run.
+	Image Image `json:"image"`
+	// Command is the entrypoint array. If not specified, the image's default entrypoint is used.
+	Command []string `json:"command,omitempty"`
+	// Args are the arguments passed to the container command at runtime.
+	Args []string `json:"args,omitempty"`
+	// Env is the list of environment variables to set in the container.
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// WorkingDir is the container's working directory. If unset, the container runtime's default is used.
+	WorkingDir string `json:"workingDir,omitempty"`
 }

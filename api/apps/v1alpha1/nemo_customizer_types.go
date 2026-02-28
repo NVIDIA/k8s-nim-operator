@@ -880,6 +880,7 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	// Set rules for customizer
 	params.Rules = []rbacv1.PolicyRule{
@@ -965,6 +966,7 @@ func (n *NemoCustomizer) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	params.ServiceAccountName = n.GetServiceAccountName()
 	params.RoleName = n.GetName()
@@ -1109,7 +1111,7 @@ func (n *NemoCustomizer) GetConfigMapParams(customizerConfigYAML []byte) *render
 	return &rendertypes.ConfigMapParams{
 		Name:        n.Name,
 		Namespace:   n.Namespace,
-		Labels:      n.GetLabels(),
+		Labels:      n.GetServiceLabels(),
 		Annotations: n.GetAnnotations(),
 		ConfigMapData: map[string]string{
 			"config.yaml": config.String(),
@@ -1123,7 +1125,7 @@ func (n *NemoCustomizer) GetSecretParams(secretMapData map[string]string) *rende
 	// Set metadata
 	params.Name = n.Name
 	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetLabels()
+	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetAnnotations()
 
 	params.SecretMapData = secretMapData
