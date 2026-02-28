@@ -162,6 +162,7 @@ type StatefulSetParams struct {
 	RuntimeClassName   string
 	OrchestratorType   string
 	InitContainers     []corev1.Container
+	SidecarContainers  []corev1.Container
 }
 
 // ServiceParams holds the parameters for rendering a Service template.
