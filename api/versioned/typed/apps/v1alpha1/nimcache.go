@@ -18,9 +18,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	scheme "github.com/NVIDIA/k8s-nim-operator/api/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,33 +36,34 @@ type NIMCachesGetter interface {
 
 // NIMCacheInterface has methods to work with NIMCache resources.
 type NIMCacheInterface interface {
-	Create(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.CreateOptions) (*v1alpha1.NIMCache, error)
-	Update(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.UpdateOptions) (*v1alpha1.NIMCache, error)
+	Create(ctx context.Context, nIMCache *appsv1alpha1.NIMCache, opts v1.CreateOptions) (*appsv1alpha1.NIMCache, error)
+	Update(ctx context.Context, nIMCache *appsv1alpha1.NIMCache, opts v1.UpdateOptions) (*appsv1alpha1.NIMCache, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.UpdateOptions) (*v1alpha1.NIMCache, error)
+	UpdateStatus(ctx context.Context, nIMCache *appsv1alpha1.NIMCache, opts v1.UpdateOptions) (*appsv1alpha1.NIMCache, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NIMCache, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NIMCacheList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1alpha1.NIMCache, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1alpha1.NIMCacheList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NIMCache, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1alpha1.NIMCache, err error)
 	NIMCacheExpansion
 }
 
 // nIMCaches implements NIMCacheInterface
 type nIMCaches struct {
-	*gentype.ClientWithList[*v1alpha1.NIMCache, *v1alpha1.NIMCacheList]
+	*gentype.ClientWithList[*appsv1alpha1.NIMCache, *appsv1alpha1.NIMCacheList]
 }
 
 // newNIMCaches returns a NIMCaches
 func newNIMCaches(c *AppsV1alpha1Client, namespace string) *nIMCaches {
 	return &nIMCaches{
-		gentype.NewClientWithList[*v1alpha1.NIMCache, *v1alpha1.NIMCacheList](
+		gentype.NewClientWithList[*appsv1alpha1.NIMCache, *appsv1alpha1.NIMCacheList](
 			"nimcaches",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.NIMCache { return &v1alpha1.NIMCache{} },
-			func() *v1alpha1.NIMCacheList { return &v1alpha1.NIMCacheList{} }),
+			func() *appsv1alpha1.NIMCache { return &appsv1alpha1.NIMCache{} },
+			func() *appsv1alpha1.NIMCacheList { return &appsv1alpha1.NIMCacheList{} },
+		),
 	}
 }

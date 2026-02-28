@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NemoCustomizerLister helps list NemoCustomizers.
@@ -29,7 +29,7 @@ import (
 type NemoCustomizerLister interface {
 	// List lists all NemoCustomizers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NemoCustomizer, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NemoCustomizer, err error)
 	// NemoCustomizers returns an object that can list and get NemoCustomizers.
 	NemoCustomizers(namespace string) NemoCustomizerNamespaceLister
 	NemoCustomizerListerExpansion
@@ -37,17 +37,17 @@ type NemoCustomizerLister interface {
 
 // nemoCustomizerLister implements the NemoCustomizerLister interface.
 type nemoCustomizerLister struct {
-	listers.ResourceIndexer[*v1alpha1.NemoCustomizer]
+	listers.ResourceIndexer[*appsv1alpha1.NemoCustomizer]
 }
 
 // NewNemoCustomizerLister returns a new NemoCustomizerLister.
 func NewNemoCustomizerLister(indexer cache.Indexer) NemoCustomizerLister {
-	return &nemoCustomizerLister{listers.New[*v1alpha1.NemoCustomizer](indexer, v1alpha1.Resource("nemocustomizer"))}
+	return &nemoCustomizerLister{listers.New[*appsv1alpha1.NemoCustomizer](indexer, appsv1alpha1.Resource("nemocustomizer"))}
 }
 
 // NemoCustomizers returns an object that can list and get NemoCustomizers.
 func (s *nemoCustomizerLister) NemoCustomizers(namespace string) NemoCustomizerNamespaceLister {
-	return nemoCustomizerNamespaceLister{listers.NewNamespaced[*v1alpha1.NemoCustomizer](s.ResourceIndexer, namespace)}
+	return nemoCustomizerNamespaceLister{listers.NewNamespaced[*appsv1alpha1.NemoCustomizer](s.ResourceIndexer, namespace)}
 }
 
 // NemoCustomizerNamespaceLister helps list and get NemoCustomizers.
@@ -55,15 +55,15 @@ func (s *nemoCustomizerLister) NemoCustomizers(namespace string) NemoCustomizerN
 type NemoCustomizerNamespaceLister interface {
 	// List lists all NemoCustomizers in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NemoCustomizer, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NemoCustomizer, err error)
 	// Get retrieves the NemoCustomizer from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NemoCustomizer, error)
+	Get(name string) (*appsv1alpha1.NemoCustomizer, error)
 	NemoCustomizerNamespaceListerExpansion
 }
 
 // nemoCustomizerNamespaceLister implements the NemoCustomizerNamespaceLister
 // interface.
 type nemoCustomizerNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.NemoCustomizer]
+	listers.ResourceIndexer[*appsv1alpha1.NemoCustomizer]
 }

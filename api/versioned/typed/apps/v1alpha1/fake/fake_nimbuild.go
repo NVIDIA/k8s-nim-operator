@@ -18,129 +18,32 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeNIMBuilds implements NIMBuildInterface
-type FakeNIMBuilds struct {
+// fakeNIMBuilds implements NIMBuildInterface
+type fakeNIMBuilds struct {
+	*gentype.FakeClientWithList[*v1alpha1.NIMBuild, *v1alpha1.NIMBuildList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var nimbuildsResource = v1alpha1.SchemeGroupVersion.WithResource("nimbuilds")
-
-var nimbuildsKind = v1alpha1.SchemeGroupVersion.WithKind("NIMBuild")
-
-// Get takes name of the nIMBuild, and returns the corresponding nIMBuild object, and an error if there is any.
-func (c *FakeNIMBuilds) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NIMBuild, err error) {
-	emptyResult := &v1alpha1.NIMBuild{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(nimbuildsResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeNIMBuilds(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.NIMBuildInterface {
+	return &fakeNIMBuilds{
+		gentype.NewFakeClientWithList[*v1alpha1.NIMBuild, *v1alpha1.NIMBuildList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("nimbuilds"),
+			v1alpha1.SchemeGroupVersion.WithKind("NIMBuild"),
+			func() *v1alpha1.NIMBuild { return &v1alpha1.NIMBuild{} },
+			func() *v1alpha1.NIMBuildList { return &v1alpha1.NIMBuildList{} },
+			func(dst, src *v1alpha1.NIMBuildList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.NIMBuildList) []*v1alpha1.NIMBuild { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1alpha1.NIMBuildList, items []*v1alpha1.NIMBuild) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.NIMBuild), err
-}
-
-// List takes label and field selectors, and returns the list of NIMBuilds that match those selectors.
-func (c *FakeNIMBuilds) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NIMBuildList, err error) {
-	emptyResult := &v1alpha1.NIMBuildList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(nimbuildsResource, nimbuildsKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.NIMBuildList{ListMeta: obj.(*v1alpha1.NIMBuildList).ListMeta}
-	for _, item := range obj.(*v1alpha1.NIMBuildList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested nIMBuilds.
-func (c *FakeNIMBuilds) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(nimbuildsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a nIMBuild and creates it.  Returns the server's representation of the nIMBuild, and an error, if there is any.
-func (c *FakeNIMBuilds) Create(ctx context.Context, nIMBuild *v1alpha1.NIMBuild, opts v1.CreateOptions) (result *v1alpha1.NIMBuild, err error) {
-	emptyResult := &v1alpha1.NIMBuild{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(nimbuildsResource, c.ns, nIMBuild, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMBuild), err
-}
-
-// Update takes the representation of a nIMBuild and updates it. Returns the server's representation of the nIMBuild, and an error, if there is any.
-func (c *FakeNIMBuilds) Update(ctx context.Context, nIMBuild *v1alpha1.NIMBuild, opts v1.UpdateOptions) (result *v1alpha1.NIMBuild, err error) {
-	emptyResult := &v1alpha1.NIMBuild{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(nimbuildsResource, c.ns, nIMBuild, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMBuild), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNIMBuilds) UpdateStatus(ctx context.Context, nIMBuild *v1alpha1.NIMBuild, opts v1.UpdateOptions) (result *v1alpha1.NIMBuild, err error) {
-	emptyResult := &v1alpha1.NIMBuild{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(nimbuildsResource, "status", c.ns, nIMBuild, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMBuild), err
-}
-
-// Delete takes name of the nIMBuild and deletes it. Returns an error if one occurs.
-func (c *FakeNIMBuilds) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(nimbuildsResource, c.ns, name, opts), &v1alpha1.NIMBuild{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeNIMBuilds) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(nimbuildsResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.NIMBuildList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched nIMBuild.
-func (c *FakeNIMBuilds) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NIMBuild, err error) {
-	emptyResult := &v1alpha1.NIMBuild{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(nimbuildsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMBuild), err
 }

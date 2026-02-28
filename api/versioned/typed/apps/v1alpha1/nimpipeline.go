@@ -18,9 +18,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	scheme "github.com/NVIDIA/k8s-nim-operator/api/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,33 +36,34 @@ type NIMPipelinesGetter interface {
 
 // NIMPipelineInterface has methods to work with NIMPipeline resources.
 type NIMPipelineInterface interface {
-	Create(ctx context.Context, nIMPipeline *v1alpha1.NIMPipeline, opts v1.CreateOptions) (*v1alpha1.NIMPipeline, error)
-	Update(ctx context.Context, nIMPipeline *v1alpha1.NIMPipeline, opts v1.UpdateOptions) (*v1alpha1.NIMPipeline, error)
+	Create(ctx context.Context, nIMPipeline *appsv1alpha1.NIMPipeline, opts v1.CreateOptions) (*appsv1alpha1.NIMPipeline, error)
+	Update(ctx context.Context, nIMPipeline *appsv1alpha1.NIMPipeline, opts v1.UpdateOptions) (*appsv1alpha1.NIMPipeline, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, nIMPipeline *v1alpha1.NIMPipeline, opts v1.UpdateOptions) (*v1alpha1.NIMPipeline, error)
+	UpdateStatus(ctx context.Context, nIMPipeline *appsv1alpha1.NIMPipeline, opts v1.UpdateOptions) (*appsv1alpha1.NIMPipeline, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NIMPipeline, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NIMPipelineList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1alpha1.NIMPipeline, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1alpha1.NIMPipelineList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NIMPipeline, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1alpha1.NIMPipeline, err error)
 	NIMPipelineExpansion
 }
 
 // nIMPipelines implements NIMPipelineInterface
 type nIMPipelines struct {
-	*gentype.ClientWithList[*v1alpha1.NIMPipeline, *v1alpha1.NIMPipelineList]
+	*gentype.ClientWithList[*appsv1alpha1.NIMPipeline, *appsv1alpha1.NIMPipelineList]
 }
 
 // newNIMPipelines returns a NIMPipelines
 func newNIMPipelines(c *AppsV1alpha1Client, namespace string) *nIMPipelines {
 	return &nIMPipelines{
-		gentype.NewClientWithList[*v1alpha1.NIMPipeline, *v1alpha1.NIMPipelineList](
+		gentype.NewClientWithList[*appsv1alpha1.NIMPipeline, *appsv1alpha1.NIMPipelineList](
 			"nimpipelines",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.NIMPipeline { return &v1alpha1.NIMPipeline{} },
-			func() *v1alpha1.NIMPipelineList { return &v1alpha1.NIMPipelineList{} }),
+			func() *appsv1alpha1.NIMPipeline { return &appsv1alpha1.NIMPipeline{} },
+			func() *appsv1alpha1.NIMPipelineList { return &appsv1alpha1.NIMPipelineList{} },
+		),
 	}
 }

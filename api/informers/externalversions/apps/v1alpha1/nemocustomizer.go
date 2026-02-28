@@ -18,12 +18,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	apiappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	internalinterfaces "github.com/NVIDIA/k8s-nim-operator/api/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/listers/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/listers/apps/v1alpha1"
 	versioned "github.com/NVIDIA/k8s-nim-operator/api/versioned"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -35,7 +35,7 @@ import (
 // NemoCustomizers.
 type NemoCustomizerInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.NemoCustomizerLister
+	Lister() appsv1alpha1.NemoCustomizerLister
 }
 
 type nemoCustomizerInformer struct {
@@ -56,21 +56,33 @@ func NewNemoCustomizerInformer(client versioned.Interface, namespace string, res
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredNemoCustomizerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().NemoCustomizers(namespace).List(context.TODO(), options)
+				return client.AppsV1alpha1().NemoCustomizers(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().NemoCustomizers(namespace).Watch(context.TODO(), options)
+				return client.AppsV1alpha1().NemoCustomizers(namespace).Watch(context.Background(), options)
 			},
-		},
-		&appsv1alpha1.NemoCustomizer{},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AppsV1alpha1().NemoCustomizers(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AppsV1alpha1().NemoCustomizers(namespace).Watch(ctx, options)
+			},
+		}, client),
+		&apiappsv1alpha1.NemoCustomizer{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +93,9 @@ func (f *nemoCustomizerInformer) defaultInformer(client versioned.Interface, res
 }
 
 func (f *nemoCustomizerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.NemoCustomizer{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiappsv1alpha1.NemoCustomizer{}, f.defaultInformer)
 }
 
-func (f *nemoCustomizerInformer) Lister() v1alpha1.NemoCustomizerLister {
-	return v1alpha1.NewNemoCustomizerLister(f.Informer().GetIndexer())
+func (f *nemoCustomizerInformer) Lister() appsv1alpha1.NemoCustomizerLister {
+	return appsv1alpha1.NewNemoCustomizerLister(f.Informer().GetIndexer())
 }

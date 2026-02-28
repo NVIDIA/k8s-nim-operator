@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NIMBuildLister helps list NIMBuilds.
@@ -29,7 +29,7 @@ import (
 type NIMBuildLister interface {
 	// List lists all NIMBuilds in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NIMBuild, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NIMBuild, err error)
 	// NIMBuilds returns an object that can list and get NIMBuilds.
 	NIMBuilds(namespace string) NIMBuildNamespaceLister
 	NIMBuildListerExpansion
@@ -37,17 +37,17 @@ type NIMBuildLister interface {
 
 // nIMBuildLister implements the NIMBuildLister interface.
 type nIMBuildLister struct {
-	listers.ResourceIndexer[*v1alpha1.NIMBuild]
+	listers.ResourceIndexer[*appsv1alpha1.NIMBuild]
 }
 
 // NewNIMBuildLister returns a new NIMBuildLister.
 func NewNIMBuildLister(indexer cache.Indexer) NIMBuildLister {
-	return &nIMBuildLister{listers.New[*v1alpha1.NIMBuild](indexer, v1alpha1.Resource("nimbuild"))}
+	return &nIMBuildLister{listers.New[*appsv1alpha1.NIMBuild](indexer, appsv1alpha1.Resource("nimbuild"))}
 }
 
 // NIMBuilds returns an object that can list and get NIMBuilds.
 func (s *nIMBuildLister) NIMBuilds(namespace string) NIMBuildNamespaceLister {
-	return nIMBuildNamespaceLister{listers.NewNamespaced[*v1alpha1.NIMBuild](s.ResourceIndexer, namespace)}
+	return nIMBuildNamespaceLister{listers.NewNamespaced[*appsv1alpha1.NIMBuild](s.ResourceIndexer, namespace)}
 }
 
 // NIMBuildNamespaceLister helps list and get NIMBuilds.
@@ -55,15 +55,15 @@ func (s *nIMBuildLister) NIMBuilds(namespace string) NIMBuildNamespaceLister {
 type NIMBuildNamespaceLister interface {
 	// List lists all NIMBuilds in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NIMBuild, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NIMBuild, err error)
 	// Get retrieves the NIMBuild from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NIMBuild, error)
+	Get(name string) (*appsv1alpha1.NIMBuild, error)
 	NIMBuildNamespaceListerExpansion
 }
 
 // nIMBuildNamespaceLister implements the NIMBuildNamespaceLister
 // interface.
 type nIMBuildNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.NIMBuild]
+	listers.ResourceIndexer[*appsv1alpha1.NIMBuild]
 }

@@ -18,129 +18,34 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeNemoGuardrails implements NemoGuardrailInterface
-type FakeNemoGuardrails struct {
+// fakeNemoGuardrails implements NemoGuardrailInterface
+type fakeNemoGuardrails struct {
+	*gentype.FakeClientWithList[*v1alpha1.NemoGuardrail, *v1alpha1.NemoGuardrailList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var nemoguardrailsResource = v1alpha1.SchemeGroupVersion.WithResource("nemoguardrails")
-
-var nemoguardrailsKind = v1alpha1.SchemeGroupVersion.WithKind("NemoGuardrail")
-
-// Get takes name of the nemoGuardrail, and returns the corresponding nemoGuardrail object, and an error if there is any.
-func (c *FakeNemoGuardrails) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NemoGuardrail, err error) {
-	emptyResult := &v1alpha1.NemoGuardrail{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(nemoguardrailsResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeNemoGuardrails(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.NemoGuardrailInterface {
+	return &fakeNemoGuardrails{
+		gentype.NewFakeClientWithList[*v1alpha1.NemoGuardrail, *v1alpha1.NemoGuardrailList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("nemoguardrails"),
+			v1alpha1.SchemeGroupVersion.WithKind("NemoGuardrail"),
+			func() *v1alpha1.NemoGuardrail { return &v1alpha1.NemoGuardrail{} },
+			func() *v1alpha1.NemoGuardrailList { return &v1alpha1.NemoGuardrailList{} },
+			func(dst, src *v1alpha1.NemoGuardrailList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.NemoGuardrailList) []*v1alpha1.NemoGuardrail {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.NemoGuardrailList, items []*v1alpha1.NemoGuardrail) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.NemoGuardrail), err
-}
-
-// List takes label and field selectors, and returns the list of NemoGuardrails that match those selectors.
-func (c *FakeNemoGuardrails) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NemoGuardrailList, err error) {
-	emptyResult := &v1alpha1.NemoGuardrailList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(nemoguardrailsResource, nemoguardrailsKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.NemoGuardrailList{ListMeta: obj.(*v1alpha1.NemoGuardrailList).ListMeta}
-	for _, item := range obj.(*v1alpha1.NemoGuardrailList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested nemoGuardrails.
-func (c *FakeNemoGuardrails) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(nemoguardrailsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a nemoGuardrail and creates it.  Returns the server's representation of the nemoGuardrail, and an error, if there is any.
-func (c *FakeNemoGuardrails) Create(ctx context.Context, nemoGuardrail *v1alpha1.NemoGuardrail, opts v1.CreateOptions) (result *v1alpha1.NemoGuardrail, err error) {
-	emptyResult := &v1alpha1.NemoGuardrail{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(nemoguardrailsResource, c.ns, nemoGuardrail, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NemoGuardrail), err
-}
-
-// Update takes the representation of a nemoGuardrail and updates it. Returns the server's representation of the nemoGuardrail, and an error, if there is any.
-func (c *FakeNemoGuardrails) Update(ctx context.Context, nemoGuardrail *v1alpha1.NemoGuardrail, opts v1.UpdateOptions) (result *v1alpha1.NemoGuardrail, err error) {
-	emptyResult := &v1alpha1.NemoGuardrail{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(nemoguardrailsResource, c.ns, nemoGuardrail, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NemoGuardrail), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNemoGuardrails) UpdateStatus(ctx context.Context, nemoGuardrail *v1alpha1.NemoGuardrail, opts v1.UpdateOptions) (result *v1alpha1.NemoGuardrail, err error) {
-	emptyResult := &v1alpha1.NemoGuardrail{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(nemoguardrailsResource, "status", c.ns, nemoGuardrail, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NemoGuardrail), err
-}
-
-// Delete takes name of the nemoGuardrail and deletes it. Returns an error if one occurs.
-func (c *FakeNemoGuardrails) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(nemoguardrailsResource, c.ns, name, opts), &v1alpha1.NemoGuardrail{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeNemoGuardrails) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(nemoguardrailsResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.NemoGuardrailList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched nemoGuardrail.
-func (c *FakeNemoGuardrails) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NemoGuardrail, err error) {
-	emptyResult := &v1alpha1.NemoGuardrail{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(nemoguardrailsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NemoGuardrail), err
 }

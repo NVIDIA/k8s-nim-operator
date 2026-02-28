@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NIMCacheLister helps list NIMCaches.
@@ -29,7 +29,7 @@ import (
 type NIMCacheLister interface {
 	// List lists all NIMCaches in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NIMCache, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NIMCache, err error)
 	// NIMCaches returns an object that can list and get NIMCaches.
 	NIMCaches(namespace string) NIMCacheNamespaceLister
 	NIMCacheListerExpansion
@@ -37,17 +37,17 @@ type NIMCacheLister interface {
 
 // nIMCacheLister implements the NIMCacheLister interface.
 type nIMCacheLister struct {
-	listers.ResourceIndexer[*v1alpha1.NIMCache]
+	listers.ResourceIndexer[*appsv1alpha1.NIMCache]
 }
 
 // NewNIMCacheLister returns a new NIMCacheLister.
 func NewNIMCacheLister(indexer cache.Indexer) NIMCacheLister {
-	return &nIMCacheLister{listers.New[*v1alpha1.NIMCache](indexer, v1alpha1.Resource("nimcache"))}
+	return &nIMCacheLister{listers.New[*appsv1alpha1.NIMCache](indexer, appsv1alpha1.Resource("nimcache"))}
 }
 
 // NIMCaches returns an object that can list and get NIMCaches.
 func (s *nIMCacheLister) NIMCaches(namespace string) NIMCacheNamespaceLister {
-	return nIMCacheNamespaceLister{listers.NewNamespaced[*v1alpha1.NIMCache](s.ResourceIndexer, namespace)}
+	return nIMCacheNamespaceLister{listers.NewNamespaced[*appsv1alpha1.NIMCache](s.ResourceIndexer, namespace)}
 }
 
 // NIMCacheNamespaceLister helps list and get NIMCaches.
@@ -55,15 +55,15 @@ func (s *nIMCacheLister) NIMCaches(namespace string) NIMCacheNamespaceLister {
 type NIMCacheNamespaceLister interface {
 	// List lists all NIMCaches in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NIMCache, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NIMCache, err error)
 	// Get retrieves the NIMCache from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NIMCache, error)
+	Get(name string) (*appsv1alpha1.NIMCache, error)
 	NIMCacheNamespaceListerExpansion
 }
 
 // nIMCacheNamespaceLister implements the NIMCacheNamespaceLister
 // interface.
 type nIMCacheNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.NIMCache]
+	listers.ResourceIndexer[*appsv1alpha1.NIMCache]
 }
