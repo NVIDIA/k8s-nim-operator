@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	sigsyaml "sigs.k8s.io/yaml"
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
@@ -92,7 +93,7 @@ const (
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
-// +kubebuilder:validation:XValidation:rule="!(has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))", message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
+// +kubebuilder:validation:XValidation:rule="!(has(self.expose) && has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))",message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
@@ -123,7 +124,7 @@ type NIMServiceSpec struct {
 	Scale          Autoscaling   `json:"scale,omitempty"`
 	SchedulerName  string        `json:"schedulerName,omitempty"`
 	Metrics        Metrics       `json:"metrics,omitempty"`
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=0
 	Replicas         *int32                     `json:"replicas,omitempty"`
 	UserID           *int64                     `json:"userID,omitempty"`
 	GroupID          *int64                     `json:"groupID,omitempty"`
@@ -135,6 +136,9 @@ type NIMServiceSpec struct {
 	// +kubebuilder:validation:Enum=standalone;kserve
 	// +kubebuilder:default:="standalone"
 	InferencePlatform PlatformType `json:"inferencePlatform,omitempty"`
+
+	InitContainers    []*NIMContainerSpec `json:"initContainers,omitempty"`
+	SidecarContainers []*NIMContainerSpec `json:"sidecarContainers,omitempty"`
 }
 
 // NimServiceMultiNodeConfig defines the configuration for multi-node NIMService.
@@ -149,6 +153,10 @@ type NimServiceMultiNodeConfig struct {
 
 	// MPI config for NIMService using LeaderWorkerSet
 	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
+
+	// ComputeDomain specifies the compute domain to use for a
+	// multi-node NIMService.
+	ComputeDomain *ComputeDomain `json:"computeDomain,omitempty"`
 }
 
 type ParallelismSpec struct {
@@ -183,6 +191,8 @@ type NIMServiceStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	DRAResourceStatuses []DRAResourceStatus `json:"draResourceStatuses,omitempty"`
+	// ComputeDomainStatus is the status of the ComputeDomain for a multi-node NIMService.
+	ComputeDomainStatus *ComputeDomainStatus `json:"computeDomainStatus,omitempty"`
 }
 
 // ModelStatus defines the configuration of the NIMService model.
@@ -711,6 +721,16 @@ func (n *NIMService) GetVolumes(modelPVC *PersistentVolumeClaim) []corev1.Volume
 			},
 		},
 	}
+	if n.scratchNeeded() {
+		volumes = append(volumes, corev1.Volume{
+			Name: "scratch",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: corev1.StorageMediumDefault,
+				},
+			},
+		})
+	}
 	switch {
 	case modelPVC != nil:
 		volumes = append(volumes, corev1.Volume{
@@ -834,6 +854,14 @@ func (n *NIMService) GetWorkerVolumes(modelPVC *PersistentVolumeClaim) []corev1.
 	return volumes
 }
 
+func (n *NIMService) scratchNeeded() bool {
+	additionalInitContainers := 0
+	if n.GetProxyCertConfigMap() != "" {
+		additionalInitContainers++
+	}
+	return len(n.Spec.InitContainers) > additionalInitContainers || len(n.Spec.SidecarContainers) > 0
+}
+
 // GetVolumeMounts returns volumes for the NIMService container.
 func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
 	subPath := ""
@@ -852,8 +880,38 @@ func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.V
 		},
 	}
 
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "scratch",
+			MountPath: "/scratch",
+		})
+	}
 	if n.GetProxyCertConfigMap() != "" {
 		volumeMounts = append(volumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
+	}
+	return volumeMounts
+}
+
+func (n *NIMService) GetInitContainerVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
+	subPath := ""
+	if modelPVC != nil {
+		subPath = modelPVC.SubPath
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "model-store",
+			MountPath: "/model-store",
+			SubPath:   subPath,
+		},
+	}
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "scratch",
+			MountPath: "/scratch",
+		})
+	}
+	if n.GetProxyCertConfigMap() != "" {
+		volumeMounts = append(volumeMounts, k8sutil.GetUpdateCaCertInitContainerVolumeMounts()...)
 	}
 	return volumeMounts
 }
@@ -959,19 +1017,58 @@ func (n *NIMService) GetDeploymentKind() string {
 
 // GetInitContainers returns the init containers for the NIMService deployment.
 func (n *NIMService) GetInitContainers() []corev1.Container {
+	res := []corev1.Container{}
 	if n.GetProxyCertConfigMap() != "" {
-		return []corev1.Container{
-			{
-				Name:            "update-ca-certificates",
-				Image:           n.GetImage(),
-				ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
-				Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
-				SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
-				VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
-			},
-		}
+		res = append(res, corev1.Container{
+			Name:            "update-ca-certificates",
+			Image:           n.GetImage(),
+			ImagePullPolicy: corev1.PullPolicy(n.GetImagePullPolicy()),
+			Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
+			SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
+		})
 	}
-	return []corev1.Container{}
+	for _, ic := range n.Spec.InitContainers {
+		var pp corev1.PullPolicy
+		if ic.Image.PullPolicy != "" {
+			pp = corev1.PullPolicy(ic.Image.PullPolicy)
+		} else {
+			pp = corev1.PullPolicy(n.GetImagePullPolicy())
+		}
+
+		res = append(res, corev1.Container{
+			Name:            ic.Name,
+			Image:           fmt.Sprintf("%s:%s", ic.Image.Repository, ic.Image.Tag),
+			ImagePullPolicy: pp,
+			Command:         ic.Command,
+			Args:            ic.Args,
+			Env:             ic.Env,
+			WorkingDir:      ic.WorkingDir,
+		})
+	}
+	return res
+}
+
+func (n *NIMService) GetSidecarContainers() []corev1.Container {
+	res := []corev1.Container{}
+	for _, sc := range n.Spec.SidecarContainers {
+		var pp corev1.PullPolicy
+		if sc.Image.PullPolicy != "" {
+			pp = corev1.PullPolicy(sc.Image.PullPolicy)
+		} else {
+			pp = corev1.PullPolicy(n.GetImagePullPolicy())
+		}
+
+		res = append(res, corev1.Container{
+			Name:            sc.Name,
+			Image:           fmt.Sprintf("%s:%s", sc.Image.Repository, sc.Image.Tag),
+			ImagePullPolicy: pp,
+			Command:         sc.Command,
+			Args:            sc.Args,
+			Env:             sc.Env,
+			WorkingDir:      sc.WorkingDir,
+		})
+	}
+	return res
 }
 
 // IsAutoScalingEnabled returns true if autoscaling is enabled for NIMService deployment.
@@ -1090,9 +1187,7 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
-	if !n.IsAutoScalingEnabled() {
-		params.Replicas = n.GetReplicas()
-	}
+	params.Replicas = n.GetReplicas()
 	params.NodeSelector = n.GetNodeSelector()
 	params.Tolerations = n.GetTolerations()
 	params.Affinity = n.GetAffinity()
@@ -1154,6 +1249,14 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 			ContainerPort: *n.Spec.Expose.Service.MetricsPort,
 		})
 	}
+	params.InitContainers = n.GetInitContainers()
+	for idx := range params.InitContainers {
+		params.InitContainers[idx].Env = utils.MergeEnvVars(params.Env, params.InitContainers[idx].Env)
+	}
+	params.SidecarContainers = n.GetSidecarContainers()
+	for idx := range params.SidecarContainers {
+		params.SidecarContainers[idx].Env = utils.MergeEnvVars(params.Env, params.SidecarContainers[idx].Env)
+	}
 	return params
 }
 
@@ -1208,7 +1311,15 @@ func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
 	params.ServiceAccountName = n.GetServiceAccountName()
 	params.SchedulerName = n.GetSchedulerName()
 	params.RuntimeClassName = n.GetRuntimeClassName()
+
 	params.InitContainers = n.GetInitContainers()
+	for idx := range params.InitContainers {
+		params.InitContainers[idx].Env = utils.MergeEnvVars(n.getLWSCommonEnv(), params.InitContainers[idx].Env)
+	}
+	params.SidecarContainers = n.GetSidecarContainers()
+	for idx := range params.SidecarContainers {
+		params.SidecarContainers[idx].Env = utils.MergeEnvVars(n.getLWSCommonEnv(), params.SidecarContainers[idx].Env)
+	}
 	return params
 }
 
@@ -1429,6 +1540,7 @@ func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	// Set rules to use SCC
 	switch {
@@ -1471,6 +1583,7 @@ func (n *NIMService) GetRoleBindingParams() *rendertypes.RoleBindingParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
+	params.Labels = n.GetServiceLabels()
 
 	params.ServiceAccountName = n.GetServiceAccountName()
 	params.RoleName = n.GetName()
@@ -1638,26 +1751,36 @@ func (n *NIMService) GetInferenceServiceParams(
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
 
 	// Set template spec
-	if !n.IsAutoScalingEnabled() || deploymentMode != kserveconstants.RawDeployment {
-		params.MinReplicas = n.GetReplicas()
-	} else {
-		params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
+	if utils.IsKServeStandardDeploymentMode(deploymentMode) {
+		if n.IsAutoScalingEnabled() {
+			params.Annotations[kserveconstants.AutoscalerClass] = string(kserveconstants.AutoscalerClassHPA)
 
-		minReplicas, maxReplicas, metric, metricType, target := n.GetInferenceServiceHPAParams()
-		if minReplicas != nil {
-			params.MinReplicas = minReplicas
-		}
-		if maxReplicas > 0 {
-			params.MaxReplicas = ptr.To[int32](maxReplicas)
-		}
-		if metric != "" {
-			params.ScaleMetric = metric
-		}
-		if metricType != "" {
-			params.ScaleMetricType = metricType
-		}
-		if target > 0 {
-			params.ScaleTarget = ptr.To(target)
+			minReplicas, maxReplicas, metric, metricType, target := n.GetInferenceServiceHPAParams()
+			if minReplicas != nil {
+				params.MinReplicas = minReplicas
+			}
+			if maxReplicas > 0 {
+				params.MaxReplicas = ptr.To[int32](maxReplicas)
+			}
+			if metric != "" {
+				params.ScaleMetric = metric
+			}
+			if metricType != "" {
+				params.ScaleMetricType = metricType
+			}
+			if target > 0 {
+				params.ScaleTarget = ptr.To(target)
+			}
+		} else {
+			// Use spec.replicas when autoscaling is disabled
+			replicas := n.GetReplicas()
+			if replicas != nil {
+				params.MinReplicas = replicas
+				params.MaxReplicas = replicas
+			}
+			params.ScaleMetric = ""
+			params.ScaleMetricType = ""
+			params.ScaleTarget = nil
 		}
 	}
 
@@ -1703,12 +1826,20 @@ func (n *NIMService) GetInferenceServiceParams(
 
 	params.Ports = n.GetInferenceServicePorts(deploymentMode)
 
+	params.InitContainers = n.GetInitContainers()
+	for idx := range params.InitContainers {
+		params.InitContainers[idx].Env = utils.MergeEnvVars(n.getLWSCommonEnv(), params.InitContainers[idx].Env)
+	}
+	params.SidecarContainers = n.GetSidecarContainers()
+	for idx := range params.SidecarContainers {
+		params.SidecarContainers[idx].Env = utils.MergeEnvVars(n.getLWSCommonEnv(), params.SidecarContainers[idx].Env)
+	}
 	return params
 }
 
 // GetInferenceServiceLivenessProbe returns liveness probe for the NIMService container.
 func (n *NIMService) GetInferenceServiceLivenessProbe(modeType kserveconstants.DeploymentModeType) *corev1.Probe {
-	if modeType == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(modeType) {
 		if n.Spec.LivenessProbe.Probe == nil {
 			return n.GetDefaultLivenessProbe()
 		}
@@ -1744,7 +1875,7 @@ func (n *NIMService) GetInferenceServiceLivenessProbe(modeType kserveconstants.D
 
 // GetInferenceServiceReadinessProbe returns readiness probe for the NIMService container.
 func (n *NIMService) GetInferenceServiceReadinessProbe(modeType kserveconstants.DeploymentModeType) *corev1.Probe {
-	if modeType == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(modeType) {
 		if n.Spec.ReadinessProbe.Probe == nil {
 			return n.GetDefaultReadinessProbe()
 		}
@@ -1780,7 +1911,7 @@ func (n *NIMService) GetInferenceServiceReadinessProbe(modeType kserveconstants.
 
 // GetInferenceServiceStartupProbe returns startup probe for the NIMService container.
 func (n *NIMService) GetInferenceServiceStartupProbe(modeType kserveconstants.DeploymentModeType) *corev1.Probe {
-	if modeType == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(modeType) {
 		if n.Spec.StartupProbe.Probe == nil {
 			return n.GetDefaultStartupProbe()
 		}
@@ -1819,7 +1950,7 @@ func (n *NIMService) GetInferenceServicePorts(modeType kserveconstants.Deploymen
 	ports := []corev1.ContainerPort{}
 
 	// Setup container ports for nimservice
-	if modeType == kserveconstants.RawDeployment {
+	if utils.IsKServeStandardDeploymentMode(modeType) {
 		ports = append(ports, corev1.ContainerPort{
 			Name:          DefaultNamedPortAPI,
 			Protocol:      corev1.ProtocolTCP,
@@ -1898,6 +2029,12 @@ func (n *NIMService) GetInferenceServiceHPAParams() (*int32, int32, string, stri
 	return minReplicas, maxReplicas, metric, metricType, target
 }
 
+// IsMultiNode returns true if the NIMService is a multi-node NIMService.
+func (n *NIMService) IsMultiNode() bool {
+	return n.GetMultiNodePipelineParallelism() > 1
+}
+
+// GetMultiNodeTensorParallelism returns the tensor parallelism size for the multi-node NIMService.
 func (n *NIMService) GetMultiNodeTensorParallelism() uint32 {
 	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Tensor != nil {
 		return *n.Spec.MultiNode.Parallelism.Tensor
@@ -1905,11 +2042,413 @@ func (n *NIMService) GetMultiNodeTensorParallelism() uint32 {
 	return 0
 }
 
+// GetMultiNodePipelineParallelism returns the pipeline parallelism size for the multi-node NIMService.
 func (n *NIMService) GetMultiNodePipelineParallelism() uint32 {
-	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Tensor != nil {
+	if n.Spec.MultiNode != nil && n.Spec.MultiNode.Parallelism != nil && n.Spec.MultiNode.Parallelism.Pipeline != nil {
 		return *n.Spec.MultiNode.Parallelism.Pipeline
 	}
 	return 0
+}
+
+// IsComputeDomainEnabled returns true if the NIMService is a multi-node NIMService and a compute domain is requested.
+func (n *NIMService) IsComputeDomainEnabled() bool {
+	if !n.IsMultiNode() {
+		return false
+	}
+	return n.Spec.MultiNode.ComputeDomain != nil
+}
+
+// GetComputeDomainName returns the name of the ComputeDomain for the multi-node NIMService.
+func (n *NIMService) GetComputeDomainName() string {
+	if n.IsComputeDomainEnabled() {
+		if n.Spec.MultiNode.ComputeDomain.Create == nil || !*n.Spec.MultiNode.ComputeDomain.Create {
+			return n.Spec.MultiNode.ComputeDomain.Name
+		}
+
+		return n.GetName()
+	}
+
+	return ""
+}
+
+// GetComputeDomainParams returns the parameters for rendering the ComputeDomain for the multi-node NIMService.
+func (n *NIMService) GetComputeDomainParams(resourceClaimTemplateName string) *rendertypes.ComputeDomainParams {
+	return &rendertypes.ComputeDomainParams{
+		Name:                      n.GetName(),
+		Namespace:                 n.GetNamespace(),
+		Labels:                    n.GetServiceLabels(),
+		Annotations:               n.GetNIMServiceAnnotations(),
+		NumNodes:                  n.GetMultiNodePipelineParallelism(),
+		ResourceClaimTemplateName: resourceClaimTemplateName,
+	}
+}
+
+const (
+	// EPPGRPCExtProcPort is the gRPC external processing port for the EPP container.
+	EPPGRPCExtProcPort int32 = 9002
+	// EPPHealthPort is the gRPC health check port for the EPP container.
+	EPPHealthPort int32 = 9003
+	// EPPMetricsPort is the HTTP metrics port for the EPP container.
+	EPPMetricsPort int32 = 9090
+	// eppConfigFileName is the filename used when the operator generates an EPP ConfigMap.
+	eppConfigFileName = "default-plugins.yaml"
+)
+
+// IsEPPEnabled returns true if EPP (Endpoint Picker) is configured for this NIMService.
+func (n *NIMService) IsEPPEnabled() bool {
+	return n.Spec.Expose.Router.EPPConfig != nil
+}
+
+// GetEPPName returns the name used for EPP-related resources.
+func (n *NIMService) GetEPPName() string {
+	return fmt.Sprintf("%s-epp", n.GetName())
+}
+
+func (n *NIMService) GetEPPConfig() *EPPConfig {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig
+}
+
+// GetEPPContainerSpec returns the container spec for the EPP deployment.
+func (n *NIMService) GetEPPContainerSpec() *NIMContainerSpec {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig.ContainerSpec
+}
+
+// GetEPPContainerArgs returns the arguments for the EPP container.
+// If EPPConfig.ContainerSpec.Args is set, it is used; otherwise the default arguments are returned.
+func (n *NIMService) GetEPPContainerArgs() []string {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	eppContainerSpec := n.GetEPPContainerSpec()
+	if eppContainerSpec == nil {
+		return nil
+	}
+	if eppContainerSpec.Args == nil {
+		return []string{
+			"--pool-name", n.GetName(),
+			"--pool-namespace", n.GetNamespace(),
+			"--pool-group", "inference.networking.k8s.io",
+			"--zap-encoder", "json",
+			"--config-file", n.GetEPPConfigFileName(),
+			"--v", "6",
+			"--model-server-metrics-path", "/v1/metrics",
+		}
+	}
+	return eppContainerSpec.Args
+
+}
+
+// GetEPPContainerCmd returns the command for the EPP container.
+// If EPPConfig.ContainerSpec.Command is set, it is used; otherwise the default command is returned.
+func (n *NIMService) GetEPPContainerCmd() []string {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig.ContainerSpec.Command
+}
+
+// GetEPPReadinessProbe returns the readiness probe for the EPP deployment.
+func (n *NIMService) GetEPPReadinessProbe() *corev1.Probe {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	if n.Spec.Expose.Router.EPPConfig.ReadinessProbe == nil {
+		return &corev1.Probe{
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       10,
+			ProbeHandler: corev1.ProbeHandler{
+				GRPC: &corev1.GRPCAction{
+					Port: EPPHealthPort,
+				},
+			},
+		}
+	}
+	return n.Spec.Expose.Router.EPPConfig.ReadinessProbe
+}
+
+// GetEPPLivenessProbe returns the liveness probe for the EPP deployment.
+func (n *NIMService) GetEPPLivenessProbe() *corev1.Probe {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	if n.Spec.Expose.Router.EPPConfig.LivenessProbe == nil {
+		return &corev1.Probe{
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       10,
+			ProbeHandler: corev1.ProbeHandler{
+				GRPC: &corev1.GRPCAction{
+					Port: EPPHealthPort,
+				},
+			},
+		}
+	}
+	return n.Spec.Expose.Router.EPPConfig.LivenessProbe
+}
+
+// GetEPPStartupProbe returns the startup probe for the EPP deployment.
+func (n *NIMService) GetEPPStartupProbe() *corev1.Probe {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig.StartupProbe
+}
+
+func (n *NIMService) GetEPPContainerPorts() []corev1.ContainerPort {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	if n.Spec.Expose.Router.EPPConfig.Ports == nil {
+		return []corev1.ContainerPort{
+			{
+				Name:          "grpc-ext-proc",
+				ContainerPort: EPPGRPCExtProcPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+			{
+				Name:          "grpc-health",
+				ContainerPort: EPPHealthPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+			{
+				Name:          "http-metrics",
+				ContainerPort: EPPMetricsPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		}
+	}
+	return n.Spec.Expose.Router.EPPConfig.Ports
+}
+
+// GetEPPContainerEnv returns the environment variables for the EPP container.
+// If EPPConfig.ContainerSpec.Env is set, it is used; otherwise the default environment variables are returned.
+func (n *NIMService) GetEPPContainerEnv() []corev1.EnvVar {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	return n.Spec.Expose.Router.EPPConfig.ContainerSpec.Env
+}
+
+// GetEPPImage returns the container image for the EPP deployment.
+// If EPPConfig.ContainerSpec.Image is set, it is used (Repository:Tag); otherwise DefaultEPPImage is returned.
+func (n *NIMService) GetEPPImage() string {
+	if eppConfig := n.GetEPPConfig(); eppConfig != nil && eppConfig.ContainerSpec != nil {
+		r, t := eppConfig.ContainerSpec.Image.Repository, eppConfig.ContainerSpec.Image.Tag
+		if t == "" {
+			t = "latest"
+		}
+		if r != "" {
+			return fmt.Sprintf("%s:%s", r, t)
+		}
+	}
+	return ""
+}
+
+// GetEPPConfigMapName returns the name of the operator-generated EPP ConfigMap.
+func (n *NIMService) GetEPPConfigMapName() string {
+	return fmt.Sprintf("%s-epp-config", n.GetName())
+}
+
+// GetEPPServiceAccountParams returns params to render the EPP ServiceAccount.
+func (n *NIMService) GetEPPServiceAccountParams() *rendertypes.ServiceAccountParams {
+	return &rendertypes.ServiceAccountParams{
+		Name:      n.GetEPPName(),
+		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
+	}
+}
+
+// GetEPPRoleParams returns params to render the EPP Role.
+func (n *NIMService) GetEPPRoleParams() *rendertypes.RoleParams {
+	return &rendertypes.RoleParams{
+		Name:      n.GetEPPName(),
+		Namespace: n.GetNamespace(),
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"inference.networking.k8s.io"},
+				Resources: []string{"inferencepools", "inferenceobjectives"},
+				Verbs:     []string{"get", "watch", "list"},
+			},
+			{
+				APIGroups: []string{"inference.networking.x-k8s.io"},
+				Resources: []string{"inferencepools", "inferenceobjectives"},
+				Verbs:     []string{"get", "watch", "list"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "watch", "list"},
+			},
+		},
+	}
+}
+
+// GetEPPRoleBindingParams returns params to render the EPP RoleBinding.
+func (n *NIMService) GetEPPRoleBindingParams() *rendertypes.RoleBindingParams {
+	return &rendertypes.RoleBindingParams{
+		Name:               n.GetEPPName(),
+		Namespace:          n.GetNamespace(),
+		RoleName:           n.GetEPPName(),
+		ServiceAccountName: n.GetEPPName(),
+	}
+}
+
+func (n *NIMService) GetEPPServicePorts() []corev1.ServicePort {
+	if n.Spec.Expose.Router.EPPConfig == nil {
+		return nil
+	}
+	if n.Spec.Expose.Router.EPPConfig.Ports == nil {
+		return []corev1.ServicePort{
+			{
+				Name:       "grpc-ext-proc",
+				Port:       EPPGRPCExtProcPort,
+				TargetPort: intstr.FromInt32(EPPGRPCExtProcPort),
+				Protocol:   corev1.ProtocolTCP,
+			},
+			{
+				Name:       "http-metrics",
+				Port:       EPPMetricsPort,
+				TargetPort: intstr.FromInt32(EPPMetricsPort),
+				Protocol:   corev1.ProtocolTCP,
+			},
+		}
+	} else {
+		servicePorts := []corev1.ServicePort{}
+		for _, port := range n.Spec.Expose.Router.EPPConfig.Ports {
+			servicePorts = append(servicePorts, corev1.ServicePort{
+				Name:       port.Name,
+				Port:       port.ContainerPort,
+				TargetPort: intstr.FromInt32(port.ContainerPort),
+				Protocol:   port.Protocol,
+			})
+		}
+		return servicePorts
+	}
+
+}
+
+// GetEPPServiceParams returns params to render the EPP Service.
+func (n *NIMService) GetEPPServiceParams() *rendertypes.ServiceParams {
+	return &rendertypes.ServiceParams{
+		Name:      n.GetEPPName(),
+		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
+		SelectorLabels: map[string]string{
+			"app": n.GetEPPName(),
+		},
+		Type:  string(corev1.ServiceTypeClusterIP),
+		Ports: n.GetEPPServicePorts(),
+	}
+}
+
+// GetEPPConfigMapParams returns params to render the EPP ConfigMap from an inline Config.
+// Returns nil if Config is not set (user supplies their own ConfigMap via ConfigMapRef).
+func (n *NIMService) GetEPPConfigMapParams() (*rendertypes.ConfigMapParams, error) {
+	if n.Spec.Expose.Router.EPPConfig.Config == nil {
+		return nil, nil
+	}
+
+	configYAML, err := sigsyaml.Marshal(n.Spec.Expose.Router.EPPConfig.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal EPP config: %w", err)
+	}
+	return &rendertypes.ConfigMapParams{
+		Name:      n.GetEPPConfigMapName(),
+		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
+		ConfigMapData: map[string]string{
+			eppConfigFileName: string(configYAML),
+		},
+	}, nil
+}
+
+func (n *NIMService) GetEPPConfigFileName() string {
+	var configFile string
+	if n.Spec.Expose.Router.EPPConfig.Config != nil {
+		configFile = fmt.Sprintf("/config/%s", eppConfigFileName)
+	} else if n.Spec.Expose.Router.EPPConfig.ConfigMapRef != nil {
+		configFile = fmt.Sprintf("/config/%s", n.Spec.Expose.Router.EPPConfig.ConfigMapRef.Key)
+	}
+	return configFile
+}
+
+// GetEPPDeploymentParams returns params to render the EPP Deployment.
+func (n *NIMService) GetEPPDeploymentParams() *rendertypes.DeploymentParams {
+	eppConfig := n.Spec.Expose.Router.EPPConfig
+
+	// Determine volume source based on config origin.
+	var configVolume corev1.Volume
+	if eppConfig.Config != nil {
+		configVolume = corev1.Volume{
+			Name: "epp-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.GetEPPConfigMapName(),
+					},
+				},
+			},
+		}
+	} else if eppConfig.ConfigMapRef != nil {
+		configVolume = corev1.Volume{
+			Name: "epp-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: eppConfig.ConfigMapRef.Name,
+					},
+				},
+			},
+		}
+	}
+
+	params := &rendertypes.DeploymentParams{
+		Name:      n.GetEPPName(),
+		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
+		SelectorLabels: map[string]string{
+			"app": n.GetEPPName(),
+		},
+		ContainerName:      "epp",
+		Image:              n.GetEPPImage(),
+		ImagePullSecrets:   n.GetImagePullSecrets(),
+		ImagePullPolicy:    n.GetImagePullPolicy(),
+		ServiceAccountName: n.GetEPPName(),
+		Env:                n.GetEPPContainerEnv(),
+		Command:            n.GetEPPContainerCmd(),
+		Args:               n.GetEPPContainerArgs(),
+		Ports:              n.GetEPPContainerPorts(),
+		ReadinessProbe:     n.GetEPPReadinessProbe(),
+		LivenessProbe:      n.GetEPPLivenessProbe(),
+		StartupProbe:       n.GetEPPStartupProbe(),
+		Volumes:            []corev1.Volume{configVolume},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "epp-config",
+				MountPath: "/config",
+				ReadOnly:  true,
+			},
+		},
+	}
+	return params
+}
+
+// GetInferencePoolParams returns params to render the InferencePool.
+func (n *NIMService) GetInferencePoolParams() *rendertypes.InferencePoolParams {
+	return &rendertypes.InferencePoolParams{
+		Name:           n.GetName(),
+		Namespace:      n.GetNamespace(),
+		Labels:         n.GetServiceLabels(),
+		SelectorLabels: n.GetSelectorLabels(),
+		TargetPort:     n.GetServicePort(),
+		EPPServiceName: n.GetEPPName(),
+		EPPServicePort: EPPGRPCExtProcPort,
+	}
 }
 
 func init() {

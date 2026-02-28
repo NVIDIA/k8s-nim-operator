@@ -23,10 +23,9 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/kserve/kserve/pkg/constants"
 	"github.com/kserve/kserve/pkg/utils"
@@ -41,14 +40,14 @@ const (
 	UnsupportedStorageURIFormatError                 = "storageUri, must be one of: [%s] or match https://{}.blob.core.windows.net/{}/{} or be an absolute or relative local path. StorageUri [%s] is not supported"
 	UnsupportedStorageSpecFormatError                = "storage.spec.type, must be one of: [%s]. storage.spec.type [%s] is not supported"
 	InvalidLoggerType                                = "invalid logger type"
+	InvalidLoggerStorageConfigError                  = "invalid logger storage configuration"
 	InvalidISVCNameFormatError                       = "the InferenceService \"%s\" is invalid: a InferenceService name must consist of lower case alphanumeric characters or '-', and must start with alphabetical character. (e.g. \"my-name\" or \"abc-123\", regex used for validation is '%s')"
 	InvalidProtocol                                  = "invalid protocol %s. Must be one of [%s]"
 	MissingStorageURI                                = "the InferenceService %q is invalid: StorageURI must be set for multinode enabled"
-	InvalidAutoScalerError                           = "the InferenceService %q is invalid: Multinode only supports 'external' autoscaler(%s)"
-	InvalidNotSupportedStorageURIProtocolError       = "the InferenceService %q is invalid: Multinode only supports 'pvc' Storage Protocol(%s)"
-	InvalidCustomGPUTypesAnnotationFormatError       = "the InferenceService %q is invalid: invalid format for %s annotation: must be a valid JSON array"
+	InvalidAutoScalerError                           = "the InferenceService %q is invalid: Multinode only supports 'none' autoscaler(%s)"
+	InvalidNotSupportedStorageURIProtocolError       = "the InferenceService %q is invalid: Multinode only supports 'pvc' and 'oci' Storage Protocol(%s)"
 	InvalidUnknownGPUTypeError                       = "the InferenceService %q is invalid: Unknown GPU resource type. Set 'serving.kserve.io/gpu-resource-types' annotation to use custom gpu resource type"
-	InvalidWorkerSpecPipelineParallelSizeValueError  = "the InferenceService %q is invalid: WorkerSpec.PipelineParallelSize cannot be less than 2(%s)"
+	InvalidWorkerSpecPipelineParallelSizeValueError  = "the InferenceService %q is invalid: WorkerSpec.PipelineParallelSize cannot be less than 1(%s)"
 	InvalidWorkerSpecTensorParallelSizeValueError    = "the InferenceService %q is invalid: WorkerSpec.TensorParallelSize cannot be less than 1(%s)"
 	DisallowedMultipleContainersInWorkerSpecError    = "the InferenceService %q is invalid: setting multiple containers in workerSpec is not allowed"
 	DisallowedWorkerSpecPipelineParallelSizeEnvError = "the InferenceService %q is invalid: setting PIPELINE_PARALLEL_SIZE in environment variables is not allowed"
@@ -67,7 +66,7 @@ type ComponentImplementation interface {
 	Validate() error
 	GetContainer(metadata metav1.ObjectMeta, extensions *ComponentExtensionSpec, config *InferenceServicesConfig, predictorHost ...string) *corev1.Container
 	GetStorageUri() *string
-	GetStorageSpec() *StorageSpec
+	GetStorageSpec() *ModelStorageSpec
 	GetProtocol() constants.InferenceServiceProtocol
 }
 
@@ -135,6 +134,9 @@ type ComponentExtensionSpec struct {
 type AutoScalingSpec struct {
 	// metrics is a list of metrics spec to be used for autoscaling
 	Metrics []MetricsSpec `json:"metrics,omitempty"`
+	// Behavior contains the scaling behavior configuration for the Horizontal Pod Autoscaler.
+	// +optional
+	Behavior *autoscalingv2.HorizontalPodAutoscalerBehavior `json:"behavior,omitempty"`
 }
 
 // MetricsSpec specifies how to scale based on a single metric
@@ -202,6 +204,11 @@ type ExternalMetricSource struct {
 	// metric identifies the target metric by name and selector
 	Metric ExternalMetrics `json:"metric"`
 
+	// authenticationRef is a reference to the authentication information
+	// for more information see: https://keda.sh/docs/2.17/scalers/prometheus/#authentication-parameters
+	// +optional
+	Authentication *ExtMetricAuthentication `json:"authenticationRef,omitempty"`
+
 	// target specifies the target value for the given metric
 	Target MetricTarget `json:"target"`
 }
@@ -218,6 +225,22 @@ type PodMetricSource struct {
 	Target MetricTarget `json:"target"`
 }
 
+type AuthenticationRef struct {
+	// name is the name of the authentication secret
+	Name string `json:"name"`
+}
+
+type ExtMetricAuthentication struct {
+	// authenticationRef is a reference to the authentication information
+	// for more information see: https://keda.sh/docs/2.17/scalers/prometheus/#authentication-parameters
+	AuthenticationRef AuthenticationRef `json:"authenticationRef"`
+	// authModes defines the authentication modes for the metrics backend
+	// possible values are bearer, basic, tls.
+	// for more information see: https://keda.sh/docs/2.17/scalers/prometheus/#authentication-parameters
+	// +optional
+	AuthModes string `json:"authModes,omitempty"`
+}
+
 // MetricTarget defines the target value, average value, or average utilization of a specific metric
 type MetricTarget struct {
 	// type represents whether the metric type is Utilization, Value, or AverageValue
@@ -226,12 +249,12 @@ type MetricTarget struct {
 
 	// value is the target value of the metric (as a quantity).
 	// +optional
-	Value *resource.Quantity `json:"value,omitempty"`
+	Value *MetricQuantity `json:"value,omitempty"`
 
 	// averageValue is the target value of the average of the
 	// metric across all relevant pods (as a quantity)
 	// +optional
-	AverageValue *resource.Quantity `json:"averageValue,omitempty"`
+	AverageValue *MetricQuantity `json:"averageValue,omitempty"`
 
 	// averageUtilization is the target value of the average of the
 	// resource metric across all relevant pods, represented as a percentage of
@@ -323,7 +346,7 @@ func (s *ComponentExtensionSpec) Validate() error {
 	})
 }
 
-func validateStorageSpec(storageSpec *StorageSpec, storageURI *string) error {
+func validateStorageSpec(storageSpec *ModelStorageSpec, storageURI *string) error {
 	if storageSpec == nil {
 		return nil
 	}
@@ -376,10 +399,16 @@ func validateContainerConcurrency(containerConcurrency *int64) error {
 
 func validateLogger(logger *LoggerSpec) error {
 	if logger != nil {
-		if !(logger.Mode == LogAll || logger.Mode == LogRequest || logger.Mode == LogResponse) {
+		if logger.Mode != LogAll && logger.Mode != LogRequest && logger.Mode != LogResponse {
 			return errors.New(InvalidLoggerType)
 		}
+		if logger.Storage != nil {
+			if logger.Storage.Path == nil || logger.Storage.Parameters == nil || logger.Storage.StorageKey == nil {
+				return errors.New(InvalidLoggerStorageConfigError)
+			}
+		}
 	}
+
 	return nil
 }
 
@@ -411,7 +440,7 @@ func NonNilComponents(objects []ComponentImplementation) (results []ComponentImp
 // ExactlyOneErrorFor creates an error for the component's one-of semantic.
 func ExactlyOneErrorFor(component Component) error {
 	componentType := reflect.ValueOf(component).Type().Elem()
-	implementationTypes := []string{}
+	implementationTypes := make([]string, 0, componentType.NumField()-1)
 	for i := range componentType.NumField() - 1 {
 		implementationTypes = append(implementationTypes, componentType.Field(i).Name)
 	}

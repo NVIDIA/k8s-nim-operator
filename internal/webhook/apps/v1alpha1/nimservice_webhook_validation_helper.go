@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"slices"
@@ -25,10 +26,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/blang/semver/v4"
+	kserveconstants "github.com/kserve/kserve/pkg/constants"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
@@ -63,7 +67,10 @@ var validDRAResourceQuantitySelectorOps = []appsv1alpha1.DRAResourceQuantitySele
 // object. It is intended to be invoked by both ValidateCreate and ValidateUpdate to
 // ensure the resource is well-formed before any other validation (e.g. immutability)
 // is performed.
-func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path, kubeVersion string) (admission.Warnings, field.ErrorList) {
+func validateNIMServiceSpec(ctx context.Context, nimservice *appsv1alpha1.NIMService, fldPath *field.Path, kubeVersion string,
+	k8sClient client.Client) (admission.Warnings, field.ErrorList) {
+	spec := &nimservice.Spec
+
 	warningList, errList := validateImageConfiguration(&spec.Image, fldPath.Child("image"))
 
 	// TODO abstract all validation functions with a single signature validateFunc(*appsv1alpha1.NIMServiceSpec, *field.Path) (admission.Warnings, field.ErrorList)
@@ -99,7 +106,8 @@ func validateNIMServiceSpec(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Pa
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
-	w, err = validateKServeConfiguration(spec, fldPath)
+	namespacedName := client.ObjectKeyFromObject(nimservice)
+	w, err = validateKServeConfiguration(ctx, spec, fldPath, &namespacedName, k8sClient)
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
@@ -182,6 +190,9 @@ func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage
 	// Check if EmptyDir is defined (non-empty)
 	emptyDirDefined := storage.EmptyDir != nil
 
+	// Check if HostPath is defined (non-empty)
+	hostPathDefined := storage.HostPath != nil && *storage.HostPath != ""
+
 	// Count how many are defined
 	definedCount := 0
 	if nimCacheDefined {
@@ -193,12 +204,15 @@ func validateServiceStorageConfiguration(storage *appsv1alpha1.NIMServiceStorage
 	if emptyDirDefined {
 		definedCount++
 	}
+	if hostPathDefined {
+		definedCount++
+	}
 
 	// Ensure only one of nimCache, PVC, or EmptyDir is defined
 	if definedCount == 0 {
-		errList = append(errList, field.Required(fldPath, fmt.Sprintf("one of %s, %s or %s, must be defined", fldPath.Child("nimCache"), fldPath.Child("pvc"), fldPath.Child("emptyDir"))))
+		errList = append(errList, field.Required(fldPath, fmt.Sprintf("one of %s, %s, %s or %s, must be defined", fldPath.Child("nimCache"), fldPath.Child("pvc"), fldPath.Child("emptyDir"), fldPath.Child("hostPath"))))
 	} else if definedCount > 1 {
-		errList = append(errList, field.Invalid(fldPath, "multiple storage sources defined", fmt.Sprintf("only one of %s, %s or %s must be defined", fldPath.Child("nimCache"), fldPath.Child("pvc"), fldPath.Child("emptyDir"))))
+		errList = append(errList, field.Invalid(fldPath, "multiple storage sources defined", fmt.Sprintf("only one of %s, %s, %s or %s must be defined", fldPath.Child("nimCache"), fldPath.Child("pvc"), fldPath.Child("emptyDir"), fldPath.Child("hostPath"))))
 	}
 
 	// If NIMCache is non-nil, NIMCache.Name must not be empty
@@ -497,48 +511,52 @@ func validateResourcesConfiguration(resources *corev1.ResourceRequirements, fldP
 }
 
 // validateKServeonfiguration implements required KServe validations.
-func validateKServeConfiguration(spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
+func validateKServeConfiguration(ctx context.Context, spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path,
+	namespacedName *types.NamespacedName, k8sClient client.Client) (admission.Warnings, field.ErrorList) {
 	errList := field.ErrorList{}
 	warningList := admission.Warnings{}
 
-	platformIsKServe := spec.InferencePlatform == appsv1alpha1.PlatformTypeKServe
+	if spec.InferencePlatform == appsv1alpha1.PlatformTypeKServe {
+		// Get the deployment mode
+		mode, err := utils.GetKServeDeploymentMode(ctx, k8sClient, spec.Annotations, namespacedName)
+		if err != nil {
+			errList = append(errList, field.InternalError(fldPath, fmt.Errorf("failed to determine KServe deployment mode: %w", err)))
+		} else {
+			knative := strings.EqualFold(string(mode), string(kserveconstants.Knative)) || strings.EqualFold(string(mode), string(kserveconstants.LegacyServerless))
 
-	// mode is the value, and annotated is true if the key-value pair exist.
-	mode, annotated := spec.Annotations["serving.kserve.org/deploymentMode"]
-	// If the annotation is absent, kserve defaults to serverless.
-	serverless := !annotated || strings.EqualFold(mode, "serverless")
+			// When Spec.InferencePlatform is "kserve" and used in "Knative" mode:
+			if knative {
+				// Spec.Scale (autoscaling) cannot be set.
+				if spec.Scale.Enabled != nil && *spec.Scale.Enabled {
+					errList = append(errList, field.Forbidden(fldPath.Child("scale").Child("enabled"), fmt.Sprintf("%s (autoscaling) cannot be set when KServe runs in knative mode", fldPath.Child("scale"))))
+				}
 
-	// When Spec.InferencePlatform is "kserve" and used in "serverless" mode:
-	if platformIsKServe && serverless {
-		// Spec.Scale (autoscaling) cannot be set.
-		if spec.Scale.Enabled != nil && *spec.Scale.Enabled {
-			errList = append(errList, field.Forbidden(fldPath.Child("scale").Child("enabled"), fmt.Sprintf("%s (autoscaling) cannot be set when KServe runs in serverless mode", fldPath.Child("scale"))))
+				// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
+				if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled { //nolint:staticcheck
+					errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in knative mode", fldPath.Child("expose").Child("ingress").Child("enabled"))))
+				}
+
+				// Spec.Expose.Router.Ingress cannot be set.
+				if spec.Expose.Router.Ingress != nil {
+					errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingress"), fmt.Sprintf("%s cannot be set when KServe runs in knative mode", fldPath.Child("router").Child("ingress"))))
+				}
+
+				// Spec.Expose.Router.Gateway cannot be set.
+				if spec.Expose.Router.Gateway != nil {
+					errList = append(errList, field.Forbidden(fldPath.Child("router").Child("gateway"), fmt.Sprintf("%s cannot be set when KServe runs in knative mode", fldPath.Child("router").Child("gateway"))))
+				}
+
+				// Spec.Metrics.ServiceMonitor cannot be set.
+				if spec.Metrics.Enabled != nil && *spec.Metrics.Enabled {
+					errList = append(errList, field.Forbidden(fldPath.Child("metrics").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in knative mode", fldPath.Child("metrics").Child("enabled"))))
+				}
+			}
 		}
 
-		// TODO deprecate this once we have removed the .spec.expose.ingress field from the spec
-		if spec.Expose.Ingress.Enabled != nil && *spec.Expose.Ingress.Enabled { //nolint:staticcheck
-			errList = append(errList, field.Forbidden(fldPath.Child("expose").Child("ingress").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("expose").Child("ingress").Child("enabled"))))
+		// Spec.MultiNode cannot be enabled when inferencePlatform is kserve.
+		if spec.MultiNode != nil {
+			errList = append(errList, field.Forbidden(fldPath.Child("multiNode"), "cannot be set when the inferencePlatform is KServe"))
 		}
-
-		// Spec.Expose.Router.Ingress cannot be set.
-		if spec.Expose.Router.Ingress != nil {
-			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("ingress"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("ingress"))))
-		}
-
-		// Spec.Expose.Router.Gateway cannot be set.
-		if spec.Expose.Router.Gateway != nil {
-			errList = append(errList, field.Forbidden(fldPath.Child("router").Child("gateway"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("router").Child("gateway"))))
-		}
-
-		// Spec.Metrics.ServiceMonitor cannot be set.
-		if spec.Metrics.Enabled != nil && *spec.Metrics.Enabled {
-			errList = append(errList, field.Forbidden(fldPath.Child("metrics").Child("enabled"), fmt.Sprintf("%s cannot be set when KServe runs in serverless mode", fldPath.Child("metrics").Child("serviceMonitor"))))
-		}
-	}
-
-	// Spec.MultiNode cannot be enabled when inferencePlatform is kserve.
-	if platformIsKServe && spec.MultiNode != nil {
-		errList = append(errList, field.Forbidden(fldPath.Child("multiNode"), "cannot be set when KServe runs in serverless mode"))
 	}
 
 	return warningList, errList

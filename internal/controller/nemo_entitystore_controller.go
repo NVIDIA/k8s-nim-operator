@@ -28,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -129,8 +129,9 @@ func (r *NemoEntitystoreReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if NemoEntitystore.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(NemoEntitystore, NemoEntitystoreFinalizer) {
-			controllerutil.AddFinalizer(NemoEntitystore, NemoEntitystoreFinalizer)
-			if err := r.Update(ctx, NemoEntitystore); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoEntitystore, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NemoEntitystoreFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -144,8 +145,9 @@ func (r *NemoEntitystoreReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, err
 			}
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(NemoEntitystore, NemoEntitystoreFinalizer)
-			if err := r.Update(ctx, NemoEntitystore); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, NemoEntitystore, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NemoEntitystoreFinalizer)
+			}); err != nil {
 				r.GetEventRecorder().Eventf(NemoEntitystore, corev1.EventTypeNormal, "Delete",
 					"NemoEntitystore %s finalizer removed", NemoEntitystore.Name)
 				return ctrl.Result{}, err
@@ -345,7 +347,7 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &networkingv1.Ingress{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -360,7 +362,7 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 		}
 	} else {
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &gatewayv1.HTTPRoute{}, namespacedName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apiErrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 	}
@@ -438,7 +440,7 @@ func (r *NemoEntitystoreReconciler) renderAndSyncResource(ctx context.Context, n
 
 	namespacedName := types.NamespacedName{Name: nemoEntitystore.GetName(), Namespace: nemoEntitystore.GetNamespace()}
 	getErr := r.Get(ctx, namespacedName, obj)
-	if getErr != nil && !errors.IsNotFound(getErr) {
+	if getErr != nil && !apiErrors.IsNotFound(getErr) {
 		logger.Error(getErr, fmt.Sprintf("Error is not NotFound for %s: %v", obj.GetObjectKind(), getErr))
 		return getErr
 	}

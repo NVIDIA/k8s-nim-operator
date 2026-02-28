@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 
 	"google.golang.org/protobuf/proto"
@@ -95,7 +96,7 @@ func setResourceRequirementDefaults(config *InferenceServicesConfig, requirement
 }
 
 func (d *InferenceServiceDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	isvc, err := convertToInferenceService(obj)
+	isvc, err := utils.Convert[*InferenceService](obj)
 	if err != nil {
 		validatorLogger.Error(err, "Unable to convert object to InferenceService")
 		return err
@@ -133,7 +134,7 @@ func (d *InferenceServiceDefaulter) Default(ctx context.Context, obj runtime.Obj
 		return err
 	}
 
-	_, localModelDisabledForIsvc := isvc.ObjectMeta.Annotations[constants.DisableLocalModelKey]
+	_, localModelDisabledForIsvc := isvc.Annotations[constants.DisableLocalModelKey]
 	var models *v1alpha1.LocalModelCacheList
 	if !localModelDisabledForIsvc && localModelConfig.Enabled {
 		var c client.Client
@@ -154,15 +155,27 @@ func (d *InferenceServiceDefaulter) Default(ctx context.Context, obj runtime.Obj
 }
 
 func (isvc *InferenceService) DefaultInferenceService(config *InferenceServicesConfig, deployConfig *DeployConfig, securityConfig *SecurityConfig, models *v1alpha1.LocalModelCacheList) {
-	deploymentMode, ok := isvc.ObjectMeta.Annotations[constants.DeploymentMode]
+	deploymentMode, ok := isvc.Annotations[constants.DeploymentMode]
+
+	// Normalize deprecated annotation values
+	if ok {
+		if deploymentMode == string(constants.LegacyRawDeployment) {
+			isvc.Annotations[constants.DeploymentMode] = string(constants.Standard)
+			deploymentMode = string(constants.Standard)
+		}
+		if deploymentMode == string(constants.LegacyServerless) {
+			isvc.Annotations[constants.DeploymentMode] = string(constants.Knative)
+			deploymentMode = string(constants.Knative)
+		}
+	}
 
 	if !ok && deployConfig != nil {
 		if deployConfig.DefaultDeploymentMode == string(constants.ModelMeshDeployment) ||
-			deployConfig.DefaultDeploymentMode == string(constants.RawDeployment) {
-			if isvc.ObjectMeta.Annotations == nil {
-				isvc.ObjectMeta.Annotations = map[string]string{}
+			deployConfig.DefaultDeploymentMode == string(constants.Standard) {
+			if isvc.Annotations == nil {
+				isvc.Annotations = map[string]string{}
 			}
-			isvc.ObjectMeta.Annotations[constants.DeploymentMode] = deployConfig.DefaultDeploymentMode
+			isvc.Annotations[constants.DeploymentMode] = deployConfig.DefaultDeploymentMode
 		}
 	}
 	components := []Component{isvc.Spec.Transformer, isvc.Spec.Explainer}
@@ -242,11 +255,24 @@ func (isvc *InferenceService) setPredictorModelDefaults() {
 		isvc.assignPaddleRuntime()
 	}
 
-	if isvc.Spec.Predictor.Model != nil && isvc.Spec.Predictor.Model.ProtocolVersion == nil {
-		if isvc.Spec.Predictor.Model.ModelFormat.Name == constants.SupportedModelTriton {
-			// set 'v2' as default protocol version for triton server
+	if isvc.Spec.Predictor.Model != nil {
+		// Set 'v2' as default protocol version for triton server
+		if isvc.Spec.Predictor.Model.ProtocolVersion == nil &&
+			isvc.Spec.Predictor.Model.ModelFormat.Name == constants.SupportedModelTriton {
 			protocolV2 := constants.ProtocolV2
 			isvc.Spec.Predictor.Model.ProtocolVersion = &protocolV2
+		}
+
+		// Add framework annotation from modelFormat
+		if isvc.Spec.Predictor.Model.ModelFormat.Name != "" {
+			modelFormat := isvc.Spec.Predictor.Model.ModelFormat.Name
+			if isvc.Annotations == nil {
+				isvc.Annotations = make(map[string]string)
+			}
+			// Only set if not already present (allow user override)
+			if _, exists := isvc.Annotations[constants.ModelFormatAnnotationKey]; !exists {
+				isvc.Annotations[constants.ModelFormatAnnotationKey] = modelFormat
+			}
 		}
 	}
 }
@@ -407,10 +433,10 @@ func (isvc *InferenceService) SetMlServerDefaults() {
 	case constants.SupportedModelMLFlow:
 		modelClass = constants.MLServerModelClassMLFlow
 	}
-	if isvc.ObjectMeta.Labels == nil {
-		isvc.ObjectMeta.Labels = map[string]string{constants.ModelClassLabel: modelClass}
+	if isvc.Labels == nil {
+		isvc.Labels = map[string]string{constants.ModelClassLabel: modelClass}
 	} else {
-		isvc.ObjectMeta.Labels[constants.ModelClassLabel] = modelClass
+		isvc.Labels[constants.ModelClassLabel] = modelClass
 	}
 }
 
@@ -421,13 +447,13 @@ func (isvc *InferenceService) SetTorchServeDefaults() {
 		isvc.Spec.Predictor.Model.ProtocolVersion = &protocolV1
 	}
 	// set torchserve service envelope based on protocol version
-	if isvc.ObjectMeta.Labels == nil {
-		isvc.ObjectMeta.Labels = map[string]string{constants.ServiceEnvelope: constants.ServiceEnvelopeKServe}
+	if isvc.Labels == nil {
+		isvc.Labels = map[string]string{constants.ServiceEnvelope: constants.ServiceEnvelopeKServe}
 	} else {
-		isvc.ObjectMeta.Labels[constants.ServiceEnvelope] = constants.ServiceEnvelopeKServe
+		isvc.Labels[constants.ServiceEnvelope] = constants.ServiceEnvelopeKServe
 	}
 	if (constants.ProtocolV2 == *isvc.Spec.Predictor.Model.ProtocolVersion) || (constants.ProtocolGRPCV2 == *isvc.Spec.Predictor.Model.ProtocolVersion) {
-		isvc.ObjectMeta.Labels[constants.ServiceEnvelope] = constants.ServiceEnvelopeKServeV2
+		isvc.Labels[constants.ServiceEnvelope] = constants.ServiceEnvelopeKServeV2
 	}
 
 	// set torchserve env variable "PROTOCOL_VERSION" based on ProtocolVersion
@@ -451,6 +477,17 @@ func (isvc *InferenceService) SetTritonDefaults() {
 	}
 }
 
+// Helper function to remove local model cache internal labels and annotations
+func deleteLocalModelMetadata(isvc *InferenceService) {
+	if isvc.Labels != nil {
+		delete(isvc.Labels, constants.LocalModelLabel)
+	}
+	if isvc.Annotations != nil {
+		delete(isvc.Annotations, constants.LocalModelSourceUriAnnotationKey)
+		delete(isvc.Annotations, constants.LocalModelPVCNameAnnotationKey)
+	}
+}
+
 // If there is a LocalModelCache resource, add the name of the LocalModelCache and sourceModelUri to the isvc,
 // which is used by the local model controller to manage PV/PVCs.
 func (isvc *InferenceService) setLocalModelLabel(models *v1alpha1.LocalModelCacheList) {
@@ -466,13 +503,31 @@ func (isvc *InferenceService) setLocalModelLabel(models *v1alpha1.LocalModelCach
 	}
 	isvcStorageUri := *isvc.Spec.Predictor.GetImplementation().GetStorageUri()
 	var localModel *v1alpha1.LocalModelCache
+	var localModelPVCName string
+	isvcNodeGroup, isvcNodeGroupExists := isvc.Annotations[constants.NodeGroupAnnotationKey]
 	for i, model := range models.Items {
+		// both storage URI and node group have to match for the isvc to be considered cached
 		if model.Spec.MatchStorageURI(isvcStorageUri) {
+			if isvcNodeGroupExists {
+				if slices.Contains(model.Spec.NodeGroups, isvcNodeGroup) {
+					// isvc has the nodegroup annotation and it's in the node groups this model is cached on
+					localModelPVCName = model.Name + "-" + isvcNodeGroup
+				} else {
+					// isvc has the nodegroup annotation, but it's not in node groups this model is cached on
+					// isvc is not considered cached in this case
+					continue
+				}
+			} else {
+				// isvc doesn't have the nodegroup annotation. Use the first node group from model cache
+				localModelPVCName = model.Name + "-" + model.Spec.NodeGroups[0]
+			}
+			// found matched local model cache for isvc
 			localModel = &models.Items[i]
 			break
 		}
 	}
 	if localModel == nil {
+		deleteLocalModelMetadata(isvc)
 		return
 	}
 	if isvc.Labels == nil {
@@ -483,11 +538,7 @@ func (isvc *InferenceService) setLocalModelLabel(models *v1alpha1.LocalModelCach
 	}
 	isvc.Labels[constants.LocalModelLabel] = localModel.Name
 	isvc.Annotations[constants.LocalModelSourceUriAnnotationKey] = localModel.Spec.SourceModelUri
-	// Get node group from annotation when possible, otherwise fallback to use the first node group from localmodelcache
-	if nodeGroup, ok := isvc.Annotations[constants.NodeGroupAnnotationKey]; ok {
-		isvc.Annotations[constants.LocalModelPVCNameAnnotationKey] = localModel.Name + "-" + nodeGroup
-	} else {
-		isvc.Annotations[constants.LocalModelPVCNameAnnotationKey] = localModel.Name + "-" + localModel.Spec.NodeGroups[0]
-	}
+	isvc.Annotations[constants.LocalModelPVCNameAnnotationKey] = localModelPVCName
+
 	mutatorLogger.Info("LocalModelCache found", "model", localModel.Name, "namespace", isvc.Namespace, "isvc", isvc.Name)
 }

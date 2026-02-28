@@ -4,6 +4,7 @@ ARG GOLANG_VERSION
 FROM golang:${GOLANG_VERSION} AS builder
 ARG TARGETOS
 ARG TARGETARCH
+ARG NVIDIA_DRA_DRIVER_GPU_VERSION
 
 ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=$GOPROXY
@@ -24,7 +25,7 @@ COPY internal/ internal/
 # was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
 # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -ldflags "-X github.com/NVIDIA/k8s-dra-driver-gpu/internal/info.version=${NVIDIA_DRA_DRIVER_GPU_VERSION}" -a -o manager cmd/main.go
 
 #Install Git
 RUN apt-get update && apt-get install -y git
@@ -43,7 +44,7 @@ RUN git checkout c80af13d73e36e0eedbe9b712efa85cccb64213a
 RUN go build -o crd-apply-tool cmd/apply-crds/main.go
 
 # Use distroless as minimal base image to package the manager binary
-FROM nvcr.io/nvidia/distroless/go:v3.2.1
+FROM nvcr.io/nvidia/distroless/go:v4.0.2
 
 ARG VERSION="unknown"
 

@@ -57,6 +57,8 @@ type NIMCacheSpec struct {
 	// RuntimeClassName is the runtimeclass for the caching job
 	RuntimeClassName string     `json:"runtimeClassName,omitempty"`
 	Proxy            *ProxySpec `json:"proxy,omitempty"`
+
+	InitContainers []*NIMContainerSpec `json:"initContainers,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="(has(self.ngc) ? 1 : 0) + (has(self.dataStore) ? 1 : 0) + (has(self.hf) ? 1 : 0) == 1",message="Exactly one of ngc, dataStore, or hf must be defined"
@@ -366,6 +368,17 @@ func (n *NIMCache) GetProxyCertConfigMap() string {
 	return ""
 }
 
+// GetStandardLabels returns the standard set of labels for NIMCache resources.
+func (n *NIMCache) GetStandardLabels() map[string]string {
+	return map[string]string{
+		"app":                          "k8s-nim-operator",
+		"app.kubernetes.io/name":       n.Name,
+		"app.kubernetes.io/instance":   n.Name,
+		"app.kubernetes.io/part-of":    "nim-cache",
+		"app.kubernetes.io/managed-by": "k8s-nim-operator",
+	}
+}
+
 func (n *NIMCache) GetEnvWithProxy() []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
@@ -401,25 +414,44 @@ func (n *NIMCache) GetEnvWithProxy() []corev1.EnvVar {
 }
 
 func (n *NIMCache) GetInitContainers() []corev1.Container {
+
+	var initContainers []corev1.Container
+
 	if n.Spec.Proxy != nil {
-		initContainerList := []corev1.Container{
-			{
-				Name:            "update-ca-certificates",
-				Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
-				SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
-				VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
-			},
-		}
+		var image string
 		if n.Spec.Source.NGC != nil { // nolint:gocritic
-			initContainerList[0].Image = n.Spec.Source.NGC.ModelPuller
+			image = n.Spec.Source.NGC.ModelPuller
 		} else if n.Spec.Source.DataStore != nil {
-			initContainerList[0].Image = n.Spec.Source.DataStore.ModelPuller
+			image = n.Spec.Source.DataStore.ModelPuller
 		} else if n.Spec.Source.HF != nil {
-			initContainerList[0].Image = n.Spec.Source.HF.ModelPuller
+			image = n.Spec.Source.HF.ModelPuller
 		}
-		return initContainerList
+		initContainers = append(initContainers, corev1.Container{
+			Name:            "update-ca-certificates",
+			Image:           image,
+			Command:         k8sutil.GetUpdateCaCertInitContainerCommand(),
+			SecurityContext: k8sutil.GetUpdateCaCertInitContainerSecurityContext(),
+			VolumeMounts:    k8sutil.GetUpdateCaCertInitContainerVolumeMounts(),
+		})
 	}
-	return []corev1.Container{}
+	for _, ic := range n.Spec.InitContainers {
+		var pp corev1.PullPolicy
+		if ic.Image.PullPolicy != "" {
+			pp = corev1.PullPolicy(ic.Image.PullPolicy)
+		}
+
+		initContainers = append(initContainers, corev1.Container{
+			Name:            ic.Name,
+			Image:           fmt.Sprintf("%s:%s", ic.Image.Repository, ic.Image.Tag),
+			ImagePullPolicy: pp,
+			Command:         ic.Command,
+			Args:            ic.Args,
+			Env:             ic.Env,
+			WorkingDir:      ic.WorkingDir,
+		})
+	}
+
+	return initContainers
 }
 
 func (d *DSHFCommonFields) GetModelName() *string {

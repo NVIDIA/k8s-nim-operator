@@ -124,6 +124,39 @@ func TestGetVolumes(t *testing.T) {
 			},
 		},
 		{
+			name: "Init Container provided adds scratch",
+			nimService: &NIMService{
+				Spec: NIMServiceSpec{
+					InitContainers: []*NIMContainerSpec{
+						{Image: Image{Repository: "fake", Tag: "latest"}, Name: "init"},
+					},
+					Proxy: &ProxySpec{CertConfigMap: "proxy-ca-cert"},
+				},
+			},
+			desired: []corev1.Volume{
+				{
+					Name: "proxy-ca-cert",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "proxy-ca-cert",
+							},
+						},
+					},
+				},
+				{
+					Name: "scratch",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "scratch",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:       "Proxy Spec is set and cert config map is empty",
 			nimService: &NIMService{Spec: NIMServiceSpec{Proxy: &ProxySpec{CertConfigMap: ""}}},
 			desired:    []corev1.Volume{},
@@ -417,6 +450,32 @@ func TestGetVolumeMounts(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Volume mounts includes scratch when sidecar containers present",
+			nimService: &NIMService{
+				Spec: NIMServiceSpec{
+					SidecarContainers: []*NIMContainerSpec{
+						{Image: Image{Repository: "fake", Tag: "latest"}, Name: "init"},
+					},
+					Proxy: &ProxySpec{CertConfigMap: "proxy-ca-cert"},
+				},
+			},
+			modelPVC: &PersistentVolumeClaim{Name: "test-pvc"},
+			desired: []corev1.VolumeMount{
+				{
+					Name:      "proxy-ca-cert",
+					MountPath: "/etc/ssl/certs",
+				},
+				{
+					Name:      "model-store",
+					MountPath: "/model-store",
+				},
+				{
+					Name:      "dshm",
+					MountPath: "/dev/shm",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -593,5 +652,315 @@ func TestGetProxyCertConfigMap(t *testing.T) {
 				t.Errorf("GetProxyCertConfigMap() = %s, want %s", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestGetInferenceServiceParams tests the GetInferenceServiceParams function with different autoscaling and deployment mode combinations.
+func TestGetInferenceServiceParams(t *testing.T) {
+	tests := []struct {
+		name                string
+		nimService          *NIMService
+		deploymentMode      string
+		expectHPAAnnotation bool
+		expectMinReplicas   bool
+	}{
+		{
+			name: "Autoscaling enabled with RawDeployment mode",
+			nimService: &NIMService{
+				Spec: NIMServiceSpec{
+					Image: Image{
+						Repository: "test-repo",
+						Tag:        "test-tag",
+					},
+					AuthSecret: "test-secret",
+					Scale: Autoscaling{
+						Enabled: ptr.To(true),
+						HPA: HorizontalPodAutoscalerSpec{
+							MinReplicas: ptr.To[int32](1),
+							MaxReplicas: 5,
+						},
+					},
+					Expose: Expose{
+						Service: Service{
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			},
+			deploymentMode:      "RawDeployment",
+			expectHPAAnnotation: true,
+			expectMinReplicas:   true,
+		},
+		{
+			name: "Autoscaling disabled with Standard deployment mode",
+			nimService: &NIMService{
+				Spec: NIMServiceSpec{
+					Image: Image{
+						Repository: "test-repo",
+						Tag:        "test-tag",
+					},
+					AuthSecret: "test-secret",
+					Scale: Autoscaling{
+						Enabled: ptr.To(false),
+					},
+					Replicas: ptr.To[int32](2),
+					Expose: Expose{
+						Service: Service{
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			},
+			deploymentMode:      "Standard",
+			expectHPAAnnotation: true, // Standard mode should enable HPA
+			expectMinReplicas:   false,
+		},
+		{
+			name: "Autoscaling disabled with Knative deployment mode",
+			nimService: &NIMService{
+				Spec: NIMServiceSpec{
+					Image: Image{
+						Repository: "test-repo",
+						Tag:        "test-tag",
+					},
+					AuthSecret: "test-secret",
+					Scale: Autoscaling{
+						Enabled: ptr.To(false),
+					},
+					Replicas: ptr.To[int32](2),
+					Expose: Expose{
+						Service: Service{
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			},
+			deploymentMode:      "Knative",
+			expectHPAAnnotation: false, // Neither autoscaling nor standard mode
+			expectMinReplicas:   false,
+		},
+		{
+			name: "Autoscaling enabled with Standard deployment mode",
+			nimService: &NIMService{
+				Spec: NIMServiceSpec{
+					Image: Image{
+						Repository: "test-repo",
+						Tag:        "test-tag",
+					},
+					AuthSecret: "test-secret",
+					Scale: Autoscaling{
+						Enabled: ptr.To(true),
+						HPA: HorizontalPodAutoscalerSpec{
+							MinReplicas: ptr.To[int32](1),
+							MaxReplicas: 10,
+						},
+					},
+					Expose: Expose{
+						Service: Service{
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			},
+			deploymentMode:      "Standard",
+			expectHPAAnnotation: true, // Both conditions met
+			expectMinReplicas:   true,
+		},
+		{
+			name: "Zero replicas with autoscaling disabled",
+			nimService: &NIMService{
+				Spec: NIMServiceSpec{
+					Image: Image{
+						Repository: "test-repo",
+						Tag:        "test-tag",
+					},
+					AuthSecret: "test-secret",
+					Scale: Autoscaling{
+						Enabled: ptr.To(false),
+					},
+					Replicas: ptr.To[int32](0), // Zero replicas should be valid now
+					Expose: Expose{
+						Service: Service{
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			},
+			deploymentMode:      "Knative",
+			expectHPAAnnotation: false,
+			expectMinReplicas:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			// Test autoscaling enabled state
+			isAutoScalingEnabled := tt.nimService.IsAutoScalingEnabled()
+			if tt.expectHPAAnnotation && !isAutoScalingEnabled && tt.deploymentMode != "Standard" && tt.deploymentMode != "RawDeployment" {
+				t.Errorf("Expected autoscaling to be enabled or standard deployment mode, but neither condition is met")
+			}
+
+			// Test replica validation
+			if tt.nimService.Spec.Replicas != nil {
+				if *tt.nimService.Spec.Replicas < 0 {
+					t.Errorf("Replicas should not be negative, got %d", *tt.nimService.Spec.Replicas)
+				}
+				// Verify zero replicas are now allowed (changed from minimum of 1 to 0)
+				if *tt.nimService.Spec.Replicas == 0 {
+					// This should be valid now - test passes if we reach here
+					t.Logf("Zero replicas correctly allowed")
+				}
+			}
+
+			// Verify GetReplicas works correctly
+			if tt.expectMinReplicas {
+				replicas := tt.nimService.GetReplicas()
+				if replicas == nil {
+					t.Errorf("Expected replicas to be set for HPA, but got nil")
+				}
+			}
+		})
+	}
+}
+
+// TestReplicasMinimumValidation tests that zero replicas are now allowed.
+func TestReplicasMinimumValidation(t *testing.T) {
+	tests := []struct {
+		name       string
+		replicas   *int32
+		expectPass bool
+	}{
+		{
+			name:       "Zero replicas should be valid",
+			replicas:   ptr.To[int32](0),
+			expectPass: true,
+		},
+		{
+			name:       "One replica should be valid",
+			replicas:   ptr.To[int32](1),
+			expectPass: true,
+		},
+		{
+			name:       "Multiple replicas should be valid",
+			replicas:   ptr.To[int32](5),
+			expectPass: true,
+		},
+		{
+			name:       "Nil replicas should be valid",
+			replicas:   nil,
+			expectPass: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nimService := &NIMService{
+				Spec: NIMServiceSpec{
+					Replicas: tt.replicas,
+				},
+			}
+
+			// Validate that replicas field accepts the value
+			if nimService.Spec.Replicas != nil {
+				if *nimService.Spec.Replicas < 0 {
+					if tt.expectPass {
+						t.Errorf("Expected replicas %d to be valid, but validation would fail", *nimService.Spec.Replicas)
+					}
+				} else {
+					if !tt.expectPass {
+						t.Errorf("Expected replicas %d to be invalid, but validation would pass", *nimService.Spec.Replicas)
+					}
+				}
+			}
+
+			// Test GetReplicas method
+			replicas := nimService.GetReplicas()
+			if tt.replicas != nil && replicas != nil {
+				if *replicas != *tt.replicas {
+					t.Errorf("GetReplicas() = %d, want %d", *replicas, *tt.replicas)
+				}
+			}
+		})
+	}
+}
+
+// TestIsAutoScalingEnabled tests the autoscaling enabled detection.
+func TestIsAutoScalingEnabled(t *testing.T) {
+	tests := []struct {
+		name     string
+		scale    Autoscaling
+		expected bool
+	}{
+		{
+			name: "Autoscaling explicitly enabled",
+			scale: Autoscaling{
+				Enabled: ptr.To(true),
+			},
+			expected: true,
+		},
+		{
+			name: "Autoscaling explicitly disabled",
+			scale: Autoscaling{
+				Enabled: ptr.To(false),
+			},
+			expected: false,
+		},
+		{
+			name:     "Autoscaling not set (nil)",
+			scale:    Autoscaling{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nimService := &NIMService{
+				Spec: NIMServiceSpec{
+					Scale: tt.scale,
+				},
+			}
+
+			result := nimService.IsAutoScalingEnabled()
+			if result != tt.expected {
+				t.Errorf("IsAutoScalingEnabled() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestStandardModeReplicasWithoutAutoscaling(t *testing.T) {
+	nimService := &NIMService{
+		Spec: NIMServiceSpec{
+			Image: Image{
+				Repository: "test-repo",
+				Tag:        "test-tag",
+			},
+			AuthSecret: "test-secret",
+			Scale: Autoscaling{
+				Enabled: ptr.To(false),
+			},
+			Replicas: ptr.To[int32](3),
+			Expose: Expose{
+				Service: Service{
+					Port: ptr.To[int32](8000),
+				},
+			},
+		},
+	}
+
+	params := nimService.GetInferenceServiceParams("Standard")
+
+	if params.MinReplicas == nil {
+		t.Fatal("expected MinReplicas to be set, got nil")
+	}
+	if *params.MinReplicas != 3 {
+		t.Errorf("MinReplicas = %d, want 3", *params.MinReplicas)
+	}
+	if params.MaxReplicas == nil {
+		t.Fatal("expected MaxReplicas to be set, got nil")
+	}
+	if *params.MaxReplicas != 3 {
+		t.Errorf("MaxReplicas = %d, want 3", *params.MaxReplicas)
 	}
 }

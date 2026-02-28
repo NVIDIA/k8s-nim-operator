@@ -29,7 +29,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	apiResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -152,8 +152,9 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if nimCache.DeletionTimestamp.IsZero() {
 		// Add finalizer if not present
 		if !controllerutil.ContainsFinalizer(nimCache, NIMCacheFinalizer) {
-			controllerutil.AddFinalizer(nimCache, NIMCacheFinalizer)
-			if err = r.Update(ctx, nimCache); err != nil {
+			if err = k8sutil.RetryUpdate(ctx, r.Client, nimCache, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NIMCacheFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -166,8 +167,9 @@ func (r *NIMCacheReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			}
 
 			// Remove finalizer to allow for deletion
-			controllerutil.RemoveFinalizer(nimCache, NIMCacheFinalizer)
-			if err := r.Update(ctx, nimCache); err != nil {
+			if err := k8sutil.RetryUpdate(ctx, r.Client, nimCache, func(obj client.Object) {
+				controllerutil.RemoveFinalizer(obj, NIMCacheFinalizer)
+			}); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -326,7 +328,8 @@ func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1
 			Name:      roleName,
 			Namespace: nimCache.GetNamespace(),
 			Labels: map[string]string{
-				"app": "k8s-nim-operator",
+				"app":                          "k8s-nim-operator",
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
 			},
 		},
 	}
@@ -371,9 +374,14 @@ func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1
 		logger.Info("Successfully created Role", "Name", roleName)
 	} else if !roleEqual(existingRole, desiredRole) { // Role exists, check if it needs to be updated
 		logger.Info("Updating existing Role", "Name", roleName)
-		existingRole.Rules = desiredRole.Rules
-
-		err = r.Update(ctx, existingRole)
+		err = k8sutil.RetryUpdate(ctx, r.Client, existingRole, func(obj client.Object) {
+			r, ok := obj.(*rbacv1.Role)
+			if !ok {
+				logger.Error(fmt.Errorf("failed to cast object to Role"), "object", obj)
+				return
+			}
+			r.Rules = desiredRole.Rules
+		})
 		if err != nil {
 			logger.Error(err, "Failed to update Role", "Name", roleName)
 			return err
@@ -401,7 +409,8 @@ func (r *NIMCacheReconciler) reconcileRoleBinding(ctx context.Context, nimCache 
 			Name:      rbName,
 			Namespace: nimCache.GetNamespace(),
 			Labels: map[string]string{
-				"app": "k8s-nim-operator",
+				"app":                          "k8s-nim-operator",
+				"app.kubernetes.io/managed-by": "k8s-nim-operator",
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -439,10 +448,15 @@ func (r *NIMCacheReconciler) reconcileRoleBinding(ctx context.Context, nimCache 
 		logger.Info("Successfully created RoleBinding", "Name", rbName)
 	} else if !roleBindingEqual(existingRB, desiredRB) { // RoleBinding exists, check if it needs to be updated
 		logger.Info("Updating existing RoleBinding", "Name", rbName)
-		existingRB.RoleRef = desiredRB.RoleRef
-		existingRB.Subjects = desiredRB.Subjects
-
-		err = r.Update(ctx, existingRB)
+		err = k8sutil.RetryUpdate(ctx, r.Client, existingRB, func(obj client.Object) {
+			rb, ok := obj.(*rbacv1.RoleBinding)
+			if !ok {
+				logger.Error(fmt.Errorf("failed to cast object to RoleBinding"), "object", obj)
+				return
+			}
+			rb.RoleRef = desiredRB.RoleRef
+			rb.Subjects = desiredRB.Subjects
+		})
 		if err != nil {
 			logger.Error(err, "Failed to update RoleBinding", "Name", rbName)
 			return err
@@ -478,7 +492,7 @@ func (r *NIMCacheReconciler) reconcileServiceAccount(ctx context.Context, nimCac
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      saName,
 				Namespace: nimCache.GetNamespace(),
-				Labels:    map[string]string{"app": "k8s-nim-operator"},
+				Labels:    map[string]string{"app.kubernetes.io/managed-by": "k8s-nim-operator"},
 			},
 		}
 
@@ -510,7 +524,7 @@ func (r *NIMCacheReconciler) reconcilePVC(ctx context.Context, nimCache *appsv1a
 	// If PVC does not exist, create a new one if creation flag is enabled
 	if err != nil {
 		if nimCache.Spec.Storage.PVC.Create != nil && *nimCache.Spec.Storage.PVC.Create {
-			pvc, err = shared.ConstructPVC(nimCache.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimCache.GetNamespace()})
+			pvc, err = shared.ConstructPVC(nimCache.Spec.Storage.PVC, metav1.ObjectMeta{Name: pvcName, Namespace: nimCache.GetNamespace(), Labels: nimCache.GetStandardLabels()})
 			if err != nil {
 				logger.Error(err, "Failed to construct pvc", "name", pvcName)
 				return err
@@ -651,7 +665,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 
 	// Model manifest is successfully extracted, cleanup temporary pod
 	err = r.Delete(ctx, existingPod)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apiErrors.IsNotFound(err) {
 		logger.Error(err, "failed to delete", "pod", pod.Name)
 		// requeue request with delay until the pod is cleaned up
 		// this is required as NIM containers are resource heavy
@@ -812,7 +826,7 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 func (r *NIMCacheReconciler) createPod(ctx context.Context, pod *corev1.Pod) error {
 	// Create pod
 	err := r.Create(ctx, pod)
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil && !apiErrors.IsAlreadyExists(err) {
 		return err
 	}
 	return nil
@@ -887,14 +901,14 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 
 func (r *NIMCacheReconciler) updateNIMCacheStatus(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
 	logger := r.GetLogger()
-	obj := &appsv1alpha1.NIMCache{}
-	errGet := r.Get(ctx, types.NamespacedName{Name: nimCache.Name, Namespace: nimCache.GetNamespace()}, obj)
-	if errGet != nil {
-		logger.Error(errGet, "error getting NIMCache", "name", nimCache.Name)
-		return errGet
-	}
-	obj.Status = nimCache.Status
-	if err := r.Status().Update(ctx, obj); err != nil {
+	if err := k8sutil.RetryStatusUpdate(ctx, r.Client, nimCache, func(obj client.Object) {
+		nc, ok := obj.(*appsv1alpha1.NIMCache)
+		if !ok {
+			logger.Error(fmt.Errorf("failed to cast object to NIMCache"), "object", obj)
+			return
+		}
+		nc.Status = nimCache.Status
+	}); err != nil {
 		logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
 		return err
 	}
@@ -1055,6 +1069,14 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 								},
 							},
 						},
+						{
+							Name: "scratch",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{
+									Medium: corev1.StorageMediumDefault,
+								},
+							},
+						},
 					},
 					ImagePullSecrets:   []corev1.LocalObjectReference{},
 					ServiceAccountName: NIMCacheServiceAccount,
@@ -1106,6 +1128,10 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
+					{
+						Name:      "scratch",
+						MountPath: "/scratch",
+					},
 				},
 				Resources: corev1.ResourceRequirements{
 					Limits: map[corev1.ResourceName]apiResource.Quantity{
@@ -1153,6 +1179,10 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						Name:      "nim-cache-volume",
 						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
+					},
+					{
+						Name:      "scratch",
+						MountPath: "/scratch",
 					},
 				},
 				Resources: corev1.ResourceRequirements{
@@ -1224,6 +1254,10 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 						MountPath: utils.DefaultModelStorePath,
 						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
 					},
+					{
+						Name:      "scratch",
+						MountPath: "/scratch",
+					},
 				},
 				Resources: corev1.ResourceRequirements{
 					Limits: map[corev1.ResourceName]apiResource.Quantity{
@@ -1259,15 +1293,21 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 
 	// Inject custom CA certificates when running in a proxy envronment
 	if nimCache.Spec.CertConfig != nil { //nolint:staticcheck // checking for deprecated field
-		err := errors.NewBadRequest("Deprecated field 'CertConfig' is used. Please migrate to 'Proxy' field on NIMCache.\"")
+		err := apiErrors.NewBadRequest("Deprecated field 'CertConfig' is used. Please migrate to 'Proxy' field on NIMCache.\"")
 		logger.Error(err, err.Error())
 		return nil, err
 	}
 
+	ics := nimCache.GetInitContainers()
+	for idx := range ics {
+		ics[idx].VolumeMounts = append(ics[idx].VolumeMounts, job.Spec.Template.Spec.Containers[0].VolumeMounts...)
+		ics[idx].Env = utils.MergeEnvVars(ics[idx].Env, job.Spec.Template.Spec.Containers[0].Env)
+	}
+	job.Spec.Template.Spec.InitContainers = ics
+
 	if nimCache.GetProxySpec() != nil {
 		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.GetEnvWithProxy())
 		if nimCache.GetProxyCertConfigMap() != "" {
-			job.Spec.Template.Spec.InitContainers = nimCache.GetInitContainers()
 			job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
 			job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, k8sutil.GetVolumesForUpdatingCaCert(nimCache.Spec.Proxy.CertConfigMap)...)
 		}
@@ -1314,9 +1354,7 @@ func (r *NIMCacheReconciler) createManifestConfigMap(ctx context.Context, nimCac
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getManifestConfigName(nimCache),
 			Namespace: nimCache.GetNamespace(),
-			Labels: map[string]string{
-				"app": nimCache.GetName(),
-			},
+			Labels:    nimCache.GetStandardLabels(),
 		},
 	}
 

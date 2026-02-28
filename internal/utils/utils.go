@@ -59,7 +59,7 @@ const (
 
 const (
 	// MinSupportedClusterVersionForDRA is the minimum supported cluster version for integration with DRA resources.
-	MinSupportedClusterVersionForDRA = "v1.33.0"
+	MinSupportedClusterVersionForDRA = "v1.34.0"
 )
 
 // GetFilesWithSuffix returns all files under a given base directory that have a specific suffix
@@ -318,9 +318,11 @@ func DeepHashObject(objToWrite any) string {
 }
 
 func UpdateObject(obj client.Object, desired client.Object) client.Object {
-	if obj == nil || desired == nil || !reflect.DeepEqual(obj.GetObjectKind(), desired.GetObjectKind()) || obj.GetName() != desired.GetName() || obj.GetNamespace() != desired.GetNamespace() {
+	if obj == nil || desired == nil || obj.GetName() != desired.GetName() || obj.GetNamespace() != desired.GetNamespace() {
 		panic("invalid input to UpdateObject")
 	}
+	// Note: We do not require GetObjectKind() to match because desired objects created in-memory
+	// often have zero TypeMeta, while existing objects from the API have GVK set.
 
 	switch castedObj := obj.(type) {
 	case *appsv1.Deployment:

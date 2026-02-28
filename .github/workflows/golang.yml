@@ -28,7 +28,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       name: Checkout code
     - name: Get Golang version
       id: vars
@@ -36,11 +36,11 @@ jobs:
         GOLANG_VERSION=$(./hack/golang-version.sh)
         echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION := }" >> $GITHUB_ENV
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GOLANG_VERSION }}
     - name: Lint
-      uses: golangci/golangci-lint-action@v8
+      uses: golangci/golangci-lint-action@v9
       with:
         version: latest
         args: -v --timeout 5m
@@ -66,14 +66,14 @@ jobs:
       id-token: write
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Get Golang version
       id: vars
       run: |
         GOLANG_VERSION=$(./hack/golang-version.sh)
         echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GOLANG_VERSION }}
     - name: Setup Go Proxy
@@ -92,14 +92,14 @@ jobs:
       id-token: write
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Get Golang version
       id: vars
       run: |
         GOLANG_VERSION=$(./hack/golang-version.sh)
         echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> $GITHUB_ENV
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GOLANG_VERSION }}
     - name: Setup Go Proxy

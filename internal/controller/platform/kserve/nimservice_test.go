@@ -50,7 +50,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -165,14 +165,14 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		discoveryClient = &discoveryfake.FakeDiscovery{Fake: &testing.Fake{}}
 		discoveryClient.Resources = []*metav1.APIResourceList{
 			{
-				GroupVersion: resourcev1beta2.SchemeGroupVersion.String(),
+				GroupVersion: resourcev1.SchemeGroupVersion.String(),
 				APIResources: []metav1.APIResource{
 					{Name: "resourceclaims"},
 				},
 			},
 		}
 		discoveryClient.FakedServerVersion = &version.Info{
-			GitVersion: "v1.33.0",
+			GitVersion: "v1.34.0",
 		}
 
 		reconciler = &NIMServiceReconciler{
@@ -410,10 +410,10 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 		kserveDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "kserve-controller-manager",
+				Name:      utils.KServeControllerName,
 				Namespace: "default",
 				Labels: map[string]string{
-					"app.kubernetes.io/name": "kserve-controller-manager",
+					"app.kubernetes.io/name": utils.KServeControllerName,
 				},
 			},
 			Spec: appsv1.DeploymentSpec{
@@ -507,7 +507,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		By("delete the KServe Deployment")
 		kserveDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "kserve-controller-manager",
+				Name:      utils.KServeControllerName,
 				Namespace: "default",
 			},
 		}
@@ -701,7 +701,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Expect(podSpec.Containers[0].Resources.Claims[1].Request).To(Equal("test-request-2"))
 			})
 
-			It("should mark NIMService as failed when cluster version is less than v1.33.0", func() {
+			It("should mark NIMService as failed when cluster version is less than v1.34.0", func() {
 				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
 					Fake: &testing.Fake{},
 					FakedServerVersion: &version.Info{
@@ -730,37 +730,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Expect(failedCondition).NotTo(BeNil())
 				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
 				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
-				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.33.0' or higher"))
-			})
-
-			It("should mark NIMService as failed when resource claim CRD is not enabled", func() {
-				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
-					Fake: &testing.Fake{},
-					FakedServerVersion: &version.Info{
-						GitVersion: "v1.33.0",
-					},
-				}
-				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
-					{
-						ResourceClaimName: ptr.To("test-resource-claim"),
-					},
-				}
-				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
-				err := client.Create(context.TODO(), nimService)
-				Expect(err).NotTo(HaveOccurred())
-
-				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
-				Expect(err).NotTo(HaveOccurred())
-
-				obj := &appsv1alpha1.NIMService{}
-				err = client.Get(context.TODO(), nimServiceKey, obj)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
-				failedCondition := getCondition(obj, conditions.Failed)
-				Expect(failedCondition).NotTo(BeNil())
-				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
-				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
-				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please ensure resource.k8s.io/v1beta2 API group is enabled"))
+				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.34.0' or higher"))
 			})
 
 			It("should mark NIMService as failed when resource claim name is duplicated", func() {
@@ -851,11 +821,100 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(*isvc.Spec.Predictor.MinReplicas).To(Equal(int32(1)))
-			Expect(isvc.Spec.Predictor.MaxReplicas).To(Equal(int32(0)))
+			Expect(isvc.Spec.Predictor.MaxReplicas).To(Equal(int32(1)))
 			Expect(isvc.Spec.Predictor.ScaleMetricType).To(BeNil())
 			Expect(isvc.Spec.Predictor.ScaleMetric).To(BeNil())
 			Expect(isvc.Spec.Predictor.ScaleTarget).To(BeNil())
 
+			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeTrue())
+			Expect(visibility).Should(Equal(kserveconstants.ClusterLocalVisibility))
+		})
+	})
+
+	Context("network visibility configuration", func() {
+		It("should set network visibility to cluster-local when ingress is disabled and not explicitly configured", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Disable ingress and don't set network visibility
+			nimService.Spec.Expose.Router.Ingress = nil
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should have cluster-local visibility
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeTrue())
+			Expect(visibility).Should(Equal(kserveconstants.ClusterLocalVisibility))
+		})
+
+		It("should preserve explicitly set network visibility label when ingress is disabled", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Explicitly set NetworkVisibility to a custom value
+			nimService.Spec.Labels[kserveconstants.NetworkVisibility] = "exposed"
+			// Disable ingress (which would normally set cluster-local)
+			nimService.Spec.Expose.Router.Ingress = nil
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should preserve user-provided visibility, not override with ClusterLocalVisibility
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeTrue())
+			Expect(visibility).Should(Equal("exposed"))
+		})
+
+		It("should not set network visibility when ingress is enabled and not explicitly configured", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Enable ingress
+			nimService.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+				IngressClass: "nginx",
+			}
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should not have network visibility set (external access)
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+			_, found := isvc.Labels[kserveconstants.NetworkVisibility]
+			Expect(found).Should(BeFalse())
+		})
+
+		It("should preserve explicitly set network visibility when ingress is enabled", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			// Explicitly set NetworkVisibility to cluster-local
+			nimService.Spec.Labels[kserveconstants.NetworkVisibility] = kserveconstants.ClusterLocalVisibility
+			// Enable ingress (which would normally not set visibility)
+			nimService.Spec.Expose.Router.Ingress = &appsv1alpha1.RouterIngress{
+				IngressClass: "nginx",
+			}
+			err := client.Create(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// InferenceService should preserve user-provided visibility
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
 			visibility, found := isvc.Labels[kserveconstants.NetworkVisibility]
 			Expect(found).Should(BeTrue())
 			Expect(visibility).Should(Equal(kserveconstants.ClusterLocalVisibility))
@@ -1019,7 +1078,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.Serverless)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).To(HaveOccurred())
 			Expect(nimService.Status.Model).To(BeNil())
 		})
@@ -1044,7 +1103,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.Serverless)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).To(HaveOccurred())
 			Expect(nimService.Status.Model).To(BeNil())
 		})
@@ -1070,7 +1129,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.Serverless)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(nimService.Status.Model).ToNot(BeNil())
 			Expect(nimService.Status.Model.Name).ToNot(BeEmpty())
@@ -1086,7 +1145,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.Serverless)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).ToNot(HaveOccurred())
 			modelStatus := nimService.Status.Model
 			Expect(modelStatus).ToNot(BeNil())
@@ -1116,7 +1175,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			err = client.Update(context.TODO(), isvc)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.RawDeployment)
+			err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).ToNot(HaveOccurred())
 			modelStatus := nimService.Status.Model
 			Expect(modelStatus).ToNot(BeNil())
@@ -1149,7 +1208,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				err = client.Update(context.TODO(), isvc)
 				Expect(err).ToNot(HaveOccurred())
 
-				err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.RawDeployment)
+				err = reconciler.updateModelStatus(context.Background(), nimService, kserveconstants.LegacyRawDeployment)
 				Expect(err).ToNot(HaveOccurred())
 				modelStatus := nimService.Status.Model
 				Expect(modelStatus).ToNot(BeNil())
@@ -1561,14 +1620,14 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 		It("should return err when InferenceService is missing", func() {
 			_ = client.Delete(context.TODO(), isvc)
-			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.RawDeployment)
+			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 			Expect(err).Should(MatchError("inferenceservices.serving.kserve.io \"test-nimservice\" not found"))
 		})
 
 		It("should return error when external endpoint is not set", func() {
-			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.RawDeployment)
+			_, _, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).To(HaveOccurred())
 			Expect(err).Should(MatchError("external endpoint not available, nimservice test-nimservice"))
 		})
@@ -1578,7 +1637,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			isvc.Status.URL, err = knativeapis.ParseURL("external.example.com")
 			Expect(err).ToNot(HaveOccurred())
 			_ = client.Update(context.TODO(), isvc)
-			_, _, err = reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.RawDeployment)
+			_, _, err = reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).To(HaveOccurred())
 			Expect(err).Should(MatchError("cluster endpoint not available, nimservice test-nimservice"))
 		})
@@ -1591,7 +1650,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			isvc.Status.Address.URL, err = knativeapis.ParseURL("cluster.example.com")
 			Expect(err).ToNot(HaveOccurred())
 			_ = client.Update(context.TODO(), isvc)
-			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.Serverless)
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyServerless)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(internal).To(Equal("cluster.example.com"))
 			Expect(external).To(Equal("external.example.com"))
@@ -1605,7 +1664,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			isvc.Status.Address.URL, err = knativeapis.ParseURL("cluster.example.com")
 			Expect(err).ToNot(HaveOccurred())
 			_ = client.Update(context.TODO(), isvc)
-			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.RawDeployment)
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService, kserveconstants.LegacyRawDeployment)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(internal).To(Equal("cluster.example.com"))
 			Expect(external).To(Equal("external.example.com"))
@@ -1879,7 +1938,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		})
 
 		Context("Hugging Face model handling", func() {
-			It("should replace NGC_API_KEY with HF_TOKEN when NIMCache is a Hugging Face model", func() {
+			It("should make NGC_API_KEY optional and add HF_TOKEN when NIMCache is a Hugging Face model", func() {
 				// Create a Hugging Face NIMCache
 				hfNimCache := &appsv1alpha1.NIMCache{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1987,15 +2046,20 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				// Verify environment variables
 				container := isvc.Spec.Predictor.Containers[0]
 
-				// NGC_API_KEY should NOT be present
-				var ngcKeyPresent bool
+				// NGC_API_KEY should be present with Optional flag set to true
+				var ngcKeyEnv *corev1.EnvVar
 				for _, env := range container.Env {
 					if env.Name == appsv1alpha1.NGCAPIKey {
-						ngcKeyPresent = true
+						ngcKeyEnv = &env
 						break
 					}
 				}
-				Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for HuggingFace models")
+				Expect(ngcKeyEnv).NotTo(BeNil(), "NGC_API_KEY should be present with Optional flag set to true")
+				Expect(ngcKeyEnv.ValueFrom).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To[bool](true)))
 
 				// HF_TOKEN should be present with correct secret reference
 				var hfTokenEnv *corev1.EnvVar
@@ -2023,7 +2087,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Expect(customEnv.Value).To(Equal("custom-value"))
 			})
 
-			It("should replace NGC_API_KEY with HF_TOKEN when NIMCache is a DataStore source", func() {
+			It("should make NGC_API_KEY optional and add HF_TOKEN when NIMCache is a DataStore source", func() {
 				// Create a DataStore NIMCache
 				dsNimCache := &appsv1alpha1.NIMCache{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2131,15 +2195,20 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				// Verify environment variables
 				container := isvc.Spec.Predictor.Containers[0]
 
-				// NGC_API_KEY should NOT be present
-				var ngcKeyPresent bool
+				// NGC_API_KEY should be present with Optional flag set to true
+				var ngcKeyEnv *corev1.EnvVar
 				for _, env := range container.Env {
 					if env.Name == appsv1alpha1.NGCAPIKey {
-						ngcKeyPresent = true
+						ngcKeyEnv = &env
 						break
 					}
 				}
-				Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for DataStore models")
+				Expect(ngcKeyEnv).NotTo(BeNil(), "NGC_API_KEY should be present with Optional flag set to true")
+				Expect(ngcKeyEnv.ValueFrom).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To[bool](true)))
 
 				// HF_TOKEN should be present with correct secret reference
 				var hfTokenEnv *corev1.EnvVar
@@ -2167,7 +2236,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				Expect(customEnv.Value).To(Equal("custom-value"))
 			})
 
-			It("should replace NGC_API_KEY with HF_TOKEN when NIMService has HF model name", func() {
+			It("should make NGC_API_KEY optional and add HF_TOKEN when NIMService has HF model name", func() {
 				// Create a regular NGC NIMCache (not HF)
 				regularNimCache := &appsv1alpha1.NIMCache{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2273,15 +2342,20 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				// Verify environment variables
 				container := isvc.Spec.Predictor.Containers[0]
 
-				// NGC_API_KEY should NOT be present
-				var ngcKeyPresent bool
+				// NGC_API_KEY should be present with Optional flag set to true
+				var ngcKeyEnv *corev1.EnvVar
 				for _, env := range container.Env {
 					if env.Name == appsv1alpha1.NGCAPIKey {
-						ngcKeyPresent = true
+						ngcKeyEnv = &env
 						break
 					}
 				}
-				Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for HuggingFace models")
+				Expect(ngcKeyEnv).NotTo(BeNil(), "NGC_API_KEY should be present with Optional flag set to true")
+				Expect(ngcKeyEnv.ValueFrom).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+				Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To[bool](true)))
 
 				// HF_TOKEN should be present with correct secret reference
 				var hfTokenEnv *corev1.EnvVar
@@ -2435,6 +2509,339 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 				}
 				Expect(hfTokenPresent).To(BeFalse(), "HF_TOKEN should not be present for non-HF models")
 			})
+		})
+	})
+
+	Describe("InitContainers and SidecarContainers rendering for InferenceService", func() {
+		BeforeEach(func() {
+			// Create InferenceService ConfigMap if it doesn't exist
+			isvcConfig := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      kserveconstants.InferenceServiceConfigMapName,
+					Namespace: "default",
+				},
+				Data: map[string]string{
+					"deploy": `{"defaultDeploymentMode": "Serverless"}`,
+				},
+			}
+			err := client.Create(context.TODO(), isvcConfig)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				Expect(err).To(Succeed())
+			}
+		})
+
+		It("should render initContainers and sidecarContainers in InferenceService", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-isvc-containers",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim",
+						Tag:        "1.0.0",
+						PullPolicy: "IfNotPresent",
+					},
+					AuthSecret:        "ngc-secret",
+					InferencePlatform: appsv1alpha1.PlatformTypeKServe,
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "isvc-init-setup",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "1.35",
+								PullPolicy: "Always",
+							},
+							Command: []string{"sh", "-c"},
+							Args:    []string{"echo 'Initializing InferenceService...'"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "ISVC_INIT_ENV",
+									Value: "isvc-init-value",
+								},
+							},
+							WorkingDir: "/workspace",
+						},
+						{
+							Name: "isvc-model-loader",
+							Image: appsv1alpha1.Image{
+								Repository: "alpine",
+								Tag:        "3.18",
+							},
+							Command: []string{"wget"},
+							Args:    []string{"-O", "/models/config.json", "https://example.com/config.json"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "MODEL_CONFIG_URL",
+									Value: "https://example.com/config.json",
+								},
+							},
+						},
+					},
+					SidecarContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "isvc-logging-sidecar",
+							Image: appsv1alpha1.Image{
+								Repository: "fluent/fluent-bit",
+								Tag:        "2.0",
+								PullPolicy: "IfNotPresent",
+							},
+							Command: []string{"/fluent-bit/bin/fluent-bit"},
+							Args:    []string{"-c", "/fluent-bit/etc/fluent-bit.conf"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "FLUENT_ISVC_ENV",
+									Value: "production",
+								},
+							},
+						},
+						{
+							Name: "isvc-metrics-agent",
+							Image: appsv1alpha1.Image{
+								Repository: "prom/pushgateway",
+								Tag:        "v1.5.0",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "PUSH_GATEWAY_PORT",
+									Value: "9091",
+								},
+							},
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Get the rendered InferenceService
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify initContainers are rendered correctly
+			Expect(isvc.Spec.Predictor.InitContainers).To(HaveLen(2))
+
+			initContainer1 := isvc.Spec.Predictor.InitContainers[0]
+			Expect(initContainer1.Name).To(Equal("isvc-init-setup"))
+			Expect(initContainer1.Image).To(Equal("busybox:1.35"))
+			Expect(initContainer1.ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(initContainer1.Command).To(Equal([]string{"sh", "-c"}))
+			Expect(initContainer1.Args).To(Equal([]string{"echo 'Initializing InferenceService...'"}))
+			Expect(initContainer1.WorkingDir).To(Equal("/workspace"))
+
+			// Verify environment variables are merged
+			var foundISVCInitEnv, foundGlobalEnv bool
+			for _, env := range initContainer1.Env {
+				if env.Name == "ISVC_INIT_ENV" && env.Value == "isvc-init-value" {
+					foundISVCInitEnv = true
+				}
+				// Global NIM env vars should be present
+				if env.Name == "NIM_CACHE_PATH" {
+					foundGlobalEnv = true
+				}
+			}
+			Expect(foundISVCInitEnv).To(BeTrue(), "Init-specific env var should be present")
+			Expect(foundGlobalEnv).To(BeTrue(), "Global NIM env vars should be merged")
+
+			initContainer2 := isvc.Spec.Predictor.InitContainers[1]
+			Expect(initContainer2.Name).To(Equal("isvc-model-loader"))
+			Expect(initContainer2.Image).To(Equal("alpine:3.18"))
+			Expect(initContainer2.Command).To(Equal([]string{"wget"}))
+			Expect(initContainer2.Args).To(Equal([]string{"-O", "/models/config.json", "https://example.com/config.json"}))
+
+			var foundModelConfigURL bool
+			for _, env := range initContainer2.Env {
+				if env.Name == "MODEL_CONFIG_URL" {
+					foundModelConfigURL = true
+				}
+			}
+			Expect(foundModelConfigURL).To(BeTrue())
+
+			// Verify sidecarContainers are rendered correctly
+			// Main container + 2 sidecars = 3 total
+			Expect(isvc.Spec.Predictor.Containers).To(HaveLen(3))
+
+			// Find the sidecar containers
+			var loggingSidecar, metricsAgent *corev1.Container
+			for i := range isvc.Spec.Predictor.Containers {
+				c := &isvc.Spec.Predictor.Containers[i]
+				switch c.Name {
+				case "isvc-logging-sidecar":
+					loggingSidecar = c
+				case "isvc-metrics-agent":
+					metricsAgent = c
+				}
+			}
+
+			Expect(loggingSidecar).NotTo(BeNil(), "logging-sidecar should be present in InferenceService")
+			Expect(loggingSidecar.Image).To(Equal("fluent/fluent-bit:2.0"))
+			Expect(loggingSidecar.ImagePullPolicy).To(Equal(corev1.PullIfNotPresent))
+			Expect(loggingSidecar.Command).To(Equal([]string{"/fluent-bit/bin/fluent-bit"}))
+			Expect(loggingSidecar.Args).To(Equal([]string{"-c", "/fluent-bit/etc/fluent-bit.conf"}))
+
+			var foundFluentEnv bool
+			for _, env := range loggingSidecar.Env {
+				if env.Name == "FLUENT_ISVC_ENV" && env.Value == "production" {
+					foundFluentEnv = true
+				}
+			}
+			Expect(foundFluentEnv).To(BeTrue(), "Sidecar-specific env var should be present")
+
+			Expect(metricsAgent).NotTo(BeNil(), "metrics-agent should be present in InferenceService")
+			Expect(metricsAgent.Image).To(Equal("prom/pushgateway:v1.5.0"))
+
+			var foundPushGatewayPort bool
+			for _, env := range metricsAgent.Env {
+				if env.Name == "PUSH_GATEWAY_PORT" && env.Value == "9091" {
+					foundPushGatewayPort = true
+				}
+			}
+			Expect(foundPushGatewayPort).To(BeTrue(), "Metrics agent env var should be present")
+		})
+
+		It("should handle empty initContainers and sidecarContainers in InferenceService", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-isvc-no-containers",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim",
+						Tag:        "1.0.0",
+					},
+					AuthSecret:        "ngc-secret",
+					InferencePlatform: appsv1alpha1.PlatformTypeKServe,
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Should only have system-generated init containers (if any)
+			// No user-defined initContainers
+			for _, ic := range isvc.Spec.Predictor.InitContainers {
+				// All init containers should be system-generated
+				Expect(ic.Name).NotTo(ContainSubstring("isvc-init-"))
+			}
+
+			// Should only have 1 container (the main NIM container)
+			Expect(isvc.Spec.Predictor.Containers).To(HaveLen(1))
+			Expect(isvc.Spec.Predictor.Containers[0].Name).To(Equal(testNimService.GetContainerName()))
+		})
+
+		It("should use custom pull policy for initContainers and sidecarContainers in InferenceService", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-isvc-pullpolicy",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim",
+						Tag:        "1.0.0",
+						PullPolicy: "IfNotPresent",
+					},
+					AuthSecret:        "ngc-secret",
+					InferencePlatform: appsv1alpha1.PlatformTypeKServe,
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "isvc-init-always",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "latest",
+								PullPolicy: "Always",
+							},
+						},
+						{
+							Name: "isvc-init-default",
+							Image: appsv1alpha1.Image{
+								Repository: "alpine",
+								Tag:        "latest",
+								// No PullPolicy specified, should inherit from parent
+							},
+						},
+					},
+					SidecarContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "isvc-sidecar-never",
+							Image: appsv1alpha1.Image{
+								Repository: "nginx",
+								Tag:        "latest",
+								PullPolicy: "Never",
+							},
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			isvc := &kservev1beta1.InferenceService{}
+			err = client.Get(context.TODO(), namespacedName, isvc)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify initContainer pull policies
+			Expect(isvc.Spec.Predictor.InitContainers).To(HaveLen(2))
+			Expect(isvc.Spec.Predictor.InitContainers[0].ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(isvc.Spec.Predictor.InitContainers[1].ImagePullPolicy).To(Equal(corev1.PullIfNotPresent))
+
+			// Verify sidecar pull policy
+			var sidecarFound bool
+			for i := range isvc.Spec.Predictor.Containers {
+				if isvc.Spec.Predictor.Containers[i].Name == "isvc-sidecar-never" {
+					Expect(isvc.Spec.Predictor.Containers[i].ImagePullPolicy).To(Equal(corev1.PullNever))
+					sidecarFound = true
+					break
+				}
+			}
+			Expect(sidecarFound).To(BeTrue(), "Sidecar should be present in InferenceService")
 		})
 	})
 })

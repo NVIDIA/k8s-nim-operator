@@ -39,7 +39,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,12 +59,16 @@ import (
 
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 
+	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
+	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
 
 func sortEnvVars(envVars []corev1.EnvVar) {
@@ -147,8 +151,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(monitoringv1.AddToScheme(scheme)).To(Succeed())
 		Expect(lwsv1.AddToScheme(scheme)).To(Succeed())
-		Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
+		Expect(resourcev1.AddToScheme(scheme)).To(Succeed())
 		Expect(gatewayv1.Install(scheme)).To(Succeed())
+		Expect(nvidiaresourcev1beta1.AddToScheme(scheme)).To(Succeed())
+		Expect(inferencev1.Install(scheme)).To(Succeed())
 
 		client = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -164,14 +170,14 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		discoveryClient = &discoveryfake.FakeDiscovery{Fake: &testing.Fake{}}
 		discoveryClient.Resources = []*metav1.APIResourceList{
 			{
-				GroupVersion: resourcev1beta2.SchemeGroupVersion.String(),
+				GroupVersion: resourcev1.SchemeGroupVersion.String(),
 				APIResources: []metav1.APIResource{
 					{Name: "resourceclaims"},
 				},
 			},
 		}
 		discoveryClient.FakedServerVersion = &version.Info{
-			GitVersion: "v1.33.0",
+			GitVersion: "v1.34.0",
 		}
 
 		reconciler = &NIMServiceReconciler{
@@ -300,6 +306,15 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 						},
 					},
 				},
+				InitContainers: []*appsv1alpha1.NIMContainerSpec{
+					{
+						Image: appsv1alpha1.Image{
+							Repository: "fake",
+							Tag:        "latest",
+						},
+						Name: "init",
+					},
+				},
 				Metrics: appsv1alpha1.Metrics{
 					Enabled: &boolTrue,
 					ServiceMonitor: appsv1alpha1.ServiceMonitor{
@@ -358,6 +373,14 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				},
 			},
 			{
+				Name: "scratch",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{
+						Medium: corev1.StorageMediumDefault,
+					},
+				},
+			},
+			{
 				Name: "model-store",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
@@ -377,6 +400,10 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			{
 				Name:      "dshm",
 				MountPath: "/dev/shm",
+			},
+			{
+				Name:      "scratch",
+				MountPath: "/scratch",
 			},
 		}
 		nimCache = &appsv1alpha1.NIMCache{
@@ -654,7 +681,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Expect(podSpec.Containers[0].Resources.Claims[1].Request).To(Equal("test-request-2"))
 			})
 
-			It("should mark NIMService as failed when cluster version is less than v1.33.0", func() {
+			It("should mark NIMService as failed when cluster version is less than v1.34.0", func() {
 				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
 					Fake: &testing.Fake{},
 					FakedServerVersion: &version.Info{
@@ -683,37 +710,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Expect(failedCondition).NotTo(BeNil())
 				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
 				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
-				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.33.0' or higher"))
-			})
-
-			It("should mark NIMService as failed when resource claim CRD is not enabled", func() {
-				reconciler.discoveryClient = &discoveryfake.FakeDiscovery{
-					Fake: &testing.Fake{},
-					FakedServerVersion: &version.Info{
-						GitVersion: "v1.33.0",
-					},
-				}
-				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
-					{
-						ResourceClaimName: ptr.To("test-resource-claim"),
-					},
-				}
-				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
-				err := client.Create(context.TODO(), nimService)
-				Expect(err).NotTo(HaveOccurred())
-
-				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
-				Expect(err).NotTo(HaveOccurred())
-
-				obj := &appsv1alpha1.NIMService{}
-				err = client.Get(context.TODO(), nimServiceKey, obj)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
-				failedCondition := getCondition(obj, conditions.Failed)
-				Expect(failedCondition).NotTo(BeNil())
-				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
-				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
-				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please ensure resource.k8s.io/v1beta2 API group is enabled"))
+				Expect(failedCondition.Message).To(Equal("DRA resources are not supported by NIM-Operator on this cluster, please upgrade to k8s version 'v1.34.0' or higher"))
 			})
 
 			It("should mark NIMService as failed when resource claim name is duplicated", func() {
@@ -1328,6 +1325,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Name:      "test-nimservice-lws",
 					Namespace: "default",
 				},
+				Spec: lwsv1.LeaderWorkerSetSpec{
+					Replicas: ptr.To(int32(1)),
+				},
 				Status: lwsv1.LeaderWorkerSetStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -1350,6 +1350,9 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					Name:      "test-nimservice-lws",
 					Namespace: "default",
 				},
+				Spec: lwsv1.LeaderWorkerSetSpec{
+					Replicas: ptr.To(int32(1)),
+				},
 				Status: lwsv1.LeaderWorkerSetStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -1370,7 +1373,123 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(ready).To(Equal(false))
 			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is not ready", lws.Name)))
 		})
+		It("should report not ready when LWS is scaled down", func() {
+			lws := &lwsv1.LeaderWorkerSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-lws",
+					Namespace: "default",
+				},
+				Status: lwsv1.LeaderWorkerSetStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(lwsv1.LeaderWorkerSetAvailable),
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			}
+			err := client.Create(context.TODO(), lws)
+			Expect(err).NotTo(HaveOccurred())
+			msg, ready, err := reconciler.isLeaderWorkerSetReady(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(Equal(false))
+			Expect(msg).To(Equal(fmt.Sprintf("leaderworkerset %q is scaled down", lws.Name)))
+		})
 	})
+
+	Describe("ComputeDomain-enabled multi-node NIMService", func() {
+		It("should create compute domain when create is true", func() {
+			mnns := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism:   &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(8)), Pipeline: ptr.To(uint32(2))},
+						ComputeDomain: &appsv1alpha1.ComputeDomain{Create: ptr.To(true)},
+					},
+				},
+			}
+			namedDraResources, err := shared.NewNamedDRAResourceList(context.TODO(), client, mnns)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(namedDraResources.Resources)).To(Equal(1))
+			Expect(namedDraResources.Resources[0].ResourceName).To(Equal("cd-claimtemplate-6bb8bf548c"))
+			Expect(namedDraResources.GetComputeDomainNamedDRAResource()).ToNot(BeNil())
+			Expect(namedDraResources.GetComputeDomainNamedDRAResource().ResourceName).To(Equal("cd-claimtemplate-6bb8bf548c"))
+
+			err = reconciler.reconcileComputeDomain(context.TODO(), mnns, namedDraResources)
+			Expect(err).ToNot(HaveOccurred())
+
+			computeDomain := &nvidiaresourcev1beta1.ComputeDomain{}
+			err = client.Get(context.TODO(), types.NamespacedName{Name: "test-nimservice", Namespace: "default"}, computeDomain)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(computeDomain.Spec.Channel.ResourceClaimTemplate.Name).To(Equal("cd-claimtemplate-6bb8bf548c"))
+			Expect(computeDomain.Spec.Channel.AllocationMode).To(Equal(nvidiaresourcev1beta1.ComputeDomainChannelAllocationModeSingle))
+		})
+
+		It("should use existing compute domain when provided", func() {
+			computeDomain := &nvidiaresourcev1beta1.ComputeDomain{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice-cd",
+					Namespace: "default",
+				},
+				Spec: nvidiaresourcev1beta1.ComputeDomainSpec{
+					Channel: &nvidiaresourcev1beta1.ComputeDomainChannelSpec{
+						ResourceClaimTemplate: nvidiaresourcev1beta1.ComputeDomainResourceClaimTemplate{
+							Name: "test-nimservice-cd-claimtemplate",
+						},
+					},
+				},
+				Status: nvidiaresourcev1beta1.ComputeDomainStatus{
+					Status: nvidiaresourcev1beta1.ComputeDomainStatusReady,
+					Nodes: []*nvidiaresourcev1beta1.ComputeDomainNode{
+						{
+							Name:     "test-nimservice-cd-node1",
+							CliqueID: "test-nimservice-cd-clique1",
+							Status:   nvidiaresourcev1beta1.ComputeDomainStatusReady,
+						},
+					},
+				},
+			}
+			err := client.Create(context.TODO(), computeDomain)
+			Expect(err).ToNot(HaveOccurred())
+
+			mnns := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism:   &appsv1alpha1.ParallelismSpec{Tensor: ptr.To(uint32(8)), Pipeline: ptr.To(uint32(2))},
+						ComputeDomain: &appsv1alpha1.ComputeDomain{Name: "test-nimservice-cd"},
+					},
+				},
+			}
+			err = client.Create(context.TODO(), mnns)
+			Expect(err).ToNot(HaveOccurred())
+
+			namedDraResources, err := shared.NewNamedDRAResourceList(context.TODO(), client, mnns)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(namedDraResources.Resources)).To(Equal(1))
+			Expect(namedDraResources.Resources[0].ResourceName).To(Equal("test-nimservice-cd-claimtemplate"))
+			err = reconciler.reconcileComputeDomain(context.TODO(), mnns, namedDraResources)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify the compute domain status is updated
+			err = reconciler.updateComputeDomainStatus(context.TODO(), mnns)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(mnns.Status.ComputeDomainStatus).ToNot(BeNil())
+			Expect(mnns.Status.ComputeDomainStatus.Name).To(Equal("test-nimservice-cd"))
+			Expect(mnns.Status.ComputeDomainStatus.Status).To(Equal(nvidiaresourcev1beta1.ComputeDomainStatusReady))
+			Expect(len(mnns.Status.ComputeDomainStatus.Nodes)).To(Equal(1))
+			Expect(mnns.Status.ComputeDomainStatus.Nodes[0].Name).To(Equal("test-nimservice-cd-node1"))
+			Expect(mnns.Status.ComputeDomainStatus.Nodes[0].CliqueID).To(Equal("test-nimservice-cd-clique1"))
+			Expect(mnns.Status.ComputeDomainStatus.Nodes[0].Status).To(Equal(nvidiaresourcev1beta1.ComputeDomainStatusReady))
+		})
+	})
+
 	Describe("update model status on NIMService", func() {
 		BeforeEach(func() {
 			ingress := &networkingv1.Ingress{
@@ -2573,7 +2692,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 	})
 
 	Context("Hugging Face model handling", func() {
-		It("should replace NGC_API_KEY with HF_TOKEN when NIMCache is a Hugging Face model", func() {
+		It("should make NGC_API_KEY optional and add HF_TOKEN when NIMCache is a Hugging Face model", func() {
 			// Create a Hugging Face NIMCache
 			hfNimCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2681,15 +2800,20 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			// Verify environment variables
 			container := deployment.Spec.Template.Spec.Containers[0]
 
-			// NGC_API_KEY should NOT be present
-			var ngcKeyPresent bool
+			// NGC_API_KEY should be present with Optional flag set to true
+			var ngcKeyEnv *corev1.EnvVar
 			for _, env := range container.Env {
 				if env.Name == appsv1alpha1.NGCAPIKey {
-					ngcKeyPresent = true
+					ngcKeyEnv = &env
 					break
 				}
 			}
-			Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for HuggingFace models")
+			Expect(ngcKeyEnv).NotTo(BeNil(), "NGC_API_KEY should be present with Optional flag set to true")
+			Expect(ngcKeyEnv.ValueFrom).NotTo(BeNil())
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To[bool](true)))
 
 			// HF_TOKEN should be present with correct secret reference
 			var hfTokenEnv *corev1.EnvVar
@@ -2717,7 +2841,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(customEnv.Value).To(Equal("custom-value"))
 		})
 
-		It("should replace NGC_API_KEY with HF_TOKEN when NIMCache is a DataStore source", func() {
+		It("should make NGC_API_KEY optional and add HF_TOKEN when NIMCache is a DataStore source", func() {
 			// Create a DataStore NIMCache
 			dsNimCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2825,15 +2949,20 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			// Verify environment variables
 			container := deployment.Spec.Template.Spec.Containers[0]
 
-			// NGC_API_KEY should NOT be present
-			var ngcKeyPresent bool
+			// NGC_API_KEY should be present with Optional flag set to true
+			var ngcKeyEnv *corev1.EnvVar
 			for _, env := range container.Env {
 				if env.Name == appsv1alpha1.NGCAPIKey {
-					ngcKeyPresent = true
+					ngcKeyEnv = &env
 					break
 				}
 			}
-			Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for DataStore models")
+			Expect(ngcKeyEnv).NotTo(BeNil(), "NGC_API_KEY should be present with Optional flag set to true")
+			Expect(ngcKeyEnv.ValueFrom).NotTo(BeNil())
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To[bool](true)))
 
 			// HF_TOKEN should be present with correct secret reference
 			var hfTokenEnv *corev1.EnvVar
@@ -2861,7 +2990,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(customEnv.Value).To(Equal("custom-value"))
 		})
 
-		It("should replace NGC_API_KEY with HF_TOKEN when NIMService has HF model name", func() {
+		It("should make NGC_API_KEY optional and add HF_TOKEN when NIMService has HF model name", func() {
 			// Create a regular NGC NIMCache (not HF)
 			regularNimCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2967,15 +3096,20 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			// Verify environment variables
 			container := deployment.Spec.Template.Spec.Containers[0]
 
-			// NGC_API_KEY should NOT be present
-			var ngcKeyPresent bool
+			// NGC_API_KEY should be present with Optional flag set to true
+			var ngcKeyEnv *corev1.EnvVar
 			for _, env := range container.Env {
 				if env.Name == appsv1alpha1.NGCAPIKey {
-					ngcKeyPresent = true
+					ngcKeyEnv = &env
 					break
 				}
 			}
-			Expect(ngcKeyPresent).To(BeFalse(), "NGC_API_KEY should not be present for HuggingFace models")
+			Expect(ngcKeyEnv).NotTo(BeNil(), "NGC_API_KEY should be present with Optional flag set to true")
+			Expect(ngcKeyEnv.ValueFrom).NotTo(BeNil())
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("hf-secret"))
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To[bool](true)))
 
 			// HF_TOKEN should be present with correct secret reference
 			var hfTokenEnv *corev1.EnvVar
@@ -3128,6 +3262,367 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				}
 			}
 			Expect(hfTokenPresent).To(BeFalse(), "HF_TOKEN should not be present for non-HF models")
+		})
+	})
+
+	Describe("InitContainers and SidecarContainers rendering tests", func() {
+		It("should render initContainers and sidecarContainers in Deployment", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-initcontainers",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim",
+						Tag:        "1.0.0",
+						PullPolicy: "IfNotPresent",
+					},
+					AuthSecret: "ngc-secret",
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "init-setup",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "1.35",
+								PullPolicy: "Always",
+							},
+							Command: []string{"sh", "-c"},
+							Args:    []string{"echo 'Setting up...' && sleep 2"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "INIT_ENV",
+									Value: "init-value",
+								},
+							},
+							WorkingDir: "/tmp",
+						},
+						{
+							Name: "init-migration",
+							Image: appsv1alpha1.Image{
+								Repository: "alpine",
+								Tag:        "3.18",
+							},
+							Command: []string{"echo"},
+							Args:    []string{"Running migrations"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "MIGRATION_ENV",
+									Value: "migration-value",
+								},
+							},
+						},
+					},
+					SidecarContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "logging-sidecar",
+							Image: appsv1alpha1.Image{
+								Repository: "fluent/fluent-bit",
+								Tag:        "2.0",
+								PullPolicy: "IfNotPresent",
+							},
+							Command: []string{"/fluent-bit/bin/fluent-bit"},
+							Args:    []string{"-c", "/fluent-bit/etc/fluent-bit.conf"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "FLUENT_ENV",
+									Value: "production",
+								},
+							},
+						},
+						{
+							Name: "metrics-sidecar",
+							Image: appsv1alpha1.Image{
+								Repository: "prom/statsd-exporter",
+								Tag:        "v0.22.0",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "METRICS_PORT",
+									Value: "9102",
+								},
+							},
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Get the rendered Deployment
+			deployment := &appsv1.Deployment{}
+			err = client.Get(context.TODO(), namespacedName, deployment)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify initContainers are rendered correctly
+			Expect(deployment.Spec.Template.Spec.InitContainers).To(HaveLen(2))
+
+			initContainer1 := deployment.Spec.Template.Spec.InitContainers[0]
+			Expect(initContainer1.Name).To(Equal("init-setup"))
+			Expect(initContainer1.Image).To(Equal("busybox:1.35"))
+			Expect(initContainer1.ImagePullPolicy).To(Equal(corev1.PullAlways))
+			Expect(initContainer1.Command).To(Equal([]string{"sh", "-c"}))
+			Expect(initContainer1.Args).To(Equal([]string{"echo 'Setting up...' && sleep 2"}))
+			Expect(initContainer1.WorkingDir).To(Equal("/tmp"))
+
+			// Verify environment variables are merged
+			var foundInitEnv, foundGlobalEnv bool
+			for _, env := range initContainer1.Env {
+				if env.Name == "INIT_ENV" && env.Value == "init-value" {
+					foundInitEnv = true
+				}
+				// Global NIM env vars should be present
+				if env.Name == "NIM_CACHE_PATH" {
+					foundGlobalEnv = true
+				}
+			}
+			Expect(foundInitEnv).To(BeTrue(), "Init-specific env var should be present")
+			Expect(foundGlobalEnv).To(BeTrue(), "Global NIM env vars should be merged")
+
+			initContainer2 := deployment.Spec.Template.Spec.InitContainers[1]
+			Expect(initContainer2.Name).To(Equal("init-migration"))
+			Expect(initContainer2.Image).To(Equal("alpine:3.18"))
+			Expect(initContainer2.Command).To(Equal([]string{"echo"}))
+			Expect(initContainer2.Args).To(Equal([]string{"Running migrations"}))
+
+			// Verify sidecarContainers are rendered correctly
+			// Main container + 2 sidecars = 3 total
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(3))
+
+			// Find the sidecar containers (they come after the main container)
+			var loggingSidecar, metricsSidecar *corev1.Container
+			for i := range deployment.Spec.Template.Spec.Containers {
+				c := &deployment.Spec.Template.Spec.Containers[i]
+				switch c.Name {
+				case "logging-sidecar":
+					loggingSidecar = c
+				case "metrics-sidecar":
+					metricsSidecar = c
+				}
+			}
+
+			Expect(loggingSidecar).NotTo(BeNil(), "logging-sidecar should be present")
+			Expect(loggingSidecar.Image).To(Equal("fluent/fluent-bit:2.0"))
+			Expect(loggingSidecar.ImagePullPolicy).To(Equal(corev1.PullIfNotPresent))
+			Expect(loggingSidecar.Command).To(Equal([]string{"/fluent-bit/bin/fluent-bit"}))
+			Expect(loggingSidecar.Args).To(Equal([]string{"-c", "/fluent-bit/etc/fluent-bit.conf"}))
+
+			var foundFluentEnv bool
+			for _, env := range loggingSidecar.Env {
+				if env.Name == "FLUENT_ENV" && env.Value == "production" {
+					foundFluentEnv = true
+				}
+			}
+			Expect(foundFluentEnv).To(BeTrue(), "Sidecar-specific env var should be present")
+
+			Expect(metricsSidecar).NotTo(BeNil(), "metrics-sidecar should be present")
+			Expect(metricsSidecar.Image).To(Equal("prom/statsd-exporter:v0.22.0"))
+
+			var foundMetricsEnv bool
+			for _, env := range metricsSidecar.Env {
+				if env.Name == "METRICS_PORT" && env.Value == "9102" {
+					foundMetricsEnv = true
+				}
+			}
+			Expect(foundMetricsEnv).To(BeTrue(), "Metrics sidecar env var should be present")
+		})
+
+		It("should render initContainers and sidecarContainers in LeaderWorkerSet", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-lws-containers",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim-llm",
+						Tag:        "1.0.0",
+					},
+					AuthSecret: "ngc-secret",
+					Replicas:   ptr.To[int32](2),
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						BackendType: appsv1alpha1.NIMBackendTypeLWS,
+						Parallelism: &appsv1alpha1.ParallelismSpec{
+							Tensor:   ptr.To[uint32](4),
+							Pipeline: ptr.To[uint32](2),
+						},
+					},
+					InitContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "lws-init",
+							Image: appsv1alpha1.Image{
+								Repository: "busybox",
+								Tag:        "latest",
+							},
+							Command: []string{"sh", "-c"},
+							Args:    []string{"echo 'LWS init'"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "LWS_INIT_VAR",
+									Value: "lws-init-value",
+								},
+							},
+						},
+					},
+					SidecarContainers: []*appsv1alpha1.NIMContainerSpec{
+						{
+							Name: "lws-monitor",
+							Image: appsv1alpha1.Image{
+								Repository: "prom/node-exporter",
+								Tag:        "latest",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "MONITOR_PORT",
+									Value: "9100",
+								},
+							},
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			lwsName := types.NamespacedName{
+				Name:      testNimService.GetLWSName(),
+				Namespace: testNimService.Namespace,
+			}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Get the rendered LeaderWorkerSet
+			lws := &lwsv1.LeaderWorkerSet{}
+			err = client.Get(context.TODO(), lwsName, lws)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify initContainers in leader template
+			leaderInitContainers := lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.InitContainers
+			Expect(leaderInitContainers).To(HaveLen(1))
+			Expect(leaderInitContainers[0].Name).To(Equal("lws-init"))
+			Expect(leaderInitContainers[0].Image).To(Equal("busybox:latest"))
+			Expect(leaderInitContainers[0].Command).To(Equal([]string{"sh", "-c"}))
+			Expect(leaderInitContainers[0].Args).To(Equal([]string{"echo 'LWS init'"}))
+
+			// Verify environment variables in init container
+			var foundLWSInitVar bool
+			for _, env := range leaderInitContainers[0].Env {
+				if env.Name == "LWS_INIT_VAR" && env.Value == "lws-init-value" {
+					foundLWSInitVar = true
+				}
+			}
+			Expect(foundLWSInitVar).To(BeTrue(), "LWS init env var should be present")
+
+			// Verify sidecarContainers in leader template
+			leaderContainers := lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers
+			// Should have main container + sidecar
+			Expect(leaderContainers).To(HaveLen(2))
+
+			var monitorSidecar *corev1.Container
+			for i := range leaderContainers {
+				if leaderContainers[i].Name == "lws-monitor" {
+					monitorSidecar = &leaderContainers[i]
+				}
+			}
+
+			Expect(monitorSidecar).NotTo(BeNil(), "Monitor sidecar should be present in LWS")
+			Expect(monitorSidecar.Image).To(Equal("prom/node-exporter:latest"))
+
+			var foundMonitorPort bool
+			for _, env := range monitorSidecar.Env {
+				if env.Name == "MONITOR_PORT" && env.Value == "9100" {
+					foundMonitorPort = true
+				}
+			}
+			Expect(foundMonitorPort).To(BeTrue(), "Monitor port env should be present")
+
+			// Verify initContainers in worker template
+			workerInitContainers := lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.InitContainers
+			Expect(workerInitContainers).To(HaveLen(1))
+			Expect(workerInitContainers[0].Name).To(Equal("lws-init"))
+
+			// Verify sidecarContainers in worker template
+			workerContainers := lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers
+			Expect(workerContainers).To(HaveLen(2)) // main + sidecar
+
+			var workerMonitorSidecar *corev1.Container
+			for i := range workerContainers {
+				if workerContainers[i].Name == "lws-monitor" {
+					workerMonitorSidecar = &workerContainers[i]
+				}
+			}
+			Expect(workerMonitorSidecar).NotTo(BeNil(), "Monitor sidecar should be present in worker")
+		})
+
+		It("should handle empty initContainers and sidecarContainers", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-no-extra-containers",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim",
+						Tag:        "1.0.0",
+					},
+					AuthSecret: "ngc-secret",
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			deployment := &appsv1.Deployment{}
+			err = client.Get(context.TODO(), namespacedName, deployment)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Should only have system-generated init containers (if any)
+			// No user-defined initContainers
+			for _, ic := range deployment.Spec.Template.Spec.InitContainers {
+				// All init containers should be system-generated (like update-ca-certificates)
+				Expect(ic.Name).NotTo(ContainSubstring("init-"))
+			}
+
+			// Should only have 1 container (the main NIM container)
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal(testNimService.GetContainerName()))
 		})
 	})
 })

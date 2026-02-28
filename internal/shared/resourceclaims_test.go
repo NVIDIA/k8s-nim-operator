@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,12 +22,12 @@ import (
 
 var _ = Describe("DRA resourceclaim tests", func() {
 	DescribeTable("should handle resource claims correctly",
-		func(containers []corev1.Container, draResources []NamedDRAResource, expected []corev1.Container) {
+		func(containers []corev1.Container, namedDraResources *NamedDRAResourceList, expected []corev1.Container) {
 			// Create a copy of the containers to avoid modifying the test data
 			containersCopy := make([]corev1.Container, len(containers))
 			copy(containersCopy, containers)
 
-			UpdateContainerResourceClaims(containersCopy, draResources)
+			namedDraResources.UpdateContainerResourceClaims(containersCopy)
 			Expect(containersCopy).To(Equal(expected))
 		},
 		Entry("add new resource claim to empty containers",
@@ -39,9 +39,11 @@ var _ = Describe("DRA resourceclaim tests", func() {
 					},
 				},
 			},
-			[]NamedDRAResource{
-				{
-					Name: "claim1",
+			&NamedDRAResourceList{
+				Resources: []NamedDRAResource{
+					{
+						Name: "claim1",
+					},
 				},
 			},
 			[]corev1.Container{
@@ -70,9 +72,11 @@ var _ = Describe("DRA resourceclaim tests", func() {
 					},
 				},
 			},
-			[]NamedDRAResource{
-				{
-					Name: "new-claim",
+			&NamedDRAResourceList{
+				Resources: []NamedDRAResource{
+					{
+						Name: "new-claim",
+					},
 				},
 			},
 			[]corev1.Container{
@@ -104,9 +108,11 @@ var _ = Describe("DRA resourceclaim tests", func() {
 					},
 				},
 			},
-			[]NamedDRAResource{
-				{
-					Name: "existing-claim",
+			&NamedDRAResourceList{
+				Resources: []NamedDRAResource{
+					{
+						Name: "existing-claim",
+					},
 				},
 			},
 			[]corev1.Container{
@@ -137,12 +143,14 @@ var _ = Describe("DRA resourceclaim tests", func() {
 					},
 				},
 			},
-			[]NamedDRAResource{
-				{
-					Name: "claim1",
-				},
-				{
-					Name: "claim2",
+			&NamedDRAResourceList{
+				Resources: []NamedDRAResource{
+					{
+						Name: "claim1",
+					},
+					{
+						Name: "claim2",
+					},
 				},
 			},
 			[]corev1.Container{
@@ -197,12 +205,14 @@ var _ = Describe("DRA resourceclaim tests", func() {
 					},
 				},
 			},
-			[]NamedDRAResource{
-				{
-					Name: "claim1",
-				},
-				{
-					Name: "claim2",
+			&NamedDRAResourceList{
+				Resources: []NamedDRAResource{
+					{
+						Name: "claim1",
+					},
+					{
+						Name: "claim2",
+					},
 				},
 			},
 			[]corev1.Container{
@@ -237,13 +247,15 @@ var _ = Describe("DRA resourceclaim tests", func() {
 					},
 				},
 			},
-			[]NamedDRAResource{
-				{
-					Name: "claim1",
-					DRAResource: appsv1alpha1.DRAResource{
-						Requests: []string{
-							"request1",
-							"request2",
+			&NamedDRAResourceList{
+				Resources: []NamedDRAResource{
+					{
+						Name: "claim1",
+						DRAResource: appsv1alpha1.DRAResource{
+							Requests: []string{
+								"request1",
+								"request2",
+							},
 						},
 					},
 				},
@@ -378,6 +390,11 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			Expect(result1).To(HaveSuffix("-0"))
 			Expect(result2).To(HaveSuffix("-1"))
 		})
+
+		It("should generate correct compute domain resource name", func() {
+			name := generateUniqueDRAResourceName(nimServiceName, "cd-claimtemplate", noIndexSuffix)
+			Expect(name).To(Equal("cd-claimtemplate-8568b4fb55"))
+		})
 	})
 
 	Describe("generateDRAResourceStatus", func() {
@@ -391,13 +408,13 @@ var _ = Describe("DRA resourceclaim tests", func() {
 			ctx = context.Background()
 			ns = "test-ns"
 			scheme := runtime.NewScheme()
-			Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
+			Expect(resourcev1.AddToScheme(scheme)).To(Succeed())
 			client = fake.NewClientBuilder().WithScheme(scheme).Build()
 		})
 
 		It("should return a single claim status when a resource claim name is provided", func() {
 			// Setup test claims
-			claim := &resourcev1beta2.ResourceClaim{
+			claim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-claim",
 					Namespace: ns,
@@ -427,7 +444,7 @@ var _ = Describe("DRA resourceclaim tests", func() {
 
 		It("should return status for all matching claims for a resource claim template", func() {
 			// Setup test claims
-			claim1 := &resourcev1beta2.ResourceClaim{
+			claim1 := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "template-generated-claim-1",
 					Namespace: ns,
@@ -436,7 +453,7 @@ var _ = Describe("DRA resourceclaim tests", func() {
 					},
 				},
 			}
-			claim2 := &resourcev1beta2.ResourceClaim{
+			claim2 := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "template-generated-claim-2",
 					Namespace: ns,
@@ -479,7 +496,7 @@ var _ = Describe("DRA resourceclaim tests", func() {
 
 		It("should return appropriate state for claims of a resource claim template that are being deleted", func() {
 			// Setup test claims
-			claim1 := &resourcev1beta2.ResourceClaim{
+			claim1 := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "template-generated-claim-1",
 					Namespace: ns,
@@ -488,12 +505,12 @@ var _ = Describe("DRA resourceclaim tests", func() {
 					},
 				},
 			}
-			claim2 := &resourcev1beta2.ResourceClaim{
+			claim2 := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "template-generated-claim-2",
 					Namespace: ns,
 					Finalizers: []string{
-						resourcev1beta2.Finalizer,
+						resourcev1.Finalizer,
 					},
 					Annotations: map[string]string{
 						utils.DRAPodClaimNameAnnotationKey: "claim-8568b4fb55-1-5cb744997d-0",
@@ -535,7 +552,7 @@ var _ = Describe("DRA resourceclaim tests", func() {
 
 		It("should return appropriate state for claims of a resource claim template that is allocated and in-use", func() {
 			// Setup test claims
-			claim1 := &resourcev1beta2.ResourceClaim{
+			claim1 := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "template-generated-claim-1",
 					Namespace: ns,
@@ -543,9 +560,9 @@ var _ = Describe("DRA resourceclaim tests", func() {
 						utils.DRAPodClaimNameAnnotationKey: "claim-8568b4fb55-1-5cb744997d-0",
 					},
 				},
-				Status: resourcev1beta2.ResourceClaimStatus{
-					Allocation: &resourcev1beta2.AllocationResult{},
-					ReservedFor: []resourcev1beta2.ResourceClaimConsumerReference{
+				Status: resourcev1.ResourceClaimStatus{
+					Allocation: &resourcev1.AllocationResult{},
+					ReservedFor: []resourcev1.ResourceClaimConsumerReference{
 						{
 							Name:     "pod-test",
 							Resource: "pods",
@@ -582,7 +599,7 @@ var _ = Describe("DRA resourceclaim tests", func() {
 
 		It("should return nil status for non-matching claims for a resource claim template", func() {
 			// Setup test claim with different pod claim name
-			claim := &resourcev1beta2.ResourceClaim{
+			claim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "template-generated-claim-1",
 					Namespace: ns,
@@ -622,12 +639,46 @@ var _ = Describe("DRA resourceclaim tests", func() {
 				ResourceName: "test-template",
 			}
 
-			// Fake client with no resourcev1beta2scheme
+			// Fake client with no resourcev1scheme
 			errorClient := fake.NewClientBuilder().WithScheme(runtime.NewScheme()).Build()
 
 			status, err := generateDRAResourceStatus(ctx, errorClient, ns, resource)
 			Expect(err).To(HaveOccurred())
 			Expect(status).To(BeNil())
+		})
+	})
+
+	Describe("GetComputeDomainNamedDRAResource", func() {
+		It("should return the compute domain resource when it is present", func() {
+			namedDraResources := &NamedDRAResourceList{
+				Resources: []NamedDRAResource{
+					{ResourceName: "claim-8568b4fb55-0-9f8c8d9fb-0", FieldType: DRAResourceFieldTypeClaim},
+					{ResourceName: "claim-8568b4fb55-1-5cb744997d-0", FieldType: DRAResourceFieldTypeClaimTemplate},
+					{ResourceName: "cd-claimtemplate-6bb8bf548c", FieldType: DRAResourceFieldTypeComputeDomainClaimTemplate},
+				},
+			}
+			cdDraResource := namedDraResources.GetComputeDomainNamedDRAResource()
+			Expect(cdDraResource).ToNot(BeNil())
+			Expect(cdDraResource.ResourceName).To(Equal("cd-claimtemplate-6bb8bf548c"))
+			Expect(cdDraResource.FieldType).To(Equal(DRAResourceFieldTypeComputeDomainClaimTemplate))
+		})
+
+		It("should return nil when named dra resources list is empty", func() {
+			namedDraResources := &NamedDRAResourceList{
+				Resources: []NamedDRAResource{},
+			}
+			Expect(namedDraResources.GetComputeDomainNamedDRAResource()).To(BeNil())
+		})
+
+		It("should return nil when named dra resources list does not contain a compute domain resource", func() {
+			namedDraResources := &NamedDRAResourceList{
+				Resources: []NamedDRAResource{
+					{ResourceName: "claim-8568b4fb55-0-9f8c8d9fb-0", FieldType: DRAResourceFieldTypeClaim},
+					{ResourceName: "claim-8568b4fb55-1-5cb744997d-0", FieldType: DRAResourceFieldTypeClaimTemplate},
+					{ResourceName: "claim-8568b4fb55-2-e47306f647-0", FieldType: DRAResourceFieldTypeClaim},
+				},
+			}
+			Expect(namedDraResources.GetComputeDomainNamedDRAResource()).To(BeNil())
 		})
 	})
 

@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -54,8 +56,9 @@ var _ = Describe("NIMService Controller", func() {
 		Expect(appsv1alpha1.AddToScheme(scheme)).To(Succeed())
 		Expect(batchv1.AddToScheme(scheme)).To(Succeed())
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
-		Expect(resourcev1beta2.AddToScheme(scheme)).To(Succeed())
+		Expect(resourcev1.AddToScheme(scheme)).To(Succeed())
 		Expect(gatewayv1.Install(scheme)).To(Succeed())
+		Expect(nvidiaresourcev1beta1.AddToScheme(scheme)).To(Succeed())
 
 		testClient = fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(&appsv1alpha1.NIMService{}).
@@ -262,7 +265,7 @@ var _ = Describe("NIMService Controller", func() {
 
 	Describe("mapResourceClaimToNIMService tests", func() {
 		It("should return reconcile requests for NIMServices with matching ResourceClaimName in the same namespace", func() {
-			resourceClaim := &resourcev1beta2.ResourceClaim{
+			resourceClaim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-claim",
 					Namespace: "default",
@@ -323,7 +326,7 @@ var _ = Describe("NIMService Controller", func() {
 		})
 
 		It("should return reconcile requests for NIMServices with matching ResourceClaimTemplateName", func() {
-			resourceClaim := &resourcev1beta2.ResourceClaim{
+			resourceClaim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "template-generated-claim",
 					Namespace: "default",
@@ -359,7 +362,7 @@ var _ = Describe("NIMService Controller", func() {
 		})
 
 		It("should return empty requests when no NIMServices reference the claim", func() {
-			resourceClaim := &resourcev1beta2.ResourceClaim{
+			resourceClaim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-claim",
 					Namespace: "default",
@@ -402,7 +405,7 @@ var _ = Describe("NIMService Controller", func() {
 
 		It("should handle NIMServices without DRA resources", func() {
 			// Create a ResourceClaim
-			resourceClaim := &resourcev1beta2.ResourceClaim{
+			resourceClaim := &resourcev1.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-claim",
 					Namespace: "default",
@@ -425,6 +428,164 @@ var _ = Describe("NIMService Controller", func() {
 			// Test the mapping function
 			requests := reconciler.mapResourceClaimToNIMService(ctx, resourceClaim)
 
+			Expect(requests).To(BeEmpty())
+		})
+	})
+
+	Describe("mapComputeDomainToNIMService tests", func() {
+		It("should return reconcile requests for NIMServices with matching ComputeDomainName in the same namespace", func() {
+			computeDomain := &nvidiaresourcev1beta1.ComputeDomain{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-compute-domain",
+					Namespace: "default",
+				},
+			}
+			Expect(testClient.Create(ctx, computeDomain)).To(Succeed())
+
+			nimService1 := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service-1",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism: &appsv1alpha1.ParallelismSpec{
+							Tensor:   ptr.To(uint32(8)),
+							Pipeline: ptr.To(uint32(2)),
+						},
+						ComputeDomain: &appsv1alpha1.ComputeDomain{
+							Create: ptr.To(false),
+							Name:   "test-compute-domain",
+						},
+					},
+				},
+			}
+
+			nimService2 := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service-2",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism: &appsv1alpha1.ParallelismSpec{
+							Tensor:   ptr.To(uint32(8)),
+							Pipeline: ptr.To(uint32(2)),
+						},
+						ComputeDomain: &appsv1alpha1.ComputeDomain{
+							Create: ptr.To(false),
+							Name:   "test-compute-domain",
+						},
+					},
+				},
+			}
+
+			nimService3 := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service-3",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism: &appsv1alpha1.ParallelismSpec{
+							Tensor:   ptr.To(uint32(8)),
+							Pipeline: ptr.To(uint32(2)),
+						},
+						ComputeDomain: &appsv1alpha1.ComputeDomain{
+							Create: ptr.To(false),
+							Name:   "test-diff-compute-domain",
+						},
+					},
+				},
+			}
+
+			Expect(testClient.Create(ctx, nimService1)).To(Succeed())
+			Expect(testClient.Create(ctx, nimService2)).To(Succeed())
+			Expect(testClient.Create(ctx, nimService3)).To(Succeed())
+
+			requests := reconciler.mapComputeDomainToNIMService(ctx, computeDomain)
+
+			Expect(requests).To(HaveLen(2))
+			Expect(requests).To(ContainElements(
+				ctrl.Request{NamespacedName: types.NamespacedName{Name: "test-service-1", Namespace: "default"}},
+				ctrl.Request{NamespacedName: types.NamespacedName{Name: "test-service-2", Namespace: "default"}},
+			))
+		})
+
+		It("should return empty requests when no NIMServices reference the compute domain", func() {
+			computeDomain := &nvidiaresourcev1beta1.ComputeDomain{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-compute-domain",
+					Namespace: "default",
+				},
+			}
+			Expect(testClient.Create(ctx, computeDomain)).To(Succeed())
+
+			nimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism: &appsv1alpha1.ParallelismSpec{
+							Tensor:   ptr.To(uint32(8)),
+							Pipeline: ptr.To(uint32(2)),
+						},
+						ComputeDomain: &appsv1alpha1.ComputeDomain{
+							Create: ptr.To(false),
+							Name:   "test-diff-compute-domain",
+						},
+					},
+				},
+			}
+			Expect(testClient.Create(ctx, nimService)).To(Succeed())
+
+			requests := reconciler.mapComputeDomainToNIMService(ctx, computeDomain)
+
+			Expect(requests).To(BeEmpty())
+		})
+
+		It("should handle NIMServices without compute domain", func() {
+			computeDomain := &nvidiaresourcev1beta1.ComputeDomain{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-compute-domain",
+					Namespace: "default",
+				},
+			}
+			Expect(testClient.Create(ctx, computeDomain)).To(Succeed())
+
+			nimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						Parallelism: &appsv1alpha1.ParallelismSpec{
+							Tensor:   ptr.To(uint32(8)),
+							Pipeline: ptr.To(uint32(2)),
+						},
+						ComputeDomain: nil,
+					},
+				},
+			}
+			Expect(testClient.Create(ctx, nimService)).To(Succeed())
+
+			requests := reconciler.mapComputeDomainToNIMService(ctx, computeDomain)
+			Expect(requests).To(BeEmpty())
+		})
+
+		It("should handle invalid object type", func() {
+			// Pass a non-ComputeDomain object
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+			}
+
+			requests := reconciler.mapResourceClaimToNIMService(ctx, pod)
 			Expect(requests).To(BeEmpty())
 		})
 	})
