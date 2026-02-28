@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NemoEvaluatorLister helps list NemoEvaluators.
@@ -29,7 +29,7 @@ import (
 type NemoEvaluatorLister interface {
 	// List lists all NemoEvaluators in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NemoEvaluator, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NemoEvaluator, err error)
 	// NemoEvaluators returns an object that can list and get NemoEvaluators.
 	NemoEvaluators(namespace string) NemoEvaluatorNamespaceLister
 	NemoEvaluatorListerExpansion
@@ -37,17 +37,17 @@ type NemoEvaluatorLister interface {
 
 // nemoEvaluatorLister implements the NemoEvaluatorLister interface.
 type nemoEvaluatorLister struct {
-	listers.ResourceIndexer[*v1alpha1.NemoEvaluator]
+	listers.ResourceIndexer[*appsv1alpha1.NemoEvaluator]
 }
 
 // NewNemoEvaluatorLister returns a new NemoEvaluatorLister.
 func NewNemoEvaluatorLister(indexer cache.Indexer) NemoEvaluatorLister {
-	return &nemoEvaluatorLister{listers.New[*v1alpha1.NemoEvaluator](indexer, v1alpha1.Resource("nemoevaluator"))}
+	return &nemoEvaluatorLister{listers.New[*appsv1alpha1.NemoEvaluator](indexer, appsv1alpha1.Resource("nemoevaluator"))}
 }
 
 // NemoEvaluators returns an object that can list and get NemoEvaluators.
 func (s *nemoEvaluatorLister) NemoEvaluators(namespace string) NemoEvaluatorNamespaceLister {
-	return nemoEvaluatorNamespaceLister{listers.NewNamespaced[*v1alpha1.NemoEvaluator](s.ResourceIndexer, namespace)}
+	return nemoEvaluatorNamespaceLister{listers.NewNamespaced[*appsv1alpha1.NemoEvaluator](s.ResourceIndexer, namespace)}
 }
 
 // NemoEvaluatorNamespaceLister helps list and get NemoEvaluators.
@@ -55,15 +55,15 @@ func (s *nemoEvaluatorLister) NemoEvaluators(namespace string) NemoEvaluatorName
 type NemoEvaluatorNamespaceLister interface {
 	// List lists all NemoEvaluators in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NemoEvaluator, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NemoEvaluator, err error)
 	// Get retrieves the NemoEvaluator from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NemoEvaluator, error)
+	Get(name string) (*appsv1alpha1.NemoEvaluator, error)
 	NemoEvaluatorNamespaceListerExpansion
 }
 
 // nemoEvaluatorNamespaceLister implements the NemoEvaluatorNamespaceLister
 // interface.
 type nemoEvaluatorNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.NemoEvaluator]
+	listers.ResourceIndexer[*appsv1alpha1.NemoEvaluator]
 }

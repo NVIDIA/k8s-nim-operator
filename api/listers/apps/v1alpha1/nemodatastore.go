@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NemoDatastoreLister helps list NemoDatastores.
@@ -29,7 +29,7 @@ import (
 type NemoDatastoreLister interface {
 	// List lists all NemoDatastores in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NemoDatastore, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NemoDatastore, err error)
 	// NemoDatastores returns an object that can list and get NemoDatastores.
 	NemoDatastores(namespace string) NemoDatastoreNamespaceLister
 	NemoDatastoreListerExpansion
@@ -37,17 +37,17 @@ type NemoDatastoreLister interface {
 
 // nemoDatastoreLister implements the NemoDatastoreLister interface.
 type nemoDatastoreLister struct {
-	listers.ResourceIndexer[*v1alpha1.NemoDatastore]
+	listers.ResourceIndexer[*appsv1alpha1.NemoDatastore]
 }
 
 // NewNemoDatastoreLister returns a new NemoDatastoreLister.
 func NewNemoDatastoreLister(indexer cache.Indexer) NemoDatastoreLister {
-	return &nemoDatastoreLister{listers.New[*v1alpha1.NemoDatastore](indexer, v1alpha1.Resource("nemodatastore"))}
+	return &nemoDatastoreLister{listers.New[*appsv1alpha1.NemoDatastore](indexer, appsv1alpha1.Resource("nemodatastore"))}
 }
 
 // NemoDatastores returns an object that can list and get NemoDatastores.
 func (s *nemoDatastoreLister) NemoDatastores(namespace string) NemoDatastoreNamespaceLister {
-	return nemoDatastoreNamespaceLister{listers.NewNamespaced[*v1alpha1.NemoDatastore](s.ResourceIndexer, namespace)}
+	return nemoDatastoreNamespaceLister{listers.NewNamespaced[*appsv1alpha1.NemoDatastore](s.ResourceIndexer, namespace)}
 }
 
 // NemoDatastoreNamespaceLister helps list and get NemoDatastores.
@@ -55,15 +55,15 @@ func (s *nemoDatastoreLister) NemoDatastores(namespace string) NemoDatastoreName
 type NemoDatastoreNamespaceLister interface {
 	// List lists all NemoDatastores in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NemoDatastore, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NemoDatastore, err error)
 	// Get retrieves the NemoDatastore from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NemoDatastore, error)
+	Get(name string) (*appsv1alpha1.NemoDatastore, error)
 	NemoDatastoreNamespaceListerExpansion
 }
 
 // nemoDatastoreNamespaceLister implements the NemoDatastoreNamespaceLister
 // interface.
 type nemoDatastoreNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.NemoDatastore]
+	listers.ResourceIndexer[*appsv1alpha1.NemoDatastore]
 }
