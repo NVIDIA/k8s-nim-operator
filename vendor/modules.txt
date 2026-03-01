@@ -2159,7 +2159,7 @@ sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
 # sigs.k8s.io/gateway-api v1.4.2-0.20260116062110-0d0ca872766e
 ## explicit; go 1.24.0
 sigs.k8s.io/gateway-api/apis/v1
-# sigs.k8s.io/gateway-api-inference-extension v1.3.0
+# sigs.k8s.io/gateway-api-inference-extension v1.3.1
 ## explicit; go 1.24.0
 sigs.k8s.io/gateway-api-inference-extension/api/v1
 sigs.k8s.io/gateway-api-inference-extension/apix/config/v1alpha1
