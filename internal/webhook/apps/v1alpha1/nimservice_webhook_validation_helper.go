@@ -68,7 +68,7 @@ var validDRAResourceQuantitySelectorOps = []appsv1alpha1.DRAResourceQuantitySele
 // ensure the resource is well-formed before any other validation (e.g. immutability)
 // is performed.
 func validateNIMServiceSpec(ctx context.Context, nimservice *appsv1alpha1.NIMService, fldPath *field.Path, kubeVersion string,
-	k8sClient client.Client) (admission.Warnings, field.ErrorList) {
+	k8sClient client.Client, apiReader client.Reader) (admission.Warnings, field.ErrorList) {
 	spec := &nimservice.Spec
 
 	warningList, errList := validateImageConfiguration(&spec.Image, fldPath.Child("image"))
@@ -107,7 +107,7 @@ func validateNIMServiceSpec(ctx context.Context, nimservice *appsv1alpha1.NIMSer
 	errList = append(errList, err...)
 
 	namespacedName := client.ObjectKeyFromObject(nimservice)
-	w, err = validateKServeConfiguration(ctx, spec, fldPath, &namespacedName, k8sClient)
+	w, err = validateKServeConfiguration(ctx, spec, fldPath, &namespacedName, k8sClient, apiReader)
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
@@ -511,13 +511,13 @@ func validateResourcesConfiguration(resources *corev1.ResourceRequirements, fldP
 
 // validateKServeonfiguration implements required KServe validations.
 func validateKServeConfiguration(ctx context.Context, spec *appsv1alpha1.NIMServiceSpec, fldPath *field.Path,
-	namespacedName *types.NamespacedName, k8sClient client.Client) (admission.Warnings, field.ErrorList) {
+	namespacedName *types.NamespacedName, k8sClient client.Client, apiReader client.Reader) (admission.Warnings, field.ErrorList) {
 	errList := field.ErrorList{}
 	warningList := admission.Warnings{}
 
 	if spec.InferencePlatform == appsv1alpha1.PlatformTypeKServe {
 		// Get the deployment mode
-		mode, err := utils.GetKServeDeploymentMode(ctx, k8sClient, spec.Annotations, namespacedName)
+		mode, err := utils.GetKServeDeploymentMode(ctx, apiReader, k8sClient, spec.Annotations, namespacedName)
 		if err != nil {
 			errList = append(errList, field.InternalError(fldPath, fmt.Errorf("failed to determine KServe deployment mode: %w", err)))
 		} else {

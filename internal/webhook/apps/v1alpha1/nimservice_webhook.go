@@ -39,7 +39,7 @@ var nimservicelog = logf.Log.WithName("webhooks").WithName("NIMService")
 
 // SetupNIMServiceWebhookWithManager registers the webhook for NIMService in the manager.
 func SetupNIMServiceWebhookWithManager(mgr ctrl.Manager) error {
-	validator, err := NewNIMServiceCustomValidator(mgr.GetClient())
+	validator, err := NewNIMServiceCustomValidator(mgr.GetClient(), mgr.GetAPIReader())
 	if err != nil {
 		return err
 	}
@@ -65,12 +65,13 @@ func SetupNIMServiceWebhookWithManager(mgr ctrl.Manager) error {
 type NIMServiceCustomValidator struct {
 	k8sVersion string
 	k8sClient  client.Client
+	apiReader  client.Reader
 }
 
 var _ webhook.CustomValidator = &NIMServiceCustomValidator{}
 
 // NewNIMServiceCustomValidator fetches and caches the Kubernetes version.
-func NewNIMServiceCustomValidator(k8sClient client.Client) (*NIMServiceCustomValidator, error) {
+func NewNIMServiceCustomValidator(k8sClient client.Client, apiReader client.Reader) (*NIMServiceCustomValidator, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get in-cluster config: %v", err)
@@ -86,6 +87,7 @@ func NewNIMServiceCustomValidator(k8sClient client.Client) (*NIMServiceCustomVal
 	return &NIMServiceCustomValidator{
 		k8sVersion: versionInfo.GitVersion,
 		k8sClient:  k8sClient,
+		apiReader:  apiReader,
 	}, nil
 }
 
@@ -100,7 +102,7 @@ func (v *NIMServiceCustomValidator) ValidateCreate(ctx context.Context, obj runt
 	fldPath := field.NewPath("nimservice").Child("spec")
 
 	// Perform comprehensive spec validation via helper.
-	warningList, errList := validateNIMServiceSpec(ctx, nimservice, fldPath, v.k8sVersion, v.k8sClient)
+	warningList, errList := validateNIMServiceSpec(ctx, nimservice, fldPath, v.k8sVersion, v.k8sClient, v.apiReader)
 
 	if len(errList) > 0 {
 		return warningList, errList.ToAggregate()
@@ -123,7 +125,7 @@ func (v *NIMServiceCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 
 	fldPath := field.NewPath("nimservice").Child("spec")
 	// Start with structural validation to ensure the updated object is well formed.
-	warningList, errList := validateNIMServiceSpec(ctx, newNIMService, fldPath, v.k8sVersion, v.k8sClient)
+	warningList, errList := validateNIMServiceSpec(ctx, newNIMService, fldPath, v.k8sVersion, v.k8sClient, v.apiReader)
 
 	wList, eList := validateMultiNodeImmutability(oldNIMService, newNIMService, field.NewPath("spec").Child("multiNode"))
 	warningList = append(warningList, wList...)
