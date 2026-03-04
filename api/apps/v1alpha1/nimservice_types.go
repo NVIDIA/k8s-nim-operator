@@ -2268,6 +2268,7 @@ func (n *NIMService) GetEPPRoleParams() *rendertypes.RoleParams {
 	return &rendertypes.RoleParams{
 		Name:      n.GetEPPName(),
 		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"inference.networking.k8s.io"},
@@ -2295,6 +2296,7 @@ func (n *NIMService) GetEPPRoleBindingParams() *rendertypes.RoleBindingParams {
 		Namespace:          n.GetNamespace(),
 		RoleName:           n.GetEPPName(),
 		ServiceAccountName: n.GetEPPName(),
+		Labels:             n.GetServiceLabels(),
 	}
 }
 
