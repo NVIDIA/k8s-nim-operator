@@ -1,0 +1,31 @@
+# NIMService example: Kata VM sandbox (runtimeClassName: kata-qemu-nvidia-gpu); does *not* enable encryption
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-3-2-1b-instruct-kata-sandbox
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
+    tag: "1.12.0"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    emptyDir:
+      sizeLimit: 10Gi
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/pgpu: "1"
+      cpu: "8"
+      memory: "16Gi"
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  runtimeClassName: kata-qemu-nvidia-gpu
+  userID: 0
+  groupID: 0
