@@ -66,6 +66,7 @@ type NemoGuardrailReconciler struct {
 	Config           *rest.Config
 	recorder         record.EventRecorder
 	orchestratorType k8sutil.OrchestratorType
+	apiReader        client.Reader
 }
 
 // Ensure NemoGuardrailReconciler implements the Reconciler interface.
@@ -219,6 +220,11 @@ func (r *NemoGuardrailReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
+// GetAPIReader returns the API reader for direct API server access.
+func (r *NemoGuardrailReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
+}
+
 // GetOrchestratorType returns the container platform type.
 func (r *NemoGuardrailReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
@@ -235,6 +241,7 @@ func (r *NemoGuardrailReconciler) GetOrchestratorType(ctx context.Context) (k8su
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nemo-guardrail-service-controller")
+	r.apiReader = mgr.GetAPIReader()
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoGuardrail{}).
 		Owns(&appsv1.Deployment{}).

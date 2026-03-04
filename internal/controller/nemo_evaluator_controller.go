@@ -66,6 +66,7 @@ type NemoEvaluatorReconciler struct {
 	Config           *rest.Config
 	recorder         record.EventRecorder
 	orchestratorType k8sutil.OrchestratorType
+	apiReader        client.Reader
 }
 
 // Ensure NemoEvaluatorReconciler implements the Reconciler interface.
@@ -219,6 +220,11 @@ func (r *NemoEvaluatorReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
+// GetAPIReader returns the API reader for direct API server access.
+func (r *NemoEvaluatorReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
+}
+
 // GetOrchestratorType returns the container platform type.
 func (r *NemoEvaluatorReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
@@ -235,6 +241,7 @@ func (r *NemoEvaluatorReconciler) GetOrchestratorType(ctx context.Context) (k8su
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nemo-evaluator-service-controller")
+	r.apiReader = mgr.GetAPIReader()
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoEvaluator{}).
 		Owns(&appsv1.Deployment{}).

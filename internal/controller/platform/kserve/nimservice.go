@@ -71,6 +71,7 @@ type NIMServiceReconciler struct {
 	updater          conditions.Updater
 	renderer         render.Renderer
 	recorder         record.EventRecorder
+	apiReader        client.Reader
 	orchestratorType k8sutil.OrchestratorType
 }
 
@@ -86,12 +87,18 @@ func NewNIMServiceReconciler(ctx context.Context, r shared.Reconciler) *NIMServi
 		updater:          r.GetUpdater(),
 		renderer:         render.NewRenderer(ManifestsDir),
 		recorder:         r.GetEventRecorder(),
+		apiReader:        r.GetAPIReader(),
 		orchestratorType: orchestratorType,
 	}
 }
 
 func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
 	return r.renderer
+}
+
+// GetAPIReader returns the API reader for direct API server access.
+func (r *NIMServiceReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
 }
 
 func (r *NIMServiceReconciler) cleanupNIMService(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
@@ -156,7 +163,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	var deploymentMode kserveconstants.DeploymentModeType
 	// Check KServe deployment mode
 	namespacedName := client.ObjectKeyFromObject(nimService)
-	deploymentMode, err = utils.GetKServeDeploymentMode(ctx, r.Client, nimService.Spec.Annotations, &namespacedName)
+	// Use API reader to get the kserve deployment object because the informer cache only has deployments created by NIM Operator
+	deploymentMode, err = utils.GetKServeDeploymentMode(ctx, r.GetAPIReader(), r.Client, nimService.Spec.Annotations, &namespacedName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
