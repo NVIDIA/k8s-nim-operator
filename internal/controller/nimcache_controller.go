@@ -88,6 +88,7 @@ type NIMCacheReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 	updater          conditions.Updater
 	recorder         record.EventRecorder
+	apiReader        client.Reader
 }
 
 // Ensure NIMCacheReconciler implements the Reconciler interface.
@@ -235,6 +236,11 @@ func (r *NIMCacheReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
+// GetAPIReader returns the API reader for direct API server access.
+func (r *NIMCacheReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
+}
+
 // GetOrchestratorType returns the container platform type.
 func (r *NIMCacheReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
@@ -251,6 +257,7 @@ func (r *NIMCacheReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.O
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMCacheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nimcache-controller")
+	r.apiReader = mgr.GetAPIReader()
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMCache{}).
 		Owns(&batchv1.Job{}).

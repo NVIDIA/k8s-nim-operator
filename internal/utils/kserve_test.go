@@ -165,7 +165,7 @@ var _ = Describe("KServe Utilities", func() {
 		Describe("Priority chain: status > annotation > config > default", func() {
 			DescribeTable("deployment mode detection",
 				func(annotations map[string]string, expected kserveconstants.DeploymentModeType, expectedErr error) {
-					mode, err := GetKServeDeploymentMode(context.Background(), client, annotations, nil)
+					mode, err := GetKServeDeploymentMode(context.Background(), client, client, annotations, nil)
 					if expectedErr != nil {
 						Expect(err).To(MatchError(expectedErr.Error()))
 						Expect(mode).To(BeEmpty())
@@ -226,7 +226,7 @@ var _ = Describe("KServe Utilities", func() {
 				})
 
 				It("should use InferenceService status over annotations", func() {
-					mode, err := GetKServeDeploymentMode(context.Background(), client,
+					mode, err := GetKServeDeploymentMode(context.Background(), client, client,
 						map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.LegacyServerless)},
 						&types.NamespacedName{Name: isvcName, Namespace: namespace})
 					Expect(err).NotTo(HaveOccurred())
@@ -235,7 +235,7 @@ var _ = Describe("KServe Utilities", func() {
 
 				It("should use InferenceService status over ConfigMap default when no annotation", func() {
 					mode, err := GetKServeDeploymentMode(context.Background(), client,
-						nil,
+						client, nil,
 						&types.NamespacedName{Name: isvcName, Namespace: namespace})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(mode).To(Equal(kserveconstants.Knative))
@@ -245,7 +245,7 @@ var _ = Describe("KServe Utilities", func() {
 					isvc.Status.DeploymentMode = ""
 					Expect(client.Update(context.Background(), isvc)).To(Succeed())
 
-					mode, err := GetKServeDeploymentMode(context.Background(), client,
+					mode, err := GetKServeDeploymentMode(context.Background(), client, client,
 						map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Standard)},
 						&types.NamespacedName{Name: isvcName, Namespace: namespace})
 					Expect(err).NotTo(HaveOccurred())
@@ -256,7 +256,7 @@ var _ = Describe("KServe Utilities", func() {
 					isvc.Status.DeploymentMode = ""
 					Expect(client.Update(context.Background(), isvc)).To(Succeed())
 
-					mode, err := GetKServeDeploymentMode(context.Background(), client,
+					mode, err := GetKServeDeploymentMode(context.Background(), client, client,
 						nil,
 						&types.NamespacedName{Name: isvcName, Namespace: namespace})
 					Expect(err).NotTo(HaveOccurred())
@@ -268,7 +268,7 @@ var _ = Describe("KServe Utilities", func() {
 		Describe("Nil client scenarios (webhook validation)", func() {
 			DescribeTable("should handle nil client gracefully",
 				func(annotations map[string]string, expected kserveconstants.DeploymentModeType, expectedErr error) {
-					mode, err := GetKServeDeploymentMode(context.Background(), nil, annotations, nil)
+					mode, err := GetKServeDeploymentMode(context.Background(), nil, nil, annotations, nil)
 					if expectedErr != nil {
 						Expect(err).To(MatchError(expectedErr.Error()))
 						Expect(mode).To(BeEmpty())
@@ -319,7 +319,7 @@ var _ = Describe("KServe Utilities", func() {
 				}
 				Expect(isolatedClient.Create(context.Background(), badConfigMap)).To(Succeed())
 
-				_, err := GetKServeDeploymentMode(context.Background(), isolatedClient, nil, nil)
+				_, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("unable to parse deploy config json"))
 			})
@@ -339,7 +339,7 @@ var _ = Describe("KServe Utilities", func() {
 				}
 				Expect(isolatedClient.Create(context.Background(), badConfigMap)).To(Succeed())
 
-				_, err := GetKServeDeploymentMode(context.Background(), isolatedClient, nil, nil)
+				_, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("defaultDeploymentMode is required"))
 			})
@@ -359,7 +359,7 @@ var _ = Describe("KServe Utilities", func() {
 				}
 				Expect(isolatedClient.Create(context.Background(), badConfigMap)).To(Succeed())
 
-				_, err := GetKServeDeploymentMode(context.Background(), isolatedClient, nil, nil)
+				_, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid deployment mode"))
 			})
@@ -368,7 +368,7 @@ var _ = Describe("KServe Utilities", func() {
 				isolatedClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 				// Don't create KServe deployment
 
-				_, err := GetKServeDeploymentMode(context.Background(), isolatedClient, nil, nil)
+				_, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to find the namespace of KServe Deployment"))
 			})
@@ -378,7 +378,7 @@ var _ = Describe("KServe Utilities", func() {
 				Expect(isolatedClient.Create(context.Background(), createKServeDeployment())).To(Succeed())
 				// Don't create ConfigMap
 
-				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient,
+				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient,
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Knative)}, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mode).To(Equal(kserveconstants.Knative))
@@ -400,7 +400,7 @@ var _ = Describe("KServe Utilities", func() {
 				}
 				Expect(isolatedClient.Create(context.Background(), emptyConfigMap)).To(Succeed())
 
-				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, nil, nil)
+				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mode).To(Equal(kserveconstants.DefaultDeployment))
 			})
@@ -423,7 +423,7 @@ var _ = Describe("KServe Utilities", func() {
 				}
 				Expect(isolatedClient.Create(context.Background(), standardConfig)).To(Succeed())
 
-				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, nil, nil)
+				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mode).To(Equal(kserveconstants.Standard))
 			})
@@ -443,7 +443,7 @@ var _ = Describe("KServe Utilities", func() {
 				}
 				Expect(isolatedClient.Create(context.Background(), knativeConfig)).To(Succeed())
 
-				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, nil, nil)
+				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mode).To(Equal(kserveconstants.Knative))
 			})
@@ -463,7 +463,7 @@ var _ = Describe("KServe Utilities", func() {
 				}
 				Expect(isolatedClient.Create(context.Background(), serverlessConfig)).To(Succeed())
 
-				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, nil, nil)
+				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mode).To(Equal(kserveconstants.LegacyServerless))
 			})
@@ -498,7 +498,7 @@ var _ = Describe("KServe Utilities", func() {
 					"allowed-annotation":           "should-remain",
 				}
 
-				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, annotations, nil)
+				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, annotations, nil)
 				Expect(err).NotTo(HaveOccurred())
 				// Should still detect Knative mode since the deployment mode annotation is allowed
 				Expect(mode).To(Equal(kserveconstants.Knative))
@@ -533,7 +533,7 @@ var _ = Describe("KServe Utilities", func() {
 					"allowed-annotation":           "should-remain",
 				}
 
-				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, annotations, nil)
+				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, annotations, nil)
 				Expect(err).NotTo(HaveOccurred())
 				// Should fall back to ConfigMap default (Standard) since deployment mode annotation was filtered
 				Expect(mode).To(Equal(kserveconstants.Standard))
@@ -578,7 +578,7 @@ var _ = Describe("KServe Utilities", func() {
 					kserveconstants.DeploymentMode: string(kserveconstants.LegacyServerless),
 				}
 
-				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, annotations,
+				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, annotations,
 					&types.NamespacedName{Name: isvcName, Namespace: namespace})
 				Expect(err).NotTo(HaveOccurred())
 				// Status should take priority even when annotation is filtered

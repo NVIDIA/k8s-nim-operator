@@ -73,6 +73,7 @@ type NIMBuildReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 	updater          conditions.Updater
 	recorder         record.EventRecorder
+	apiReader        client.Reader
 }
 
 // Ensure NIMBuildReconciler implements the Reconciler interface.
@@ -203,6 +204,11 @@ func (r *NIMBuildReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
+// GetAPIReader returns the API reader for direct API server access.
+func (r *NIMBuildReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
+}
+
 func (r *NIMBuildReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
 		orchestratorType, err := k8sutil.GetOrchestratorType(ctx, r.GetClient())
@@ -218,6 +224,7 @@ func (r *NIMBuildReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.O
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nimbuild-controller")
+	r.apiReader = mgr.GetAPIReader()
 
 	err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),

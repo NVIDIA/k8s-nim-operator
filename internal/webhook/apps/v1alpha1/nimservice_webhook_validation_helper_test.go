@@ -1112,7 +1112,7 @@ func TestValidateKServeConfiguration(t *testing.T) {
 
 			tc.modify(ns)
 
-			w, errs := validateKServeConfiguration(context.TODO(), &ns.Spec, fld, nil, nil)
+			w, errs := validateKServeConfiguration(context.TODO(), &ns.Spec, fld, nil, nil, nil)
 			gotErrs := len(errs)
 			gotWarnings := len(w)
 			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {

@@ -70,6 +70,7 @@ type NIMServiceReconciler struct {
 	Config           *rest.Config
 	orchestratorType k8sutil.OrchestratorType
 	recorder         record.EventRecorder
+	apiReader        client.Reader
 }
 
 // Ensure NIMServiceReconciler implements the Reconciler interface.
@@ -233,6 +234,11 @@ func (r *NIMServiceReconciler) GetEventRecorder() record.EventRecorder {
 	return r.recorder
 }
 
+// GetAPIReader returns the API reader for direct API server access.
+func (r *NIMServiceReconciler) GetAPIReader() client.Reader {
+	return r.apiReader
+}
+
 // GetOrchestratorType returns the container platform type.
 func (r *NIMServiceReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.OrchestratorType, error) {
 	if r.orchestratorType == "" {
@@ -249,6 +255,7 @@ func (r *NIMServiceReconciler) GetOrchestratorType(ctx context.Context) (k8sutil
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nimservice-controller")
+	r.apiReader = mgr.GetAPIReader()
 	err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&appsv1alpha1.NIMService{},

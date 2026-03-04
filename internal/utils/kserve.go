@@ -46,7 +46,7 @@ func IsKServeKnativeDeploymentMode(deploymentMode kserveconstants.DeploymentMode
 	return deploymentMode == kserveconstants.Knative || deploymentMode == kserveconstants.LegacyServerless
 }
 
-func GetKServeDeploymentMode(ctx context.Context, k8sClient client.Client,
+func GetKServeDeploymentMode(ctx context.Context, k8sReader client.Reader, k8sClient client.Client,
 	podAnnotations map[string]string, isvcNamespacedName *types.NamespacedName) (kserveconstants.DeploymentModeType, error) {
 	logger := log.FromContext(ctx).WithName("KServe").WithName("Deployment Mode")
 
@@ -54,8 +54,8 @@ func GetKServeDeploymentMode(ctx context.Context, k8sClient client.Client,
 	var deployConfig *kservev1beta1.DeployConfig
 	var statusDeploymentMode string
 
-	if k8sClient != nil {
-		isvcConfigMap, err := getISVCConfigMap(ctx, k8sClient)
+	if k8sReader != nil {
+		isvcConfigMap, err := getISVCConfigMap(ctx, k8sReader, k8sClient)
 		if err != nil {
 			return "", err
 		}
@@ -215,11 +215,11 @@ func newDeployConfig(isvcConfigMap *corev1.ConfigMap) (*kservev1beta1.DeployConf
 	return deployConfig, nil
 }
 
-func getISVCConfigMap(ctx context.Context, k8sClient client.Client) (*corev1.ConfigMap, error) {
+func getISVCConfigMap(ctx context.Context, k8sReader client.Reader, k8sClient client.Client) (*corev1.ConfigMap, error) {
 	var namespace string
 	// Find the namespace of the KServe controller
 	deploymentList := &appsv1.DeploymentList{}
-	if err := k8sClient.List(ctx, deploymentList, client.MatchingLabels{"app.kubernetes.io/name": KServeControllerName}); err != nil {
+	if err := k8sReader.List(ctx, deploymentList, client.MatchingLabels{"app.kubernetes.io/name": KServeControllerName}); err != nil {
 		return nil, err
 	}
 	for _, deployment := range deploymentList.Items {
