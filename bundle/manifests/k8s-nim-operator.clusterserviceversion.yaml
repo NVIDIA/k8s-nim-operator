@@ -1161,6 +1161,18 @@ spec:
                 - update
                 - watch
             - apiGroups:
+                - resource.nvidia.com
+              resources:
+                - computedomains
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
                 - route.openshift.io
               resources:
                 - routes
