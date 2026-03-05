@@ -367,7 +367,7 @@ func (n *NemoGuardrail) GetSecretParams(secretMapData map[string]string) *render
 	// Set metadata
 	params.Name = n.Name
 	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetLabels()
+	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetAnnotations()
 
 	params.SecretMapData = secretMapData

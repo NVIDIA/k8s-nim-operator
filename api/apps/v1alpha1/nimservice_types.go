@@ -1266,7 +1266,7 @@ func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
 	// Set metadata
 	params.Name = n.GetLWSName()
 	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetLabels()
+	params.Labels = n.GetServiceLabels()
 	params.Annotations = n.GetNIMServiceAnnotations()
 	params.PodAnnotations = n.GetNIMServiceAnnotations()
 	delete(params.PodAnnotations, utils.NvidiaAnnotationParentSpecHashKey)
@@ -1400,7 +1400,7 @@ func (n *NIMService) GetMPIConfigParams() *rendertypes.ConfigMapParams {
 		Name:          fmt.Sprintf("%s-mpi-config", n.GetName()),
 		Namespace:     n.GetNamespace(),
 		ConfigMapData: n.generateMPIConfigData(),
-		Labels:        n.GetLabels(),
+		Labels:        n.GetServiceLabels(),
 		Annotations:   n.GetAnnotations(),
 	}
 }
@@ -1416,7 +1416,7 @@ func (n *NIMService) GetDefaultMPIScriptConfigParams() *rendertypes.ConfigMapPar
 		ConfigMapData: map[string]string{
 			"start-mpi-cluster.sh": DefaultMPIStartScript,
 		},
-		Labels:      n.GetLabels(),
+		Labels:      n.GetServiceLabels(),
 		Annotations: n.GetAnnotations(),
 	}
 }
@@ -1441,7 +1441,7 @@ func (n *NIMService) GetMPISSHSecretParams() (*rendertypes.SecretParams, error) 
 	return &rendertypes.SecretParams{
 		Name:        fmt.Sprintf("%s-ssh-pk", n.GetName()),
 		Namespace:   n.GetNamespace(),
-		Labels:      n.GetLabels(),
+		Labels:      n.GetServiceLabels(),
 		Annotations: n.GetAnnotations(),
 		SecretMapData: map[string]string{
 			"private.key": base64.StdEncoding.EncodeToString(privateKeyPEM),
@@ -2268,6 +2268,7 @@ func (n *NIMService) GetEPPRoleParams() *rendertypes.RoleParams {
 	return &rendertypes.RoleParams{
 		Name:      n.GetEPPName(),
 		Namespace: n.GetNamespace(),
+		Labels:    n.GetServiceLabels(),
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"inference.networking.k8s.io"},
@@ -2295,6 +2296,7 @@ func (n *NIMService) GetEPPRoleBindingParams() *rendertypes.RoleBindingParams {
 		Namespace:          n.GetNamespace(),
 		RoleName:           n.GetEPPName(),
 		ServiceAccountName: n.GetEPPName(),
+		Labels:             n.GetServiceLabels(),
 	}
 }
 
