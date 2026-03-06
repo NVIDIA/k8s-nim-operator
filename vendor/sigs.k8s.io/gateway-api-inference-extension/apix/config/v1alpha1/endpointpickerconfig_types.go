@@ -32,7 +32,7 @@ type EndpointPickerConfig struct {
 
 	// +optional
 	// FeatureGates is a set of flags that enable various experimental features with the EPP.
-	// If omitted non of these experimental features will be enabled.
+	// If omitted none of these experimental features will be enabled.
 	FeatureGates FeatureGates `json:"featureGates,omitempty"`
 
 	// +required
@@ -54,16 +54,22 @@ type EndpointPickerConfig struct {
 	// +optional
 	// Data configures the DataLayer. It is required if the new DataLayer is enabled.
 	Data *DataLayerConfig `json:"data"`
+
+	// +optional
+	// FlowControl configures the Flow Control layer.
+	// This configuration is only respected if the "flowControl" FeatureGate is enabled.
+	FlowControl *FlowControlConfig `json:"flowControl,omitempty"`
 }
 
 func (cfg EndpointPickerConfig) String() string {
 	return fmt.Sprintf(
-		"{FeatureGates: %v, Plugins: %v, SchedulingProfiles: %v, Data: %v, SaturationDetector: %v}",
+		"{FeatureGates: %v, Plugins: %v, SchedulingProfiles: %v, Data: %v, SaturationDetector: %v, FlowControl: %v}",
 		cfg.FeatureGates,
 		cfg.Plugins,
 		cfg.SchedulingProfiles,
 		cfg.Data,
 		cfg.SaturationDetector,
+		cfg.FlowControl,
 	)
 }
 
@@ -118,21 +124,21 @@ func (sp SchedulingProfile) String() string {
 type SchedulingPlugin struct {
 	// +required
 	// +kubebuilder:validation:Required
-	// PluginRef specifies a partiular Plugin instance to be associated with
+	// PluginRef specifies a particular Plugin instance to be associated with
 	// this SchedulingProfile. The reference is to the name of an
 	// entry of the Plugins defined in the configuration's Plugins
 	// section
 	PluginRef string `json:"pluginRef"`
 
 	// +optional
-	// Weight is the weight fo be used if this plugin is a Scorer.
-	Weight *int `json:"weight"`
+	// Weight is the weight to be used if this plugin is a Scorer.
+	Weight *float64 `json:"weight"`
 }
 
 func (sp SchedulingPlugin) String() string {
 	var weight string
 	if sp.Weight != nil {
-		weight = fmt.Sprintf(", Weight: %d", *sp.Weight)
+		weight = fmt.Sprintf(", Weight: %f", *sp.Weight)
 	}
 	return fmt.Sprintf("{PluginRef: %s%s}", sp.PluginRef, weight)
 }
@@ -215,7 +221,7 @@ func (dlc DataLayerConfig) String() string {
 type DataLayerSource struct {
 	// +required
 	// +kubebuilder:validation:Required
-	// PluginRef specifies a partiular Plugin instance to be associated with
+	// PluginRef specifies a particular Plugin instance to be associated with
 	// this Source. The reference is to the name of an entry of the Plugins
 	// defined in the configuration's Plugins section
 	PluginRef string `json:"pluginRef"`
@@ -236,7 +242,7 @@ func (dls DataLayerSource) String() string {
 type DataLayerExtractor struct {
 	// +required
 	// +kubebuilder:validation:Required
-	// PluginRef specifies a partiular Plugin instance to be associated with
+	// PluginRef specifies a particular Plugin instance to be associated with
 	// this Extractor. The reference is to the name of an entry of the Plugins
 	// defined in the configuration's Plugins section
 	PluginRef string `json:"pluginRef"`
@@ -244,4 +250,71 @@ type DataLayerExtractor struct {
 
 func (dle DataLayerExtractor) String() string {
 	return "{PluginRef: " + dle.PluginRef + "}"
+}
+
+// FlowControlConfig configures the Flow Control layer.
+type FlowControlConfig struct {
+	// +optional
+	// MaxBytes defines the global capacity limit for the Flow Control system.
+	// It represents the maximum aggregate byte size of all active requests across all priority
+	// levels. If this limit is exceeded, new requests will be rejected even if their specific
+	// priority band has capacity.
+	// If 0 or omitted, no global limit is enforced (unlimited).
+	// Default: 0 (unlimited).
+	MaxBytes *int64 `json:"maxBytes,omitempty"`
+
+	// +optional
+	// DefaultRequestTTL serves as a fallback timeout for requests that do not specify their own
+	// deadline.
+	// It ensures that requests do not hang indefinitely in the queue.
+	// If 0 or omitted, it defaults to the client context deadline, meaning requests may wait
+	// indefinitely unless cancelled by the client.
+	DefaultRequestTTL *metav1.Duration `json:"defaultRequestTTL,omitempty"`
+
+	// +optional
+	// DefaultPriorityBand allows you to define a template for handling traffic with priority levels
+	// that are not explicitly configured in `PriorityBands`.
+	// This ensures that unforeseen traffic classes are still managed (e.g., given a default capacity
+	// limit) rather than being rejected or treated arbitrarily.
+	// If not specified, a system-default template is used to dynamically provision bands for new
+	// priority levels. This template cascades to the standard `PriorityBandConfig` defaults.
+	DefaultPriorityBand *PriorityBandConfig `json:"defaultPriorityBand,omitempty"`
+
+	// PriorityBands allows you to explicitly define policies (like capacity limits) for specific
+	// priority levels. Traffic matching these priorities will be handled according to these rules.
+	// If a priority band is not specified, it uses specific defaults.
+	PriorityBands []PriorityBandConfig `json:"priorityBands,omitempty"`
+}
+
+func (fcc *FlowControlConfig) String() string {
+	return fmt.Sprintf("{MaxBytes: %v, DefaultPriorityBand: %v, PriorityBands: %v}",
+		fcc.MaxBytes, fcc.DefaultPriorityBand, fcc.PriorityBands)
+}
+
+// PriorityBandConfig configures a single priority band.
+type PriorityBandConfig struct {
+	// Priority is the integer priority level for this band.
+	// Higher values indicate higher priority.
+	Priority int `json:"priority"`
+
+	// +optional
+	// MaxBytes is the maximum number of bytes allowed for this priority band.
+	// If 0 or omitted, the system default is used.
+	// Default: 1 GB.
+	MaxBytes *int64 `json:"maxBytes,omitempty"`
+
+	// +optional
+	// FairnessPolicyRef specifies the name of the policy that governs flow selection.
+	// If omitted, the system default ("global-strict-fairness-policy") is used.
+	FairnessPolicyRef string `json:"fairnessPolicyRef,omitempty"`
+
+	// +optional
+	// OrderingPolicyRef specifies the name of the policy that governs request selection within a flow.
+	// If omitted, the system default ("fcfs-ordering-policy") is used.
+	OrderingPolicyRef string `json:"orderingPolicyRef,omitempty"`
+}
+
+func (pbc PriorityBandConfig) String() string {
+	return fmt.Sprintf("{Priority: %d, MaxBytes: %v, FairnessPolicyRef: %s, OrderingPolicyRef: %s}",
+		pbc.Priority, pbc.MaxBytes, pbc.FairnessPolicyRef, pbc.OrderingPolicyRef)
 }
