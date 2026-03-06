@@ -30,7 +30,6 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metaerrors "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
@@ -498,15 +497,12 @@ func ControllerWatchesIfCRDExists(discoveryClient discovery.DiscoveryInterface,
 //
 // This reduces memory usage by only caching objects with the specified labels.
 // WARNING: Only include object types that are labeled with the given selector.
-// Objects without matching labels (i.e pre-existing ConfigMaps, PVCs, ResourceClaims) should not be added here.
+// Objects without matching labels (i.e pre-existing ConfigMaps, PVCs, ResourceClaims, Role, RoleBindings, ServiceAccounts) should not be added here.
 func BuildByObjectFilteredCache(discoveryClient discovery.DiscoveryInterface, ls labels.Selector) (map[client.Object]cache.ByObject, error) {
 	byObject := map[client.Object]cache.ByObject{
 		&appsv1.Deployment{}:                     {Label: ls},
 		&appsv1.StatefulSet{}:                    {Label: ls},
 		&corev1.Service{}:                        {Label: ls},
-		&corev1.ServiceAccount{}:                 {Label: ls},
-		&rbacv1.Role{}:                           {Label: ls},
-		&rbacv1.RoleBinding{}:                    {Label: ls},
 		&autoscalingv2.HorizontalPodAutoscaler{}: {Label: ls},
 		&batchv1.Job{}:                           {Label: ls},
 		&corev1.Pod{}:                            {Label: ls},
