@@ -7,7 +7,7 @@ require (
 	github.com/NVIDIA/k8s-dra-driver-gpu v0.0.0-20251124164413-9b590606ceb6
 	github.com/NVIDIA/k8s-test-infra v0.0.0-20240806103558-2d7411125519
 	github.com/blang/semver/v4 v4.0.0
-	github.com/go-git/go-git/v5 v5.16.5
+	github.com/go-git/go-git/v5 v5.17.1
 	github.com/go-logr/logr v1.4.3
 	github.com/google/cel-go v0.26.0
 	github.com/kserve/kserve v0.0.0-20260219142638-5454cafc1f9f
@@ -89,7 +89,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
-	github.com/go-git/go-billy/v5 v5.6.2 // indirect
+	github.com/go-git/go-billy/v5 v5.8.0 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
