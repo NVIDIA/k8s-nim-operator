@@ -125,12 +125,17 @@ type NIMServiceSpec struct {
 	SchedulerName  string        `json:"schedulerName,omitempty"`
 	Metrics        Metrics       `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=0
-	Replicas         *int32                     `json:"replicas,omitempty"`
-	UserID           *int64                     `json:"userID,omitempty"`
-	GroupID          *int64                     `json:"groupID,omitempty"`
-	RuntimeClassName string                     `json:"runtimeClassName,omitempty"`
-	Proxy            *ProxySpec                 `json:"proxy,omitempty"`
-	MultiNode        *NimServiceMultiNodeConfig `json:"multiNode,omitempty"`
+	Replicas         *int32 `json:"replicas,omitempty"`
+	UserID           *int64 `json:"userID,omitempty"`
+	GroupID          *int64 `json:"groupID,omitempty"`
+	RuntimeClassName string `json:"runtimeClassName,omitempty"`
+	// PriorityClassName is the name of the PriorityClass to assign to pods created by this NIMService.
+	// If set, the Kubernetes scheduler uses the specified priority for preemption decisions,
+	// ensuring pods are scheduled even when resources (e.g. GPUs) are fully utilised by lower-priority workloads.
+	// The referenced PriorityClass must exist in the cluster.
+	PriorityClassName string                     `json:"priorityClassName,omitempty"`
+	Proxy             *ProxySpec                 `json:"proxy,omitempty"`
+	MultiNode         *NimServiceMultiNodeConfig `json:"multiNode,omitempty"`
 	// InferencePlatform specifies the inference platform to use for this NIMService.
 	// Valid values are "standalone" (default) and "kserve".
 	// +kubebuilder:validation:Enum=standalone;kserve
@@ -1227,6 +1232,9 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	// Set scheduler
 	params.SchedulerName = n.GetSchedulerName()
 
+	// Set priority class
+	params.PriorityClassName = n.GetPriorityClassName()
+
 	// Setup container ports for nimservice
 	params.Ports = []corev1.ContainerPort{
 		{
@@ -1311,6 +1319,7 @@ func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
 	params.ServiceAccountName = n.GetServiceAccountName()
 	params.SchedulerName = n.GetSchedulerName()
 	params.RuntimeClassName = n.GetRuntimeClassName()
+	params.PriorityClassName = n.GetPriorityClassName()
 
 	params.InitContainers = n.GetInitContainers()
 	for idx := range params.InitContainers {
@@ -1326,6 +1335,11 @@ func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
 // GetSchedulerName returns the scheduler name for the NIMService deployment.
 func (n *NIMService) GetSchedulerName() string {
 	return n.Spec.SchedulerName
+}
+
+// GetPriorityClassName returns the priority class name for the NIMService deployment.
+func (n *NIMService) GetPriorityClassName() string {
+	return n.Spec.PriorityClassName
 }
 
 // GetStatefulSetParams returns params to render StatefulSet from templates.
@@ -1371,6 +1385,9 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 
 	// Set runtime class
 	params.RuntimeClassName = n.GetRuntimeClassName()
+
+	// Set priority class
+	params.PriorityClassName = n.GetPriorityClassName()
 	return params
 }
 
