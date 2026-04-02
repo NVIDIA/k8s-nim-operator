@@ -24,6 +24,9 @@ spec:
         app: {{ .Name }}
     spec:
       runtimeClassName: {{ .RuntimeClassName }}
+      {{- if .PriorityClassName }}
+      priorityClassName: {{ .PriorityClassName }}
+      {{- end }}
       {{- if .Affinity }}
       affinity:
         {{ .Affinity | yaml | nindent 8 }}

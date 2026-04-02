@@ -3728,6 +3728,13 @@ spec:
                               type: array
                               x-kubernetes-list-type: atomic
                           type: object
+                        priorityClassName:
+                          description: |-
+                            PriorityClassName is the name of the PriorityClass to assign to pods created by this NIMService.
+                            If set, the Kubernetes scheduler uses the specified priority for preemption decisions,
+                            ensuring pods are scheduled even when resources (e.g. GPUs) are fully utilised by lower-priority workloads.
+                            The referenced PriorityClass must exist in the cluster.
+                          type: string
                         proxy:
                           description: ProxySpec defines the proxy configuration for
                             NIMService.
