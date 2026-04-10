@@ -84,7 +84,7 @@ jobs:
      # This makes the result appear on the merged commit's Checks tab
       - name: Report status on merged commit
         if: always()
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.checks.create({
