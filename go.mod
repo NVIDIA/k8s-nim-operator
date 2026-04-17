@@ -7,7 +7,7 @@ require (
 	github.com/NVIDIA/k8s-dra-driver-gpu v0.0.0-20251124164413-9b590606ceb6
 	github.com/NVIDIA/k8s-test-infra v0.0.0-20240806103558-2d7411125519
 	github.com/blang/semver/v4 v4.0.0
-	github.com/go-git/go-git/v5 v5.17.1
+	github.com/go-git/go-git/v5 v5.18.0
 	github.com/go-logr/logr v1.4.3
 	github.com/google/cel-go v0.26.0
 	github.com/kserve/kserve v0.0.0-20260219142638-5454cafc1f9f
