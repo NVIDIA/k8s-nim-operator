@@ -47,6 +47,9 @@ spec:
         {{- if .SchedulerName }}
         schedulerName: {{ .SchedulerName }}
         {{- end }}
+        {{- if .PriorityClassName }}
+        priorityClassName: {{ .PriorityClassName }}
+        {{- end }}
         initContainers:
         {{- range .InitContainers }}
         - name: {{ .Name }}
@@ -237,6 +240,9 @@ spec:
           runAsGroup: {{ .GroupID }}
           fsGroup: {{ .GroupID }}
           {{- end }}
+        {{- if .PriorityClassName }}
+        priorityClassName: {{ .PriorityClassName }}
+        {{- end }}
         initContainers:
         {{- range .InitContainers }}
         - name: {{ .Name }}

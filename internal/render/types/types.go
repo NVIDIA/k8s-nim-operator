@@ -88,6 +88,7 @@ type DeploymentParams struct {
 	InitContainers     []corev1.Container
 	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
+	PriorityClassName  string
 }
 
 // LeaderWorkerSetParams holds the parameters for rendering a LeaderWorkerSet template.
@@ -130,6 +131,7 @@ type LeaderWorkerSetParams struct {
 	InitContainers     []corev1.Container
 	SidecarContainers  []corev1.Container
 	PodResourceClaims  []corev1.PodResourceClaim
+	PriorityClassName  string
 }
 
 // StatefulSetParams holds the parameters for rendering a StatefulSet template.
@@ -162,6 +164,7 @@ type StatefulSetParams struct {
 	RuntimeClassName   string
 	OrchestratorType   string
 	InitContainers     []corev1.Container
+	PriorityClassName  string
 }
 
 // ServiceParams holds the parameters for rendering a Service template.
