@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
@@ -35,7 +36,9 @@ import (
 )
 
 const (
-	KServeControllerName = "kserve-controller-manager"
+	KServeNamespaceEnvVar      = "KSERVE_NAMESPACE"
+	KServeControllerLabel      = "control-plane"
+	KServeControllerLabelValue = "kserve-controller-manager"
 )
 
 func IsKServeStandardDeploymentMode(deploymentMode kserveconstants.DeploymentModeType) bool {
@@ -215,37 +218,87 @@ func newDeployConfig(isvcConfigMap *corev1.ConfigMap) (*kservev1beta1.DeployConf
 	return deployConfig, nil
 }
 
-func getISVCConfigMap(ctx context.Context, k8sReader client.Reader, k8sClient client.Client) (*corev1.ConfigMap, error) {
-	var namespace string
-	// Find the namespace of the KServe controller
+// discoverKServeNamespace finds the KServe controller namespace by listing Deployments across all namespaces
+// with label control-plane=kserve-controller-manager. Returns the namespace of the matched Deployment.
+// Errors if zero or more than one matching Deployments are found.
+func discoverKServeNamespace(ctx context.Context, k8sReader client.Reader) (string, error) {
 	deploymentList := &appsv1.DeploymentList{}
-	if err := k8sReader.List(ctx, deploymentList, client.MatchingLabels{"app.kubernetes.io/name": KServeControllerName}); err != nil {
+	if err := k8sReader.List(ctx, deploymentList, client.MatchingLabels{
+		KServeControllerLabel: KServeControllerLabelValue,
+	}); err != nil {
+		return "", fmt.Errorf("failed to list KServe controller deployments: %w", err)
+	}
+
+	switch len(deploymentList.Items) {
+	case 0:
+		return "", fmt.Errorf("no KServe controller deployment found with label %s=%s; "+
+			"set the %s env var to specify the target KServe namespace explicitly",
+			KServeControllerLabel, KServeControllerLabelValue, KServeNamespaceEnvVar)
+	case 1:
+		return deploymentList.Items[0].Namespace, nil
+	default:
+		return "", fmt.Errorf("expected exactly one KServe controller deployment with label %s=%s, found %d; "+
+			"set the %s env var to specify the target KServe namespace explicitly",
+			KServeControllerLabel, KServeControllerLabelValue, len(deploymentList.Items), KServeNamespaceEnvVar)
+	}
+}
+
+// getISVCConfigMap fetches the inferenceservice-config ConfigMap from the KServe controller namespace using a
+// two-tier strategy:
+//   - Primary: if the KSERVE_NAMESPACE env var is set, fetches the ConfigMap from that namespace directly.
+//     Returns nil if the ConfigMap does not exist there.
+//   - Fallback: if KSERVE_NAMESPACE is unset, discovers the namespace dynamically via discoverKServeNamespace
+//     and fetches the ConfigMap from there. Returns nil if the ConfigMap does not exist in the discovered namespace.
+func getISVCConfigMap(ctx context.Context, k8sReader client.Reader, k8sClient client.Client) (*corev1.ConfigMap, error) {
+	logger := log.FromContext(ctx).WithName("KServe")
+
+	isvcConfigMap := &corev1.ConfigMap{}
+
+	namespace := os.Getenv(KServeNamespaceEnvVar)
+	if namespace != "" {
+		err := k8sClient.Get(ctx, types.NamespacedName{
+			Name:      kserveconstants.InferenceServiceConfigMapName,
+			Namespace: namespace,
+		}, isvcConfigMap)
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				logger.Info("ConfigMap not found in namespace from env var",
+					"configMap", kserveconstants.InferenceServiceConfigMapName, "namespace", namespace)
+				return nil, nil
+			}
+			return nil, fmt.Errorf("failed to get ConfigMap %s from namespace %s: %w", kserveconstants.InferenceServiceConfigMapName, namespace, err)
+		}
+
+		logger.Info("Using KServe namespace from env var",
+			"namespace", namespace)
+		return isvcConfigMap, nil
+	}
+
+	logger.Info("Env var not set, discovering KServe namespace from controller deployment",
+		"envVar", KServeNamespaceEnvVar)
+
+	namespace, err := discoverKServeNamespace(ctx, k8sReader)
+	if err != nil {
 		return nil, err
 	}
-	for _, deployment := range deploymentList.Items {
-		if deployment.GetName() == KServeControllerName {
-			namespace = deployment.Namespace
-			break
-		}
-	}
 
-	if namespace == "" {
-		return nil, fmt.Errorf("failed to find the namespace of KServe Deployment")
-	}
+	logger.Info("Discovered KServe namespace",
+		"namespace", namespace)
 
-	// Get the inferenceservice-config ConfigMap in the namespace
-	isvcConfigMap := &corev1.ConfigMap{}
-	err := k8sClient.Get(ctx,
-		types.NamespacedName{
-			Name:      kserveconstants.InferenceServiceConfigMapName,
-			Namespace: namespace},
-		isvcConfigMap)
+	err = k8sClient.Get(ctx, types.NamespacedName{
+		Name:      kserveconstants.InferenceServiceConfigMapName,
+		Namespace: namespace,
+	}, isvcConfigMap)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
+			logger.Info("ConfigMap not found in discovered namespace",
+				"configMap", kserveconstants.InferenceServiceConfigMapName, "namespace", namespace)
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to get ConfigMap %s from namespace %s: %w", kserveconstants.InferenceServiceConfigMapName, namespace, err)
 	}
 
+	logger.Info("Using KServe namespace from controller deployment discovery",
+		"namespace", namespace)
 	return isvcConfigMap, nil
 }

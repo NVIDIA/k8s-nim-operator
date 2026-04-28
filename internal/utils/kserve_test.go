@@ -19,6 +19,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,6 +39,172 @@ import (
 )
 
 var _ = Describe("KServe Utilities", func() {
+	Describe("getISVCConfigMap namespace discovery", func() {
+		var (
+			client k8sclient.Client
+			scheme *runtime.Scheme
+		)
+
+		BeforeEach(func() {
+			scheme = runtime.NewScheme()
+			Expect(appsv1.AddToScheme(scheme)).To(Succeed())
+			Expect(corev1.AddToScheme(scheme)).To(Succeed())
+
+			os.Unsetenv(KServeNamespaceEnvVar)
+		})
+
+		AfterEach(func() {
+			os.Unsetenv(KServeNamespaceEnvVar)
+		})
+
+		It("should fetch ConfigMap from env var namespace directly", func() {
+			os.Setenv(KServeNamespaceEnvVar, "custom-ns")
+
+			configMap := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      kserveconstants.InferenceServiceConfigMapName,
+					Namespace: "custom-ns",
+				},
+				Data: map[string]string{"deploy": `{"defaultDeploymentMode": "Standard"}`},
+			}
+			client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(configMap).Build()
+
+			cm, err := getISVCConfigMap(context.Background(), client, client)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm).NotTo(BeNil())
+			Expect(cm.Namespace).To(Equal("custom-ns"))
+		})
+
+		It("should discover namespace via deployment when env var is unset", func() {
+			deployment := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kserve-controller-manager",
+					Namespace: "kserve",
+					Labels:    map[string]string{KServeControllerLabel: KServeControllerLabelValue},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "kserve"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "kserve"}},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{Name: "manager", Image: "kserve:latest"}},
+						},
+					},
+				},
+			}
+			configMap := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      kserveconstants.InferenceServiceConfigMapName,
+					Namespace: "kserve",
+				},
+				Data: map[string]string{"deploy": `{"defaultDeploymentMode": "Standard"}`},
+			}
+			client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(deployment, configMap).Build()
+
+			cm, err := getISVCConfigMap(context.Background(), client, client)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm).NotTo(BeNil())
+			Expect(cm.Namespace).To(Equal("kserve"))
+		})
+
+		It("should return nil when env var is set but ConfigMap not found in that namespace", func() {
+			os.Setenv(KServeNamespaceEnvVar, "wrong-ns")
+
+			client = fake.NewClientBuilder().WithScheme(scheme).Build()
+
+			cm, err := getISVCConfigMap(context.Background(), client, client)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm).To(BeNil())
+		})
+
+		It("should return nil when ConfigMap not found in discovered namespace", func() {
+			deployment := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kserve-controller-manager",
+					Namespace: "kserve-system",
+					Labels:    map[string]string{KServeControllerLabel: KServeControllerLabelValue},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "kserve"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "kserve"}},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{Name: "manager", Image: "kserve:latest"}},
+						},
+					},
+				},
+			}
+			client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(deployment).Build()
+
+			cm, err := getISVCConfigMap(context.Background(), client, client)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm).To(BeNil())
+		})
+
+		It("should return error when no deployment found in fallback", func() {
+			client = fake.NewClientBuilder().WithScheme(scheme).Build()
+
+			_, err := getISVCConfigMap(context.Background(), client, client)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no KServe controller deployment found"))
+			Expect(err.Error()).To(ContainSubstring(KServeNamespaceEnvVar))
+		})
+
+		It("should return error when multiple deployments found in fallback", func() {
+			dep1 := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kserve-controller-1",
+					Namespace: "ns1",
+					Labels:    map[string]string{KServeControllerLabel: KServeControllerLabelValue},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "kserve-1"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "kserve-1"}},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{Name: "manager", Image: "kserve:latest"}},
+						},
+					},
+				},
+			}
+			dep2 := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kserve-controller-2",
+					Namespace: "ns2",
+					Labels:    map[string]string{KServeControllerLabel: KServeControllerLabelValue},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "kserve-2"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "kserve-2"}},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{Name: "manager", Image: "kserve:latest"}},
+						},
+					},
+				},
+			}
+			client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(dep1, dep2).Build()
+
+			_, err := getISVCConfigMap(context.Background(), client, client)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("expected exactly one"))
+			Expect(err.Error()).To(ContainSubstring("found 2"))
+			Expect(err.Error()).To(ContainSubstring(KServeNamespaceEnvVar))
+		})
+	})
+
 	Describe("Get Deployment Mode", func() {
 		var (
 			client k8sclient.Client
@@ -46,19 +213,17 @@ var _ = Describe("KServe Utilities", func() {
 
 		namespace := "default"
 
-		var kserveDeployment *appsv1.Deployment
 		var isvcConfig *corev1.ConfigMap
 
 		isvcName := "test-isvc"
 
-		// Helper function to create a fresh KServe deployment for isolated tests
 		createKServeDeployment := func() *appsv1.Deployment {
 			return &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      KServeControllerName,
+					Name:      "kserve-controller-manager",
 					Namespace: namespace,
 					Labels: map[string]string{
-						"app.kubernetes.io/name": KServeControllerName,
+						KServeControllerLabel: KServeControllerLabelValue,
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
@@ -98,45 +263,11 @@ var _ = Describe("KServe Utilities", func() {
 			Expect(corev1.AddToScheme(scheme)).To(Succeed())
 			Expect(kservev1beta1.AddToScheme(scheme)).To(Succeed())
 
+			os.Setenv(KServeNamespaceEnvVar, namespace)
+
 			client = fake.NewClientBuilder().WithScheme(scheme).Build()
 
-			kserveDeployment = &appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      KServeControllerName,
-					Namespace: namespace,
-					Labels: map[string]string{
-						"app.kubernetes.io/name": KServeControllerName,
-					},
-				},
-				Spec: appsv1.DeploymentSpec{
-					Replicas: ptr.To[int32](1),
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"app": "nim-test-kserve",
-						},
-					},
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"app": "nim-test-kserve",
-							},
-						},
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nim-test-kserve-container",
-									Image: "nim-test-kserve-image",
-									Ports: []corev1.ContainerPort{
-										{
-											ContainerPort: 80,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			}
+			kserveDeployment := createKServeDeployment()
 			Expect(client.Create(context.Background(), kserveDeployment)).To(Succeed())
 
 			isvcConfig = &corev1.ConfigMap{
@@ -152,6 +283,8 @@ var _ = Describe("KServe Utilities", func() {
 		})
 
 		AfterEach(func() {
+			os.Unsetenv(KServeNamespaceEnvVar)
+
 			By("delete the KServe Deployment")
 			Expect(client.DeleteAllOf(context.Background(), &appsv1.Deployment{})).To(Succeed())
 
@@ -364,19 +497,19 @@ var _ = Describe("KServe Utilities", func() {
 				Expect(err.Error()).To(ContainSubstring("invalid deployment mode"))
 			})
 
-			It("should return error when KServe deployment not found", func() {
+			It("should return error when KServe namespace cannot be discovered", func() {
+				os.Unsetenv(KServeNamespaceEnvVar)
 				isolatedClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-				// Don't create KServe deployment
 
 				_, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("failed to find the namespace of KServe Deployment"))
+				Expect(err.Error()).To(ContainSubstring("no KServe controller deployment found"))
+				Expect(err.Error()).To(ContainSubstring(KServeNamespaceEnvVar))
 			})
 
 			It("should use annotation when ConfigMap doesn't exist", func() {
 				isolatedClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 				Expect(isolatedClient.Create(context.Background(), createKServeDeployment())).To(Succeed())
-				// Don't create ConfigMap
 
 				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient,
 					map[string]string{kserveconstants.DeploymentMode: string(kserveconstants.Knative)}, nil)
@@ -585,6 +718,18 @@ var _ = Describe("KServe Utilities", func() {
 				// Status = Knative, filtered annotation = LegacyServerless, config = Standard
 				// Result should be Knative (status wins)
 				Expect(mode).To(Equal(kserveconstants.Knative))
+			})
+		})
+
+		Describe("Env var set but ConfigMap missing", func() {
+			It("should use default deployment mode when env var namespace has no ConfigMap", func() {
+				os.Setenv(KServeNamespaceEnvVar, "wrong-ns")
+
+				isolatedClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+				mode, err := GetKServeDeploymentMode(context.Background(), isolatedClient, isolatedClient, nil, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(mode).To(Equal(kserveconstants.DefaultDeployment))
 			})
 		})
 	})
