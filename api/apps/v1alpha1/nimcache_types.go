@@ -170,6 +170,7 @@ type NIMCacheStorage struct {
 // NIMCacheStatus defines the observed state of NIMCache.
 type NIMCacheStatus struct {
 	State      string             `json:"state,omitempty"`
+	Type       string             `json:"type,omitempty"`
 	PVC        string             `json:"pvc,omitempty"`
 	Profiles   []NIMProfile       `json:"profiles,omitempty"`
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
@@ -452,6 +453,46 @@ func (n *NIMCache) GetInitContainers() []corev1.Container {
 	}
 
 	return initContainers
+}
+
+// GetHFUri returns the HF URI for the NIMCache.
+func (n *NIMCache) GetHFUri() string {
+	switch {
+	case n.Spec.Source.DataStore != nil:
+		return fmt.Sprintf("hf://%s/%s", n.Spec.Source.DataStore.GetNamespace(), *n.Spec.Source.DataStore.GetModelName())
+	case n.Spec.Source.HF != nil:
+		return fmt.Sprintf("hf://%s/%s", n.Spec.Source.HF.GetNamespace(), *n.Spec.Source.HF.GetModelName())
+	default:
+		return ""
+	}
+}
+
+// GetPullSecret returns the pull secret for the NIMCache.
+func (n *NIMCache) GetPullSecret() string {
+	switch {
+	case n.Spec.Source.NGC != nil:
+		return n.Spec.Source.NGC.PullSecret
+	case n.Spec.Source.DataStore != nil:
+		return n.Spec.Source.DataStore.PullSecret
+	case n.Spec.Source.HF != nil:
+		return n.Spec.Source.HF.PullSecret
+	default:
+		return ""
+	}
+}
+
+// GetModelPuller returns the model puller for the NIMCache.
+func (n *NIMCache) GetModelPuller() string {
+	switch {
+	case n.Spec.Source.NGC != nil:
+		return n.Spec.Source.NGC.ModelPuller
+	case n.Spec.Source.DataStore != nil:
+		return n.Spec.Source.DataStore.ModelPuller
+	case n.Spec.Source.HF != nil:
+		return n.Spec.Source.HF.ModelPuller
+	default:
+		return ""
+	}
 }
 
 func (d *DSHFCommonFields) GetModelName() *string {
