@@ -3249,9 +3249,25 @@ spec:
                         minimum: 1
                         type: integer
                     type: object
+                  ray:
+                    description: Ray config for NIMService using LeaderWorkerSet
+                    properties:
+                      rayPort:
+                        default: 6379
+                        description: RayPort specifies the port for the Ray cluster.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1
+                        type: integer
+                    required:
+                    - rayPort
+                    type: object
                 required:
                 - parallelism
                 type: object
+                x-kubernetes-validations:
+                - message: mpi and ray are mutually exclusive
+                  rule: '!(has(self.mpi) && has(self.ray))'
               nodeSelector:
                 additionalProperties:
                   type: string

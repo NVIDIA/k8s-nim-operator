@@ -2311,6 +2311,155 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		})
 	})
 
+	Describe("Ray multi-node LWS reconciliation", func() {
+		It("should configure leader/worker for Ray and skip MPI resources", func() {
+			const rayPort = 6380
+
+			rayNimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-multinode-ray-nimcache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{
+						NGC: &appsv1alpha1.NGCSource{
+							ModelPuller: "test-container",
+							PullSecret:  "my-secret",
+						},
+					},
+					Storage: appsv1alpha1.NIMCacheStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create:       ptr.To[bool](true),
+							StorageClass: "standard",
+							Size:         "1Gi",
+							SubPath:      "subPath",
+						},
+					},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					State: appsv1alpha1.NimCacheStatusReady,
+					PVC:   "test-multinode-ray-nimcache-pvc",
+					Profiles: []appsv1alpha1.NIMProfile{{
+						Name:   "test-profile",
+						Config: map[string]string{"tp": "4"},
+					}},
+				},
+			}
+			Expect(client.Create(context.TODO(), rayNimCache)).To(Succeed())
+
+			rayPVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-multinode-ray-nimcache-pvc",
+					Namespace: "default",
+				},
+			}
+			Expect(client.Create(context.TODO(), rayPVC)).To(Succeed())
+
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-multinode-ray-nimservice",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository:  "nvcr.io/nvidia/nim-llm",
+						Tag:         "v0.1.0",
+						PullPolicy:  "IfNotPresent",
+						PullSecrets: []string{"ngc-secret"},
+					},
+					Replicas: ptr.To(int32(1)),
+					Storage: appsv1alpha1.NIMServiceStorage{
+						PVC: appsv1alpha1.PersistentVolumeClaim{
+							Name:         "test-pvc",
+							StorageClass: "standard",
+							Size:         "1Gi",
+							Create:       ptr.To[bool](true),
+						},
+						NIMCache: appsv1alpha1.NIMCacheVolSpec{
+							Name: "test-multinode-ray-nimcache",
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123)},
+					},
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						BackendType: appsv1alpha1.NIMBackendTypeLWS,
+						Parallelism: &appsv1alpha1.ParallelismSpec{
+							Tensor:   ptr.To(uint32(2)),
+							Pipeline: ptr.To(uint32(2)),
+						},
+						Ray: &appsv1alpha1.MultiNodeRayConfig{
+							RayPort: rayPort,
+						},
+					},
+				},
+			}
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			lws := &lwsv1.LeaderWorkerSet{}
+			lwsKey := types.NamespacedName{Name: testNimService.GetLWSName(), Namespace: testNimService.Namespace}
+			Expect(client.Get(context.TODO(), lwsKey, lws)).To(Succeed())
+
+			leaderContainer := lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Containers[0]
+			workerContainer := lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Containers[0]
+
+			Expect(leaderContainer.Args).To(Equal([]string{
+				"nim-serve-ray", "--head", "--port", fmt.Sprintf("%d", rayPort),
+			}))
+			Expect(workerContainer.Args).To(Equal([]string{
+				"nim-serve-ray", "--head-address", fmt.Sprintf("$(LWS_LEADER_ADDRESS):%d", rayPort),
+			}))
+
+			// Ray container port is exposed on both leader and worker.
+			rayPortMatcher := And(
+				HaveField("Name", "ray"),
+				HaveField("ContainerPort", int32(rayPort)),
+			)
+			Expect(leaderContainer.Ports).To(ContainElement(rayPortMatcher))
+			Expect(workerContainer.Ports).To(ContainElement(rayPortMatcher))
+
+			// Worker has the `ray status` startup probe.
+			Expect(workerContainer.StartupProbe).NotTo(BeNil())
+			Expect(workerContainer.StartupProbe.Exec).NotTo(BeNil())
+			Expect(workerContainer.StartupProbe.Exec.Command).To(Equal([]string{"/bin/sh", "-c", "ray status"}))
+
+			// MPI/SSH volumes must not be present on either pod template.
+			leaderVolumes := lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Volumes
+			workerVolumes := lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Volumes
+			for _, name := range []string{"mpi-config", "ssh-pk", "ssh-dotfiles", "ssh-confs", "start-mpi-script"} {
+				Expect(leaderVolumes).NotTo(ContainElement(HaveField("Name", name)),
+					fmt.Sprintf("leader volume %q should not exist on the Ray path", name))
+				Expect(workerVolumes).NotTo(ContainElement(HaveField("Name", name)),
+					fmt.Sprintf("worker volume %q should not exist on the Ray path", name))
+			}
+
+			// MPI configmaps and SSH secret must not be created.
+			cm := &corev1.ConfigMap{}
+			err = client.Get(context.TODO(), types.NamespacedName{
+				Name:      fmt.Sprintf("%s-mpi-config", testNimService.Name),
+				Namespace: testNimService.Namespace,
+			}, cm)
+			Expect(errors.IsNotFound(err)).To(BeTrue(), "MPI configmap should not be created on the Ray path")
+
+			err = client.Get(context.TODO(), types.NamespacedName{
+				Name:      fmt.Sprintf("%s-mpi-start-script", testNimService.Name),
+				Namespace: testNimService.Namespace,
+			}, cm)
+			Expect(errors.IsNotFound(err)).To(BeTrue(), "MPI start-script configmap should not be created on the Ray path")
+
+			secret := &corev1.Secret{}
+			err = client.Get(context.TODO(), types.NamespacedName{
+				Name:      fmt.Sprintf("%s-ssh-pk", testNimService.Name),
+				Namespace: testNimService.Namespace,
+			}, secret)
+			Expect(errors.IsNotFound(err)).To(BeTrue(), "MPI SSH secret should not be created on the Ray path")
+		})
+	})
+
 	Describe("getNIMModelEndpoints", func() {
 		var (
 			svc     *corev1.Service

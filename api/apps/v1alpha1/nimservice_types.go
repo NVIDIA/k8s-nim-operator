@@ -142,6 +142,7 @@ type NIMServiceSpec struct {
 }
 
 // NimServiceMultiNodeConfig defines the configuration for multi-node NIMService.
+// +kubebuilder:validation:XValidation:rule="!(has(self.mpi) && has(self.ray))",message="mpi and ray are mutually exclusive"
 type NimServiceMultiNodeConfig struct {
 	// +kubebuilder:validation:Enum=lws
 	// +kubebuilder:default:=lws
@@ -153,6 +154,9 @@ type NimServiceMultiNodeConfig struct {
 
 	// MPI config for NIMService using LeaderWorkerSet
 	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
+
+	// Ray config for NIMService using LeaderWorkerSet
+	Ray *MultiNodeRayConfig `json:"ray,omitempty"`
 
 	// ComputeDomain specifies the compute domain to use for a
 	// multi-node NIMService.
@@ -173,6 +177,14 @@ type MultiNodeMPIConfig struct {
 	// +kubebuilder:default:=300
 	// MPIStartTimeout specifies the timeout in seconds for starting the cluster.
 	MPIStartTimeout int `json:"mpiStartTimeout"`
+}
+
+type MultiNodeRayConfig struct {
+	// RayPort specifies the port for the Ray cluster.
+	// +kubebuilder:default:=6379
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	RayPort int32 `json:"rayPort"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume.

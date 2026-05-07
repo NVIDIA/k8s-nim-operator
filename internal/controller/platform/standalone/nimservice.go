@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -453,8 +454,6 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		lwsParams := nimService.GetLWSParams()
 		lwsParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
-		lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(modelPVC)
-		lwsParams.WorkerVolumes = nimService.GetWorkerVolumes(modelPVC)
 		if nimCache.IsUniversalNIM() {
 			lwsParams.WorkerEnvs = utils.MergeEnvVars([]corev1.EnvVar{{
 				Name:  "NIM_MODEL_NAME",
@@ -465,8 +464,6 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 				Value: utils.DefaultModelStorePath,
 			}}, lwsParams.LeaderEnvs)
 		}
-		lwsParams.LeaderVolumeMounts = nimService.GetLeaderVolumeMounts(modelPVC)
-		lwsParams.WorkerVolumeMounts = nimService.GetWorkerVolumeMounts(modelPVC)
 		if profileEnv != nil {
 			lwsParams.WorkerEnvs = utils.MergeEnvVars(*profileEnv, lwsParams.WorkerEnvs)
 			lwsParams.LeaderEnvs = utils.MergeEnvVars(*profileEnv, lwsParams.LeaderEnvs)
@@ -474,10 +471,50 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		if gpuResources != nil {
 			lwsParams.Resources = gpuResources
 		}
+
 		initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
 		for idx := range lwsParams.InitContainers {
 			lwsParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
 		}
+
+		if nimService.Spec.MultiNode.Ray != nil {
+			port := strconv.Itoa(int(nimService.Spec.MultiNode.Ray.RayPort))
+			lwsParams.LeaderArgs = []string{"nim-serve-ray", "--head", "--port", port}
+			lwsParams.WorkerArgs = []string{"nim-serve-ray", "--head-address", "$(LWS_LEADER_ADDRESS):" + port}
+			lwsParams.Ports = append(lwsParams.Ports, corev1.ContainerPort{
+				Name:          "ray",
+				ContainerPort: int32(nimService.Spec.MultiNode.Ray.RayPort),
+				Protocol:      corev1.ProtocolTCP,
+			})
+			lwsParams.LeaderVolumes = nimService.GetVolumes(modelPVC)
+			lwsParams.WorkerVolumes = nimService.GetVolumes(modelPVC)
+			lwsParams.LeaderVolumeMounts = nimService.GetVolumeMounts(modelPVC)
+			lwsParams.WorkerVolumeMounts = nimService.GetVolumeMounts(modelPVC)
+			lwsParams.WorkerStartupProbe = &corev1.Probe{
+				InitialDelaySeconds: 30,
+				TimeoutSeconds:      5,
+				PeriodSeconds:       10,
+				FailureThreshold:    3,
+				ProbeHandler: corev1.ProbeHandler{
+					Exec: &corev1.ExecAction{
+						Command: []string{"/bin/sh", "-c", "ray status"},
+					},
+				},
+			}
+		} else {
+			lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(modelPVC)
+			lwsParams.WorkerVolumes = nimService.GetWorkerVolumes(modelPVC)
+
+			lwsParams.LeaderVolumeMounts = nimService.GetLeaderVolumeMounts(modelPVC)
+			lwsParams.WorkerVolumeMounts = nimService.GetWorkerVolumeMounts(modelPVC)
+
+			// Create configmap for MPI
+			err = r.createMultiNodeVolumeObjects(ctx, nimService)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to create multi-node volumes: %v", err)
+			}
+		}
+
 		renderFunc = func() (client.Object, error) {
 			result, err := renderer.LeaderWorkerSet(lwsParams)
 			if err != nil {
@@ -492,15 +529,11 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 			return result, nil
 		}
+
 		conType = "LeaderWorkerSet"
 		failedCon = conditions.ReasonLeaderWorkerSetFailed
 		renderObj = &lws.LeaderWorkerSet{}
 
-		// Create configmap for MPI
-		err = r.createMultiNodeVolumeObjects(ctx, nimService)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to create multi-node volumes: %v", err)
-		}
 	} else {
 		deploymentParams := nimService.GetDeploymentParams()
 		deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
