@@ -418,7 +418,7 @@ func (n *NIMCache) GetInitContainers() []corev1.Container {
 
 	var initContainers []corev1.Container
 
-	if n.Spec.Proxy != nil {
+	if n.GetProxyCertConfigMap() != "" {
 		var image string
 		if n.Spec.Source.NGC != nil { // nolint:gocritic
 			image = n.Spec.Source.NGC.ModelPuller
