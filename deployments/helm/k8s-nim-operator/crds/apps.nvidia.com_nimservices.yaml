@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: nimservices.apps.nvidia.com
 spec:
   group: apps.nvidia.com
@@ -3255,6 +3255,9 @@ spec:
                       rayPort:
                         default: 6379
                         description: RayPort specifies the port for the Ray cluster.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1
                         type: integer
                     required:
                     - rayPort
@@ -3262,6 +3265,9 @@ spec:
                 required:
                 - parallelism
                 type: object
+                x-kubernetes-validations:
+                - message: mpi and ray are mutually exclusive
+                  rule: '!(has(self.mpi) && has(self.ray))'
               nodeSelector:
                 additionalProperties:
                   type: string
