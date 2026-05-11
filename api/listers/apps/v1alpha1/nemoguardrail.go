@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NemoGuardrailLister helps list NemoGuardrails.
@@ -29,7 +29,7 @@ import (
 type NemoGuardrailLister interface {
 	// List lists all NemoGuardrails in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NemoGuardrail, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NemoGuardrail, err error)
 	// NemoGuardrails returns an object that can list and get NemoGuardrails.
 	NemoGuardrails(namespace string) NemoGuardrailNamespaceLister
 	NemoGuardrailListerExpansion
@@ -37,17 +37,17 @@ type NemoGuardrailLister interface {
 
 // nemoGuardrailLister implements the NemoGuardrailLister interface.
 type nemoGuardrailLister struct {
-	listers.ResourceIndexer[*v1alpha1.NemoGuardrail]
+	listers.ResourceIndexer[*appsv1alpha1.NemoGuardrail]
 }
 
 // NewNemoGuardrailLister returns a new NemoGuardrailLister.
 func NewNemoGuardrailLister(indexer cache.Indexer) NemoGuardrailLister {
-	return &nemoGuardrailLister{listers.New[*v1alpha1.NemoGuardrail](indexer, v1alpha1.Resource("nemoguardrail"))}
+	return &nemoGuardrailLister{listers.New[*appsv1alpha1.NemoGuardrail](indexer, appsv1alpha1.Resource("nemoguardrail"))}
 }
 
 // NemoGuardrails returns an object that can list and get NemoGuardrails.
 func (s *nemoGuardrailLister) NemoGuardrails(namespace string) NemoGuardrailNamespaceLister {
-	return nemoGuardrailNamespaceLister{listers.NewNamespaced[*v1alpha1.NemoGuardrail](s.ResourceIndexer, namespace)}
+	return nemoGuardrailNamespaceLister{listers.NewNamespaced[*appsv1alpha1.NemoGuardrail](s.ResourceIndexer, namespace)}
 }
 
 // NemoGuardrailNamespaceLister helps list and get NemoGuardrails.
@@ -55,15 +55,15 @@ func (s *nemoGuardrailLister) NemoGuardrails(namespace string) NemoGuardrailName
 type NemoGuardrailNamespaceLister interface {
 	// List lists all NemoGuardrails in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NemoGuardrail, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NemoGuardrail, err error)
 	// Get retrieves the NemoGuardrail from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NemoGuardrail, error)
+	Get(name string) (*appsv1alpha1.NemoGuardrail, error)
 	NemoGuardrailNamespaceListerExpansion
 }
 
 // nemoGuardrailNamespaceLister implements the NemoGuardrailNamespaceLister
 // interface.
 type nemoGuardrailNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.NemoGuardrail]
+	listers.ResourceIndexer[*appsv1alpha1.NemoGuardrail]
 }
