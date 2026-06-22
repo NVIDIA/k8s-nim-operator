@@ -46,6 +46,9 @@ spec:
     {{- if .SchedulerName }}
     schedulerName: {{ .SchedulerName }}
     {{- end }}
+    {{- if .PriorityClassName }}
+    priorityClassName: {{ .PriorityClassName }}
+    {{- end }}
     serviceAccountName: {{ .ServiceAccountName }}
     runtimeClassName: {{ .RuntimeClassName }}
     initContainers:
