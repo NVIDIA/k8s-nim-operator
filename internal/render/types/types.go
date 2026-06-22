@@ -68,6 +68,7 @@ type DeploymentParams struct {
 	ImagePullSecrets   []string
 	ImagePullPolicy    string
 	SchedulerName      string
+	PriorityClassName  string
 	Volumes            []corev1.Volume
 	VolumeMounts       []corev1.VolumeMount
 	Env                []corev1.EnvVar
@@ -109,6 +110,7 @@ type LeaderWorkerSetParams struct {
 	ImagePullSecrets   []string
 	ImagePullPolicy    string
 	SchedulerName      string
+	PriorityClassName  string
 	WorkerVolumes      []corev1.Volume
 	LeaderVolumes      []corev1.Volume
 	WorkerVolumeMounts []corev1.VolumeMount
@@ -164,6 +166,7 @@ type StatefulSetParams struct {
 	NIMCachePVC        string
 	RuntimeClassName   string
 	OrchestratorType   string
+	PriorityClassName  string
 	InitContainers     []corev1.Container
 }
 
@@ -317,6 +320,7 @@ type InferenceServiceParams struct {
 	ImagePullSecrets   []string
 	ImagePullPolicy    string
 	SchedulerName      string
+	PriorityClassName  string
 	Volumes            []corev1.Volume
 	VolumeMounts       []corev1.VolumeMount
 	Env                []corev1.EnvVar

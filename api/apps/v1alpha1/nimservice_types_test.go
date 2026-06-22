@@ -999,3 +999,35 @@ func TestStandardModeReplicasWithoutAutoscaling(t *testing.T) {
 		t.Errorf("MaxReplicas = %d, want 3", *params.MaxReplicas)
 	}
 }
+
+func TestGetPriorityClassName(t *testing.T) {
+	nimService := &NIMService{
+		Spec: NIMServiceSpec{
+			PriorityClassName: "gpu-critical",
+			Image: Image{
+				Repository: "test-repo",
+				Tag:        "test-tag",
+			},
+			AuthSecret: "test-secret",
+			Expose: Expose{
+				Service: Service{
+					Port: ptr.To[int32](8000),
+				},
+			},
+		},
+	}
+
+	if got := nimService.GetPriorityClassName(); got != "gpu-critical" {
+		t.Errorf("GetPriorityClassName() = %q, want %q", got, "gpu-critical")
+	}
+
+	deploymentParams := nimService.GetDeploymentParams()
+	if deploymentParams.PriorityClassName != "gpu-critical" {
+		t.Errorf("GetDeploymentParams().PriorityClassName = %q, want %q", deploymentParams.PriorityClassName, "gpu-critical")
+	}
+
+	inferenceParams := nimService.GetInferenceServiceParams("Standard")
+	if inferenceParams.PriorityClassName != "gpu-critical" {
+		t.Errorf("GetInferenceServiceParams().PriorityClassName = %q, want %q", inferenceParams.PriorityClassName, "gpu-critical")
+	}
+}
