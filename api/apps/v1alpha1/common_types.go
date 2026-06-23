@@ -167,6 +167,7 @@ type Service struct {
 	// +kubebuilder:validation:Maximum=65535
 	MetricsPort *int32            `json:"metricsPort,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 // Deprecated: Use .spec.expose.router.ingress instead.
