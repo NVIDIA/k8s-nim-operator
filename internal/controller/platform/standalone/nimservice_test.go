@@ -268,7 +268,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 					},
 				},
 				Expose: appsv1alpha1.Expose{
-					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}},
+					Service: appsv1alpha1.Service{Type: corev1.ServiceTypeLoadBalancer, Port: ptr.To[int32](8123), Annotations: map[string]string{"annotation-key-specific": "service"}, Labels: map[string]string{"label-key-specific": "service"}},
 
 					Router: appsv1alpha1.Router{
 						Ingress: &appsv1alpha1.RouterIngress{
@@ -518,6 +518,8 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(service.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(service.Annotations["annotation-key"]).To(Equal("annotation-value"))
 			Expect(service.Annotations["annotation-key-specific"]).To(Equal("service"))
+			Expect(service.Labels["app"]).To(Equal("test-app"))
+			Expect(service.Labels["label-key-specific"]).To(Equal("service"))
 			// Verify the named ports
 			expectedPorts := map[string]int32{
 				"api": 8123,
@@ -574,6 +576,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(deployment.Name).To(Equal(nimService.GetName()))
 			Expect(deployment.Namespace).To(Equal(nimService.GetNamespace()))
 			Expect(deployment.Annotations["annotation-key"]).To(Equal("annotation-value"))
+			Expect(deployment.Labels).NotTo(HaveKey("label-key-specific"))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal(nimService.GetContainerName()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(nimService.GetImage()))
 			Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(Equal(nimService.Spec.ReadinessProbe.Probe))
