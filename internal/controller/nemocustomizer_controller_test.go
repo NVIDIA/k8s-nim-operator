@@ -648,6 +648,36 @@ var _ = Describe("NemoCustomizer Controller", func() {
 			Expect(parsed).To(HaveKeyWithValue("mlflow_tracking_url", "http://mlflow-tracking.nemo.svc.cluster.local:80"))
 		})
 
+		It("should create customizer config when training config map is omitted", func() {
+			namespacedName := types.NamespacedName{Name: nemoCustomizer.Name, Namespace: "default"}
+			nemoCustomizer.Spec.Training.ConfigMap = nil
+
+			err := client.Create(context.TODO(), nemoCustomizer)
+			Expect(err).NotTo(HaveOccurred())
+			err = client.Create(context.TODO(), secrets)
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			configMap := &corev1.ConfigMap{}
+			err = client.Get(context.TODO(), namespacedName, configMap)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(configMap.Data).To(HaveKey("config.yaml"))
+
+			var parsed map[string]interface{}
+			err = yaml.Unmarshal([]byte(configMap.Data["config.yaml"]), &parsed)
+			Expect(err).NotTo(HaveOccurred())
+
+			training, ok := parsed["training"].(map[string]interface{})
+			Expect(ok).To(BeTrue(), "expected 'training' to be a map")
+			Expect(training).To(HaveKeyWithValue("image", "nvcr.io/nvidia/nemo-microservices/customizer:25.04"))
+			Expect(training).To(HaveKey("pvc"))
+			Expect(training).To(HaveKey("imagePullSecrets"))
+			Expect(training).To(HaveKeyWithValue("workspace_dir", "/pvc/workspace"))
+		})
+
 		It("should delete HPA when NemoCustomizer is updated", func() {
 			namespacedName := types.NamespacedName{Name: nemoCustomizer.Name, Namespace: "default"}
 			err := client.Create(context.TODO(), nemoCustomizer)

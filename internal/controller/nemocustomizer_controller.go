@@ -663,7 +663,8 @@ func (r *NemoCustomizerReconciler) addTrainingConfig(ctx context.Context, cfg ma
 	}
 
 	trainingCfg := make(map[string]interface{})
-	if cmName := n.Spec.Training.ConfigMap.Name; cmName != "" {
+	if trainingConfigMap := n.Spec.Training.ConfigMap; trainingConfigMap != nil && trainingConfigMap.Name != "" {
+		cmName := trainingConfigMap.Name
 		trainingRaw, err := k8sutil.GetRawYAMLFromConfigMap(ctx, r.GetClient(), n.GetNamespace(), cmName, "training")
 		if err != nil {
 			return fmt.Errorf("loading training config: %w", err)
