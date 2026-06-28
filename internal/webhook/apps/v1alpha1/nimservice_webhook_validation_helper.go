@@ -385,6 +385,11 @@ func validateDRADeviceAttributeSelectorOp(op appsv1alpha1.DRADeviceAttributeSele
 
 func validateDRADeviceAttributeSelectorValue(attribute *appsv1alpha1.DRADeviceAttributeSelectorValue, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
+	if attribute == nil {
+		errList = append(errList, field.Required(fldPath, "is required"))
+		return errList
+	}
+
 	var fieldCount int
 	if attribute.BoolValue != nil {
 		fieldCount++
