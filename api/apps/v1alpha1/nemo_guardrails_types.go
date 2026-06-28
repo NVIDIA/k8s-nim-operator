@@ -118,7 +118,7 @@ type NIMEndpoint struct {
 
 // GuardrailConfig defines the source where the service config is made available.
 //
-// +kubebuilder:validation:XValidation:rule="!(has(self.configMap) && has(self.pvc))", message="Cannot set both ConfigMap and PVC in ConfigStore"
+// +kubebuilder:validation:XValidation:rule="has(self.configMap) != has(self.pvc)", message="Exactly one of configMap or pvc must be set in ConfigStore"
 type GuardrailConfig struct {
 	ConfigMap *ConfigMapRef          `json:"configMap,omitempty"`
 	PVC       *PersistentVolumeClaim `json:"pvc,omitempty"`
@@ -163,6 +163,18 @@ func (n *NemoGuardrail) GetPVCName(pvc PersistentVolumeClaim) string {
 		pvcName = pvc.Name
 	}
 	return pvcName
+}
+
+// ValidateConfigStore verifies that NemoGuardrail has exactly one config source.
+func (n *NemoGuardrail) ValidateConfigStore() error {
+	hasConfigMap := n.Spec.ConfigStore.ConfigMap != nil
+	hasPVC := n.Spec.ConfigStore.PVC != nil
+
+	if hasConfigMap == hasPVC {
+		return fmt.Errorf("exactly one of spec.configStore.configMap or spec.configStore.pvc must be set")
+	}
+
+	return nil
 }
 
 // GetStandardSelectorLabels returns the standard selector labels for the NemoGuardrail deployment.
@@ -529,33 +541,43 @@ func (n *NemoGuardrail) GetStartupProbe() *corev1.Probe {
 
 // GetVolumes returns volumes for the NemoGuardrail container.
 func (n *NemoGuardrail) GetVolumes() []corev1.Volume {
-	volumes := []corev1.Volume{}
+	if n.ValidateConfigStore() != nil {
+		return []corev1.Volume{}
+	}
+
 	if n.Spec.ConfigStore.ConfigMap != nil {
-		volumes = append(volumes, corev1.Volume{
-			Name: "config-store",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.ConfigStore.ConfigMap.Name,
+		return []corev1.Volume{
+			{
+				Name: "config-store",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: n.Spec.ConfigStore.ConfigMap.Name,
+						},
 					},
 				},
 			},
-		})
-	} else {
-		volumes = append(volumes, corev1.Volume{
+		}
+	}
+
+	return []corev1.Volume{
+		{
 			Name: "config-store",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: n.Spec.ConfigStore.PVC.Name,
 				},
 			},
-		})
+		},
 	}
-	return volumes
 }
 
 // GetVolumeMounts returns volumes for the NemoGuardrail container.
 func (n *NemoGuardrail) GetVolumeMounts() []corev1.VolumeMount {
+	if n.ValidateConfigStore() != nil {
+		return []corev1.VolumeMount{}
+	}
+
 	volumeMount := corev1.VolumeMount{
 		Name:      "config-store",
 		MountPath: "/config-store",

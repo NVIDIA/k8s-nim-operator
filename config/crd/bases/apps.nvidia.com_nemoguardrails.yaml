@@ -1020,8 +1020,8 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-validations:
-                - message: Cannot set both ConfigMap and PVC in ConfigStore
-                  rule: '!(has(self.configMap) && has(self.pvc))'
+                - message: Exactly one of configMap or pvc must be set in ConfigStore
+                  rule: has(self.configMap) != has(self.pvc)
               databaseConfig:
                 description: DatabaseConfig stores the metadata for the guardrail
                   service.

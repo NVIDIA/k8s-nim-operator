@@ -310,6 +310,10 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 
 	renderer := r.GetRenderer()
 
+	if err = nemoGuardrail.ValidateConfigStore(); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Sync serviceaccount
 	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &corev1.ServiceAccount{}, func() (client.Object, error) {
 		return renderer.ServiceAccount(nemoGuardrail.GetServiceAccountParams())
