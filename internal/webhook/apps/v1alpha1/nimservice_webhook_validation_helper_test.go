@@ -581,6 +581,33 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			wantWarnings:    0,
 		},
 		{
+			name: "claimCreationSpec with invalid attribute selector - nil value",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
+						Devices: []appsv1alpha1.DRADeviceSpec{{
+							Name:            "gpu",
+							Count:           1,
+							DeviceClassName: "gpu.nvidia.com",
+							DriverName:      "gpu.nvidia.com",
+							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
+								{
+									Key:   "memory",
+									Op:    appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+									Value: nil,
+								},
+							},
+						}},
+					},
+				}}
+			},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Required value: is required"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
+		},
+		{
 			name: "claimCreationSpec with invalid attribute selector - no value",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{

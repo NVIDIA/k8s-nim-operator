@@ -87,6 +87,10 @@ type DRADeviceAttributeSelectorValue struct {
 }
 
 func (d *DRADeviceAttributeSelectorValue) GetValue() any {
+	if d == nil {
+		return nil
+	}
+
 	switch {
 	case d.BoolValue != nil:
 		return *d.BoolValue
@@ -101,6 +105,10 @@ func (d *DRADeviceAttributeSelectorValue) GetValue() any {
 }
 
 func (d *DRADeviceAttributeSelectorValue) GetValueType() k8sutilcel.ValueType {
+	if d == nil {
+		return k8sutilcel.TypeUnknown
+	}
+
 	switch {
 	case d.BoolValue != nil:
 		return k8sutilcel.TypeBool
@@ -166,10 +174,15 @@ type DRADeviceAttributeSelector struct {
 	// +kubebuilder:default=Equal
 	Op DRADeviceAttributeSelectorOp `json:"op"`
 	// Value is the value to compare against the device attribute.
+	// +kubebuilder:validation:Required
 	Value *DRADeviceAttributeSelectorValue `json:"value,omitempty"`
 }
 
 func (d *DRADeviceAttributeSelector) GetCELExpression(driverName string) (string, error) {
+	if d == nil || d.Value == nil {
+		return "", fmt.Errorf("attribute selector value is required")
+	}
+
 	domain, name := k8sutil.SplitQualifiedName(d.Key, driverName)
 	attrKey := fmt.Sprintf("device.attributes[%q].%s", domain, name)
 	return k8sutilcel.BuildExpr(attrKey, d.Op.GetCELOperator(), d.Value.GetValue(), d.Value.GetValueType())
