@@ -785,6 +785,46 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				Expect(failedCondition.Message).To(ContainSubstring("spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value.versionValue.version: invalid version \"550.127.08\":"))
 			})
 
+			It("should mark NIMService as failed when ClaimCreationSpec.Devices[].AttributeSelectors value is omitted", func() {
+				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
+					{
+						ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
+							Devices: []appsv1alpha1.DRADeviceSpec{
+								{
+									Name:            "test-device",
+									Count:           1,
+									DriverName:      "gpu.nvidia.com",
+									DeviceClassName: "gpu.nvidia.com",
+									AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
+										{
+											Key:   "testKey",
+											Op:    "GreaterThan",
+											Value: nil,
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				nimServiceKey := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+				err := client.Create(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = reconciler.reconcileNIMService(context.TODO(), nimService)
+				Expect(err).NotTo(HaveOccurred())
+
+				obj := &appsv1alpha1.NIMService{}
+				err = client.Get(context.TODO(), nimServiceKey, obj)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(obj.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusFailed))
+				failedCondition := getCondition(obj, conditions.Failed)
+				Expect(failedCondition).NotTo(BeNil())
+				Expect(failedCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(failedCondition.Reason).To(Equal(conditions.ReasonDRAResourcesUnsupported))
+				Expect(failedCondition.Message).To(Equal("spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: value is required"))
+			})
+
 			It("should succeed with valid ClaimCreationSpec", func() {
 				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
 					{
