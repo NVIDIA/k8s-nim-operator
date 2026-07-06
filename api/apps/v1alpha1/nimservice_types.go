@@ -29,6 +29,7 @@ import (
 
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -88,6 +89,13 @@ const (
 	PlatformTypeStandalone PlatformType = "standalone"
 	// PlatformTypeKServe represents KServe deployment platform.
 	PlatformTypeKServe PlatformType = "kserve"
+)
+
+const (
+	// ConfidentialDeploymentPhaseDryRun renders confidential workload artifacts without applying pod-bearing resources.
+	ConfidentialDeploymentPhaseDryRun = "DryRun"
+	// ConfidentialDeploymentPhaseActive applies the rendered confidential workload.
+	ConfidentialDeploymentPhaseActive = "Active"
 )
 
 // NIMServiceSpec defines the desired state of NIMService.
@@ -166,11 +174,38 @@ type ConfidentialContainersSpec struct {
 	// InitData configures init-data input for GenPolicy and runtime encoding.
 	InitData InitDataSpec `json:"initData"`
 
+	// Deployment provides an in-memory copy of the rendered Deployment to be verified with GenPolicy.
+	Deployment *appsv1.Deployment `json:"-"`
+
 	// SealedAuthSecret contains sealed secret reference.
 	SealedAuthSecret string `json:"sealedAuthSecret"`
 
 	// Model configures model delivery without NIMCache.
 	Model ConfidentialModelSpec `json:"model"`
+}
+
+func (n *NIMService) IsConfidentialContainersEnabled() bool {
+	return n != nil && n.Spec.ConfidentialContainers != nil && n.Spec.ConfidentialContainers.Enabled
+}
+
+func (n *NIMService) IsConfidentialDeploymentDryRun() bool {
+	if !n.IsConfidentialContainersEnabled() {
+		return false
+	}
+	phase := n.Spec.ConfidentialContainers.ConfidentialDeploymentPhase
+	return phase == "" || phase == ConfidentialDeploymentPhaseDryRun
+}
+
+// SetConfidentialDeployment stores a deep copy of the rendered Deployment for GenPolicy.
+func (n *NIMService) SetConfidentialDeployment(deployment *appsv1.Deployment) {
+	if !n.IsConfidentialContainersEnabled() {
+		return
+	}
+	if deployment == nil {
+		n.Spec.ConfidentialContainers.Deployment = nil
+		return
+	}
+	n.Spec.ConfidentialContainers.Deployment = deployment.DeepCopy()
 }
 
 // InitDataSpec is the common-case init-data input.

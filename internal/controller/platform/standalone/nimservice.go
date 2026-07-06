@@ -942,14 +942,25 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	// Track an existing resource
 	found := getErr == nil
 
-	// Don't do anything if CR is unchanged.
+	isConfidentialDeploymentDryRun := nimService.IsConfidentialDeploymentDryRun()
+
+	if isConfidentialDeploymentDryRun {
+		if deployment, ok := resource.(*appsv1.Deployment); ok &&
+			deployment.GetName() == nimService.GetName() &&
+			deployment.GetNamespace() == nimService.GetNamespace() {
+			nimService.SetConfidentialDeployment(deployment)
+			return nil
+		}
+	}
+
+	// Skip syncing if the parent CR spec is unchanged.
 	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
 		return nil
 	}
 
 	// If we found the object and autoscaling is enabled on the NIMService,
 	// copy the current replicas from the existing object into the desired (resource),
-	// so we don't fight the HPA (or external scaler) on each reconcile.
+	// so we do not fight the HPA (or external scaler) on each reconcile.
 	if found && nimService.IsAutoScalingEnabled() {
 		if curr, ok := obj.(*appsv1.Deployment); ok {
 			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {

@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/autoscaling/v2"
 	"k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -147,6 +148,11 @@ func (in *ComputeDomainStatus) DeepCopy() *ComputeDomainStatus {
 func (in *ConfidentialContainersSpec) DeepCopyInto(out *ConfidentialContainersSpec) {
 	*out = *in
 	out.InitData = in.InitData
+	if in.Deployment != nil {
+		in, out := &in.Deployment, &out.Deployment
+		*out = new(appsv1.Deployment)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Model.DeepCopyInto(&out.Model)
 }
 
