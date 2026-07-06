@@ -599,11 +599,6 @@ func getSelectedProfiles(nimCache *appsv1alpha1.NIMCache) ([]string, error) {
 func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCache *appsv1alpha1.NIMCache) (requeue bool, err error) {
 	logger := r.GetLogger()
 
-	// Model manifest is available only for NGC model pullers
-	if !nimCache.IsOptimizedNIM() {
-		return false, nil
-	}
-
 	existingConfig := &corev1.ConfigMap{}
 	cmName := getManifestConfigName(nimCache)
 	err = r.Get(ctx, client.ObjectKey{Name: cmName, Namespace: nimCache.Namespace}, existingConfig)
@@ -617,6 +612,10 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 		return false, nil
 	}
 
+	// No manifest extraction needed: a previous reconcile already determined this NIM has no manifest
+	if nimCache.Status.Type == "model-free" {
+		return false, nil
+	}
 	// Create a configmap by extracting the model manifest
 	// Create a temporary pod for parsing model manifest
 	pod := constructPodSpec(nimCache, r.orchestratorType)
@@ -654,22 +653,25 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 		return true, nil
 	}
 
-	parser := nimparserutils.GetNIMParser([]byte(output))
-	// Parse the file
-	manifest, err := parser.ParseModelManifestFromRawOutput([]byte(output))
-	if err != nil {
-		logger.Error(err, "Failed to parse model manifest from the pod")
-		return false, err
-	}
-	logger.V(2).Info("manifest file", "nimcache", nimCache.Name, "manifest", manifest)
+	if strings.Contains(output, "model_manifest.yaml not found") {
+		logger.Info("model manifest file not found", "output", output)
+		nimCache.Status.Type = "model-free"
+	} else {
+		parser := nimparserutils.GetNIMParser([]byte(output))
+		manifest, err := parser.ParseModelManifestFromRawOutput([]byte(output))
+		if err != nil {
+			logger.Error(err, "Failed to parse model manifest from the pod")
+			return false, err
+		}
+		logger.V(2).Info("manifest file", "nimcache", nimCache.Name, "manifest", manifest)
 
-	// Create a ConfigMap with the model manifest file for re-use
-	err = r.createManifestConfigMap(ctx, nimCache, &manifest)
-	if err != nil {
-		logger.Error(err, "Failed to create model manifest config map")
-		return false, err
+		// Create a ConfigMap with the model manifest file for re-use
+		err = r.createManifestConfigMap(ctx, nimCache, &manifest)
+		if err != nil {
+			logger.Error(err, "Failed to create model manifest config map")
+			return false, err
+		}
 	}
-
 	// Model manifest is successfully extracted, cleanup temporary pod
 	err = r.Delete(ctx, existingPod)
 	if err != nil && !apiErrors.IsNotFound(err) {
@@ -941,8 +943,10 @@ func getCommand() []string {
 		strings.Join([]string{
 			"if [ -f /opt/nim/etc/default/model_manifest.yaml ]; then",
 			"cat /opt/nim/etc/default/model_manifest.yaml;",
-			"else",
+			"elif [ -f /etc/nim/config/model_manifest.yaml ]; then",
 			"cat /etc/nim/config/model_manifest.yaml;",
+			"else",
+			"echo \"model_manifest.yaml not found\";",
 			"fi;",
 			"sleep infinity",
 		}, " "),
@@ -976,7 +980,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 			Containers: []corev1.Container{
 				{
 					Name:    NIMCacheContainerName,
-					Image:   nimCache.Spec.Source.NGC.ModelPuller,
+					Image:   nimCache.GetModelPuller(),
 					Command: getCommand(),
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: ptr.To[bool](false),
@@ -1019,7 +1023,7 @@ func constructPodSpec(nimCache *appsv1alpha1.NIMCache, platformType k8sutil.Orch
 
 	pod.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 		{
-			Name: nimCache.Spec.Source.NGC.PullSecret,
+			Name: nimCache.GetPullSecret(),
 		},
 	}
 
@@ -1111,9 +1115,13 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		} else if nimCache.Spec.Source.HF != nil {
 			hfDataSource = nimCache.Spec.Source.HF
 		}
-
-		command := nimsource.HFDownloadToCacheCommand(hfDataSource, utils.DefaultModelStorePath)
-
+		var command []string
+		if nimCache.Status.Type == "model-free" {
+			hfUri := nimCache.GetHFUri()
+			command = []string{"download-to-cache", "--model-uri", hfUri, "--manifest-file", utils.DefaultModelStorePath + "/model_manifest.json"}
+		} else {
+			command = nimsource.HFDownloadToCacheCommand(hfDataSource, utils.DefaultModelStorePath)
+		}
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
 				Name:    NIMCacheContainerName,
@@ -1127,6 +1135,14 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 					{
 						Name:  "HF_HUB_OFFLINE",
 						Value: "0",
+					},
+					{
+						Name:  "NIM_CACHE_PATH",
+						Value: utils.DefaultModelStorePath,
+					},
+					{
+						Name:  "HF_HOME",
+						Value: utils.DefaultModelStorePath + "/huggingface/hub",
 					},
 				},
 				VolumeMounts: []corev1.VolumeMount{

@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: nemoentitystores.apps.nvidia.com
 spec:
   group: apps.nvidia.com
@@ -2338,6 +2338,10 @@ spec:
                         maximum: 65535
                         minimum: 1
                         type: integer
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
                       metricsPort:
                         description: |-
                           MetricsPort is the port for metrics

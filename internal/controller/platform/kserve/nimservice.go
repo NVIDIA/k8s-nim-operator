@@ -502,10 +502,17 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 	isvcParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 	if nimCache.IsUniversalNIM() {
+		hfUri := nimCache.GetHFUri()
 		isvcParams.Env = utils.MergeEnvVars([]corev1.EnvVar{
 			{
 				Name:  "NIM_MODEL_NAME",
 				Value: utils.DefaultModelStorePath,
+			}, {
+				Name:  "HF_HOME",
+				Value: utils.DefaultModelStorePath + "/huggingface/hub",
+			}, {
+				Name:  "NIM_MODEL_PATH",
+				Value: hfUri,
 			},
 		}, isvcParams.Env)
 	}

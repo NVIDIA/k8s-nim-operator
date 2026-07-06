@@ -142,6 +142,7 @@ type NIMServiceSpec struct {
 }
 
 // NimServiceMultiNodeConfig defines the configuration for multi-node NIMService.
+// +kubebuilder:validation:XValidation:rule="!(has(self.mpi) && has(self.ray))",message="mpi and ray are mutually exclusive"
 type NimServiceMultiNodeConfig struct {
 	// +kubebuilder:validation:Enum=lws
 	// +kubebuilder:default:=lws
@@ -153,6 +154,9 @@ type NimServiceMultiNodeConfig struct {
 
 	// MPI config for NIMService using LeaderWorkerSet
 	MPI *MultiNodeMPIConfig `json:"mpi,omitempty"`
+
+	// Ray config for NIMService using LeaderWorkerSet
+	Ray *MultiNodeRayConfig `json:"ray,omitempty"`
 
 	// ComputeDomain specifies the compute domain to use for a
 	// multi-node NIMService.
@@ -173,6 +177,14 @@ type MultiNodeMPIConfig struct {
 	// +kubebuilder:default:=300
 	// MPIStartTimeout specifies the timeout in seconds for starting the cluster.
 	MPIStartTimeout int `json:"mpiStartTimeout"`
+}
+
+type MultiNodeRayConfig struct {
+	// RayPort specifies the port for the Ray cluster.
+	// +kubebuilder:default:=6379
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	RayPort int32 `json:"rayPort"`
 }
 
 // NIMCacheVolSpec defines the spec to use NIMCache volume.
@@ -526,7 +538,7 @@ func (n *NIMService) GetNIMServiceAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetServiceLabels returns merged labels to apply to the NIMService instance.
+// GetServiceLabels returns merged labels to apply to NIMService-owned resources.
 func (n *NIMService) GetServiceLabels() map[string]string {
 	standardLabels := n.GetStandardLabels()
 
@@ -534,6 +546,16 @@ func (n *NIMService) GetServiceLabels() map[string]string {
 		return utils.MergeMaps(standardLabels, n.Spec.Labels)
 	}
 	return standardLabels
+}
+
+// GetExposeServiceLabels returns labels to apply to the generated Kubernetes Service.
+func (n *NIMService) GetExposeServiceLabels() map[string]string {
+	serviceLabels := n.GetServiceLabels()
+
+	if n.Spec.Expose.Service.Labels != nil {
+		return utils.MergeMaps(serviceLabels, n.Spec.Expose.Service.Labels)
+	}
+	return serviceLabels
 }
 
 // GetSelectorLabels returns standard selector labels to apply to the NIMService instance.
@@ -1456,7 +1478,7 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetServiceLabels()
+	params.Labels = n.GetExposeServiceLabels()
 	params.Annotations = n.GetServiceAnnotations()
 
 	// Set service selector labels

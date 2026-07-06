@@ -102,6 +102,8 @@ type LeaderWorkerSetParams struct {
 	Size               int
 	ContainerName      string
 	Args               []string
+	LeaderArgs         []string
+	WorkerArgs         []string
 	Command            []string
 	Image              string
 	ImagePullSecrets   []string
@@ -120,6 +122,7 @@ type LeaderWorkerSetParams struct {
 	LivenessProbe      *corev1.Probe
 	ReadinessProbe     *corev1.Probe
 	StartupProbe       *corev1.Probe
+	WorkerStartupProbe *corev1.Probe
 	ServiceAccountName string
 	NIMCachePVC        string
 	UserID             *int64
