@@ -54,6 +54,14 @@ import (
 // ErrConfigMapKeyNotFound indicates an error that the given key is missing from the config map.
 var ErrConfigMapKeyNotFound = goerrors.New("configmap key not found")
 
+// GatewayGroupVersionResource returns a GroupVersionResource for Gateway API v1 resources.
+func GatewayGroupVersionResource(resource string) schema.GroupVersionResource {
+	return schema.GroupVersion{
+		Group:   gatewayv1.GroupVersion.Group,
+		Version: gatewayv1.GroupVersion.Version,
+	}.WithResource(resource)
+}
+
 // OrchestratorType is the underlying container orchestrator type.
 type OrchestratorType string
 
@@ -527,10 +535,10 @@ func BuildByObjectFilteredCache(discoveryClient discovery.DiscoveryInterface, ls
 	if err := addIfExists(monitoring.SchemeGroupVersion.WithResource("servicemonitors"), &monitoring.ServiceMonitor{}, "ServiceMonitor"); err != nil {
 		return nil, err
 	}
-	if err := addIfExists(gatewayv1.SchemeGroupVersion.WithResource("grpcroutes"), &gatewayv1.GRPCRoute{}, "GRPCRoute"); err != nil {
+	if err := addIfExists(GatewayGroupVersionResource("grpcroutes"), &gatewayv1.GRPCRoute{}, "GRPCRoute"); err != nil {
 		return nil, err
 	}
-	if err := addIfExists(gatewayv1.SchemeGroupVersion.WithResource("httproutes"), &gatewayv1.HTTPRoute{}, "HTTPRoute"); err != nil {
+	if err := addIfExists(GatewayGroupVersionResource("httproutes"), &gatewayv1.HTTPRoute{}, "HTTPRoute"); err != nil {
 		return nil, err
 	}
 	if err := addIfExists(kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"), &kservev1beta1.InferenceService{}, "InferenceService"); err != nil {

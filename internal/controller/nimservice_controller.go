@@ -352,7 +352,7 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
 		r.discoveryClient,
 		nimServiceBuilder,
-		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		k8sutil.GatewayGroupVersionResource("httproutes"),
 		&gatewayv1.HTTPRoute{},
 	)
 	if err != nil {
@@ -362,7 +362,7 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
 		r.discoveryClient,
 		nimServiceBuilder,
-		gatewayv1.SchemeGroupVersion.WithResource("grpcroutes"),
+		k8sutil.GatewayGroupVersionResource("grpcroutes"),
 		&gatewayv1.GRPCRoute{},
 	)
 	if err != nil {
