@@ -254,7 +254,7 @@ func (r *NIMServiceReconciler) GetOrchestratorType(ctx context.Context) (k8sutil
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nimservice-controller")
+	r.recorder = newLegacyEventRecorder(mgr.GetEventRecorder("nimservice-controller"))
 	r.apiReader = mgr.GetAPIReader()
 	err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),

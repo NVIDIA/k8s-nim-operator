@@ -240,7 +240,7 @@ func (r *NemoEvaluatorReconciler) GetOrchestratorType(ctx context.Context) (k8su
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nemo-evaluator-service-controller")
+	r.recorder = newLegacyEventRecorder(mgr.GetEventRecorder("nemo-evaluator-service-controller"))
 	r.apiReader = mgr.GetAPIReader()
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoEvaluator{}).

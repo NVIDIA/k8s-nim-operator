@@ -239,7 +239,7 @@ func (r *NemoEntitystoreReconciler) GetOrchestratorType(ctx context.Context) (k8
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoEntitystoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nemo-entitystore-service-controller")
+	r.recorder = newLegacyEventRecorder(mgr.GetEventRecorder("nemo-entitystore-service-controller"))
 	r.apiReader = mgr.GetAPIReader()
 	bd := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoEntitystore{}).

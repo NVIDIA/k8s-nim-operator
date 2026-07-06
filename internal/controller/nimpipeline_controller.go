@@ -379,7 +379,7 @@ func (r *NIMPipelineReconciler) GetEventRecorder() record.EventRecorder {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMPipelineReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nimpipeline-controller")
+	r.recorder = newLegacyEventRecorder(mgr.GetEventRecorder("nimpipeline-controller"))
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMPipeline{}).
 		Owns(&appsv1alpha1.NIMService{}).

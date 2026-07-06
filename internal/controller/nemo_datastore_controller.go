@@ -240,7 +240,7 @@ func (r *NemoDatastoreReconciler) GetOrchestratorType(ctx context.Context) (k8su
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoDatastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nemo-datastore-service-controller")
+	r.recorder = newLegacyEventRecorder(mgr.GetEventRecorder("nemo-datastore-service-controller"))
 	r.apiReader = mgr.GetAPIReader()
 	bd := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoDatastore{}).

@@ -240,7 +240,7 @@ func (r *NemoGuardrailReconciler) GetOrchestratorType(ctx context.Context) (k8su
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoGuardrailReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nemo-guardrail-service-controller")
+	r.recorder = newLegacyEventRecorder(mgr.GetEventRecorder("nemo-guardrail-service-controller"))
 	r.apiReader = mgr.GetAPIReader()
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoGuardrail{}).
