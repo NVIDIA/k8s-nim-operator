@@ -275,7 +275,7 @@ func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder, err := k8sutil.ControllerOwnsIfCRDExists(
 		r.discoveryClient,
 		builder,
-		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		k8sutil.GatewayGroupVersionResource("httproutes"),
 		&gatewayv1.HTTPRoute{},
 	)
 	if err != nil {
