@@ -276,7 +276,7 @@ func (r *NemoDatastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	bd, err := k8sutil.ControllerOwnsIfCRDExists(
 		r.discoveryClient,
 		bd,
-		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		k8sutil.GatewayGroupVersionResource("httproutes"),
 		&gatewayv1.HTTPRoute{},
 	)
 	if err != nil {
