@@ -24,7 +24,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.35.2
 	k8s.io/apimachinery v0.35.2
 	k8s.io/client-go v0.35.2
-	k8s.io/dynamic-resource-allocation v0.34.0
+	k8s.io/dynamic-resource-allocation v0.35.2
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	knative.dev/pkg v0.0.0-20250326102644-9f3e60a9244c
 	sigs.k8s.io/controller-runtime v0.23.3

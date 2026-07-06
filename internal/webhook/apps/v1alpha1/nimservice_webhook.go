@@ -43,8 +43,8 @@ func SetupNIMServiceWebhookWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
-	return ctrl.NewWebhookManagedBy(mgr).For(&appsv1alpha1.NIMService{}).
-		WithValidator(validator).
+	return ctrl.NewWebhookManagedBy(mgr, &appsv1alpha1.NIMService{}).
+		WithCustomValidator(validator).
 		Complete()
 }
 

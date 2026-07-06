@@ -1983,7 +1983,7 @@ k8s.io/component-base/tracing
 k8s.io/component-base/tracing/api/v1
 k8s.io/component-base/version
 k8s.io/component-base/zpages/features
-# k8s.io/dynamic-resource-allocation v0.34.0
+# k8s.io/dynamic-resource-allocation v0.35.2
 ## explicit; go 1.24.0
 k8s.io/dynamic-resource-allocation/cel
 # k8s.io/klog/v2 v2.140.0

@@ -36,8 +36,8 @@ var nimcachelog = logf.Log.WithName("webhooks").WithName("NIMCache")
 
 // SetupNIMCacheWebhookWithManager registers the webhook for NIMCache in the manager.
 func SetupNIMCacheWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&appsv1alpha1.NIMCache{}).
-		WithValidator(&NIMCacheCustomValidator{}).
+	return ctrl.NewWebhookManagedBy(mgr, &appsv1alpha1.NIMCache{}).
+		WithCustomValidator(&NIMCacheCustomValidator{}).
 		Complete()
 }
 
