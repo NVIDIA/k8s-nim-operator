@@ -44,7 +44,7 @@ jobs:
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION := }" >> $GITHUB_ENV
 
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.3.0
+        uses: NVIDIA/holodeck@v0.3.3
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -84,7 +84,7 @@ jobs:
      # This makes the result appear on the merged commit's Checks tab
       - name: Report status on merged commit
         if: always()
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.checks.create({
