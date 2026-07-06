@@ -89,6 +89,10 @@ spec:
         {{- end }}
         containers:
         - name: nim-leader
+          {{- if .LeaderArgs}}
+          args:
+            {{ .LeaderArgs| yaml | nindent 12 }}
+          {{- end }}
           {{- if .LeaderEnvs}}
           env:
             {{- .LeaderEnvs | yaml | nindent 12 }}
@@ -279,6 +283,10 @@ spec:
         {{- end }}
         containers:
         - name: nim-worker
+          {{- if .WorkerArgs}}
+          args:
+            {{ .WorkerArgs| yaml | nindent 12 }}
+          {{- end }}
           {{- if .WorkerEnvs }}
           env:
             {{ .WorkerEnvs | yaml | nindent 12 }}
@@ -287,6 +295,10 @@ spec:
           ports:
           {{- if .Ports }}
             {{- .Ports | yaml | nindent 12 }}
+          {{- end }}
+          {{- if .WorkerStartupProbe }}
+          startupProbe:
+            {{ .WorkerStartupProbe | yaml | nindent 12 }}
           {{- end }}
           {{- with .Resources }}
           resources:

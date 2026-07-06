@@ -410,10 +410,10 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 		kserveDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      utils.KServeControllerName,
+				Name:      "kserve-controller-manager",
 				Namespace: "default",
 				Labels: map[string]string{
-					"app.kubernetes.io/name": utils.KServeControllerName,
+					"control-plane": "kserve-controller-manager",
 				},
 			},
 			Spec: appsv1.DeploymentSpec{
@@ -507,7 +507,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		By("delete the KServe Deployment")
 		kserveDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      utils.KServeControllerName,
+				Name:      "kserve-controller-manager",
 				Namespace: "default",
 			},
 		}
