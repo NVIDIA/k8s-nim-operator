@@ -18,129 +18,32 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeNIMCaches implements NIMCacheInterface
-type FakeNIMCaches struct {
+// fakeNIMCaches implements NIMCacheInterface
+type fakeNIMCaches struct {
+	*gentype.FakeClientWithList[*v1alpha1.NIMCache, *v1alpha1.NIMCacheList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var nimcachesResource = v1alpha1.SchemeGroupVersion.WithResource("nimcaches")
-
-var nimcachesKind = v1alpha1.SchemeGroupVersion.WithKind("NIMCache")
-
-// Get takes name of the nIMCache, and returns the corresponding nIMCache object, and an error if there is any.
-func (c *FakeNIMCaches) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NIMCache, err error) {
-	emptyResult := &v1alpha1.NIMCache{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(nimcachesResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeNIMCaches(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.NIMCacheInterface {
+	return &fakeNIMCaches{
+		gentype.NewFakeClientWithList[*v1alpha1.NIMCache, *v1alpha1.NIMCacheList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("nimcaches"),
+			v1alpha1.SchemeGroupVersion.WithKind("NIMCache"),
+			func() *v1alpha1.NIMCache { return &v1alpha1.NIMCache{} },
+			func() *v1alpha1.NIMCacheList { return &v1alpha1.NIMCacheList{} },
+			func(dst, src *v1alpha1.NIMCacheList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.NIMCacheList) []*v1alpha1.NIMCache { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1alpha1.NIMCacheList, items []*v1alpha1.NIMCache) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.NIMCache), err
-}
-
-// List takes label and field selectors, and returns the list of NIMCaches that match those selectors.
-func (c *FakeNIMCaches) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NIMCacheList, err error) {
-	emptyResult := &v1alpha1.NIMCacheList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(nimcachesResource, nimcachesKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.NIMCacheList{ListMeta: obj.(*v1alpha1.NIMCacheList).ListMeta}
-	for _, item := range obj.(*v1alpha1.NIMCacheList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested nIMCaches.
-func (c *FakeNIMCaches) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(nimcachesResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a nIMCache and creates it.  Returns the server's representation of the nIMCache, and an error, if there is any.
-func (c *FakeNIMCaches) Create(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.CreateOptions) (result *v1alpha1.NIMCache, err error) {
-	emptyResult := &v1alpha1.NIMCache{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(nimcachesResource, c.ns, nIMCache, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMCache), err
-}
-
-// Update takes the representation of a nIMCache and updates it. Returns the server's representation of the nIMCache, and an error, if there is any.
-func (c *FakeNIMCaches) Update(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.UpdateOptions) (result *v1alpha1.NIMCache, err error) {
-	emptyResult := &v1alpha1.NIMCache{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(nimcachesResource, c.ns, nIMCache, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMCache), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNIMCaches) UpdateStatus(ctx context.Context, nIMCache *v1alpha1.NIMCache, opts v1.UpdateOptions) (result *v1alpha1.NIMCache, err error) {
-	emptyResult := &v1alpha1.NIMCache{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(nimcachesResource, "status", c.ns, nIMCache, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMCache), err
-}
-
-// Delete takes name of the nIMCache and deletes it. Returns an error if one occurs.
-func (c *FakeNIMCaches) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(nimcachesResource, c.ns, name, opts), &v1alpha1.NIMCache{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeNIMCaches) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(nimcachesResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.NIMCacheList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched nIMCache.
-func (c *FakeNIMCaches) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NIMCache, err error) {
-	emptyResult := &v1alpha1.NIMCache{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(nimcachesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMCache), err
 }

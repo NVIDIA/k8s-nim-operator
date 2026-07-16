@@ -18,9 +18,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	scheme "github.com/NVIDIA/k8s-nim-operator/api/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,33 +36,34 @@ type NemoCustomizersGetter interface {
 
 // NemoCustomizerInterface has methods to work with NemoCustomizer resources.
 type NemoCustomizerInterface interface {
-	Create(ctx context.Context, nemoCustomizer *v1alpha1.NemoCustomizer, opts v1.CreateOptions) (*v1alpha1.NemoCustomizer, error)
-	Update(ctx context.Context, nemoCustomizer *v1alpha1.NemoCustomizer, opts v1.UpdateOptions) (*v1alpha1.NemoCustomizer, error)
+	Create(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer, opts v1.CreateOptions) (*appsv1alpha1.NemoCustomizer, error)
+	Update(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer, opts v1.UpdateOptions) (*appsv1alpha1.NemoCustomizer, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, nemoCustomizer *v1alpha1.NemoCustomizer, opts v1.UpdateOptions) (*v1alpha1.NemoCustomizer, error)
+	UpdateStatus(ctx context.Context, nemoCustomizer *appsv1alpha1.NemoCustomizer, opts v1.UpdateOptions) (*appsv1alpha1.NemoCustomizer, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NemoCustomizer, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NemoCustomizerList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1alpha1.NemoCustomizer, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1alpha1.NemoCustomizerList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NemoCustomizer, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1alpha1.NemoCustomizer, err error)
 	NemoCustomizerExpansion
 }
 
 // nemoCustomizers implements NemoCustomizerInterface
 type nemoCustomizers struct {
-	*gentype.ClientWithList[*v1alpha1.NemoCustomizer, *v1alpha1.NemoCustomizerList]
+	*gentype.ClientWithList[*appsv1alpha1.NemoCustomizer, *appsv1alpha1.NemoCustomizerList]
 }
 
 // newNemoCustomizers returns a NemoCustomizers
 func newNemoCustomizers(c *AppsV1alpha1Client, namespace string) *nemoCustomizers {
 	return &nemoCustomizers{
-		gentype.NewClientWithList[*v1alpha1.NemoCustomizer, *v1alpha1.NemoCustomizerList](
+		gentype.NewClientWithList[*appsv1alpha1.NemoCustomizer, *appsv1alpha1.NemoCustomizerList](
 			"nemocustomizers",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.NemoCustomizer { return &v1alpha1.NemoCustomizer{} },
-			func() *v1alpha1.NemoCustomizerList { return &v1alpha1.NemoCustomizerList{} }),
+			func() *appsv1alpha1.NemoCustomizer { return &appsv1alpha1.NemoCustomizer{} },
+			func() *appsv1alpha1.NemoCustomizerList { return &appsv1alpha1.NemoCustomizerList{} },
+		),
 	}
 }

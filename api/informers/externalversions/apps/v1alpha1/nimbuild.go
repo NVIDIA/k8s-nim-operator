@@ -18,15 +18,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	apiappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	internalinterfaces "github.com/NVIDIA/k8s-nim-operator/api/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/listers/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/listers/apps/v1alpha1"
 	versioned "github.com/NVIDIA/k8s-nim-operator/api/versioned"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -35,7 +36,7 @@ import (
 // NIMBuilds.
 type NIMBuildInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.NIMBuildLister
+	Lister() appsv1alpha1.NIMBuildLister
 }
 
 type nIMBuildInformer struct {
@@ -48,42 +49,67 @@ type nIMBuildInformer struct {
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewNIMBuildInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredNIMBuildInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewNIMBuildInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredNIMBuildInformer constructs a new informer for NIMBuild type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredNIMBuildInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+	return NewNIMBuildInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewNIMBuildInformerWithOptions constructs a new informer for NIMBuild type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewNIMBuildInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1alpha1", Resource: "nimbuilds"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.AppsV1alpha1().NIMBuilds(namespace).List(context.TODO(), options)
+				return client.AppsV1alpha1().NIMBuilds(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.AppsV1alpha1().NIMBuilds(namespace).Watch(context.TODO(), options)
+				return client.AppsV1alpha1().NIMBuilds(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.AppsV1alpha1().NIMBuilds(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.AppsV1alpha1().NIMBuilds(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiappsv1alpha1.NIMBuild{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&appsv1alpha1.NIMBuild{},
-		resyncPeriod,
-		indexers,
 	)
 }
 
 func (f *nIMBuildInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredNIMBuildInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewNIMBuildInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *nIMBuildInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.NIMBuild{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiappsv1alpha1.NIMBuild{}, f.defaultInformer)
 }
 
-func (f *nIMBuildInformer) Lister() v1alpha1.NIMBuildLister {
-	return v1alpha1.NewNIMBuildLister(f.Informer().GetIndexer())
+func (f *nIMBuildInformer) Lister() appsv1alpha1.NIMBuildLister {
+	return appsv1alpha1.NewNIMBuildLister(f.Informer().GetIndexer())
 }
