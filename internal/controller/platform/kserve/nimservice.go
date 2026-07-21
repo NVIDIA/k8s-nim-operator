@@ -48,6 +48,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/imageprotocol"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
@@ -68,28 +69,38 @@ type NIMServiceReconciler struct {
 	log             logr.Logger
 	discoveryClient discovery.DiscoveryInterface
 
-	updater          conditions.Updater
-	renderer         render.Renderer
-	recorder         record.EventRecorder
-	apiReader        client.Reader
-	orchestratorType k8sutil.OrchestratorType
+	updater               conditions.Updater
+	renderer              render.Renderer
+	recorder              record.EventRecorder
+	apiReader             client.Reader
+	orchestratorType      k8sutil.OrchestratorType
+	imageProtocolResolver imageprotocol.Resolver
 }
 
 // NewNIMServiceReconciler returns NIMServiceReconciler for KServe platform.
 func NewNIMServiceReconciler(ctx context.Context, r shared.Reconciler) *NIMServiceReconciler {
 	orchestratorType, _ := r.GetOrchestratorType(ctx)
+	registryReader := r.GetAPIReader()
+	if registryReader == nil {
+		registryReader = r.GetClient()
+	}
 
 	return &NIMServiceReconciler{
-		Client:           r.GetClient(),
-		scheme:           r.GetScheme(),
-		log:              r.GetLogger(),
-		discoveryClient:  r.GetDiscoveryClient(),
-		updater:          r.GetUpdater(),
-		renderer:         render.NewRenderer(ManifestsDir),
-		recorder:         r.GetEventRecorder(),
-		apiReader:        r.GetAPIReader(),
-		orchestratorType: orchestratorType,
+		Client:                r.GetClient(),
+		scheme:                r.GetScheme(),
+		log:                   r.GetLogger(),
+		discoveryClient:       r.GetDiscoveryClient(),
+		updater:               r.GetUpdater(),
+		renderer:              render.NewRenderer(ManifestsDir),
+		recorder:              r.GetEventRecorder(),
+		apiReader:             r.GetAPIReader(),
+		orchestratorType:      orchestratorType,
+		imageProtocolResolver: imageprotocol.NewRegistryResolver(registryReader),
 	}
+}
+
+func (r *NIMServiceReconciler) modelLayout(ctx context.Context, nimService *appsv1alpha1.NIMService, nimCache *appsv1alpha1.NIMCache) (imageprotocol.ModelLayout, error) {
+	return imageprotocol.ResolveModelLayout(ctx, r.imageProtocolResolver, nimService, nimCache)
 }
 
 func (r *NIMServiceReconciler) GetRenderer() render.Renderer {
@@ -159,6 +170,14 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	} else if nimCache == nil {
 		return ctrl.Result{}, nil
 	}
+	layoutCache := nimCache
+	if nimService.GetNIMCacheName() == "" {
+		layoutCache = nil
+	}
+	modelLayout, err := r.modelLayout(ctx, nimService, layoutCache)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	var deploymentMode kserveconstants.DeploymentModeType
 	// Check KServe deployment mode
@@ -181,7 +200,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		}
 	}
 
-	err = r.renderAndSyncInferenceService(ctx, nimService, modelPVC, modelProfile, nimCache, deploymentMode)
+	err = r.renderAndSyncInferenceService(ctx, nimService, modelPVC, modelProfile, nimCache, modelLayout, deploymentMode)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -423,7 +442,7 @@ func (r *NIMServiceReconciler) reconcilePVC(ctx context.Context, nimService *app
 
 func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context,
 	nimService *appsv1alpha1.NIMService, modelPVC *appsv1alpha1.PersistentVolumeClaim, modelProfile string,
-	nimCache *appsv1alpha1.NIMCache, deploymentMode kserveconstants.DeploymentModeType) error {
+	nimCache *appsv1alpha1.NIMCache, modelLayout imageprotocol.ModelLayout, deploymentMode kserveconstants.DeploymentModeType) error {
 
 	logger := r.log
 
@@ -479,6 +498,12 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 	isvcParams := nimService.GetInferenceServiceParams(deploymentMode)
 	isvcParams.DeploymentMode = string(deploymentMode)
+	if modelLayout.Protocol.IsNative() {
+		isvcParams.Env = utils.MergeEnvVars([]corev1.EnvVar{{
+			Name:  imageprotocol.ModelPathEnv,
+			Value: modelLayout.ModelPath,
+		}}, isvcParams.Env)
+	}
 
 	// Setup metrics exporting
 	isvcParams.Annotations[kserveconstants.EnableMetricAggregation] = "true"
@@ -549,7 +574,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 	// Setup volume mounts with model store
 	isvcParams.Volumes = nimService.GetVolumes(modelPVC)
-	isvcParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
+	isvcParams.VolumeMounts = nimService.GetVolumeMountsAt(modelPVC, modelLayout.MountPath)
 	if profileEnv != nil {
 		isvcParams.Env = utils.MergeEnvVars(*profileEnv, isvcParams.Env)
 	}
@@ -557,7 +582,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	if gpuResources != nil {
 		isvcParams.Resources = gpuResources
 	}
-	initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+	initContainerVolumeMounts := nimService.GetInitContainerVolumeMountsAt(modelPVC, modelLayout.MountPath)
 	for idx := range isvcParams.InitContainers {
 		isvcParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
 	}

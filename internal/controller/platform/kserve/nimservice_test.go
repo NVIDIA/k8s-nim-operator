@@ -34,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/imageprotocol"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
@@ -67,6 +68,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
+
+type fakeServingProtocolResolver struct {
+	protocols []imageprotocol.Protocol
+	index     int
+}
+
+func (f *fakeServingProtocolResolver) Resolve(context.Context, string, string, []string) (imageprotocol.Protocol, error) {
+	protocol := f.protocols[f.index]
+	if f.index < len(f.protocols)-1 {
+		f.index++
+	}
+	return protocol, nil
+}
 
 func sortEnvVars(envVars []corev1.EnvVar) {
 	sort.SliceStable(envVars, func(i, j int) bool {
@@ -176,12 +190,13 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		}
 
 		reconciler = &NIMServiceReconciler{
-			Client:          client,
-			scheme:          scheme,
-			updater:         conditions.NewUpdater(client),
-			renderer:        render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/kserve"), "manifests")),
-			recorder:        record.NewFakeRecorder(1000),
-			discoveryClient: discoveryClient,
+			Client:                client,
+			scheme:                scheme,
+			updater:               conditions.NewUpdater(client),
+			renderer:              render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/kserve"), "manifests")),
+			recorder:              record.NewFakeRecorder(1000),
+			discoveryClient:       discoveryClient,
+			imageProtocolResolver: &fakeServingProtocolResolver{protocols: []imageprotocol.Protocol{imageprotocol.Legacy}},
 		}
 		pvcName := "test-pvc"
 		nimService = &appsv1alpha1.NIMService{
@@ -482,6 +497,58 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			testServer:        testServer,
 			originalTransport: originalTransport,
 		}
+	})
+
+	It("mounts and serves a native Retriever cache from /model", func() {
+		reconciler.imageProtocolResolver = &fakeServingProtocolResolver{protocols: []imageprotocol.Protocol{imageprotocol.NativeV1, imageprotocol.NativeV1}}
+		nimService.Spec.Image.Repository = "nvcr.io/nim/retriever-photon-od"
+		nimService.Spec.Image.Tag = "2.0.0"
+		nimService.Spec.Env = append(nimService.Spec.Env, corev1.EnvVar{Name: imageprotocol.ModelPathEnv, Value: "/model/custom"})
+		nimCache.Spec.Source.NGC = &appsv1alpha1.NGCSource{ModelPuller: nimService.GetImage()}
+		nimCache.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Create: ptr.To(false), Name: "test-pvc"}
+		Expect(client.Update(context.Background(), nimCache)).To(Succeed())
+		Expect(client.Create(context.Background(), nimService)).To(Succeed())
+
+		_, err := reconciler.reconcileNIMService(context.Background(), nimService)
+		Expect(err).NotTo(HaveOccurred())
+
+		isvc := &kservev1beta1.InferenceService{}
+		Expect(client.Get(context.Background(), types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)).To(Succeed())
+		container := isvc.Spec.Predictor.Containers[0]
+		Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{Name: "model-store", MountPath: "/model"}))
+		Expect(container.Env).To(ContainElement(corev1.EnvVar{Name: imageprotocol.ModelPathEnv, Value: "/model/custom"}))
+		for _, env := range container.Env {
+			Expect(env.Name).NotTo(Equal("NIM_ENGINE_MODEL_DOWNLOAD_ONLY"))
+		}
+	})
+
+	It("isolates native direct PVC storage by NIMService name", func() {
+		reconciler.imageProtocolResolver = &fakeServingProtocolResolver{protocols: []imageprotocol.Protocol{imageprotocol.NativeV1}}
+		nimService.Spec.Image.Repository = "nvcr.io/nim/retriever-photon-od"
+		nimService.Spec.Image.Tag = "2.0.0"
+		nimService.Spec.Storage.NIMCache.Name = ""
+		nimService.Spec.Storage.PVC = appsv1alpha1.PersistentVolumeClaim{Create: ptr.To(false), Name: "test-pvc"}
+		Expect(client.Create(context.Background(), nimService)).To(Succeed())
+
+		_, err := reconciler.reconcileNIMService(context.Background(), nimService)
+		Expect(err).NotTo(HaveOccurred())
+
+		isvc := &kservev1beta1.InferenceService{}
+		Expect(client.Get(context.Background(), types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)).To(Succeed())
+		container := isvc.Spec.Predictor.Containers[0]
+		Expect(container.Env).To(ContainElement(corev1.EnvVar{Name: imageprotocol.ModelPathEnv, Value: "/model/test-nimservice"}))
+	})
+
+	It("rejects a native serving image with a legacy cache source", func() {
+		reconciler.imageProtocolResolver = &fakeServingProtocolResolver{protocols: []imageprotocol.Protocol{imageprotocol.NativeV1}}
+		nimService.Spec.Image.Repository = "nvcr.io/nim/retriever-photon-od"
+		nimService.Spec.Image.Tag = "2.0.0"
+		nimCache.Spec.Source = appsv1alpha1.NIMSource{HF: &appsv1alpha1.HuggingFaceHubSource{}}
+		Expect(client.Update(context.Background(), nimCache)).To(Succeed())
+		Expect(client.Create(context.Background(), nimService)).To(Succeed())
+
+		_, err := reconciler.reconcileNIMService(context.Background(), nimService)
+		Expect(err).To(MatchError(ContainSubstring("does not match NIMCache image protocol")))
 	})
 
 	AfterEach(func() {

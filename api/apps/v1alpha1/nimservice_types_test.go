@@ -523,6 +523,30 @@ func TestGetVolumeMounts(t *testing.T) {
 	}
 }
 
+func TestGetVolumeMountsAt(t *testing.T) {
+	nimService := &NIMService{}
+	pvc := &PersistentVolumeClaim{SubPath: "retriever"}
+
+	tests := map[string][]corev1.VolumeMount{
+		"service": nimService.GetVolumeMountsAt(pvc, "/model"),
+		"init":    nimService.GetInitContainerVolumeMountsAt(pvc, "/model"),
+		"worker":  nimService.GetWorkerVolumeMountsAt(pvc, "/model"),
+		"leader":  nimService.GetLeaderVolumeMountsAt(pvc, "/model"),
+	}
+	for name, mounts := range tests {
+		if len(mounts) == 0 {
+			t.Fatalf("%s mount helper returned no mounts", name)
+		}
+		if mounts[0].Name != "model-store" || mounts[0].MountPath != "/model" || mounts[0].SubPath != "retriever" {
+			t.Fatalf("%s model mount = %#v, want /model with retriever subPath", name, mounts[0])
+		}
+	}
+
+	if got, want := nimService.GetVolumeMounts(pvc), nimService.GetVolumeMountsAt(pvc, "/model-store"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("legacy GetVolumeMounts() = %v, want %v", got, want)
+	}
+}
+
 // TestGetProxyEnv tests the GetProxyEnv function.
 func TestGetProxyEnv(t *testing.T) {
 	tests := []struct {

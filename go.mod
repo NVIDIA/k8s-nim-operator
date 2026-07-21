@@ -10,6 +10,7 @@ require (
 	github.com/go-git/go-git/v5 v5.19.1
 	github.com/go-logr/logr v1.4.3
 	github.com/google/cel-go v0.26.0
+	github.com/google/go-containerregistry v0.14.0
 	github.com/kserve/kserve v0.0.0-20260219142638-5454cafc1f9f
 	github.com/mittwald/go-helm-client v0.12.19
 	github.com/onsi/ginkgo/v2 v2.28.0
@@ -76,6 +77,10 @@ require (
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/docker/cli v25.0.1+incompatible // indirect
+	github.com/docker/distribution v2.8.3+incompatible // indirect
+	github.com/docker/docker v28.4.0+incompatible // indirect
+	github.com/docker/docker-credential-helpers v0.8.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.36.0 // indirect
@@ -107,7 +112,6 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-containerregistry v0.14.0 // indirect
 	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -141,6 +145,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
+	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect

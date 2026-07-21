@@ -52,6 +52,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/imageprotocol"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
@@ -59,6 +60,10 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
+
+func (r *NIMServiceReconciler) modelLayout(ctx context.Context, nimService *appsv1alpha1.NIMService, nimCache *appsv1alpha1.NIMCache) (imageprotocol.ModelLayout, error) {
+	return imageprotocol.ResolveModelLayout(ctx, r.imageProtocolResolver, nimService, nimCache)
+}
 
 // GetScheme returns the scheme of the reconciler.
 func (r *NIMServiceReconciler) GetScheme() *runtime.Scheme {
@@ -398,6 +403,15 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
+	var layoutCache *appsv1alpha1.NIMCache
+	if nimCacheName != "" {
+		layoutCache = &nimCache
+	}
+	modelLayout, err := r.modelLayout(ctx, nimService, layoutCache)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	var profileEnv *[]corev1.EnvVar
 	var profile *appsv1alpha1.NIMProfile
 	var gpuResources *corev1.ResourceRequirements
@@ -454,6 +468,11 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		lwsParams := nimService.GetLWSParams()
 		lwsParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
+		if modelLayout.Protocol.IsNative() {
+			modelPathEnv := []corev1.EnvVar{{Name: imageprotocol.ModelPathEnv, Value: modelLayout.ModelPath}}
+			lwsParams.WorkerEnvs = utils.MergeEnvVars(modelPathEnv, lwsParams.WorkerEnvs)
+			lwsParams.LeaderEnvs = utils.MergeEnvVars(modelPathEnv, lwsParams.LeaderEnvs)
+		}
 		if nimCache.IsUniversalNIM() {
 			lwsParams.WorkerEnvs = utils.MergeEnvVars([]corev1.EnvVar{{
 				Name:  "NIM_MODEL_NAME",
@@ -472,7 +491,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			lwsParams.Resources = gpuResources
 		}
 
-		initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+		initContainerVolumeMounts := nimService.GetInitContainerVolumeMountsAt(modelPVC, modelLayout.MountPath)
 		for idx := range lwsParams.InitContainers {
 			lwsParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
 		}
@@ -488,8 +507,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			})
 			lwsParams.LeaderVolumes = nimService.GetVolumes(modelPVC)
 			lwsParams.WorkerVolumes = nimService.GetVolumes(modelPVC)
-			lwsParams.LeaderVolumeMounts = nimService.GetVolumeMounts(modelPVC)
-			lwsParams.WorkerVolumeMounts = nimService.GetVolumeMounts(modelPVC)
+			lwsParams.LeaderVolumeMounts = nimService.GetVolumeMountsAt(modelPVC, modelLayout.MountPath)
+			lwsParams.WorkerVolumeMounts = nimService.GetVolumeMountsAt(modelPVC, modelLayout.MountPath)
 			lwsParams.WorkerStartupProbe = &corev1.Probe{
 				InitialDelaySeconds: 30,
 				TimeoutSeconds:      5,
@@ -505,8 +524,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			lwsParams.LeaderVolumes = nimService.GetLeaderVolumes(modelPVC)
 			lwsParams.WorkerVolumes = nimService.GetWorkerVolumes(modelPVC)
 
-			lwsParams.LeaderVolumeMounts = nimService.GetLeaderVolumeMounts(modelPVC)
-			lwsParams.WorkerVolumeMounts = nimService.GetWorkerVolumeMounts(modelPVC)
+			lwsParams.LeaderVolumeMounts = nimService.GetLeaderVolumeMountsAt(modelPVC, modelLayout.MountPath)
+			lwsParams.WorkerVolumeMounts = nimService.GetWorkerVolumeMountsAt(modelPVC, modelLayout.MountPath)
 
 			// Create configmap for MPI
 			err = r.createMultiNodeVolumeObjects(ctx, nimService)
@@ -538,6 +557,12 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		deploymentParams := nimService.GetDeploymentParams()
 		deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
 		deploymentParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
+		if modelLayout.Protocol.IsNative() {
+			deploymentParams.Env = utils.MergeEnvVars([]corev1.EnvVar{{
+				Name:  imageprotocol.ModelPathEnv,
+				Value: modelLayout.ModelPath,
+			}}, deploymentParams.Env)
+		}
 		if nimCache.IsUniversalNIM() {
 			hfUri := nimCache.GetHFUri()
 			deploymentParams.Env = utils.MergeEnvVars([]corev1.EnvVar{{
@@ -585,7 +610,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 
 		// Setup volume mounts with model store
 		deploymentParams.Volumes = nimService.GetVolumes(modelPVC)
-		deploymentParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
+		deploymentParams.VolumeMounts = nimService.GetVolumeMountsAt(modelPVC, modelLayout.MountPath)
 		if profileEnv != nil {
 			deploymentParams.Env = utils.MergeEnvVars(*profileEnv, deploymentParams.Env)
 		}
@@ -593,7 +618,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		if gpuResources != nil {
 			deploymentParams.Resources = gpuResources
 		}
-		initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+		initContainerVolumeMounts := nimService.GetInitContainerVolumeMountsAt(modelPVC, modelLayout.MountPath)
 		for idx := range deploymentParams.InitContainers {
 			deploymentParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
 		}

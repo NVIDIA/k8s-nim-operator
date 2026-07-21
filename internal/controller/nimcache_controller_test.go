@@ -40,10 +40,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/imageprotocol"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	nimparserv1 "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/v1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
+
+type fakeImageProtocolResolver struct {
+	protocol imageprotocol.Protocol
+	err      error
+}
+
+func (f fakeImageProtocolResolver) Resolve(context.Context, string, string, []string) (imageprotocol.Protocol, error) {
+	return f.protocol, f.err
+}
 
 var _ = Describe("NIMCache Controller", func() {
 	var (
@@ -64,9 +74,10 @@ var _ = Describe("NIMCache Controller", func() {
 			WithStatusSubresource(&corev1.ConfigMap{}).
 			Build()
 		reconciler = &NIMCacheReconciler{
-			Client:   cli,
-			scheme:   scheme,
-			recorder: record.NewFakeRecorder(1000),
+			Client:                cli,
+			scheme:                scheme,
+			recorder:              record.NewFakeRecorder(1000),
+			imageProtocolResolver: fakeImageProtocolResolver{protocol: imageprotocol.Legacy},
 		}
 
 		nimCache := &appsv1alpha1.NIMCache{
@@ -499,6 +510,124 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(job.Spec.Template.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
 			Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElements("download-to-cache"))
 			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--all"))
+		})
+
+		Context("with a native-v1 image", func() {
+			BeforeEach(func() {
+				reconciler.imageProtocolResolver = fakeImageProtocolResolver{protocol: imageprotocol.NativeV1}
+			})
+
+			It("runs the image entrypoint in download-only mode with a dedicated PVC", func() {
+				nimCache := &appsv1alpha1.NIMCache{
+					ObjectMeta: metav1.ObjectMeta{Name: "nemotron-page-elements-v3", Namespace: "default"},
+					Spec: appsv1alpha1.NIMCacheSpec{
+						Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{
+							ModelPuller: "nvcr.io/nim/retriever-photon-od:2.0.0",
+							PullSecret:  "my-secret",
+							AuthSecret:  "model-auth",
+						}},
+						Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To(true)}},
+						Env: []corev1.EnvVar{
+							{Name: "NIM_ENGINE_MODEL_NAME", Value: "nvidia/nemotron-page-elements-v3"},
+							{Name: "NIM_ENGINE_MODEL_VARIANT", Value: "multilingual"},
+							{Name: "NIM_ENGINE_MODEL_DOWNLOAD_ONLY", Value: "0"},
+						},
+					},
+				}
+
+				job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
+				Expect(err).NotTo(HaveOccurred())
+				container := job.Spec.Template.Spec.Containers[0]
+				Expect(container.Command).To(BeEmpty())
+				Expect(container.Args).To(BeEmpty())
+				Expect(container.Env).To(ContainElements(
+					corev1.EnvVar{Name: "NIM_ENGINE_MODEL_DOWNLOAD_ONLY", Value: "1"},
+					corev1.EnvVar{Name: "NIM_ENGINE_MODEL_PATH", Value: "/model"},
+					corev1.EnvVar{Name: "NIM_ENGINE_MODEL_NAME", Value: "nvidia/nemotron-page-elements-v3"},
+					corev1.EnvVar{Name: "NIM_ENGINE_MODEL_VARIANT", Value: "multilingual"},
+				))
+				Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+					Name: "nim-cache-volume", MountPath: "/model",
+				}))
+				Expect(container.EnvFrom).To(ContainElement(corev1.EnvFromSource{SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "model-auth"},
+				}}))
+				Expect(job.Spec.Template.Spec.NodeSelector).To(BeEmpty())
+			})
+
+			It("isolates an existing shared PVC by NIMCache name", func() {
+				nimCache := &appsv1alpha1.NIMCache{
+					ObjectMeta: metav1.ObjectMeta{Name: "nemotron-ocr-v2", Namespace: "default"},
+					Spec: appsv1alpha1.NIMCacheSpec{
+						Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim/retriever-photon-ocr:2.0.0"}},
+						Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create: ptr.To(false), Name: "shared-models",
+						}},
+					},
+				}
+
+				job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(job.Spec.Template.Spec.Containers[0].Env).To(ContainElement(
+					corev1.EnvVar{Name: "NIM_ENGINE_MODEL_PATH", Value: "/model/nemotron-ocr-v2"},
+				))
+			})
+
+			It("preserves an explicit model path and node selector", func() {
+				nimCache := &appsv1alpha1.NIMCache{
+					ObjectMeta: metav1.ObjectMeta{Name: "custom-cache", Namespace: "default"},
+					Spec: appsv1alpha1.NIMCacheSpec{
+						Source:       appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim/retriever-photon-od:2.0.0"}},
+						Storage:      appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Create: ptr.To(false), Name: "shared-models"}},
+						NodeSelector: map[string]string{"cache-node": "true"},
+						Env:          []corev1.EnvVar{{Name: "NIM_ENGINE_MODEL_PATH", Value: "/model/custom"}},
+					},
+				}
+
+				job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(job.Spec.Template.Spec.Containers[0].Env).To(ContainElement(
+					corev1.EnvVar{Name: "NIM_ENGINE_MODEL_PATH", Value: "/model/custom"},
+				))
+				Expect(job.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"cache-node": "true"}))
+			})
+
+			It("skips legacy manifest extraction and profile selection", func() {
+				nimCache := &appsv1alpha1.NIMCache{
+					ObjectMeta: metav1.ObjectMeta{Name: "native-cache", Namespace: "default"},
+					Spec: appsv1alpha1.NIMCacheSpec{
+						Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim/retriever-photon-od:2.0.0"}},
+						Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{
+							Create: ptr.To(false), Name: "existing-pvc",
+						}},
+					},
+				}
+				Expect(cli.Create(context.TODO(), nimCache)).To(Succeed())
+				Expect(cli.Create(context.TODO(), &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: "existing-pvc", Namespace: "default"},
+				})).To(Succeed())
+				reconciler.orchestratorType = k8sutil.K8s
+
+				_, err := reconciler.reconcileNIMCache(context.TODO(), nimCache)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cli.Get(context.TODO(), types.NamespacedName{Name: getJobName(nimCache), Namespace: "default"}, &batchv1.Job{})).To(Succeed())
+				Expect(cli.Get(context.TODO(), types.NamespacedName{Name: getPodName(nimCache), Namespace: "default"}, &corev1.Pod{})).To(MatchError(errors.IsNotFound, "temporary manifest pod should not exist"))
+				Expect(nimCache.Annotations).NotTo(HaveKey(SelectedNIMProfilesAnnotationKey))
+			})
+
+			It("reports no legacy profiles after a native download completes", func() {
+				nimCache := &appsv1alpha1.NIMCache{
+					ObjectMeta: metav1.ObjectMeta{Name: "native-cache", Namespace: "default"},
+					Spec: appsv1alpha1.NIMCacheSpec{
+						Storage: appsv1alpha1.NIMCacheStorage{PVC: appsv1alpha1.PersistentVolumeClaim{Name: "models"}},
+					},
+					Status: appsv1alpha1.NIMCacheStatus{Profiles: []appsv1alpha1.NIMProfile{{Name: "legacy-profile"}}},
+				}
+				job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "native-cache-job"}, Status: batchv1.JobStatus{Succeeded: 1}}
+
+				Expect(reconciler.reconcileJobStatus(context.TODO(), nimCache, job, imageprotocol.NativeV1)).To(Succeed())
+				Expect(nimCache.Status.Profiles).To(BeEmpty())
+			})
 		})
 
 		It("should create a job with the correct specifications", func() {

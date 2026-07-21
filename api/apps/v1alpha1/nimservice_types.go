@@ -889,6 +889,12 @@ func (n *NIMService) scratchNeeded() bool {
 
 // GetVolumeMounts returns volumes for the NIMService container.
 func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
+	return n.GetVolumeMountsAt(modelPVC, "/model-store")
+}
+
+// GetVolumeMountsAt returns volumes for the NIMService container with the model
+// volume mounted at modelMountPath.
+func (n *NIMService) GetVolumeMountsAt(modelPVC *PersistentVolumeClaim, modelMountPath string) []corev1.VolumeMount {
 	subPath := ""
 	if modelPVC != nil {
 		subPath = modelPVC.SubPath
@@ -896,7 +902,7 @@ func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.V
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "model-store",
-			MountPath: "/model-store",
+			MountPath: modelMountPath,
 			SubPath:   subPath,
 		},
 		{
@@ -918,6 +924,12 @@ func (n *NIMService) GetVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.V
 }
 
 func (n *NIMService) GetInitContainerVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
+	return n.GetInitContainerVolumeMountsAt(modelPVC, "/model-store")
+}
+
+// GetInitContainerVolumeMountsAt returns model volume mounts for init
+// containers with the model volume mounted at modelMountPath.
+func (n *NIMService) GetInitContainerVolumeMountsAt(modelPVC *PersistentVolumeClaim, modelMountPath string) []corev1.VolumeMount {
 	subPath := ""
 	if modelPVC != nil {
 		subPath = modelPVC.SubPath
@@ -925,7 +937,7 @@ func (n *NIMService) GetInitContainerVolumeMounts(modelPVC *PersistentVolumeClai
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "model-store",
-			MountPath: "/model-store",
+			MountPath: modelMountPath,
 			SubPath:   subPath,
 		},
 	}
@@ -942,7 +954,13 @@ func (n *NIMService) GetInitContainerVolumeMounts(modelPVC *PersistentVolumeClai
 }
 
 func (n *NIMService) GetWorkerVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
-	volumeMounts := n.GetVolumeMounts(modelPVC)
+	return n.GetWorkerVolumeMountsAt(modelPVC, "/model-store")
+}
+
+// GetWorkerVolumeMountsAt returns worker volume mounts with the model volume
+// mounted at modelMountPath.
+func (n *NIMService) GetWorkerVolumeMountsAt(modelPVC *PersistentVolumeClaim, modelMountPath string) []corev1.VolumeMount {
+	volumeMounts := n.GetVolumeMountsAt(modelPVC, modelMountPath)
 
 	volumeMounts = append(volumeMounts,
 		corev1.VolumeMount{
@@ -967,7 +985,13 @@ func (n *NIMService) GetWorkerVolumeMounts(modelPVC *PersistentVolumeClaim) []co
 }
 
 func (n *NIMService) GetLeaderVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
-	volumeMounts := n.GetVolumeMounts(modelPVC)
+	return n.GetLeaderVolumeMountsAt(modelPVC, "/model-store")
+}
+
+// GetLeaderVolumeMountsAt returns leader volume mounts with the model volume
+// mounted at modelMountPath.
+func (n *NIMService) GetLeaderVolumeMountsAt(modelPVC *PersistentVolumeClaim, modelMountPath string) []corev1.VolumeMount {
+	volumeMounts := n.GetVolumeMountsAt(modelPVC, modelMountPath)
 	volumeMounts = append(volumeMounts,
 		corev1.VolumeMount{
 			Name:      "mpi-config",
