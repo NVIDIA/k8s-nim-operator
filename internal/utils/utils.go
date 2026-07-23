@@ -17,10 +17,13 @@
 package utils
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -523,4 +526,95 @@ func FindEnvByValue(envs []corev1.EnvVar, key string) *corev1.EnvVar {
 		}
 	}
 	return nil
+}
+
+// ManifestConfigMapMaxPlaintextBytes is the size threshold (in bytes) above which
+// manifest content is gzip-compressed into a ConfigMap's binaryData instead of
+// being stored as plaintext in its data. It is kept well under the Kubernetes
+// 1 MiB (1048576 bytes) ConfigMap limit to leave headroom for other keys and
+// object metadata. Payloads at or below this threshold are stored as plaintext
+// so behavior (and downgrade-compatibility) is unchanged for the common case.
+const ManifestConfigMapMaxPlaintextBytes = 900 * 1024
+
+// GzipCompressedKeySuffix is appended to a manifest key when its value is stored
+// gzip-compressed in a ConfigMap's binaryData.
+const GzipCompressedKeySuffix = ".gz"
+
+// CompressData gzip-compresses the given bytes using the best compression level.
+func CompressData(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	gw, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gzip writer: %w", err)
+	}
+	if _, err := gw.Write(data); err != nil {
+		_ = gw.Close()
+		return nil, fmt.Errorf("failed to gzip data: %w", err)
+	}
+	if err := gw.Close(); err != nil {
+		return nil, fmt.Errorf("failed to finalize gzip data: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// DecompressData gzip-decompresses the given bytes.
+func DecompressData(data []byte) ([]byte, error) {
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gr.Close()
+	out, err := io.ReadAll(gr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gunzip data: %w", err)
+	}
+	return out, nil
+}
+
+// SetManifestConfigMapData stores manifest bytes into the ConfigMap under baseKey.
+//
+// Small payloads (<= ManifestConfigMapMaxPlaintextBytes) are stored as plaintext
+// in cm.Data[baseKey] to preserve existing behavior and remain readable by older
+// operator versions. Larger payloads that would otherwise approach the 1 MiB
+// ConfigMap limit are gzip-compressed into cm.BinaryData[baseKey+".gz"] instead.
+// The counterpart representation of the same key is removed so only one form is
+// ever present. It returns true when the compressed form was used.
+func SetManifestConfigMapData(cm *corev1.ConfigMap, baseKey string, raw []byte) (bool, error) {
+	gzKey := baseKey + GzipCompressedKeySuffix
+	if len(raw) <= ManifestConfigMapMaxPlaintextBytes {
+		if cm.Data == nil {
+			cm.Data = map[string]string{}
+		}
+		cm.Data[baseKey] = string(raw)
+		delete(cm.BinaryData, gzKey)
+		return false, nil
+	}
+	compressed, err := CompressData(raw)
+	if err != nil {
+		return false, err
+	}
+	if cm.BinaryData == nil {
+		cm.BinaryData = map[string][]byte{}
+	}
+	cm.BinaryData[gzKey] = compressed
+	delete(cm.Data, baseKey)
+	return true, nil
+}
+
+// GetManifestConfigMapData retrieves manifest bytes stored under baseKey,
+// transparently handling both the gzip-compressed (cm.BinaryData[baseKey+".gz"])
+// and plaintext (cm.Data[baseKey]) representations. The compressed form takes
+// precedence. The second return value reports whether the key was found.
+func GetManifestConfigMapData(cm *corev1.ConfigMap, baseKey string) ([]byte, bool, error) {
+	if gz, ok := cm.BinaryData[baseKey+GzipCompressedKeySuffix]; ok {
+		raw, err := DecompressData(gz)
+		if err != nil {
+			return nil, true, err
+		}
+		return raw, true, nil
+	}
+	if s, ok := cm.Data[baseKey]; ok {
+		return []byte(s), true, nil
+	}
+	return nil, false, nil
 }

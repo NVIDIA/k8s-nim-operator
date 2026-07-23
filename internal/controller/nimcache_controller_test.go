@@ -39,10 +39,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
+	"sigs.k8s.io/yaml"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	nimparserv1 "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/v1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
+	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
 var _ = Describe("NIMCache Controller", func() {
@@ -104,6 +107,51 @@ var _ = Describe("NIMCache Controller", func() {
 			},
 		}
 		_ = cli.Delete(context.TODO(), nimCache)
+	})
+
+	Context("When the manifest ConfigMap is gzip-compressed", func() {
+		It("extractNIMManifest transparently decompresses and parses it", func() {
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache-gz",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+				},
+			}
+
+			// Parse a real manifest and marshal it back to YAML bytes.
+			filePath := filepath.Join("testdata", "manifest_trtllm.yaml")
+			parser := nimparserv1.NIMParser{}
+			manifestData, err := parser.ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			manifestBytes, err := yaml.Marshal(&manifestData)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Store it gzip-compressed in BinaryData, simulating a large manifest
+			// that exceeded the plaintext threshold.
+			gz, err := utils.CompressData(manifestBytes)
+			Expect(err).NotTo(HaveOccurred())
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      getManifestConfigName(nimCache),
+					Namespace: nimCache.Namespace,
+				},
+				BinaryData: map[string][]byte{
+					ModelManifestKey + utils.GzipCompressedKeySuffix: gz,
+				},
+			}
+			Expect(cli.Create(context.TODO(), cm)).To(Succeed())
+
+			// extractNIMManifest should transparently decompress + parse.
+			manifest, err := reconciler.extractNIMManifest(context.TODO(), cm.Name, cm.Namespace)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(manifest).NotTo(BeNil())
+			Expect(manifest.GetProfilesList()).To(ConsistOf(manifestData.GetProfilesList()))
+
+			Expect(cli.Delete(context.TODO(), cm)).To(Succeed())
+		})
 	})
 
 	Context("When creating a NIMCache", func() {

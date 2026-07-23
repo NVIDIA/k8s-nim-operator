@@ -1039,22 +1039,28 @@ func (r *NIMBuildReconciler) updateManifestConfigMap(ctx context.Context, nimCac
 		},
 	}
 
-	// Create the ConfigMap
+	// Create the ConfigMap. Small manifests are stored as plaintext for backward
+	// compatibility; large ones are gzip-compressed into binaryData so the
+	// ConfigMap stays under the 1 MiB limit (mirrors NIMCache manifest storage).
+	var setErr error
 	if err := k8sutil.RetryUpdate(ctx, r.Client, configMap, func(obj client.Object) {
 		cm, ok := obj.(*corev1.ConfigMap)
 		if !ok {
 			return
 		}
-		if cm.Data == nil {
-			cm.Data = make(map[string]string)
+		if _, err := utils.SetManifestConfigMapData(cm, LocalModelManifestKey, prettyManifestBytes); err != nil {
+			setErr = err
+			return
 		}
-		cm.Data["local_model_manifest.yaml"] = string(prettyManifestBytes)
 		if cm.Labels == nil {
 			cm.Labels = make(map[string]string)
 		}
 		cm.Labels["app"] = nimCache.GetName()
 	}); err != nil {
 		return fmt.Errorf("failed to create manifest ConfigMap %s: %w", configMap.Name, err)
+	}
+	if setErr != nil {
+		return fmt.Errorf("failed to set local manifest data for ConfigMap %s: %w", configMap.Name, setErr)
 	}
 	return nil
 }

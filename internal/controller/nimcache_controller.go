@@ -78,6 +78,15 @@ const (
 
 	// NIMCacheContainerName returns the name of the container used for NIM Cache operations.
 	NIMCacheContainerName = "nim-cache-ctr"
+
+	// ModelManifestKey is the ConfigMap key under which the extracted model
+	// manifest is stored (plaintext in Data, or gzip-compressed in BinaryData
+	// under ModelManifestKey+".gz" for large manifests).
+	ModelManifestKey = "model_manifest.yaml"
+
+	// LocalModelManifestKey is the ConfigMap key under which NIMBuild stores the
+	// locally-built model manifest (same plaintext/gzip handling as above).
+	LocalModelManifestKey = "local_model_manifest.yaml"
 )
 
 // NIMCacheReconciler reconciles a NIMCache object.
@@ -1352,13 +1361,16 @@ func (r *NIMCacheReconciler) extractNIMManifest(ctx context.Context, configName,
 		return nil, fmt.Errorf("unable to get ConfigMap %s: %w", configName, err)
 	}
 
-	data, ok := configMap.Data["model_manifest.yaml"]
+	data, ok, err := utils.GetManifestConfigMapData(configMap, ModelManifestKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read manifest data from ConfigMap %s: %w", configName, err)
+	}
 	if !ok {
 		return nil, fmt.Errorf("model_manifest.yaml not found in ConfigMap")
 	}
 
-	parser := nimparserutils.GetNIMParser([]byte(data))
-	manifest, err := parser.ParseModelManifestFromRawOutput([]byte(data))
+	parser := nimparserutils.GetNIMParser(data)
+	manifest, err := parser.ParseModelManifestFromRawOutput(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal manifest data: %w", err)
 	}
@@ -1396,9 +1408,17 @@ func (r *NIMCacheReconciler) createManifestConfigMap(ctx context.Context, nimCac
 		return err
 	}
 
-	// Update the data
-	configMap.Data = map[string]string{
-		"model_manifest.yaml": string(manifestBytes),
+	// Store the manifest. Small manifests are kept as plaintext for backward
+	// compatibility; large manifests (e.g. models with many profiles) are
+	// gzip-compressed into binaryData so they stay under the 1 MiB ConfigMap limit.
+	compressed, err := utils.SetManifestConfigMapData(configMap, ModelManifestKey, manifestBytes)
+	if err != nil {
+		return fmt.Errorf("failed to set manifest data for ConfigMap %s: %w", configMap.Name, err)
+	}
+	if compressed {
+		r.log.Info("Storing gzip-compressed model manifest in ConfigMap binaryData",
+			"configMap", configMap.Name, "rawBytes", len(manifestBytes),
+			"compressedBytes", len(configMap.BinaryData[ModelManifestKey+utils.GzipCompressedKeySuffix]))
 	}
 
 	// Create the ConfigMap
