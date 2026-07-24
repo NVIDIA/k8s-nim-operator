@@ -5,12 +5,12 @@ Use this reference to validate an uninstall plan and the final cluster state aft
 ## Package Validation
 
 ```sh
-test -f .agents/skills/nim-operator-uninstall/SKILL.md
-grep -q '^name: nim-operator-uninstall$' .agents/skills/nim-operator-uninstall/SKILL.md
-grep -q '^description:' .agents/skills/nim-operator-uninstall/SKILL.md
-test -f .agents/skills/nim-operator-uninstall/agents/openai.yaml
-test -f .agents/skills/nim-operator-uninstall/references/validation.md
-test -x .agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+test -f skills/nim-operator-uninstall/SKILL.md
+grep -q '^name: nim-operator-uninstall$' skills/nim-operator-uninstall/SKILL.md
+grep -q '^description:' skills/nim-operator-uninstall/SKILL.md
+test -f skills/nim-operator-uninstall/agents/openai.yaml
+test -f skills/nim-operator-uninstall/references/validation.md
+test -x skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 ```
 
 ## Plan Validation

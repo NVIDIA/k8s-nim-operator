@@ -1,0 +1,48 @@
+{
+  "schema_version": "nv-base-evals-v1",
+  "skill": "nim-operator-uninstall",
+  "description": "P0 smoke evaluation dataset for the NVIDIA NIM Operator uninstall skill.",
+  "test_cases": [
+    {
+      "id": "uninstall-inventory-only",
+      "prompt": "Use the NIM Operator uninstall skill to inventory my current NIM Operator installation. Do not delete anything.",
+      "expected_skill": "nim-operator-uninstall",
+      "expected_script": "scripts/validate-nim-operator-uninstall.sh",
+      "ground_truth": "The agent runs read-only inventory only, reports Helm release and namespace state, lists CRDs and custom resources, and does not run helm uninstall or kubectl delete.",
+      "expected_behavior": [
+        "Runs the bundled validation helper as the first inventory step.",
+        "Separates read-only inventory from destructive uninstall actions.",
+        "Reports whether the Helm release, namespace resources, CRDs, and custom resources exist.",
+        "Does not run helm uninstall.",
+        "Does not delete CRDs, custom resources, namespaces, or dependencies."
+      ]
+    },
+    {
+      "id": "uninstall-default-preserve-apis",
+      "prompt": "Use the NIM Operator uninstall skill to uninstall the nim-operator release from the nim-operator namespace. Preserve CRDs, custom resources, namespace, GPU Operator, cert-manager, and KServe.",
+      "expected_skill": "nim-operator-uninstall",
+      "expected_script": "scripts/validate-nim-operator-uninstall.sh",
+      "ground_truth": "The agent inventories the installation, asks before running helm uninstall, removes only the Helm release after approval, reruns validation, and confirms preserved CRDs and dependencies.",
+      "expected_behavior": [
+        "Runs the bundled validation helper before proposing destructive commands.",
+        "Shows the exact helm uninstall nim-operator -n nim-operator command before execution.",
+        "Requires explicit approval before helm uninstall.",
+        "Does not delete CRDs or custom resources because the prompt says to preserve them.",
+        "Does not remove GPU Operator, cert-manager, KServe, or shared dependencies.",
+        "Runs post-uninstall validation after the Helm release removal."
+      ]
+    },
+    {
+      "id": "negative-install-operator",
+      "prompt": "Install NIM Operator on my Kubernetes cluster from the NVIDIA Helm repo.",
+      "expected_skill": null,
+      "expected_script": null,
+      "ground_truth": "The uninstall skill should not trigger because the user is asking for an install workflow.",
+      "expected_behavior": [
+        "Does not use the NIM Operator uninstall skill.",
+        "Does not run the uninstall validation helper.",
+        "Routes the task to the install skill or asks to use the install workflow."
+      ]
+    }
+  ]
+}

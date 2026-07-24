@@ -1,22 +1,31 @@
 ---
 name: nim-operator-install
-description: Install NVIDIA NIM Operator on Kubernetes with prerequisite checks, optional NVIDIA GPU Operator dependency installation, public or local Helm chart selection, optional Dynamo support, and optional KServe compatibility verification. Use when a customer wants to install or upgrade the NIM Operator itself, with or without Dynamo and KServe, but does not want to deploy a NIM inference model yet.
+description: Use when installing, upgrading, dry-running, or validating NVIDIA NIM Operator on Kubernetes with Helm, GPU Operator checks, Dynamo, or KServe.
+license: Apache-2.0
 ---
 
 # NVIDIA NIM Operator Install
 
-Use this skill to install or upgrade the NVIDIA NIM Operator on an existing Kubernetes cluster. The skill installs the operator and its CRDs only. Do not deploy `NIMService`, `NIMCache`, `NIMPipeline`, or NeMo service custom resources unless the user explicitly asks for that as a separate task.
+Use this skill to install or upgrade NVIDIA NIM Operator on an existing Kubernetes cluster. The skill installs the operator and its CRDs only. Do not deploy `NIMService`, `NIMCache`, `NIMPipeline`, or NeMo service custom resources unless the user explicitly asks for that as a separate task.
 
-This is the canonical, agent-neutral skill folder. If another agent framework needs a specific discovery path, create a thin adapter or symlink to this folder instead of duplicating the workflow.
+This is the canonical, agent-neutral skill folder for NIM Operator. If another agent framework needs a specific discovery path, use the repository's `.agents/skills` symlink alias instead of duplicating the workflow.
+
+## Purpose
+
+Install, upgrade, dry-run, or validate the NIM Operator control plane safely before any NIM inference workload is deployed.
+
+## Instructions
+
+Follow the safety contract, ask only for missing install choices, run the bundled validation helper before and after changes, discover chart versions before selecting one, and never deploy inference model custom resources from this skill.
 
 ## Workspace Root
 
-Assume commands run from the root of the `k8s-nim-operator` repository unless the user gives another working directory. Before using repo-relative paths such as `.agents/skills/...` or `deployments/helm/k8s-nim-operator`, verify the current directory:
+Assume commands run from the root of the `k8s-nim-operator` repository unless the user gives another working directory. Before using repo-relative paths such as `skills/nim-operator-install/...` or `deployments/helm/k8s-nim-operator`, verify the current directory:
 
 ```sh
 pwd
 test -f deployments/helm/k8s-nim-operator/Chart.yaml
-test -f .agents/skills/nim-operator-install/SKILL.md
+test -f skills/nim-operator-install/SKILL.md
 ```
 
 If these checks fail, ask for the correct repository root or `cd` to it before continuing.
@@ -36,7 +45,7 @@ Mutating examples: `helm repo add`, `helm repo update`, `helm dependency update`
 - Public NVIDIA Helm repo name: `nvidia`
 - Public NVIDIA Helm repo URL: `https://helm.ngc.nvidia.com/nvidia`
 - Local NIM Operator chart path: `deployments/helm/k8s-nim-operator`
-- NIM Operator chart version: latest available from the selected chart source unless the user requests a specific version
+- NIM Operator chart version: latest available version from the selected chart source unless the user requests a specific version
 - GPU Operator: verify first; ask before installing if missing
 - GPU Operator namespace: `gpu-operator`
 - Dynamo: disabled unless requested
@@ -45,9 +54,23 @@ Mutating examples: `helm repo add`, `helm repo update`, `helm dependency update`
 ## References
 
 - For validation levels, command safety checks, and evidence format, read `references/validation.md`.
-- For a read-only validation helper from the repository root, run `.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh`.
+- For a read-only validation helper from the repository root, run `skills/nim-operator-install/scripts/validate-nim-operator-install.sh`.
 
-## How To Ask For This Skill
+## Available Scripts
+
+| Script | Purpose | Arguments |
+| --- | --- | --- |
+| `scripts/validate-nim-operator-install.sh` | Collect read-only preflight and post-install evidence for client tools, cluster access, GPU Operator, cert-manager, KServe, current NIM Operator state, and CRDs. | Optional environment variables: `NIM_OPERATOR_RELEASE`, `NIM_OPERATOR_NAMESPACE`, `GPU_OPERATOR_NAMESPACE`. |
+
+Run the script from the repository root:
+
+```sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+```
+
+If an agent runtime exposes `run_script`, call `run_script("scripts/validate-nim-operator-install.sh")` from this skill folder for the same preflight helper.
+
+## Examples
 
 End users do not need to know the internal file layout. They should ask the agent for the outcome they want. Recognize and support these prompt patterns:
 
@@ -106,7 +129,7 @@ This section is for humans, CI jobs, and reviewers who want to run the same work
 Validation only:
 
 ```sh
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 ```
 
 Validation with overrides:
@@ -115,7 +138,7 @@ Validation with overrides:
 NIM_OPERATOR_RELEASE=nim-operator \
 NIM_OPERATOR_NAMESPACE=nim-operator \
 GPU_OPERATOR_NAMESPACE=gpu-operator \
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 ```
 
 Public chart install or upgrade:
@@ -125,13 +148,13 @@ helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
 helm repo update
 helm search repo nvidia/k8s-nim-operator --versions
 selected_version="REPLACE_WITH_VERSION_FROM_SEARCH_OUTPUT"
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 helm upgrade --install nim-operator nvidia/k8s-nim-operator \
   --namespace nim-operator \
   --create-namespace \
   --version "${selected_version}" \
   --set operator.admissionController.enabled=false
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 ```
 
 To dry-run instead of installing, add `--dry-run --debug` to the `helm upgrade --install` command. To enable Dynamo, append `--set dynamo.enabled=true` and only add Dynamo sub-options if they are intentionally selected.
@@ -140,22 +163,22 @@ Local chart install or upgrade:
 
 ```sh
 helm show chart deployments/helm/k8s-nim-operator
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 helm upgrade --install nim-operator deployments/helm/k8s-nim-operator \
   --namespace nim-operator \
   --create-namespace
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 ```
 
 Remote SSH usage if the skill folder has been copied to the remote host:
 
 ```sh
-ssh <user>@<host> '~/.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh'
+ssh <user>@<host> '~/skills/nim-operator-install/scripts/validate-nim-operator-install.sh'
 ssh <user>@<host> 'helm repo add nvidia https://helm.ngc.nvidia.com/nvidia'
 ssh <user>@<host> 'helm repo update'
 ssh <user>@<host> 'helm search repo nvidia/k8s-nim-operator --versions'
 ssh <user>@<host> 'selected_version="REPLACE_WITH_VERSION_FROM_SEARCH_OUTPUT"; helm upgrade --install nim-operator nvidia/k8s-nim-operator --namespace nim-operator --create-namespace --version "${selected_version}" --set operator.admissionController.enabled=false'
-ssh <user>@<host> '~/.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh'
+ssh <user>@<host> '~/skills/nim-operator-install/scripts/validate-nim-operator-install.sh'
 ```
 
 ## Initial Questions
@@ -201,7 +224,7 @@ Tell the user the local chart `version` and `appVersion`, then ask whether to pr
 When the user asks for a dry run or demo, do not install anything. Start by calling the bundled validation helper so preflight evidence is captured before chart discovery or Helm rendering. Use this sequence:
 
 ```sh
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
 helm repo update
 helm search repo nvidia/k8s-nim-operator --versions
@@ -224,7 +247,7 @@ Before rendering or dry-running Helm, resolve `<selected-version>` through the V
 Start prerequisite discovery by calling the bundled validation helper:
 
 ```sh
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 ```
 
 This is the canonical preflight call site for the skill. It checks client tools, cluster access, RBAC, nodes, GPU availability, GPU Operator status, cert-manager status, KServe presence, current NIM Operator state, and NIM Operator CRDs.
@@ -368,7 +391,7 @@ Make it clear that this disables the NIM Operator admission controller. Do not s
 After install or upgrade, call the bundled validation helper again to collect post-change evidence:
 
 ```sh
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 ```
 
 Then run rollout-specific verification:
@@ -415,7 +438,7 @@ kubectl get pods -n kserve
 Use the same `helm upgrade --install` command for both fresh installs and upgrades. Before upgrading, call the validation helper to capture the pre-upgrade baseline:
 
 ```sh
-.agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 ```
 
 Then inspect the current release and available target versions:

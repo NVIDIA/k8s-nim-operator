@@ -1,21 +1,30 @@
 ---
 name: nim-operator-uninstall
-description: Safely uninstall NVIDIA NIM Operator from Kubernetes with inventory checks, explicit approval gates for destructive actions, optional custom resource cleanup, optional CRD removal, and post-uninstall validation. Use when a customer wants to remove or clean up the NIM Operator itself, not the GPU Operator or unrelated cluster dependencies.
+description: Use when inventorying, uninstalling, or validating NVIDIA NIM Operator removal from Kubernetes while preserving CRDs and dependencies by default.
+license: Apache-2.0
 ---
 
 # NVIDIA NIM Operator Uninstall
 
 Use this skill to remove the NVIDIA NIM Operator Helm release from a Kubernetes cluster. This skill is intentionally separate from install because uninstall is destructive and needs stronger confirmation.
 
-By default, uninstall only removes the NIM Operator Helm release. Do not delete NIM custom resources, CRDs, namespaces, persistent volumes, secrets, GPU Operator, cert-manager, KServe, or Dynamo dependencies unless the user explicitly approves that specific action.
+By default, uninstall only removes the NIM Operator Helm release. It removes by release and namespace, not by chart version. Do not delete NIM custom resources, CRDs, namespaces, persistent volumes, secrets, GPU Operator, cert-manager, KServe, or Dynamo dependencies unless the user explicitly approves that specific action.
+
+## Purpose
+
+Remove the NIM Operator control plane safely while making preserved APIs, workloads, namespaces, and shared dependencies explicit.
+
+## Instructions
+
+Run read-only inventory first, separate Helm release removal from optional custom resource, CRD, and namespace cleanup, ask before every destructive command, and preserve shared dependencies by default.
 
 ## Workspace Root
 
-Assume commands run from the root of the `k8s-nim-operator` repository unless the user gives another working directory. Before using repo-relative paths such as `.agents/skills/...`, verify the current directory:
+Assume commands run from the root of the `k8s-nim-operator` repository unless the user gives another working directory. Before using repo-relative paths such as `skills/nim-operator-uninstall/...`, verify the current directory:
 
 ```sh
 pwd
-test -f .agents/skills/nim-operator-uninstall/SKILL.md
+test -f skills/nim-operator-uninstall/SKILL.md
 ```
 
 If this check fails, ask for the correct repository root or `cd` to it before continuing.
@@ -41,9 +50,23 @@ Destructive examples: `helm uninstall`, `kubectl delete`, namespace deletion, CR
 ## References
 
 - For validation levels, inventory checks, and evidence format, read `references/validation.md`.
-- For a read-only validation helper from the repository root, run `.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh`.
+- For a read-only validation helper from the repository root, run `skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh`.
 
-## How To Ask For This Skill
+## Available Scripts
+
+| Script | Purpose | Arguments |
+| --- | --- | --- |
+| `scripts/validate-nim-operator-uninstall.sh` | Collect read-only uninstall inventory and post-uninstall evidence for client tools, cluster access, Helm release state, namespace resources, CRDs, and custom resources. | Optional environment variables: `NIM_OPERATOR_RELEASE`, `NIM_OPERATOR_NAMESPACE`. |
+
+Run the script from the repository root:
+
+```sh
+skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+```
+
+If an agent runtime exposes `run_script`, call `run_script("scripts/validate-nim-operator-uninstall.sh")` from this skill folder for the same inventory helper.
+
+## Examples
 
 End users do not need to know the internal file layout. They should ask the agent for the cleanup outcome they want. Recognize and support these prompt patterns:
 
@@ -90,7 +113,7 @@ This section is for humans, CI jobs, and reviewers who want to run the same work
 Inventory only:
 
 ```sh
-.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 ```
 
 Inventory with overrides:
@@ -98,15 +121,15 @@ Inventory with overrides:
 ```sh
 NIM_OPERATOR_RELEASE=nim-operator \
 NIM_OPERATOR_NAMESPACE=nim-operator \
-.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 ```
 
 Safe default uninstall. This removes only the Helm release and preserves CRDs, custom resources, namespace, GPU Operator, cert-manager, KServe, and Dynamo dependencies:
 
 ```sh
-.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 helm uninstall nim-operator -n nim-operator
-.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 helm list -n nim-operator
 kubectl get pods -n nim-operator
 ```
@@ -114,9 +137,9 @@ kubectl get pods -n nim-operator
 Remote SSH usage if the skill folder has been copied to the remote host:
 
 ```sh
-ssh <user>@<host> '~/.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh'
+ssh <user>@<host> '~/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh'
 ssh <user>@<host> 'helm uninstall nim-operator -n nim-operator'
-ssh <user>@<host> '~/.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh'
+ssh <user>@<host> '~/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh'
 ssh <user>@<host> 'helm list -n nim-operator'
 ssh <user>@<host> 'kubectl get pods -n nim-operator'
 ```
@@ -137,7 +160,7 @@ If the user wants a quick default uninstall, uninstall only the `nim-operator` H
 Start inventory by calling the bundled validation helper:
 
 ```sh
-.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 ```
 
 This is the canonical pre-uninstall call site for the skill. It checks client tools, cluster access, the Helm release, operator namespace resources, NIM Operator CRDs, and any NIM/NeMo custom resources.
@@ -182,7 +205,7 @@ helm uninstall nim-operator -n nim-operator
 Then call the bundled validation helper again to collect post-uninstall evidence:
 
 ```sh
-.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 ```
 
 Also verify the key release and controller resources directly:
@@ -258,7 +281,7 @@ Do not uninstall these from this skill unless the user explicitly asks for a bro
 Run the bundled validation helper:
 
 ```sh
-.agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 ```
 
 If a manual spot-check is needed, run:

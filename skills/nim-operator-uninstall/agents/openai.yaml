@@ -1,0 +1,7 @@
+interface:
+  display_name: "NIM Operator Uninstall"
+  short_description: "Safely uninstall NIM Operator."
+  default_prompt: "Use $nim-operator-uninstall to inventory or uninstall NIM Operator from my Kubernetes cluster. Preserve CRDs, custom resources, namespace, GPU Operator, cert-manager, and KServe unless I explicitly approve deleting them."
+
+policy:
+  allow_implicit_invocation: true

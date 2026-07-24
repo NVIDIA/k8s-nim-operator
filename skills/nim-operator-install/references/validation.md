@@ -9,12 +9,12 @@ Use this reference when validating the skill package, a dry-run plan, or a live 
 Run before submitting to NVCARPS or another shared registry:
 
 ```sh
-test -f .agents/skills/nim-operator-install/SKILL.md
-grep -q '^name: nim-operator-install$' .agents/skills/nim-operator-install/SKILL.md
-grep -q '^description:' .agents/skills/nim-operator-install/SKILL.md
-test -f .agents/skills/nim-operator-install/agents/openai.yaml
-test -f .agents/skills/nim-operator-install/references/validation.md
-test -x .agents/skills/nim-operator-install/scripts/validate-nim-operator-install.sh
+test -f skills/nim-operator-install/SKILL.md
+grep -q '^name: nim-operator-install$' skills/nim-operator-install/SKILL.md
+grep -q '^description:' skills/nim-operator-install/SKILL.md
+test -f skills/nim-operator-install/agents/openai.yaml
+test -f skills/nim-operator-install/references/validation.md
+test -x skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 ```
 
 Review the skill content for:
