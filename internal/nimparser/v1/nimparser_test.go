@@ -221,5 +221,45 @@ var _ = Describe("NIMParser", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(matchedProfiles).To(HaveLen(1))
 		})
+		It("should return a minimal manifest without workspace data", func() {
+			filePath := filepath.Join("testdata", "manifest_trtllm_v1.yaml")
+			nimparser := NIMParser{}
+			config, err := nimparser.ParseModelManifest(filePath)
+			Expect(err).NotTo(HaveOccurred())
+			nimManifest, ok := config.(NIMManifest)
+			if !ok {
+				Fail("Failed to parse manifest")
+			}
+
+			// Ensure the fixture actually carries workspace bulk before stripping.
+			fullProfile := nimManifest["03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61"]
+			Expect(fullProfile.Workspace).NotTo(BeNil())
+			Expect(fullProfile.Workspace.Components).NotTo(BeEmpty())
+
+			minimalIface := nimManifest.Minimal()
+			minimal, ok := minimalIface.(NIMManifest)
+			Expect(ok).To(BeTrue())
+
+			profile, exists := minimal["03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61"]
+			Expect(exists).To(BeTrue())
+			Expect(profile.Model).To(Equal("meta/llama3-70b-instruct"))
+			Expect(profile.Release).To(Equal("1.0.0"))
+			Expect(profile.Tags["llm_engine"]).To(Equal("tensorrt_llm"))
+			Expect(profile.Tags["precision"]).To(Equal("fp16"))
+			Expect(profile.ContainerURL).To(Equal("nvcr.io/nim/meta/llama3-70b-instruct:1.0.0"))
+			Expect(profile.Workspace).To(BeNil())
+
+			// Minimal must still support profile matching.
+			modelSpec := appsv1alpha1.ModelSpec{
+				Precision:         "fp16",
+				Engine:            "tensorrt_llm",
+				QoSProfile:        "throughput",
+				TensorParallelism: "8",
+				GPUs:              []appsv1alpha1.GPUSpec{{Product: "l40s", IDs: []string{"26b5"}}},
+			}
+			matchedProfiles, err := minimal.MatchProfiles(modelSpec, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(matchedProfiles).To(HaveLen(1))
+		})
 	})
 })

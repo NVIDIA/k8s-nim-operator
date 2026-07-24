@@ -713,6 +713,9 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(profile.Tags["llm_engine"]).To(Equal("tensorrt_llm"))
 			Expect(profile.Tags["precision"]).To(Equal("fp16"))
 			Expect(profile.ContainerURL).To(Equal("nvcr.io/nim/meta/llama3-70b-instruct:1.0.0"))
+			// Bulky workspace file lists must not be persisted in the ConfigMap.
+			Expect(profile.Workspace).To(BeNil())
+			Expect(createdConfigMap.Data["model_manifest.yaml"]).NotTo(ContainSubstring("workspace"))
 		})
 
 		It("should return an error if model_manifest.yaml is not found in ConfigMap", func() {

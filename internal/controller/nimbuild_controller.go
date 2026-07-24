@@ -1009,9 +1009,12 @@ func (r *NIMBuildReconciler) createPod(ctx context.Context, pod *corev1.Pod) err
 }
 
 // updateManifestConfigMap updates the manifest ConfigMap in the cluster with the local manifest data.
+// Only a minimal copy of the manifest (without bulky workspace file lists) is stored
+// to stay under the Kubernetes ConfigMap / etcd 1MiB object size limit.
 func (r *NIMBuildReconciler) updateManifestConfigMap(ctx context.Context, nimCache *appsv1alpha1.NIMCache, manifestData *nimparser.NIMManifestInterface) error {
-	// Convert manifestData to YAML
-	manifestBytes, err := yaml.Marshal(manifestData)
+	// Convert a stripped manifest to YAML. Full manifests can exceed the 1MiB ConfigMap limit
+	// due to per-profile workspace file lists that the operator never reads.
+	manifestBytes, err := yaml.Marshal((*manifestData).Minimal())
 	if err != nil {
 		return fmt.Errorf("failed to marshal manifest data: %w", err)
 	}
