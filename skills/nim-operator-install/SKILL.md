@@ -5,11 +5,9 @@ license: Apache-2.0
 metadata:
   author: NVIDIA NIM Operator Team <meenakshik@nvidia.com>
   tags:
-    - nvidia
-    - nim-operator
-    - kubernetes
-    - helm
-    - gpu
+    - NIM
+    - NIM operator
+    - Kubernetes
 ---
 
 # NVIDIA NIM Operator Install
