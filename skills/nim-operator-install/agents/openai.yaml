@@ -1,7 +1,0 @@
-interface:
-  display_name: "NIM Operator Install"
-  short_description: "Install or upgrade NIM Operator."
-  default_prompt: "Use $nim-operator-install to dry-run or install NIM Operator on my Kubernetes cluster. Check prerequisites first, discover available chart versions, ask which version to use, and ask before running any mutating commands."
-
-policy:
-  allow_implicit_invocation: true

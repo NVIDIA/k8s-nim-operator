@@ -12,7 +12,8 @@ Run before submitting to NVCARPS or another shared registry:
 test -f skills/nim-operator-install/SKILL.md
 grep -q '^name: nim-operator-install$' skills/nim-operator-install/SKILL.md
 grep -q '^description:' skills/nim-operator-install/SKILL.md
-test -f skills/nim-operator-install/agents/openai.yaml
+test -L .agents/skills
+test "$(readlink .agents/skills)" = "../skills"
 test -f skills/nim-operator-install/references/validation.md
 test -x skills/nim-operator-install/scripts/validate-nim-operator-install.sh
 ```

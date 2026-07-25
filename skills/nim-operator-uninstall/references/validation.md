@@ -8,7 +8,8 @@ Use this reference to validate an uninstall plan and the final cluster state aft
 test -f skills/nim-operator-uninstall/SKILL.md
 grep -q '^name: nim-operator-uninstall$' skills/nim-operator-uninstall/SKILL.md
 grep -q '^description:' skills/nim-operator-uninstall/SKILL.md
-test -f skills/nim-operator-uninstall/agents/openai.yaml
+test -L .agents/skills
+test "$(readlink .agents/skills)" = "../skills"
 test -f skills/nim-operator-uninstall/references/validation.md
 test -x skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 ```

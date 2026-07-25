@@ -2,6 +2,14 @@
 name: nim-operator-uninstall
 description: Use when inventorying, uninstalling, or validating NVIDIA NIM Operator removal from Kubernetes while preserving CRDs and dependencies by default.
 license: Apache-2.0
+metadata:
+  author: NVIDIA NIM Operator Team <meenakshik@nvidia.com>
+  tags:
+    - nvidia
+    - nim-operator
+    - kubernetes
+    - helm
+    - cleanup
 ---
 
 # NVIDIA NIM Operator Uninstall
@@ -16,7 +24,10 @@ Remove the NIM Operator control plane safely while making preserved APIs, worklo
 
 ## Instructions
 
-Run read-only inventory first, separate Helm release removal from optional custom resource, CRD, and namespace cleanup, ask before every destructive command, and preserve shared dependencies by default.
+- Run read-only inventory first.
+- Separate Helm release removal from optional custom resource, CRD, and namespace cleanup.
+- Ask before every destructive command.
+- Preserve shared dependencies by default.
 
 ## Workspace Root
 
@@ -46,6 +57,24 @@ Destructive examples: `helm uninstall`, `kubectl delete`, namespace deletion, CR
 - Keep namespace by default
 - Keep GPU Operator by default
 - Keep cert-manager and KServe by default
+
+## Prerequisites
+
+- `kubectl` and `helm` are installed and point to the target cluster.
+- The user has permission to inspect Helm releases, CRDs, custom resources, and namespace resources.
+- The target release name and namespace are known, or the agent inventories them before proposing cleanup.
+
+## Limitations
+
+- Removes only the NIM Operator Helm release by default.
+- Does not delete CRDs, custom resources, namespaces, GPU Operator, cert-manager, KServe, or shared dependencies without explicit approval.
+- Does not uninstall by chart version; Helm uninstall targets release name and namespace.
+
+## Troubleshooting
+
+- Release not found: inventory namespace resources before treating the uninstall as complete.
+- Namespace still contains resources: report what remains and ask before deleting anything.
+- CRDs still present: this is expected unless the user approved full API cleanup.
 
 ## References
 
