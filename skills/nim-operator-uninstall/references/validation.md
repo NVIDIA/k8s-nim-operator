@@ -22,6 +22,7 @@ Before uninstalling, verify that the agent has:
 - identified the Helm release and namespace
 - inventoried NIM and NeMo custom resources
 - stated whether CRDs will be preserved or deleted
+- asked "Should I delete all CRDs associated with NIM Operator?" before CRD deletion
 - stated whether the namespace will be preserved or deleted
 - separated Helm uninstall from CRD deletion
 - asked for approval before every destructive step

@@ -33,6 +33,21 @@
       ]
     },
     {
+      "id": "uninstall-clean-crd-cleanup",
+      "prompt": "Use the NIM Operator uninstall skill to uninstall NIM Operator and then ask whether to delete all CRDs associated with NIM Operator. Do not delete GPU Operator.",
+      "expected_skill": "nim-operator-uninstall",
+      "expected_script": "scripts/validate-nim-operator-uninstall.sh",
+      "ground_truth": "The agent inventories the installation, asks before Helm uninstall, removes only the Helm release after approval, reruns validation, asks whether to delete all CRDs associated with NIM Operator, and deletes CRDs only if the user explicitly approves.",
+      "expected_behavior": [
+        "Runs the bundled validation helper before destructive commands.",
+        "Shows the exact helm uninstall command before execution.",
+        "Runs post-uninstall validation before CRD cleanup.",
+        "Asks: Should I delete all CRDs associated with NIM Operator?",
+        "Explains that CRD deletion removes NIM and NeMo API types and may delete existing custom resources.",
+        "Does not remove GPU Operator or unrelated dependencies."
+      ]
+    },
+    {
       "id": "negative-install-operator",
       "prompt": "Install NIM Operator on my Kubernetes cluster from the NVIDIA Helm repo.",
       "expected_skill": null,

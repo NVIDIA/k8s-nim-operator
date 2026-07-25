@@ -26,6 +26,7 @@ Remove the NIM Operator control plane safely while making preserved APIs, worklo
 - Separate Helm release removal from optional custom resource, CRD, and namespace cleanup.
 - Ask before every destructive command.
 - Preserve shared dependencies by default.
+- After Helm uninstall, ask whether to delete all CRDs associated with NIM Operator.
 
 ## Workspace Root
 
@@ -121,6 +122,12 @@ Full API cleanup:
 Use the NIM Operator uninstall skill to remove the Helm release and then ask me whether to delete NIM Operator CRDs. Show existing custom resources before deleting any CRDs.
 ```
 
+Clean uninstall:
+
+```text
+Use the NIM Operator uninstall skill to uninstall NIM Operator and then ask whether to delete all CRDs associated with NIM Operator. Do not delete GPU Operator.
+```
+
 Validate after uninstall:
 
 ```text
@@ -177,7 +184,7 @@ Ask only for missing choices that materially affect removal:
 
 1. Which release and namespace should be uninstalled?
 2. Should existing NIM and NeMo custom resources be deleted first, or preserved?
-3. Should NIM Operator CRDs be deleted after Helm uninstall, or preserved?
+3. After Helm uninstall, should all CRDs associated with NIM Operator be deleted, or preserved?
 4. Should the namespace be deleted after cleanup, or preserved?
 
 If the user wants a quick default uninstall, uninstall only the `nim-operator` Helm release from namespace `nim-operator` and preserve CRDs, custom resources, namespace, GPU Operator, cert-manager, and KServe.
@@ -245,6 +252,14 @@ kubectl get deployment -n nim-operator -l app.kubernetes.io/instance=nim-operato
 
 If Helm reports the release is not found, do not treat that as success automatically. Check whether operator resources still exist in the namespace.
 
+After the Helm release is gone and post-uninstall validation has listed remaining CRDs and custom resources, ask:
+
+```text
+Should I delete all CRDs associated with NIM Operator?
+```
+
+Explain that deleting CRDs removes the NIM/NeMo API types from the cluster and may delete existing custom resources. If the user says yes, run the Optional CRD Cleanup workflow. If the user says no or does not answer, preserve CRDs.
+
 ## Optional Custom Resource Cleanup
 
 Only if the user explicitly approves deleting NIM and NeMo custom resources, show and run targeted deletes. Prefer deleting specific resources the user selected. If the user approves deleting all NIM Operator custom resources, use:
@@ -265,7 +280,7 @@ Warn that this may remove model-serving workloads, caches, jobs, and service sta
 
 ## Optional CRD Cleanup
 
-Keep CRDs by default. Delete CRDs only if the user explicitly approves full API cleanup.
+Keep CRDs by default. Delete CRDs only if the user explicitly approves deleting all CRDs associated with NIM Operator.
 
 ```sh
 kubectl delete crd \
