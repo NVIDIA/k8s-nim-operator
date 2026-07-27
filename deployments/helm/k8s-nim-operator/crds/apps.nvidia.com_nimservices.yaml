@@ -2733,6 +2733,10 @@ spec:
                         maximum: 65535
                         minimum: 1
                         type: integer
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
                       metricsPort:
                         description: |-
                           MetricsPort is the port for metrics
@@ -3623,6 +3627,11 @@ spec:
                     type: array
                     x-kubernetes-list-type: atomic
                 type: object
+              priorityClassName:
+                description: |-
+                  PriorityClassName is the name of the PriorityClass to assign to pods created by this NIMService.
+                  If set, the Kubernetes scheduler uses the priority for preemption decisions.
+                type: string
               proxy:
                 description: ProxySpec defines the proxy configuration for NIMService.
                 properties:

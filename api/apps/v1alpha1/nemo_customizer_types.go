@@ -490,6 +490,16 @@ func (n *NemoCustomizer) GetServiceLabels() map[string]string {
 	return standardLabels
 }
 
+// GetExposeServiceLabels returns labels to apply to the generated Kubernetes Service.
+func (n *NemoCustomizer) GetExposeServiceLabels() map[string]string {
+	serviceLabels := n.GetServiceLabels()
+
+	if n.Spec.Expose.Service.Labels != nil {
+		return utils.MergeMaps(serviceLabels, n.Spec.Expose.Service.Labels)
+	}
+	return serviceLabels
+}
+
 // GetSelectorLabels returns standard selector labels to apply to the NemoCustomizer instance.
 func (n *NemoCustomizer) GetSelectorLabels() map[string]string {
 	// TODO: add custom ones
@@ -818,7 +828,7 @@ func (n *NemoCustomizer) GetServiceParams() *rendertypes.ServiceParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetServiceLabels()
+	params.Labels = n.GetExposeServiceLabels()
 	params.Annotations = n.GetServiceAnnotations()
 
 	// Set service selector labels

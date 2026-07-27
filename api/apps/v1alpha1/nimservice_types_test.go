@@ -246,6 +246,41 @@ func TestHTTpRoute(t *testing.T) {
 	}
 }
 
+func TestGetExposeServiceLabels(t *testing.T) {
+	nimService := &NIMService{}
+	nimService.Name = "test-nimservice"
+	nimService.Spec.Labels = map[string]string{
+		"global-label": "global",
+		"shared-label": "global",
+	}
+	nimService.Spec.Expose.Service.Labels = map[string]string{
+		"service-label": "service",
+		"shared-label":  "service",
+	}
+
+	commonLabels := nimService.GetServiceLabels()
+	if _, ok := commonLabels["service-label"]; ok {
+		t.Fatalf("GetServiceLabels() included expose.service label")
+	}
+	if got := commonLabels["global-label"]; got != "global" {
+		t.Fatalf("GetServiceLabels()[global-label] = %q, want global", got)
+	}
+
+	exposeServiceLabels := nimService.GetExposeServiceLabels()
+	if got := exposeServiceLabels["app.kubernetes.io/name"]; got != "test-nimservice" {
+		t.Fatalf("GetExposeServiceLabels()[app.kubernetes.io/name] = %q, want test-nimservice", got)
+	}
+	if got := exposeServiceLabels["global-label"]; got != "global" {
+		t.Fatalf("GetExposeServiceLabels()[global-label] = %q, want global", got)
+	}
+	if got := exposeServiceLabels["service-label"]; got != "service" {
+		t.Fatalf("GetExposeServiceLabels()[service-label] = %q, want service", got)
+	}
+	if got := exposeServiceLabels["shared-label"]; got != "global" {
+		t.Fatalf("GetExposeServiceLabels()[shared-label] = %q, want global", got)
+	}
+}
+
 func TestIngress(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -962,5 +997,37 @@ func TestStandardModeReplicasWithoutAutoscaling(t *testing.T) {
 	}
 	if *params.MaxReplicas != 3 {
 		t.Errorf("MaxReplicas = %d, want 3", *params.MaxReplicas)
+	}
+}
+
+func TestGetPriorityClassName(t *testing.T) {
+	nimService := &NIMService{
+		Spec: NIMServiceSpec{
+			PriorityClassName: "gpu-critical",
+			Image: Image{
+				Repository: "test-repo",
+				Tag:        "test-tag",
+			},
+			AuthSecret: "test-secret",
+			Expose: Expose{
+				Service: Service{
+					Port: ptr.To[int32](8000),
+				},
+			},
+		},
+	}
+
+	if got := nimService.GetPriorityClassName(); got != "gpu-critical" {
+		t.Errorf("GetPriorityClassName() = %q, want %q", got, "gpu-critical")
+	}
+
+	deploymentParams := nimService.GetDeploymentParams()
+	if deploymentParams.PriorityClassName != "gpu-critical" {
+		t.Errorf("GetDeploymentParams().PriorityClassName = %q, want %q", deploymentParams.PriorityClassName, "gpu-critical")
+	}
+
+	inferenceParams := nimService.GetInferenceServiceParams("Standard")
+	if inferenceParams.PriorityClassName != "gpu-critical" {
+		t.Errorf("GetInferenceServiceParams().PriorityClassName = %q, want %q", inferenceParams.PriorityClassName, "gpu-critical")
 	}
 }

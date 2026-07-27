@@ -125,12 +125,15 @@ type NIMServiceSpec struct {
 	SchedulerName  string        `json:"schedulerName,omitempty"`
 	Metrics        Metrics       `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=0
-	Replicas         *int32                     `json:"replicas,omitempty"`
-	UserID           *int64                     `json:"userID,omitempty"`
-	GroupID          *int64                     `json:"groupID,omitempty"`
-	RuntimeClassName string                     `json:"runtimeClassName,omitempty"`
-	Proxy            *ProxySpec                 `json:"proxy,omitempty"`
-	MultiNode        *NimServiceMultiNodeConfig `json:"multiNode,omitempty"`
+	Replicas         *int32 `json:"replicas,omitempty"`
+	UserID           *int64 `json:"userID,omitempty"`
+	GroupID          *int64 `json:"groupID,omitempty"`
+	RuntimeClassName string `json:"runtimeClassName,omitempty"`
+	// PriorityClassName is the name of the PriorityClass to assign to pods created by this NIMService.
+	// If set, the Kubernetes scheduler uses the priority for preemption decisions.
+	PriorityClassName string                     `json:"priorityClassName,omitempty"`
+	Proxy             *ProxySpec                 `json:"proxy,omitempty"`
+	MultiNode         *NimServiceMultiNodeConfig `json:"multiNode,omitempty"`
 	// InferencePlatform specifies the inference platform to use for this NIMService.
 	// Valid values are "standalone" (default) and "kserve".
 	// +kubebuilder:validation:Enum=standalone;kserve
@@ -538,7 +541,7 @@ func (n *NIMService) GetNIMServiceAnnotations() map[string]string {
 	return standardAnnotations
 }
 
-// GetServiceLabels returns merged labels to apply to the NIMService instance.
+// GetServiceLabels returns merged labels to apply to NIMService-owned resources.
 func (n *NIMService) GetServiceLabels() map[string]string {
 	standardLabels := n.GetStandardLabels()
 
@@ -546,6 +549,16 @@ func (n *NIMService) GetServiceLabels() map[string]string {
 		return utils.MergeMaps(standardLabels, n.Spec.Labels)
 	}
 	return standardLabels
+}
+
+// GetExposeServiceLabels returns labels to apply to the generated Kubernetes Service.
+func (n *NIMService) GetExposeServiceLabels() map[string]string {
+	serviceLabels := n.GetServiceLabels()
+
+	if n.Spec.Expose.Service.Labels != nil {
+		return utils.MergeMaps(serviceLabels, n.Spec.Expose.Service.Labels)
+	}
+	return serviceLabels
 }
 
 // GetSelectorLabels returns standard selector labels to apply to the NIMService instance.
@@ -1239,6 +1252,9 @@ func (n *NIMService) GetDeploymentParams() *rendertypes.DeploymentParams {
 	// Set scheduler
 	params.SchedulerName = n.GetSchedulerName()
 
+	// Set priority class
+	params.PriorityClassName = n.GetPriorityClassName()
+
 	// Setup container ports for nimservice
 	params.Ports = []corev1.ContainerPort{
 		{
@@ -1323,6 +1339,7 @@ func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
 	params.ServiceAccountName = n.GetServiceAccountName()
 	params.SchedulerName = n.GetSchedulerName()
 	params.RuntimeClassName = n.GetRuntimeClassName()
+	params.PriorityClassName = n.GetPriorityClassName()
 
 	params.InitContainers = n.GetInitContainers()
 	for idx := range params.InitContainers {
@@ -1338,6 +1355,11 @@ func (n *NIMService) GetLWSParams() *rendertypes.LeaderWorkerSetParams {
 // GetSchedulerName returns the scheduler name for the NIMService deployment.
 func (n *NIMService) GetSchedulerName() string {
 	return n.Spec.SchedulerName
+}
+
+// GetPriorityClassName returns the priority class for the NIMService deployment.
+func (n *NIMService) GetPriorityClassName() string {
+	return n.Spec.PriorityClassName
 }
 
 // GetStatefulSetParams returns params to render StatefulSet from templates.
@@ -1383,6 +1405,9 @@ func (n *NIMService) GetStatefulSetParams() *rendertypes.StatefulSetParams {
 
 	// Set runtime class
 	params.RuntimeClassName = n.GetRuntimeClassName()
+
+	// Set priority class
+	params.PriorityClassName = n.GetPriorityClassName()
 	return params
 }
 
@@ -1468,7 +1493,7 @@ func (n *NIMService) GetServiceParams() *rendertypes.ServiceParams {
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
-	params.Labels = n.GetServiceLabels()
+	params.Labels = n.GetExposeServiceLabels()
 	params.Annotations = n.GetServiceAnnotations()
 
 	// Set service selector labels
@@ -1835,6 +1860,9 @@ func (n *NIMService) GetInferenceServiceParams(
 
 	// Set scheduler
 	params.SchedulerName = n.GetSchedulerName()
+
+	// Set priority class
+	params.PriorityClassName = n.GetPriorityClassName()
 
 	params.Ports = n.GetInferenceServicePorts(deploymentMode)
 
