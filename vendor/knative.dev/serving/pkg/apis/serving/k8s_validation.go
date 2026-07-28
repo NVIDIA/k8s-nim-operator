@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/name"
@@ -29,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"knative.dev/pkg/apis"
-	"knative.dev/pkg/profiling"
+	"knative.dev/pkg/observability/runtime"
 	"knative.dev/serving/pkg/apis/config"
 	"knative.dev/serving/pkg/networking"
 )
@@ -63,7 +64,7 @@ var (
 		networking.QueueAdminPort,
 		networking.AutoscalingQueueMetricsPort,
 		networking.UserQueueMetricsPort,
-		profiling.ProfilingPort)
+		runtime.ProfilingDefaultPort)
 
 	reservedSidecarEnvVars = reservedEnvVars.Difference(sets.New("PORT"))
 
@@ -121,6 +122,10 @@ func validatePersistentVolumeClaims(volume corev1.VolumeSource, features *config
 func validateVolume(ctx context.Context, volume corev1.Volume) *apis.FieldError {
 	features := config.FromContextOrDefaults(ctx).Features
 	errs := validatePersistentVolumeClaims(volume.VolumeSource, features)
+	if volume.Image != nil && features.PodSpecVolumesImage != config.Enabled {
+		errs = errs.Also(&apis.FieldError{Message: fmt.Sprintf("Image volume support is disabled, "+
+			"but found Image volume %s", volume.Name)})
+	}
 	if volume.EmptyDir != nil && features.PodSpecVolumesEmptyDir != config.Enabled {
 		errs = errs.Also(&apis.FieldError{Message: fmt.Sprintf("EmptyDir volume support is disabled, "+
 			"but found EmptyDir volume %s", volume.Name)})
@@ -128,6 +133,10 @@ func validateVolume(ctx context.Context, volume corev1.Volume) *apis.FieldError 
 	if volume.HostPath != nil && features.PodSpecVolumesHostPath != config.Enabled {
 		errs = errs.Also(&apis.FieldError{Message: fmt.Sprintf("HostPath volume support is disabled, "+
 			"but found HostPath volume %s", volume.Name)})
+	}
+	if volume.CSI != nil && features.PodSpecVolumesCSI != config.Enabled {
+		errs = errs.Also(&apis.FieldError{Message: fmt.Sprintf("CSI volume support is disabled, "+
+			"but found CSI volume %s", volume.Name)})
 	}
 	errs = errs.Also(apis.CheckDisallowedFields(volume, *VolumeMask(ctx, &volume)))
 	if volume.Name == "" {
@@ -169,6 +178,15 @@ func validateVolume(ctx context.Context, volume corev1.Volume) *apis.FieldError 
 		specified = append(specified, "hostPath")
 	}
 
+	if vs.CSI != nil {
+		specified = append(specified, "csi")
+	}
+
+	if vs.Image != nil {
+		specified = append(specified, "image")
+		errs = errs.Also(validateImageVolumeSource(vs.Image).ViaField("image"))
+	}
+
 	if len(specified) == 0 {
 		fieldPaths := []string{"secret", "configMap", "projected"}
 		cfg := config.FromContextOrDefaults(ctx)
@@ -180,6 +198,12 @@ func validateVolume(ctx context.Context, volume corev1.Volume) *apis.FieldError 
 		}
 		if cfg.Features.PodSpecVolumesHostPath == config.Enabled {
 			fieldPaths = append(fieldPaths, "hostPath")
+		}
+		if cfg.Features.PodSpecVolumesCSI == config.Enabled {
+			fieldPaths = append(fieldPaths, "csi")
+		}
+		if cfg.Features.PodSpecVolumesImage == config.Enabled {
+			fieldPaths = append(fieldPaths, "image")
 		}
 		errs = errs.Also(apis.ErrMissingOneOf(fieldPaths...))
 	} else if len(specified) > 1 {
@@ -616,7 +640,7 @@ func validate(ctx context.Context, container corev1.Container, volumes map[strin
 		errs = errs.Also(apis.ErrInvalidValue(container.TerminationMessagePolicy, "terminationMessagePolicy"))
 	}
 	// VolumeMounts
-	errs = errs.Also(validateVolumeMounts(container.VolumeMounts, volumes).ViaField("volumeMounts"))
+	errs = errs.Also(validateVolumeMounts(ctx, container.VolumeMounts, volumes).ViaField("volumeMounts"))
 
 	return errs
 }
@@ -659,15 +683,16 @@ func validateSecurityContext(ctx context.Context, sc *corev1.SecurityContext) *a
 	return errs
 }
 
-func validateVolumeMounts(mounts []corev1.VolumeMount, volumes map[string]corev1.Volume) *apis.FieldError {
+func validateVolumeMounts(ctx context.Context, mounts []corev1.VolumeMount, volumes map[string]corev1.Volume) *apis.FieldError {
 	var errs *apis.FieldError
 	// Check that volume mounts match names in "volumes", that "volumes" has 100%
 	// coverage, and the field restrictions.
+	features := config.FromContextOrDefaults(ctx).Features
 	seenName := make(sets.Set[string], len(mounts))
 	seenMountPath := make(sets.Set[string], len(mounts))
 	for i := range mounts {
 		vm := mounts[i]
-		errs = errs.Also(apis.CheckDisallowedFields(vm, *VolumeMountMask(&vm)).ViaIndex(i))
+		errs = errs.Also(apis.CheckDisallowedFields(vm, *VolumeMountMask(ctx, &vm)).ViaIndex(i))
 		// This effectively checks that Name is non-empty because Volume name must be non-empty.
 		if _, ok := volumes[vm.Name]; !ok {
 			errs = errs.Also((&apis.FieldError{
@@ -698,6 +723,19 @@ func validateVolumeMounts(mounts []corev1.VolumeMount, volumes map[string]corev1
 				Message: "volume mount should be readOnly for this type of volume",
 				Paths:   []string{"readOnly"},
 			}).ViaIndex(i))
+		}
+		if vm.MountPropagation != nil {
+			if features.PodSpecVolumesMountPropagation != config.Enabled {
+				errs = errs.Also((&apis.FieldError{
+					Message: fmt.Sprintf("Volume Mount Propagation support is disabled, but found volume mount %s with mount propagation", vm.Name),
+				}).ViaIndex(i))
+			}
+			if *vm.MountPropagation != corev1.MountPropagationNone && *vm.MountPropagation != corev1.MountPropagationHostToContainer {
+				errs = errs.Also((&apis.FieldError{
+					Message: "mount propagation should be set to None or HostToContainer",
+					Paths:   []string{"mountPropagation"},
+				}).ViaIndex(i))
+			}
 		}
 
 		if volumes[vm.Name].PersistentVolumeClaim != nil {
@@ -948,12 +986,17 @@ func ValidatePodSecurityContext(ctx context.Context, sc *corev1.PodSecurityConte
 // Note that this **explicitly** does not warn on dangerous SecurityContext
 // settings, the purpose is to avoid accidentally-insecure settings, not to
 // block deliberate use of dangerous settings.
-func warnDefaultContainerSecurityContext(_ context.Context, psc *corev1.PodSecurityContext, sc *corev1.SecurityContext) *apis.FieldError {
+func warnDefaultContainerSecurityContext(ctx context.Context, psc *corev1.PodSecurityContext, sc *corev1.SecurityContext) *apis.FieldError {
 	if sc == nil {
 		sc = &corev1.SecurityContext{}
 	}
 	if psc == nil {
 		psc = &corev1.PodSecurityContext{}
+	}
+
+	// if the user has explicitly enabled the feature, we don't need to warn
+	if slices.Contains([]config.Flag{config.Enabled, config.AllowRootBounded}, config.FromContextOrDefaults(ctx).Features.SecurePodDefaults) {
+		return nil
 	}
 
 	insecureDefault := func(fieldPath string) *apis.FieldError {
@@ -1030,4 +1073,21 @@ func WithinInitContainer(ctx context.Context) context.Context {
 // IsInitContainer checks if we are in the context of an init container in the revision.
 func IsInitContainer(ctx context.Context) bool {
 	return ctx.Value(initContainer{}) != nil
+}
+
+func validateImageVolumeSource(iv *corev1.ImageVolumeSource) *apis.FieldError {
+	errs := apis.CheckDisallowedFields(*iv, *ImageVolumeSourceMask(iv))
+
+	if iv.Reference == "" {
+		errs = errs.Also(apis.ErrMissingField("reference"))
+	}
+
+	switch iv.PullPolicy {
+	case corev1.PullIfNotPresent, corev1.PullAlways, corev1.PullNever, "":
+		// ok
+	default:
+		errs = errs.Also(apis.ErrInvalidValue(iv.PullPolicy, "pullPolicy"))
+	}
+
+	return errs
 }
