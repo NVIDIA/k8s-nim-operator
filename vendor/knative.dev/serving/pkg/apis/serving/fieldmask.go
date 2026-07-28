@@ -21,8 +21,10 @@ package serving
 
 import (
 	"context"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
+
 	"knative.dev/serving/pkg/apis/config"
 )
 
@@ -68,6 +70,14 @@ func VolumeSourceMask(ctx context.Context, in *corev1.VolumeSource) *corev1.Volu
 
 	if cfg.Features.PodSpecVolumesHostPath != config.Disabled {
 		out.HostPath = in.HostPath
+	}
+
+	if cfg.Features.PodSpecVolumesCSI != config.Disabled {
+		out.CSI = in.CSI
+	}
+
+	if cfg.Features.PodSpecVolumesImage != config.Disabled {
+		out.Image = in.Image
 	}
 
 	// Too many disallowed fields to list
@@ -333,11 +343,12 @@ func ContainerMask(in *corev1.Container) *corev1.Container {
 // VolumeMountMask performs a _shallow_ copy of the Kubernetes VolumeMount object to a new
 // Kubernetes VolumeMount object bringing over only the fields allowed in the Knative API. This
 // does not validate the contents or the bounds of the provided fields.
-func VolumeMountMask(in *corev1.VolumeMount) *corev1.VolumeMount {
+func VolumeMountMask(ctx context.Context, in *corev1.VolumeMount) *corev1.VolumeMount {
 	if in == nil {
 		return nil
 	}
 
+	cfg := config.FromContextOrDefaults(ctx)
 	out := new(corev1.VolumeMount)
 
 	// Allowed fields
@@ -345,10 +356,15 @@ func VolumeMountMask(in *corev1.VolumeMount) *corev1.VolumeMount {
 	out.ReadOnly = in.ReadOnly
 	out.MountPath = in.MountPath
 	out.SubPath = in.SubPath
+	if cfg.Features.PodSpecVolumesMountPropagation != config.Disabled {
+		out.MountPropagation = in.MountPropagation
+	} else {
+		out.MountPropagation = nil
+	}
 
 	// Disallowed fields
 	// This list is unnecessary, but added here for clarity
-	out.MountPropagation = nil
+	out.RecursiveReadOnly = nil
 
 	return out
 }
@@ -369,6 +385,7 @@ func ProbeMask(in *corev1.Probe) *corev1.Probe {
 	out.PeriodSeconds = in.PeriodSeconds
 	out.SuccessThreshold = in.SuccessThreshold
 	out.FailureThreshold = in.FailureThreshold
+	out.TerminationGracePeriodSeconds = in.TerminationGracePeriodSeconds
 
 	return out
 }
@@ -650,7 +667,7 @@ func PodSecurityContextMask(ctx context.Context, in *corev1.PodSecurityContext) 
 
 	out := new(corev1.PodSecurityContext)
 
-	if config.FromContextOrDefaults(ctx).Features.SecurePodDefaults == config.Enabled {
+	if slices.Contains([]config.Flag{config.Enabled, config.AllowRootBounded}, config.FromContextOrDefaults(ctx).Features.SecurePodDefaults) {
 		// Allow to opt out of more-secure defaults if SecurePodDefaults is enabled.
 		// This aligns with defaultSecurityContext in revision_defaults.go.
 		if in.SeccompProfile != nil {
@@ -735,8 +752,8 @@ func CapabilitiesMask(ctx context.Context, in *corev1.Capabilities) *corev1.Capa
 
 	if config.FromContextOrDefaults(ctx).Features.ContainerSpecAddCapabilities == config.Enabled {
 		out.Add = in.Add
-	} else if config.FromContextOrDefaults(ctx).Features.SecurePodDefaults == config.Enabled {
-		if len(in.Add) == 1 && in.Add[0] == "NET_BIND_SERVICE" {
+	} else if slices.Contains([]config.Flag{config.Enabled, config.AllowRootBounded}, config.FromContextOrDefaults(ctx).Features.SecurePodDefaults) {
+		if slices.Equal(in.Add, []corev1.Capability{"NET_BIND_SERVICE"}) {
 			out.Add = in.Add
 		} else {
 			out.Add = nil
@@ -767,6 +784,22 @@ func NamespacedObjectReferenceMask(in *corev1.ObjectReference) *corev1.ObjectRef
 	out.FieldPath = ""
 	out.ResourceVersion = ""
 	out.UID = ""
+
+	return out
+}
+
+// ImageVolumeSourceMask performs a _shallow_ copy of Kubernetes ImageVolumeSource
+// bringing over only the fields allowed in the Knative API.
+func ImageVolumeSourceMask(in *corev1.ImageVolumeSource) *corev1.ImageVolumeSource {
+	if in == nil {
+		return nil
+	}
+
+	out := new(corev1.ImageVolumeSource)
+
+	// Allowed fields
+	out.Reference = in.Reference
+	out.PullPolicy = in.PullPolicy
 
 	return out
 }
