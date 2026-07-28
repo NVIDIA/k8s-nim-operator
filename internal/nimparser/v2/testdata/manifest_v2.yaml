@@ -1,0 +1,26 @@
+schema_version: 2.0.0
+profile_selection_criteria: default
+profiles:
+  - id: aaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999
+    tags:
+      llm_engine: tensorrt_llm
+      precision: fp16
+      profile: throughput
+      tp: "8"
+      gpu: L40S
+      gpu_device: 26b5:10de
+      feat_lora: "false"
+    workspace:
+      files:
+        engine: {uri: "ngc://org/team/model/engine.bin"}
+        config: {uri: "ngc://org/team/model/config.json"}
+        license: {uri: "ngc://org/team/model/LICENSE"}
+  - id: 1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff
+    tags:
+      llm_engine: vllm
+      precision: fp16
+      profile: latency
+      tp: "1"
+    workspace:
+      files:
+        weights: {uri: "ngc://org/team/model/weights.bin"}

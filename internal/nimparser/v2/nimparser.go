@@ -47,7 +47,7 @@ type Workspace struct {
 type NIMProfile struct {
 	ID        string            `yaml:"id" json:"id,omitempty"`
 	Tags      map[string]string `yaml:"tags" json:"tags,omitempty"`
-	Workspace Workspace         `yaml:"workspace" json:"workspace,omitempty"`
+	Workspace *Workspace        `yaml:"workspace,omitempty" json:"workspace,omitempty"`
 }
 
 // NIMManifest is the model manifest file.
@@ -82,6 +82,34 @@ func (manifest NIMManifest) GetProfileTags(profileID string) map[string]string {
 
 func (manifest NIMManifest) GetProfileRelease(profileID string) string {
 	return ""
+}
+
+// Minimal returns a copy of the manifest without workspace file lists.
+// Only fields required for profile matching and status reporting are retained.
+func (manifest NIMManifest) Minimal() nimparser.NIMManifestInterface {
+	out := NIMManifest{
+		SchemaVersion:            manifest.SchemaVersion,
+		ProfileSelectionCriteria: manifest.ProfileSelectionCriteria,
+		Profiles:                 make([]NIMProfile, 0, len(manifest.Profiles)),
+	}
+	for _, profile := range manifest.Profiles {
+		out.Profiles = append(out.Profiles, NIMProfile{
+			ID:   profile.ID,
+			Tags: copyTags(profile.Tags),
+		})
+	}
+	return out
+}
+
+func copyTags(tags map[string]string) map[string]string {
+	if tags == nil {
+		return nil
+	}
+	out := make(map[string]string, len(tags))
+	for k, v := range tags {
+		out[k] = v
+	}
+	return out
 }
 
 type NIMParser struct{}
