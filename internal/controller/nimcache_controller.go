@@ -83,12 +83,13 @@ const (
 // NIMCacheReconciler reconciles a NIMCache object.
 type NIMCacheReconciler struct {
 	client.Client
-	scheme           *runtime.Scheme
-	log              logr.Logger
-	orchestratorType k8sutil.OrchestratorType
-	updater          conditions.Updater
-	recorder         record.EventRecorder
-	apiReader        client.Reader
+	scheme                *runtime.Scheme
+	log                   logr.Logger
+	orchestratorType      k8sutil.OrchestratorType
+	updater               conditions.Updater
+	recorder              record.EventRecorder
+	apiReader             client.Reader
+	imageProtocolResolver nimsource.ProtocolResolver
 }
 
 // Ensure NIMCacheReconciler implements the Reconciler interface.
@@ -97,9 +98,10 @@ var _ shared.Reconciler = &NIMCacheReconciler{}
 // NewNIMCacheReconciler creates a new reconciler for NIMCache with the given platform.
 func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger) *NIMCacheReconciler {
 	return &NIMCacheReconciler{
-		Client: client,
-		scheme: scheme,
-		log:    log,
+		Client:                client,
+		scheme:                scheme,
+		log:                   log,
+		imageProtocolResolver: nimsource.NewProtocolResolver(client),
 	}
 }
 
@@ -110,6 +112,7 @@ func NewNIMCacheReconciler(client client.Client, scheme *runtime.Scheme, log log
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;create;delete
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;update;patch
@@ -258,6 +261,7 @@ func (r *NIMCacheReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.O
 func (r *NIMCacheReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.recorder = mgr.GetEventRecorderFor("nimcache-controller")
 	r.apiReader = mgr.GetAPIReader()
+	r.imageProtocolResolver = nimsource.NewProtocolResolver(r.apiReader)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NIMCache{}).
 		Owns(&batchv1.Job{}).
@@ -612,10 +616,12 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 		return false, nil
 	}
 
-	// No manifest extraction needed: a previous reconcile already determined this NIM has no manifest
-	if nimCache.Status.Type == "model-free" {
+	// No manifest extraction needed: a previous reconcile already determined this
+	// NIM has no manifest (legacy model-free HF flow).
+	if nimCache.Status.Type == appsv1alpha1.NIMCacheModelTypeModelFree {
 		return false, nil
 	}
+
 	// Create a configmap by extracting the model manifest
 	// Create a temporary pod for parsing model manifest
 	pod := constructPodSpec(nimCache, r.orchestratorType)
@@ -655,7 +661,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 
 	if strings.Contains(output, "model_manifest.yaml not found") {
 		logger.Info("model manifest file not found", "output", output)
-		nimCache.Status.Type = "model-free"
+		nimCache.Status.Type = appsv1alpha1.NIMCacheModelTypeModelFree
 	} else {
 		parser := nimparserutils.GetNIMParser([]byte(output))
 		manifest, err := parser.ParseModelManifestFromRawOutput([]byte(output))
@@ -780,6 +786,11 @@ func (r *NIMCacheReconciler) reconcileJobStatus(ctx context.Context, nimCache *a
 		nimCache.Status.State = appsv1alpha1.NimCacheStatusReady
 		nimCache.Status.PVC = shared.GetPVCName(nimCache, nimCache.Spec.Storage.PVC)
 
+		if nimCache.IsNativeModelDownload() {
+			nimCache.Status.Profiles = []appsv1alpha1.NIMProfile{}
+			return nil
+		}
+
 		selectedProfiles, err := getSelectedProfiles(nimCache)
 		if err != nil {
 			return fmt.Errorf("failed to get selected profiles: %w", err)
@@ -873,22 +884,32 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 		return ctrl.Result{}, err
 	}
 
-	requeue, err := r.reconcileModelManifest(ctx, nimCache)
-	if err != nil {
-		logger.Error(err, "reconciliation to extract model manifest failed", "pod", getPodName(nimCache))
-		return ctrl.Result{}, err
-	}
+	protocol := r.resolveImageProtocol(ctx, nimCache)
+	if protocol.IsNative() {
+		logger.Info("detected native model download protocol, skipping manifest probe and profile selection", "nimcache", nimCache.Name)
+		nimCache.Status.Type = appsv1alpha1.NIMCacheModelTypeNative
+	} else {
+		// Clear a stale native type if the image no longer advertises native-v1.
+		if nimCache.Status.Type == appsv1alpha1.NIMCacheModelTypeNative {
+			nimCache.Status.Type = ""
+		}
+		requeue, err := r.reconcileModelManifest(ctx, nimCache)
+		if err != nil {
+			logger.Error(err, "reconciliation to extract model manifest failed", "pod", getPodName(nimCache))
+			return ctrl.Result{}, err
+		}
 
-	if requeue {
-		logger.V(2).Info("requeueing for reconciliation for model selection", "pod", getPodName(nimCache))
-		return ctrl.Result{RequeueAfter: time.Second * 30}, err
-	}
+		if requeue {
+			logger.V(2).Info("requeueing for reconciliation for model selection", "pod", getPodName(nimCache))
+			return ctrl.Result{RequeueAfter: time.Second * 30}, err
+		}
 
-	// Reconcile NIM model selection
-	err = r.reconcileModelSelection(ctx, nimCache)
-	if err != nil {
-		logger.Error(err, "reconciliation of model selection failed")
-		return ctrl.Result{}, err
+		// Reconcile NIM model selection
+		err = r.reconcileModelSelection(ctx, nimCache)
+		if err != nil {
+			logger.Error(err, "reconciliation of model selection failed")
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Reconcile caching Job
@@ -906,6 +927,24 @@ func (r *NIMCacheReconciler) reconcileNIMCache(ctx context.Context, nimCache *ap
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *NIMCacheReconciler) resolveImageProtocol(ctx context.Context, nimCache *appsv1alpha1.NIMCache) nimsource.Protocol {
+	// Only NGC optimized NIMs (no ModelEndpoint) need pre-start protocol detection.
+	// HF/DataStore and universal ModelEndpoint flows keep the legacy behavior.
+	if nimCache.Spec.Source.NGC == nil || nimCache.Spec.Source.NGC.ModelEndpoint != nil {
+		return nimsource.Legacy
+	}
+	resolver := r.imageProtocolResolver
+	if resolver == nil {
+		resolver = nimsource.NewProtocolResolver(r.Client)
+	}
+	pullSecrets := []string{}
+	if nimCache.Spec.Source.NGC.PullSecret != "" {
+		pullSecrets = append(pullSecrets, nimCache.Spec.Source.NGC.PullSecret)
+	}
+
+	return nimsource.ResolveProtocolOrLegacy(ctx, resolver, nimCache.Spec.Source.NGC.ModelPuller, nimCache.Namespace, pullSecrets)
 }
 
 func (r *NIMCacheReconciler) updateNIMCacheStatus(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
@@ -1108,6 +1147,71 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	}
 
 	switch {
+	case nimCache.IsNativeModelDownload():
+		// Native (NIMCraft) single-model runtime: there is no download-to-cache
+		// command. Instead, run the NIM image itself with the auth key injected
+		// and NIM_ENGINE_MODEL_DOWNLOAD_ONLY=1 so it downloads its single model to
+		// the PVC mounted at /model (and optionally warms /opt/cache), then exits.
+		job.Spec.Template.Spec.Containers = []corev1.Container{
+			{
+				Name:    NIMCacheContainerName,
+				Image:   nimCache.GetModelPuller(),
+				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
+				Env: []corev1.EnvVar{
+					{
+						Name:  "NIM_ENGINE_MODEL_DOWNLOAD_ONLY",
+						Value: "1",
+					},
+					{
+						Name:  "NIM_ENGINE_MODEL_PATH",
+						Value: utils.NativeModelPath(nimCache.Name),
+					},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "nim-cache-volume",
+						MountPath: utils.NativeModelBasePath,
+						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
+					},
+					{
+						Name:      "nim-cache-volume",
+						MountPath: utils.NativeKernelCachePath,
+						SubPath:   nimCache.Spec.Storage.PVC.SubPath,
+					},
+					{
+						Name:      "scratch",
+						MountPath: "/scratch",
+					},
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: map[corev1.ResourceName]apiResource.Quantity{
+						"cpu":    nimCache.Spec.Resources.CPU,
+						"memory": nimCache.Spec.Resources.Memory,
+					},
+					Requests: map[corev1.ResourceName]apiResource.Quantity{
+						"cpu":    nimCache.Spec.Resources.CPU,
+						"memory": nimCache.Spec.Resources.Memory,
+					},
+				},
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+				SecurityContext: &corev1.SecurityContext{
+					AllowPrivilegeEscalation: ptr.To[bool](false),
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+					RunAsNonRoot: ptr.To[bool](true),
+					RunAsGroup:   nimCache.GetGroupID(),
+					RunAsUser:    nimCache.GetUserID(),
+				},
+			},
+		}
+		job.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
+			{
+				Name: nimCache.GetPullSecret(),
+			},
+		}
+
 	case nimCache.Spec.Source.DataStore != nil || nimCache.Spec.Source.HF != nil:
 		var hfDataSource nimsource.HFInterface
 		if nimCache.Spec.Source.DataStore != nil {
@@ -1116,7 +1220,7 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			hfDataSource = nimCache.Spec.Source.HF
 		}
 		var command []string
-		if nimCache.Status.Type == "model-free" {
+		if nimCache.Status.Type == appsv1alpha1.NIMCacheModelTypeModelFree {
 			hfUri := nimCache.GetHFUri()
 			command = []string{"download-to-cache", "--model-uri", hfUri, "--manifest-file", utils.DefaultModelStorePath + "/model_manifest.json"}
 		} else {
@@ -1313,6 +1417,26 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 	}
 	// Merge env with the user provided values
 	job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(job.Spec.Template.Spec.Containers[0].Env, nimCache.Spec.Env)
+
+	// Native caching is driven entirely by operator-owned env: the download-only
+	// flag and the per-instance model path are tied to the mounted volume layout.
+	// Re-assert them after merging user env (which wins in MergeEnvVars) so a
+	// user-provided value cannot silently break the caching job.
+	if nimCache.IsNativeModelDownload() {
+		job.Spec.Template.Spec.Containers[0].Env = utils.MergeEnvVars(
+			job.Spec.Template.Spec.Containers[0].Env,
+			[]corev1.EnvVar{
+				{
+					Name:  "NIM_ENGINE_MODEL_DOWNLOAD_ONLY",
+					Value: "1",
+				},
+				{
+					Name:  "NIM_ENGINE_MODEL_PATH",
+					Value: utils.NativeModelPath(nimCache.Name),
+				},
+			},
+		)
+	}
 
 	// Inject custom CA certificates when running in a proxy envronment
 	if nimCache.Spec.CertConfig != nil { //nolint:staticcheck // checking for deprecated field
