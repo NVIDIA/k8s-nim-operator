@@ -11,7 +11,7 @@ require (
 	github.com/google/cel-go v0.29.0
 	github.com/kserve/kserve v0.0.0-20260219142638-5454cafc1f9f
 	github.com/mittwald/go-helm-client v0.12.19
-	github.com/onsi/ginkgo/v2 v2.28.3
+	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.40.0
 	github.com/openshift/api v0.0.0-20240708071937-c9a91940bf0f
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.86.2
