@@ -63,7 +63,7 @@ type NIMProfile struct {
 	Release      string            `yaml:"release" json:"release,omitempty"`
 	Tags         map[string]string `yaml:"tags" json:"tags,omitempty"`
 	ContainerURL string            `yaml:"container_url" json:"container_url,omitempty"`
-	Workspace    Workspace         `yaml:"workspace" json:"workspace,omitempty"`
+	Workspace    *Workspace        `yaml:"workspace,omitempty" json:"workspace,omitempty"`
 }
 
 // NIMManifest is the model manifest file.
@@ -169,6 +169,32 @@ func (manifest NIMManifest) GetProfileTags(profileID string) map[string]string {
 }
 func (manifest NIMManifest) GetProfileRelease(profileID string) string {
 	return manifest[profileID].Release
+}
+
+// Minimal returns a copy of the manifest without workspace file lists.
+// Only fields required for profile matching and status reporting are retained.
+func (manifest NIMManifest) Minimal() nimparser.NIMManifestInterface {
+	out := make(NIMManifest, len(manifest))
+	for id, profile := range manifest {
+		out[id] = NIMProfile{
+			Model:        profile.Model,
+			Release:      profile.Release,
+			Tags:         copyTags(profile.Tags),
+			ContainerURL: profile.ContainerURL,
+		}
+	}
+	return out
+}
+
+func copyTags(tags map[string]string) map[string]string {
+	if tags == nil {
+		return nil
+	}
+	out := make(map[string]string, len(tags))
+	for k, v := range tags {
+		out[k] = v
+	}
+	return out
 }
 
 func isOptimizedEngine(engine string) bool {
