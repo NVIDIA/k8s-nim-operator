@@ -24,14 +24,12 @@ REGISTRY ?= ghcr.io/nvidia
 
 VERSION ?= v3.0.0
 
-GOLANG_VERSION ?= 1.26.3
+GOLANG_VERSION ?= 1.26.5
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.30.0
 
-# NVIDIA_DRA_DRIVER_GPU_VERSION refers to the release version of github.com/NVIDIA/k8s-dra-driver-gpu used as a dependency.
-# Issue: https://github.com/NVIDIA/k8s-dra-driver-gpu/issues/715
-# TODO: Remove this once v25.12.0 of the NVIDIA GPU DRA driver is released.
-NVIDIA_DRA_DRIVER_GPU_VERSION ?= v25.12.0
+# NVIDIA_DRA_DRIVER_GPU_VERSION is injected into sigs.k8s.io/dra-driver-nvidia-gpu/internal/info.version at build time.
+NVIDIA_DRA_DRIVER_GPU_VERSION ?= v0.4.1
 
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")
