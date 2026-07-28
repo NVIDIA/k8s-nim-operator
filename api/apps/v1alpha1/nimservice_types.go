@@ -941,6 +941,73 @@ func (n *NIMService) GetInitContainerVolumeMounts(modelPVC *PersistentVolumeClai
 	return volumeMounts
 }
 
+// GetNativeVolumeMounts returns the container volume mounts for a native
+// (NIMCraft) single-model NIM. The model store PVC is mounted at /model (weights)
+// and /opt/cache (compiled CUDA kernels) so both survive pod restarts.
+func (n *NIMService) GetNativeVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
+	subPath := ""
+	if modelPVC != nil {
+		subPath = modelPVC.SubPath
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "model-store",
+			MountPath: utils.NativeModelBasePath,
+			SubPath:   subPath,
+		},
+		{
+			Name:      "model-store",
+			MountPath: utils.NativeKernelCachePath,
+			SubPath:   subPath,
+		},
+		{
+			Name:      "dshm",
+			MountPath: "/dev/shm",
+		},
+	}
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "scratch",
+			MountPath: "/scratch",
+		})
+	}
+	if n.GetProxyCertConfigMap() != "" {
+		volumeMounts = append(volumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
+	}
+	return volumeMounts
+}
+
+// GetNativeInitContainerVolumeMounts returns init-container volume mounts for a
+// native NIM, mounting the model store PVC at /model and /opt/cache.
+func (n *NIMService) GetNativeInitContainerVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
+	subPath := ""
+	if modelPVC != nil {
+		subPath = modelPVC.SubPath
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "model-store",
+			MountPath: utils.NativeModelBasePath,
+			SubPath:   subPath,
+		},
+		{
+			Name:      "model-store",
+			MountPath: utils.NativeKernelCachePath,
+			SubPath:   subPath,
+		},
+	}
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "scratch",
+			MountPath: "/scratch",
+		})
+	}
+	if n.GetProxyCertConfigMap() != "" {
+		volumeMounts = append(volumeMounts, k8sutil.GetUpdateCaCertInitContainerVolumeMounts()...)
+	}
+	return volumeMounts
+}
+
 func (n *NIMService) GetWorkerVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
 	volumeMounts := n.GetVolumeMounts(modelPVC)
 

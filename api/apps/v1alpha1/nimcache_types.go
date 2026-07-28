@@ -219,6 +219,15 @@ const (
 	NimCacheStatusPending = "Pending"
 	// NimCacheStatusFailed indicates that caching is failed.
 	NimCacheStatusFailed = "Failed"
+
+	// NIMCacheModelTypeModelFree indicates a NIM whose image ships without a
+	// model_manifest.yaml and downloads its model via the legacy HuggingFace flow.
+	NIMCacheModelTypeModelFree = "model-free"
+	// NIMCacheModelTypeNative indicates a NIM built on the native (NIMCraft)
+	// single-model runtime (e.g. Retriever 2.0 Rust/CUDA). Such NIMs have no
+	// model_manifest.yaml, no download-to-cache/list-model-profiles commands,
+	// and download their single model on start when NGC_API_KEY/HF_TOKEN is set.
+	NIMCacheModelTypeNative = "native"
 )
 
 // EnvFromSecrets return the list of secrets that should be mounted as env vars.
@@ -346,6 +355,14 @@ func (n *NIMCache) IsOptimizedNIM() bool {
 		return true
 	}
 	return false
+}
+
+// IsNativeModelDownload returns true if the NIMCache targets a NIM built on the
+// native (NIMCraft) single-model runtime. This is determined pre-start by
+// inspecting the image's model-download-protocol OCI label and is persisted on
+// the status so subsequent reconciles do not need to re-inspect the registry.
+func (n *NIMCache) IsNativeModelDownload() bool {
+	return n.Status.Type == NIMCacheModelTypeNative
 }
 
 // GetModelSpec returns the model spec for the NIMCache.
