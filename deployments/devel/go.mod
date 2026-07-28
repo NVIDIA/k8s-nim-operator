@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/golangci/golangci-lint/v2 v2.12.2
-	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20240731191308-a39ace352f07
+	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.24.1
 	sigs.k8s.io/controller-tools v0.21.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.8.1
 )
