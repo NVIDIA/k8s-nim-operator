@@ -16,10 +16,10 @@ spec:
     {{- if .MinReplicas }}
     minReplicas: {{ .MinReplicas }}
     {{- end }}
-    {{- if or (eq .DeploymentMode "RawDeployment") (eq .DeploymentMode "Standard") }}
     {{- if .MaxReplicas }}
     maxReplicas: {{ .MaxReplicas }}
     {{- end }}
+    {{- if or (eq .DeploymentMode "RawDeployment") (eq .DeploymentMode "Standard") }}
     {{- if .ScaleMetricType }}
     scaleMetricType: {{ .ScaleMetricType }}
     {{- end }}

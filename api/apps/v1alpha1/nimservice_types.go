@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strconv"
 	"strings"
 
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
@@ -37,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	sigsyaml "sigs.k8s.io/yaml"
 
@@ -1847,6 +1849,34 @@ func (n *NIMService) GetHostPath() string {
 	return ""
 }
 
+const (
+	// knativeMinScaleAnnotation is the Knative annotation for the minimum number
+	// of pods (autoscaling.knative.dev/min-scale). A value of "0" enables
+	// scale-to-zero.
+	knativeMinScaleAnnotation = "autoscaling.knative.dev/min-scale"
+	// knativeMaxScaleAnnotation is the Knative annotation for the maximum number
+	// of pods (autoscaling.knative.dev/max-scale). A value of "0" means unbounded.
+	knativeMaxScaleAnnotation = "autoscaling.knative.dev/max-scale"
+)
+
+// parseKnativeScaleAnnotation parses a Knative scale annotation (min-scale /
+// max-scale) into an *int32. It returns (nil, nil) when the annotation is absent
+// or empty, and an error when the value is not a valid non-negative int32.
+func parseKnativeScaleAnnotation(annotations map[string]string, key string) (*int32, error) {
+	value, ok := annotations[key]
+	if !ok || value == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s annotation %q: %w", key, value, err)
+	}
+	if parsed < 0 {
+		return nil, fmt.Errorf("invalid %s annotation %q: must not be negative", key, value)
+	}
+	return ptr.To(int32(parsed)), nil
+}
+
 // GetInferenceServiceParams returns params to render InferenceService from templates.
 func (n *NIMService) GetInferenceServiceParams(
 	deploymentMode kserveconstants.DeploymentModeType) *rendertypes.InferenceServiceParams {
@@ -1892,6 +1922,30 @@ func (n *NIMService) GetInferenceServiceParams(
 			params.ScaleMetric = ""
 			params.ScaleMetricType = ""
 			params.ScaleTarget = nil
+		}
+	} else if utils.IsKServeKnativeDeploymentMode(deploymentMode) {
+		// In KServe serverless (Knative) mode, scaling is handled by the Knative
+		// KPA. KServe keeps autoscaling.knative.dev/min-scale and max-scale on its
+		// ServiceAnnotationDisallowedList and regenerates them from the typed
+		// predictor.minReplicas/maxReplicas fields (min-scale defaults to 1 when
+		// minReplicas is nil, which makes scale-to-zero impossible). HPA-based
+		// autoscaling (spec.scale.enabled) is rejected by the webhook in this mode,
+		// so users express scale bounds via the Knative annotations. Translate those
+		// annotations into the typed fields here so they survive KServe rendering.
+		// A minReplicas of 0 enables scale-to-zero.
+		minReplicas, err := parseKnativeScaleAnnotation(params.Annotations, knativeMinScaleAnnotation)
+		if err != nil {
+			log.Log.Error(err, "invalid Knative min-scale annotation; KServe will default minReplicas to 1", "nimservice", n.Name)
+		} else if minReplicas != nil {
+			params.MinReplicas = minReplicas
+		}
+		// max-scale of 0 means "unbounded" in Knative; leave MaxReplicas unset so
+		// KServe omits max-scale rather than pinning it to 0.
+		maxReplicas, err := parseKnativeScaleAnnotation(params.Annotations, knativeMaxScaleAnnotation)
+		if err != nil {
+			log.Log.Error(err, "invalid Knative max-scale annotation; maxReplicas will be left unset (unbounded)", "nimservice", n.Name)
+		} else if maxReplicas != nil && *maxReplicas > 0 {
+			params.MaxReplicas = maxReplicas
 		}
 	}
 
