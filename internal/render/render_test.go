@@ -703,5 +703,28 @@ var _ = Describe("K8s Resources Rendering", func() {
 			Expect(*inferenceservice.Spec.Predictor.SecurityContext.FSGroup).To(Equal(int64(2000)))
 
 		})
+
+		It("should render minReplicas/maxReplicas in Knative (serverless) mode", func() {
+			params := types.InferenceServiceParams{
+				Name:           "test-inferenceservice",
+				Namespace:      "default",
+				MinReplicas:    ptr.To[int32](0),
+				MaxReplicas:    ptr.To[int32](2),
+				ContainerName:  "test-container",
+				Image:          "nim-llm:latest",
+				DeploymentMode: "Knative",
+			}
+
+			r := render.NewRenderer(templatesDir)
+			inferenceservice, err := r.InferenceService(&params)
+			Expect(err).NotTo(HaveOccurred())
+			// Scale-to-zero: minReplicas must render even when 0.
+			Expect(inferenceservice.Spec.Predictor.MinReplicas).NotTo(BeNil())
+			Expect(*inferenceservice.Spec.Predictor.MinReplicas).To(Equal(int32(0)))
+			// maxReplicas must render in serverless mode (previously gated to raw/standard).
+			Expect(inferenceservice.Spec.Predictor.MaxReplicas).To(Equal(int32(2)))
+			// HPA/raw-only fields must remain unset in serverless mode.
+			Expect(inferenceservice.Spec.Predictor.DeploymentStrategy).To(BeNil())
+		})
 	})
 })
