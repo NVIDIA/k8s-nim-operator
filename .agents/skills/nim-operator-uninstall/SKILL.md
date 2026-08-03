@@ -126,8 +126,8 @@ ssh <user>@<host> 'kubectl get pods -n nim-operator'
 Ask only for missing choices that materially affect removal:
 
 1. Which release and namespace should be uninstalled?
-2. Should existing NIM and NeMo custom resources be deleted first, or preserved?
-3. Should NIM Operator CRDs be deleted after Helm uninstall, or preserved?
+2. Should existing NIM and NeMo custom resources be deleted before the Helm release is uninstalled, or preserved? Custom resources must be deleted while the operator is still running (see "Optional Custom Resource Cleanup").
+3. Should NIM Operator CRDs be deleted after the Helm release is uninstalled, or preserved?
 4. Should the namespace be deleted after cleanup, or preserved?
 
 If the user wants a quick default uninstall, uninstall only the `nim-operator` Helm release from namespace `nim-operator` and preserve CRDs, custom resources, namespace, GPU Operator, cert-manager, and KServe.
@@ -171,7 +171,47 @@ kubectl get nemoguardrails.apps.nvidia.com -A
 
 If any custom resources exist, warn that deleting CRDs will delete or orphan API access to those resources. Ask whether the user wants to delete custom resources first.
 
+## Optional Custom Resource Cleanup
+
+Do this step BEFORE uninstalling the Helm release.
+
+NIM and NeMo custom resources each carry an operator-managed finalizer (for example `finalizer.nimcache.apps.nvidia.com`, `finalizer.nimservice.apps.nvidia.com`). Only the running operator removes these finalizers during deletion. If the Helm release is uninstalled first, the controller is gone, so any later `kubectl delete` of a custom resource blocks forever: the object keeps its `deletionTimestamp` and its finalizer, which in turn blocks CRD deletion and wedges the namespace in `Terminating`. If you have already hit this, see "Recovery From Stuck Finalizers".
+
+Only if the user explicitly approves deleting NIM and NeMo custom resources, show and run targeted deletes while the operator is still running. Prefer deleting specific resources the user selected. If the user approves deleting all NIM Operator custom resources, use:
+
+```sh
+kubectl delete nimservices.apps.nvidia.com --all -A
+kubectl delete nimcaches.apps.nvidia.com --all -A
+kubectl delete nimpipelines.apps.nvidia.com --all -A
+kubectl delete nimbuilds.apps.nvidia.com --all -A
+kubectl delete nemodatastores.apps.nvidia.com --all -A
+kubectl delete nemoentitystores.apps.nvidia.com --all -A
+kubectl delete nemocustomizers.apps.nvidia.com --all -A
+kubectl delete nemoevaluators.apps.nvidia.com --all -A
+kubectl delete nemoguardrails.apps.nvidia.com --all -A
+```
+
+Warn that this may remove model-serving workloads, caches, jobs, and service state owned by those custom resources.
+
+Verification gate: before moving on to the Helm uninstall, confirm every custom resource is actually gone (not just marked for deletion). Re-run the inventory and ensure each command returns no resources:
+
+```sh
+kubectl get nimservices.apps.nvidia.com -A
+kubectl get nimcaches.apps.nvidia.com -A
+kubectl get nimpipelines.apps.nvidia.com -A
+kubectl get nimbuilds.apps.nvidia.com -A
+kubectl get nemodatastores.apps.nvidia.com -A
+kubectl get nemoentitystores.apps.nvidia.com -A
+kubectl get nemocustomizers.apps.nvidia.com -A
+kubectl get nemoevaluators.apps.nvidia.com -A
+kubectl get nemoguardrails.apps.nvidia.com -A
+```
+
+If any resource is still present with a `deletionTimestamp` and a lingering finalizer, do not proceed to `helm uninstall`. The operator must stay running to drain the finalizer; wait for it to clear before continuing, or see "Recovery From Stuck Finalizers".
+
 ## Uninstall Helm Release
+
+Only after any approved custom resources have been fully deleted (the verification gate above returns nothing) should you uninstall the Helm release. Uninstalling while NIM or NeMo custom resources still exist removes the controller that clears their finalizers and will wedge those resources, their CRDs, and the namespace.
 
 After user approval, uninstall only the Helm release:
 
@@ -194,24 +234,6 @@ kubectl get deployment -n nim-operator -l app.kubernetes.io/instance=nim-operato
 ```
 
 If Helm reports the release is not found, do not treat that as success automatically. Check whether operator resources still exist in the namespace.
-
-## Optional Custom Resource Cleanup
-
-Only if the user explicitly approves deleting NIM and NeMo custom resources, show and run targeted deletes. Prefer deleting specific resources the user selected. If the user approves deleting all NIM Operator custom resources, use:
-
-```sh
-kubectl delete nimservices.apps.nvidia.com --all -A
-kubectl delete nimcaches.apps.nvidia.com --all -A
-kubectl delete nimpipelines.apps.nvidia.com --all -A
-kubectl delete nimbuilds.apps.nvidia.com --all -A
-kubectl delete nemodatastores.apps.nvidia.com --all -A
-kubectl delete nemoentitystores.apps.nvidia.com --all -A
-kubectl delete nemocustomizers.apps.nvidia.com --all -A
-kubectl delete nemoevaluators.apps.nvidia.com --all -A
-kubectl delete nemoguardrails.apps.nvidia.com --all -A
-```
-
-Warn that this may remove model-serving workloads, caches, jobs, and service state owned by those custom resources.
 
 ## Optional CRD Cleanup
 
@@ -240,6 +262,31 @@ Keep the namespace by default. Delete it only if the user explicitly approves an
 kubectl get all -n nim-operator
 kubectl delete namespace nim-operator
 ```
+
+If the namespace hangs in `Terminating` with a condition that names `finalizer.<kind>.apps.nvidia.com` (for example `NamespaceFinalizersRemaining`), a custom resource was left with an undrained finalizer. See "Recovery From Stuck Finalizers".
+
+## Recovery From Stuck Finalizers
+
+Use this if custom resources, CRDs, or a namespace are already stuck because the Helm release was uninstalled before the custom resources were deleted. With the controller gone, the operator-managed finalizers cannot be drained. Typical symptoms:
+
+- A custom resource has a `deletionTimestamp` but still lists `finalizer.<kind>.apps.nvidia.com` and never disappears.
+- `kubectl delete crd <name>.apps.nvidia.com` blocks because instances remain.
+- `kubectl delete namespace <ns>` hangs in `Terminating` with `NamespaceFinalizersRemaining` naming `finalizer.<kind>.apps.nvidia.com`.
+
+Recommended recovery: reinstall the operator so it drains the pending finalizers, then redo cleanup in the correct order.
+
+```sh
+# Reinstall the same release/version that was removed.
+helm upgrade --install nim-operator <chart> -n nim-operator --create-namespace
+# Wait for the controller pod to be Running.
+kubectl get pods -n nim-operator
+# The operator now reconciles the pending deletions; stuck custom resources clear in ~15s.
+kubectl get nimcaches.apps.nvidia.com -A
+```
+
+Once the custom resources clear, follow the correct order: delete any remaining custom resources while the operator runs, run the verification gate, then `helm uninstall`, then CRDs, then the namespace.
+
+Avoid manually stripping finalizers (for example `kubectl patch <kind> <name> -n <ns> --type merge -p '{"metadata":{"finalizers":[]}}'`). That forces deletion without running the operator's own cleanup and can orphan PVCs, Jobs, and other owned resources. Prefer the reinstall-and-drain approach above.
 
 ## Do Not Remove These By Default
 
