@@ -27,7 +27,7 @@ require (
 	k8s.io/dynamic-resource-allocation v0.36.0-rc.0
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	knative.dev/pkg v0.0.0-20260120122510-4a022ed9999a
-	oras.land/oras-go/v2 v2.6.0
+	oras.land/oras-go/v2 v2.6.2
 	sigs.k8s.io/controller-runtime v0.22.4
 	sigs.k8s.io/dra-driver-nvidia-gpu v0.4.1
 	sigs.k8s.io/gateway-api v1.5.1
@@ -208,7 +208,7 @@ require (
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
