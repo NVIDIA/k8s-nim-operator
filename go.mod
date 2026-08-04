@@ -21,17 +21,17 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.20.2
 	k8s.io/api v0.36.0-rc.0
-	k8s.io/apiextensions-apiserver v0.35.1
+	k8s.io/apiextensions-apiserver v0.35.3
 	k8s.io/apimachinery v0.36.0-rc.0
 	k8s.io/client-go v0.36.0-rc.0
 	k8s.io/dynamic-resource-allocation v0.36.0-rc.0
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	knative.dev/pkg v0.0.0-20260120122510-4a022ed9999a
 	oras.land/oras-go/v2 v2.6.2
-	sigs.k8s.io/controller-runtime v0.22.4
+	sigs.k8s.io/controller-runtime v0.23.3
 	sigs.k8s.io/dra-driver-nvidia-gpu v0.4.1
 	sigs.k8s.io/gateway-api v1.5.1
-	sigs.k8s.io/gateway-api-inference-extension v1.3.0
+	sigs.k8s.io/gateway-api-inference-extension v1.5.0
 	sigs.k8s.io/lws v0.7.0
 	sigs.k8s.io/yaml v1.6.0
 )
