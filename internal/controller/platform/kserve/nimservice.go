@@ -60,6 +60,12 @@ import (
 const (
 	// ManifestsDir is the directory to render k8s resource manifests.
 	ManifestsDir = "/manifests"
+
+	// inferenceServiceNotReadyRequeue is how long to wait before re-checking
+	// InferenceService readiness when the NIMService is not yet Ready.
+	// This bounds stuck NotReady status when the InferenceService informer was
+	// not registered at operator start-up (e.g. KServe installed later).
+	inferenceServiceNotReadyRequeue = 30 * time.Second
 )
 
 // NIMServiceReconciler represents the NIMService reconciler instance for KServe platform.
@@ -787,20 +793,27 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
 		r.recorder.Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
 			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
-	} else {
-		// Update NIMServiceStatus with model config.
-		updateErr := r.updateModelStatus(ctx, nimService, deploymentMode)
-		if updateErr != nil {
-			logger.Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
-			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		if err != nil {
+			logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.NotReady)
+			return &ctrl.Result{}, err
 		}
-
-		// Update status as ready
-		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
-		r.recorder.Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
-			"NIMService %s ready, msg: %s", nimService.Name, msg)
+		// Requeue so readiness converges even when the InferenceService watch was
+		// not registered (KServe CRD installed after the operator started) and no
+		// other owned-resource events wake this reconcile.
+		return &ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}, nil
 	}
 
+	// Update NIMServiceStatus with model config.
+	updateErr := r.updateModelStatus(ctx, nimService, deploymentMode)
+	if updateErr != nil {
+		logger.Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// Update status as ready
+	err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
+	r.recorder.Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
+		"NIMService %s ready, msg: %s", nimService.Name, msg)
 	if err != nil {
 		logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.Ready)
 		return &ctrl.Result{}, err
@@ -813,8 +826,15 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 func (r *NIMServiceReconciler) isInferenceServiceReady(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, bool, error) {
 	logger := r.log
 
+	// Prefer the API reader so readiness is observed even when the InferenceService
+	// informer was not started (CRD missing at operator boot / not in filtered cache).
+	reader := client.Reader(r.Client)
+	if r.apiReader != nil {
+		reader = r.apiReader
+	}
+
 	isvc := &kservev1beta1.InferenceService{}
-	err := r.Get(ctx, client.ObjectKey{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)
+	err := reader.Get(ctx, client.ObjectKey{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)
 	if err != nil {
 		logger.Error(err, "failed to fetch inferenceservice")
 		if apiErrors.IsNotFound(err) {

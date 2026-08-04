@@ -182,6 +182,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			renderer:        render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/kserve"), "manifests")),
 			recorder:        record.NewFakeRecorder(1000),
 			discoveryClient: discoveryClient,
+			apiReader:       client,
 		}
 		pvcName := "test-pvc"
 		nimService = &appsv1alpha1.NIMService{
@@ -533,7 +534,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// Role should be created
 			role := &rbacv1.Role{}
@@ -788,7 +789,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			isvc := &kservev1beta1.InferenceService{}
 			err = client.Get(context.TODO(), namespacedName, isvc)
@@ -815,7 +816,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err = reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			err = client.Get(context.TODO(), namespacedName, isvc)
 			Expect(err).NotTo(HaveOccurred())
@@ -842,7 +843,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// InferenceService should have cluster-local visibility
 			isvc := &kservev1beta1.InferenceService{}
@@ -864,7 +865,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// InferenceService should preserve user-provided visibility, not override with ClusterLocalVisibility
 			isvc := &kservev1beta1.InferenceService{}
@@ -886,7 +887,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// InferenceService should not have network visibility set (external access)
 			isvc := &kservev1beta1.InferenceService{}
@@ -909,7 +910,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// InferenceService should preserve user-provided visibility
 			isvc := &kservev1beta1.InferenceService{}
@@ -1047,6 +1048,64 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(Equal(true))
 			Expect(msg).To(Equal("Predictor Ready"))
+		})
+	})
+
+	Describe("checkInferenceServiceStatus requeue behavior", func() {
+		BeforeEach(func() {
+			Expect(client.Create(context.TODO(), nimService)).To(Succeed())
+		})
+		AfterEach(func() {
+			_ = client.Delete(context.TODO(), nimService)
+		})
+
+		It("should requeue when InferenceService is not ready", func() {
+			isvc := &kservev1beta1.InferenceService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      nimService.Name,
+					Namespace: nimService.Namespace,
+				},
+				Spec:   kservev1beta1.InferenceServiceSpec{},
+				Status: kservev1beta1.InferenceServiceStatus{},
+			}
+			Expect(client.Create(context.TODO(), isvc)).To(Succeed())
+			defer func() { _ = client.Delete(context.TODO(), isvc) }()
+
+			result, err := reconciler.checkInferenceServiceStatus(context.TODO(), nimService, kserveconstants.Standard)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).ToNot(BeNil())
+			Expect(result.RequeueAfter).To(Equal(inferenceServiceNotReadyRequeue))
+
+			updated := &appsv1alpha1.NIMService{}
+			Expect(client.Get(context.TODO(), types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}, updated)).To(Succeed())
+			Expect(updated.Status.State).To(Equal(appsv1alpha1.NIMServiceStatusNotReady))
+		})
+
+		It("should requeue when PredictorReady is False", func() {
+			isvc := &kservev1beta1.InferenceService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      nimService.Name,
+					Namespace: nimService.Namespace,
+				},
+				Spec:   kservev1beta1.InferenceServiceSpec{},
+				Status: kservev1beta1.InferenceServiceStatus{},
+			}
+			Expect(client.Create(context.TODO(), isvc)).To(Succeed())
+			defer func() { _ = client.Delete(context.TODO(), isvc) }()
+
+			isvc.Status.Conditions = knativeduckv1.Conditions{
+				{
+					Type:    kservev1beta1.PredictorReady,
+					Message: "Predictor not ready",
+					Status:  corev1.ConditionFalse,
+				},
+			}
+			Expect(client.Update(context.TODO(), isvc)).To(Succeed())
+
+			result, err := reconciler.checkInferenceServiceStatus(context.TODO(), nimService, kserveconstants.Standard)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).ToNot(BeNil())
+			Expect(result.RequeueAfter).To(Equal(inferenceServiceNotReadyRequeue))
 		})
 	})
 
@@ -1324,7 +1383,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// InferenceService should be created
 			isvc := &kservev1beta1.InferenceService{}
@@ -1457,7 +1516,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// InferenceService should be created
 			isvc := &kservev1beta1.InferenceService{}
@@ -1572,7 +1631,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// InferenceService should be created
 			isvc := &kservev1beta1.InferenceService{}
@@ -1851,7 +1910,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// InferenceService should be created
 			isvc := &kservev1beta1.InferenceService{}
@@ -2034,7 +2093,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 				result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(result).To(Equal(ctrl.Result{}))
+				Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 				// InferenceService should be created
 				isvc := &kservev1beta1.InferenceService{}
@@ -2183,7 +2242,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 				result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(result).To(Equal(ctrl.Result{}))
+				Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 				// InferenceService should be created
 				isvc := &kservev1beta1.InferenceService{}
@@ -2330,7 +2389,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 				result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(result).To(Equal(ctrl.Result{}))
+				Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 				// InferenceService should be created
 				isvc := &kservev1beta1.InferenceService{}
@@ -2473,7 +2532,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 				result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(result).To(Equal(ctrl.Result{}))
+				Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 				// InferenceService should be created
 				isvc := &kservev1beta1.InferenceService{}
@@ -2626,7 +2685,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			// Get the rendered InferenceService
 			isvc := &kservev1beta1.InferenceService{}
@@ -2744,7 +2803,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			isvc := &kservev1beta1.InferenceService{}
 			err = client.Get(context.TODO(), namespacedName, isvc)
@@ -2821,7 +2880,7 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}))
 
 			isvc := &kservev1beta1.InferenceService{}
 			err = client.Get(context.TODO(), namespacedName, isvc)
