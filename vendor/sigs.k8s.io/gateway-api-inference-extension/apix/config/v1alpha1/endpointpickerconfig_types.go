@@ -21,8 +21,11 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const nilString = "<nil>"
 
 // +kubebuilder:object:root=true
 
@@ -32,7 +35,7 @@ type EndpointPickerConfig struct {
 
 	// +optional
 	// FeatureGates is a set of flags that enable various experimental features with the EPP.
-	// If omitted non of these experimental features will be enabled.
+	// If omitted none of these experimental features will be enabled.
 	FeatureGates FeatureGates `json:"featureGates,omitempty"`
 
 	// +required
@@ -47,24 +50,49 @@ type EndpointPickerConfig struct {
 	SchedulingProfiles []SchedulingProfile `json:"schedulingProfiles"`
 
 	// +optional
-	// SaturationDetector when present specifies the configuration of the
-	// Saturation detector. If not present, default values are used.
-	SaturationDetector *SaturationDetector `json:"saturationDetector,omitempty"`
+	// SaturationDetector specifies which saturation detector plugin to use for both Admission and
+	// Flow Control. If omitted, "utilization-detector" is used by default.
+	SaturationDetector *SaturationDetectorConfig `json:"saturationDetector,omitempty"`
 
 	// +optional
-	// Data configures the DataLayer. It is required if the new DataLayer is enabled.
-	Data *DataLayerConfig `json:"data"`
+	// DataLayer configures the DataLayer. It is required if the new DataLayer is enabled.
+	DataLayer *DataLayerConfig `json:"dataLayer"`
+
+	// +optional
+	// FlowControl configures the Flow Control layer.
+	// This configuration is only respected if the "flowControl" FeatureGate is enabled.
+	FlowControl *FlowControlConfig `json:"flowControl,omitempty"`
+
+	// +optional
+	// Parser specifies the parsing logic used by the EPP to process protocol messages.
+	// If unspecified, default parsing behavior will be applied.
+	Parser *ParserConfig `json:"parser,omitempty"`
 }
 
 func (cfg EndpointPickerConfig) String() string {
-	return fmt.Sprintf(
-		"{FeatureGates: %v, Plugins: %v, SchedulingProfiles: %v, Data: %v, SaturationDetector: %v}",
-		cfg.FeatureGates,
-		cfg.Plugins,
-		cfg.SchedulingProfiles,
-		cfg.Data,
-		cfg.SaturationDetector,
-	)
+	var parts []string
+	if len(cfg.FeatureGates) > 0 {
+		parts = append(parts, fmt.Sprintf("FeatureGates: %s", cfg.FeatureGates))
+	}
+	if len(cfg.Plugins) > 0 {
+		parts = append(parts, fmt.Sprintf("Plugins: %v", cfg.Plugins))
+	}
+	if len(cfg.SchedulingProfiles) > 0 {
+		parts = append(parts, fmt.Sprintf("SchedulingProfiles: %v", cfg.SchedulingProfiles))
+	}
+	if cfg.DataLayer != nil {
+		parts = append(parts, fmt.Sprintf("DataLayer: %v", cfg.DataLayer))
+	}
+	if cfg.SaturationDetector != nil {
+		parts = append(parts, fmt.Sprintf("SaturationDetector: %v", cfg.SaturationDetector))
+	}
+	if cfg.FlowControl != nil {
+		parts = append(parts, fmt.Sprintf("FlowControl: %v", cfg.FlowControl))
+	}
+	if cfg.Parser != nil {
+		parts = append(parts, fmt.Sprintf("Parser: %v", cfg.Parser))
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 // PluginSpec contains the information that describes a plugin that
@@ -88,11 +116,15 @@ type PluginSpec struct {
 }
 
 func (ps PluginSpec) String() string {
-	var parameters string
-	if ps.Parameters != nil {
-		parameters = fmt.Sprintf(", Parameters: %s", ps.Parameters)
+	var parts []string
+	if ps.Name != "" {
+		parts = append(parts, "Name: "+ps.Name)
 	}
-	return fmt.Sprintf("{%s/%s%s}", ps.Name, ps.Type, parameters)
+	parts = append(parts, "Type: "+ps.Type)
+	if len(ps.Parameters) > 0 {
+		parts = append(parts, "Parameters: "+string(ps.Parameters))
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 // SchedulingProfile contains the information to create a SchedulingProfile
@@ -110,7 +142,12 @@ type SchedulingProfile struct {
 }
 
 func (sp SchedulingProfile) String() string {
-	return fmt.Sprintf("{Name: %s, Plugins: %v}", sp.Name, sp.Plugins)
+	var parts []string
+	parts = append(parts, "Name: "+sp.Name)
+	if len(sp.Plugins) > 0 {
+		parts = append(parts, fmt.Sprintf("Plugins: %v", sp.Plugins))
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 // SchedulingPlugin describes a plugin that will be associated with a
@@ -118,23 +155,24 @@ func (sp SchedulingProfile) String() string {
 type SchedulingPlugin struct {
 	// +required
 	// +kubebuilder:validation:Required
-	// PluginRef specifies a partiular Plugin instance to be associated with
+	// PluginRef specifies a particular Plugin instance to be associated with
 	// this SchedulingProfile. The reference is to the name of an
 	// entry of the Plugins defined in the configuration's Plugins
 	// section
 	PluginRef string `json:"pluginRef"`
 
 	// +optional
-	// Weight is the weight fo be used if this plugin is a Scorer.
-	Weight *int `json:"weight"`
+	// Weight is the weight to be used if this plugin is a Scorer.
+	Weight *float64 `json:"weight"`
 }
 
 func (sp SchedulingPlugin) String() string {
-	var weight string
+	var parts []string
+	parts = append(parts, "PluginRef: "+sp.PluginRef)
 	if sp.Weight != nil {
-		weight = fmt.Sprintf(", Weight: %d", *sp.Weight)
+		parts = append(parts, fmt.Sprintf("Weight: %.2f", *sp.Weight))
 	}
-	return fmt.Sprintf("{PluginRef: %s%s}", sp.PluginRef, weight)
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 // FeatureGates is a set of flags that enable various experimental features with the EPP
@@ -157,46 +195,20 @@ func (fg FeatureGates) String() string {
 	return "{" + result + "}"
 }
 
-// SaturationDetector
-type SaturationDetector struct {
+// SaturationDetectorConfig contains the configuration for a saturation detector.
+type SaturationDetectorConfig struct {
 	// +optional
-	// QueueDepthThreshold defines the backend waiting queue size above which a
-	// pod is considered to have insufficient capacity for new requests.
-	QueueDepthThreshold int `json:"queueDepthThreshold,omitempty"`
-
-	// +optional
-	// KVCacheUtilThreshold defines the KV cache utilization (0.0 to 1.0) above
-	// which a pod is considered to have insufficient capacity.
-	KVCacheUtilThreshold float64 `json:"kvCacheUtilThreshold,omitempty"`
-
-	// +optional
-	// MetricsStalenessThreshold defines how old a pod's metrics can be.
-	// If a pod's metrics are older than this, it might be excluded from
-	// "good capacity" considerations or treated as having no capacity for
-	// safety.
-	MetricsStalenessThreshold metav1.Duration `json:"metricsStalenessThreshold,omitempty"`
+	// PluginRef specifies the name of the plugin instance to use for saturation detection.
+	// The reference is to the name of an entry of the Plugins defined in the configuration's Plugins section.
+	// If unspecified, "utilization-detector" is used by default.
+	PluginRef string `json:"pluginRef,omitempty"`
 }
 
-func (sd *SaturationDetector) String() string {
-	result := ""
-	if sd != nil {
-		if sd.QueueDepthThreshold != 0 {
-			result += fmt.Sprintf("QueueDepthThreshold: %d", sd.QueueDepthThreshold)
-		}
-		if sd.KVCacheUtilThreshold != 0.0 {
-			if len(result) != 0 {
-				result += ", "
-			}
-			result += fmt.Sprintf("KVCacheUtilThreshold: %g", sd.KVCacheUtilThreshold)
-		}
-		if sd.MetricsStalenessThreshold.Duration != 0.0 {
-			if len(result) != 0 {
-				result += ", "
-			}
-			result += fmt.Sprintf("MetricsStalenessThreshold: %s", sd.MetricsStalenessThreshold)
-		}
+func (sdc *SaturationDetectorConfig) String() string {
+	if sdc == nil {
+		return nilString
 	}
-	return "{" + result + "}"
+	return fmt.Sprintf("{PluginRef: %s}", sdc.PluginRef)
 }
 
 // DataLayerConfig contains the configuration of the DataLayer feature
@@ -207,7 +219,10 @@ type DataLayerConfig struct {
 	Sources []DataLayerSource `json:"sources"`
 }
 
-func (dlc DataLayerConfig) String() string {
+func (dlc *DataLayerConfig) String() string {
+	if dlc == nil {
+		return nilString
+	}
 	return fmt.Sprintf("{Sources: %v}", dlc.Sources)
 }
 
@@ -215,7 +230,7 @@ func (dlc DataLayerConfig) String() string {
 type DataLayerSource struct {
 	// +required
 	// +kubebuilder:validation:Required
-	// PluginRef specifies a partiular Plugin instance to be associated with
+	// PluginRef specifies a particular Plugin instance to be associated with
 	// this Source. The reference is to the name of an entry of the Plugins
 	// defined in the configuration's Plugins section
 	PluginRef string `json:"pluginRef"`
@@ -229,19 +244,178 @@ type DataLayerSource struct {
 }
 
 func (dls DataLayerSource) String() string {
-	return fmt.Sprintf("{PluginRef: %s, Extractors: %v}", dls.PluginRef, dls.Extractors)
+	var parts []string
+	parts = append(parts, "PluginRef: "+dls.PluginRef)
+	if len(dls.Extractors) > 0 {
+		parts = append(parts, fmt.Sprintf("Extractors: %v", dls.Extractors))
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 // DataLayerExtractor contains the configuration of an Extractor of the DataLayer feature
 type DataLayerExtractor struct {
 	// +required
 	// +kubebuilder:validation:Required
-	// PluginRef specifies a partiular Plugin instance to be associated with
+	// PluginRef specifies a particular Plugin instance to be associated with
 	// this Extractor. The reference is to the name of an entry of the Plugins
 	// defined in the configuration's Plugins section
 	PluginRef string `json:"pluginRef"`
 }
 
 func (dle DataLayerExtractor) String() string {
-	return "{PluginRef: " + dle.PluginRef + "}"
+	return fmt.Sprintf("{PluginRef: %s}", dle.PluginRef)
+}
+
+func (pc *ParserConfig) String() string {
+	if pc == nil {
+		return nilString
+	}
+	return fmt.Sprintf("{PluginRef: %s}", pc.PluginRef)
+}
+
+// ParserConfig contains the configuration for a parser.
+type ParserConfig struct {
+	// +required
+	// +kubebuilder:validation:Required
+	// PluginRef specifies a particular Plugin instance to be associated with
+	// this Parser. The reference is to the name of an entry of the Plugins
+	// defined in the configuration's Plugins section
+	// Default: openai-parser
+	PluginRef string `json:"pluginRef"`
+}
+
+// FlowControlConfig configures the Flow Control layer.
+type FlowControlConfig struct {
+	// +optional
+	// MaxBytes defines the global maximum aggregate byte size of all active requests across all priority
+	// levels. If this limit is exceeded, new requests will be rejected even if their specific
+	// priority band has capacity.
+	// Accepts standard Kubernetes resource quantities (e.g., "1Gi", "500M").
+	// If omitted, no global byte limit is enforced.
+	MaxBytes *resource.Quantity `json:"maxBytes,omitempty"`
+
+	// +optional
+	// MaxRequests defines the global maximum number of concurrent requests across all priority
+	// levels. If this limit is exceeded, new requests will be rejected even if their specific
+	// priority band has capacity.
+	// Accepts standard Kubernetes resource quantities (e.g., "100", "1k").
+	// If omitted, no global request limit is enforced.
+	MaxRequests *resource.Quantity `json:"maxRequests,omitempty"`
+
+	// +optional
+	// DefaultRequestTTL serves as a fallback timeout for requests that do not specify their own
+	// deadline.
+	// It ensures that requests do not hang indefinitely in the queue.
+	// If 0 or omitted, it defaults to the client context deadline, meaning requests may wait
+	// indefinitely unless cancelled by the client.
+	DefaultRequestTTL *metav1.Duration `json:"defaultRequestTTL,omitempty"`
+
+	// +optional
+	// DefaultPriorityBand allows you to define a template for handling traffic with priority levels
+	// that are not explicitly configured in `PriorityBands`.
+	// This ensures that unforeseen traffic classes are still managed (e.g., given a default capacity
+	// limit) rather than being rejected or treated arbitrarily.
+	// If not specified, a system-default template is used to dynamically provision bands for new
+	// priority levels. This template cascades to the standard `PriorityBandConfig` defaults.
+	DefaultPriorityBand *PriorityBandConfig `json:"defaultPriorityBand,omitempty"`
+
+	// PriorityBands allows you to explicitly define policies (like capacity limits) for specific
+	// priority levels. Traffic matching these priorities will be handled according to these rules.
+	// If a priority band is not specified, it uses specific defaults.
+	PriorityBands []PriorityBandConfig `json:"priorityBands,omitempty"`
+
+	// +optional
+	// UsageLimitPolicyPluginRef specifies the UsageLimitPolicy plugin to use for adaptive capacity management.
+	// Must reference a named plugin instance defined in the top-level Plugins section.
+	// If omitted, a default static policy (threshold=1.0, no gating) is used.
+	UsageLimitPolicyPluginRef string `json:"usageLimitPolicyPluginRef,omitempty"`
+}
+
+func (fcc *FlowControlConfig) String() string {
+	if fcc == nil {
+		return nilString
+	}
+
+	var parts []string
+	if fcc.MaxBytes != nil {
+		parts = append(parts, fmt.Sprintf("MaxBytes: %d", fcc.MaxBytes.Value()))
+	} else {
+		parts = append(parts, "MaxBytes: unlimited")
+	}
+
+	if fcc.MaxRequests != nil {
+		parts = append(parts, fmt.Sprintf("MaxRequests: %d", fcc.MaxRequests.Value()))
+	} else {
+		parts = append(parts, "MaxRequests: unlimited")
+	}
+
+	if fcc.DefaultRequestTTL != nil {
+		parts = append(parts, fmt.Sprintf("DefaultRequestTTL: %s", fcc.DefaultRequestTTL.Duration))
+	}
+
+	if fcc.DefaultPriorityBand != nil {
+		parts = append(parts, fmt.Sprintf("DefaultPriorityBand: %v", fcc.DefaultPriorityBand))
+	}
+
+	if len(fcc.PriorityBands) > 0 {
+		parts = append(parts, fmt.Sprintf("PriorityBands: %v", fcc.PriorityBands))
+	}
+
+	if fcc.UsageLimitPolicyPluginRef != "" {
+		parts = append(parts, "UsageLimitPolicyRef: "+fcc.UsageLimitPolicyPluginRef)
+	}
+
+	return "{" + strings.Join(parts, ", ") + "}"
+}
+
+// PriorityBandConfig configures a single priority band.
+type PriorityBandConfig struct {
+	// Priority is the integer priority level for this band.
+	// Higher values indicate higher priority.
+	Priority int `json:"priority"`
+
+	// +optional
+	// MaxBytes is the maximum number of bytes allowed for this priority band.
+	// Accepts standard Kubernetes resource quantities (e.g., "1Gi", "500M").
+	// If omitted, the system default is used.
+	MaxBytes *resource.Quantity `json:"maxBytes,omitempty"`
+
+	// +optional
+	// MaxRequests is the maximum number of concurrent requests allowed for this priority band.
+	// Accepts standard Kubernetes resource quantities (e.g., "100", "1k").
+	// If omitted, no request limit is enforced.
+	MaxRequests *resource.Quantity `json:"maxRequests,omitempty"`
+
+	// +optional
+	// FairnessPolicyRef specifies the name of the policy that governs flow selection.
+	// If omitted, the system default ("global-strict-fairness-policy") is used.
+	FairnessPolicyRef string `json:"fairnessPolicyRef,omitempty"`
+
+	// +optional
+	// OrderingPolicyRef specifies the name of the policy that governs request selection within a flow.
+	// If omitted, the system default ("fcfs-ordering-policy") is used.
+	OrderingPolicyRef string `json:"orderingPolicyRef,omitempty"`
+}
+
+func (pbc PriorityBandConfig) String() string {
+	var parts []string
+	parts = append(parts, fmt.Sprintf("Priority: %d", pbc.Priority))
+
+	if pbc.MaxBytes != nil {
+		parts = append(parts, fmt.Sprintf("MaxBytes: %d", pbc.MaxBytes.Value()))
+	}
+
+	if pbc.MaxRequests != nil {
+		parts = append(parts, fmt.Sprintf("MaxRequests: %d", pbc.MaxRequests.Value()))
+	}
+
+	if pbc.FairnessPolicyRef != "" {
+		parts = append(parts, "FairnessPolicyRef: "+pbc.FairnessPolicyRef)
+	}
+
+	if pbc.OrderingPolicyRef != "" {
+		parts = append(parts, "OrderingPolicyRef: "+pbc.OrderingPolicyRef)
+	}
+
+	return "{" + strings.Join(parts, ", ") + "}"
 }
