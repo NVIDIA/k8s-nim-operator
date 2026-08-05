@@ -974,6 +974,128 @@ spec:
                 items:
                   type: string
                 type: array
+              confidentialContainers:
+                description: |-
+                  ConfidentialContainers configures deployment under Confidential Containers.
+                  When set and enabled, the operator uses a gated DryRun → Active lifecycle,
+                  generates init-data from KBS configuration, and does not use NIMCache.
+                properties:
+                  deploymentPhase:
+                    default: DryRun
+                    description: |-
+                      DeploymentPhase controls whether Pod-bearing resources are applied.
+                      DryRun generates and publishes artifacts only.
+                      Active applies the frozen workload from dry-run artifacts.
+                    enum:
+                    - DryRun
+                    - Active
+                    type: string
+                  enabled:
+                    default: true
+                    description: Enabled activates the confidential containers deployment
+                      path.
+                    type: boolean
+                  initData:
+                    description: InitData configures init-data input for GenPolicy
+                      and runtime encoding.
+                    properties:
+                      attestationServiceUrl:
+                        description: |-
+                          AttestationServiceURL is the URL for [token_configs.coco_as] in aa.toml.
+                          Defaults to URL when unset.
+                        pattern: ^https?://.+
+                        type: string
+                      cdhSocket:
+                        default: unix:///run/confidential-containers/cdh.sock
+                        description: CDHSocket is the CDH Unix socket path written
+                          to cdh.toml.
+                        type: string
+                      kbcName:
+                        default: cc_kbc
+                        description: KBCName is the KBC name written to cdh.toml.
+                        type: string
+                      url:
+                        description: |-
+                          URL is the KBS endpoint reachable from inside the confidential guest.
+                          Used for both Attestation Agent and CDH KBC configuration.
+                        minLength: 1
+                        pattern: ^https?://.+
+                        type: string
+                    required:
+                    - url
+                    type: object
+                  model:
+                    description: Model configures model delivery without NIMCache.
+                    properties:
+                      hf:
+                        description: HF configures pull from Hugging Face Hub.
+                        properties:
+                          endpoint:
+                            default: https://huggingface.co
+                            description: Endpoint is the Hugging Face Hub endpoint.
+                            pattern: ^https?://.*$
+                            type: string
+                          modelName:
+                            description: ModelName is the model repository name.
+                            minLength: 1
+                            type: string
+                          namespace:
+                            description: Namespace is the model namespace (org or
+                              user).
+                            minLength: 1
+                            type: string
+                          revision:
+                            description: Revision is a branch, tag, or commit hash.
+                            type: string
+                        required:
+                        - modelName
+                        - namespace
+                        type: object
+                      ngc:
+                        description: NGC configures pull from NVIDIA NGC.
+                        properties:
+                          endpoint:
+                            default: https://api.ngc.nvidia.com
+                            description: Endpoint is the NGC API base URL. Defaults
+                              to the public NGC API.
+                            pattern: ^https?://.*$
+                            type: string
+                          modelUri:
+                            description: |-
+                              ModelURI is passed to the NIM container as NIM_MODEL_NAME.
+                              e.g. ngc://nvidia/nemo/llama-3_2-3b-instruct:2.0
+                            pattern: ^ngc://.+
+                            type: string
+                        required:
+                        - modelUri
+                        type: object
+                      sizeLimit:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: SizeLimit caps the emptyDir volume used as NIM_CACHE_PATH.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                    x-kubernetes-validations:
+                    - message: exactly one of ngc or hf must be set
+                      rule: '(has(self.ngc) ? 1 : 0) + (has(self.hf) ? 1 : 0) == 1'
+                  sealedAuthSecret:
+                    description: SealedAuthSecret contains sealed secret reference.
+                    type: string
+                required:
+                - enabled
+                - model
+                - sealedAuthSecret
+                type: object
+                x-kubernetes-validations:
+                - message: sealedAuthSecret is required when confidential containers
+                    is enabled
+                  rule: '!self.enabled || self.sealedAuthSecret != ""'
+                - message: initData.url is required when confidential containers is
+                    enabled
+                  rule: '!self.enabled || (has(self.initData) && self.initData.url
+                    != "")'
               draResources:
                 description: DRAResources is the list of DRA resource claims to be
                   used for the NIMService deployment or leader worker set.
@@ -3961,8 +4083,8 @@ spec:
                                   and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
                                   triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
 
-                                  This is an alpha field and requires enabling the HPAConfigurableTolerance
-                                  feature gate.
+                                  This is an beta field and requires the HPAConfigurableTolerance feature
+                                  gate to be enabled.
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                             type: object
@@ -4036,8 +4158,8 @@ spec:
                                   and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
                                   triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
 
-                                  This is an alpha field and requires enabling the HPAConfigurableTolerance
-                                  feature gate.
+                                  This is an beta field and requires the HPAConfigurableTolerance feature
+                                  gate to be enabled.
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                             type: object
@@ -4984,9 +5106,10 @@ spec:
                     operator:
                       description: |-
                         Operator represents a key's relationship to the value.
-                        Valid operators are Exists and Equal. Defaults to Equal.
+                        Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                         Exists is equivalent to wildcard for value, so that a pod can
                         tolerate all taints of a particular category.
+                        Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                       type: string
                     tolerationSeconds:
                       description: |-
@@ -5025,6 +5148,10 @@ spec:
                 .spec.expose.router.ingress.
               rule: '!(has(self.expose) && has(self.expose.ingress) && has(self.expose.ingress.enabled)
                 && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))'
+            - message: runtimeClassName is required when confidential containers is
+                enabled
+              rule: '!has(self.confidentialContainers) || !self.confidentialContainers.enabled
+                || self.runtimeClassName != ""'
           status:
             description: NIMServiceStatus defines the observed state of NIMService.
             properties:

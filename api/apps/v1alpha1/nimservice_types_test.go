@@ -20,12 +20,106 @@ import (
 	"reflect"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
+
+func TestIsConfidentialDeploymentDryRun(t *testing.T) {
+	tests := []struct {
+		name       string
+		enabled    bool
+		phase      string
+		wantDryRun bool
+	}{
+		{name: "disabled", enabled: false, phase: ConfidentialDeploymentPhaseDryRun, wantDryRun: false},
+		{name: "empty defaults to dry run", enabled: true, wantDryRun: true},
+		{name: "dry run", enabled: true, phase: ConfidentialDeploymentPhaseDryRun, wantDryRun: true},
+		{name: "active", enabled: true, phase: ConfidentialDeploymentPhaseActive, wantDryRun: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nimService := &NIMService{Spec: NIMServiceSpec{ConfidentialContainers: &ConfidentialContainersSpec{
+				Enabled:                     tt.enabled,
+				ConfidentialDeploymentPhase: tt.phase,
+			}}}
+			if got := nimService.IsConfidentialDeploymentDryRun(); got != tt.wantDryRun {
+				t.Fatalf("IsConfidentialDeploymentDryRun() = %v, want %v", got, tt.wantDryRun)
+			}
+		})
+	}
+}
+
+func TestSetConfidentialDeployment(t *testing.T) {
+	replicas := int32(2)
+	runtimeClassName := "kata-qemu-nvidia-gpu"
+	deployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "Deployment",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-nimservice",
+			Namespace: "default",
+			Labels:    map[string]string{"app": "test-app"},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: SchemeGroupVersion.String(),
+					Kind:       "NIMService",
+					Name:       "test-nimservice",
+					UID:        "test-uid",
+				},
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassName,
+				},
+			},
+		},
+	}
+
+	disabledNIMService := &NIMService{Spec: NIMServiceSpec{ConfidentialContainers: &ConfidentialContainersSpec{Enabled: false}}}
+	disabledNIMService.SetConfidentialDeployment(deployment)
+	if disabledNIMService.Spec.ConfidentialContainers.Deployment != nil {
+		t.Fatal("SetConfidentialDeployment should not set deployment when confidential containers are disabled")
+	}
+
+	nimService := &NIMService{Spec: NIMServiceSpec{ConfidentialContainers: &ConfidentialContainersSpec{Enabled: true}}}
+	nimService.SetConfidentialDeployment(deployment)
+	got := nimService.Spec.ConfidentialContainers.Deployment
+	if got == nil {
+		t.Fatal("SetConfidentialDeployment did not set deployment")
+	}
+	if !reflect.DeepEqual(got, deployment) {
+		t.Errorf("deployment = %v, want %v", got, deployment)
+	}
+
+	*deployment.Spec.Replicas = 4
+	deployment.Labels["app"] = "mutated"
+	deployment.OwnerReferences[0].Name = "mutated"
+	if got.Spec.Replicas == nil || *got.Spec.Replicas != 2 {
+		t.Fatalf("deployment was not deep-copied, got replicas %v", got.Spec.Replicas)
+	}
+	if got.Labels["app"] != "test-app" {
+		t.Fatalf("deployment metadata was not deep-copied, got labels %v", got.Labels)
+	}
+	if got.OwnerReferences[0].Name != "test-nimservice" {
+		t.Fatalf("deployment ownerReferences were not deep-copied, got ownerReferences %v", got.OwnerReferences)
+	}
+
+	nimService.SetConfidentialDeployment(nil)
+	if nimService.Spec.ConfidentialContainers.Deployment != nil {
+		t.Fatal("SetConfidentialDeployment(nil) did not clear deployment")
+	}
+}
 
 // TestGetVolumes tests the GetVolumes function.
 func TestGetVolumes(t *testing.T) {

@@ -29,6 +29,7 @@ import (
 
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -90,10 +91,18 @@ const (
 	PlatformTypeKServe PlatformType = "kserve"
 )
 
+const (
+	// ConfidentialDeploymentPhaseDryRun renders confidential workload artifacts without applying pod-bearing resources.
+	ConfidentialDeploymentPhaseDryRun = "DryRun"
+	// ConfidentialDeploymentPhaseActive applies the rendered confidential workload.
+	ConfidentialDeploymentPhaseActive = "Active"
+)
+
 // NIMServiceSpec defines the desired state of NIMService.
 // +kubebuilder:validation:XValidation:rule="!(has(self.multiNode) && has(self.scale) && has(self.scale.enabled) && self.scale.enabled)", message="autoScaling must be nil or disabled when multiNode is set"
 // +kubebuilder:validation:XValidation:rule="!(has(self.scale) && has(self.scale.enabled) && self.scale.enabled && has(self.replicas))",message="spec.replicas cannot be set when spec.scale.enabled is true"
 // +kubebuilder:validation:XValidation:rule="!(has(self.expose) && has(self.expose.ingress) && has(self.expose.ingress.enabled) && self.expose.ingress.enabled && has(self.expose.router) && has(self.expose.router.ingress))",message=".spec.expose.ingress is deprecated, and will be removed in a future release. If .spec.expose.ingress is set, please do not set .spec.expose.router.ingress."
+// +kubebuilder:validation:XValidation:rule="!has(self.confidentialContainers) || !self.confidentialContainers.enabled || self.runtimeClassName != \"\"",message="runtimeClassName is required when confidential containers is enabled"
 type NIMServiceSpec struct {
 	Image   Image           `json:"image"`
 	Command []string        `json:"command,omitempty"`
@@ -142,6 +151,153 @@ type NIMServiceSpec struct {
 
 	InitContainers    []*NIMContainerSpec `json:"initContainers,omitempty"`
 	SidecarContainers []*NIMContainerSpec `json:"sidecarContainers,omitempty"`
+	// ConfidentialContainers configures deployment under Confidential Containers.
+	// When set and enabled, the operator uses a gated DryRun → Active lifecycle,
+	// generates init-data from KBS configuration, and does not use NIMCache.
+	// +optional
+	ConfidentialContainers *ConfidentialContainersSpec `json:"confidentialContainers,omitempty"`
+}
+
+// ConfidentialContainersSpec defines Confidential Containers deployment configuration.
+//
+// +kubebuilder:validation:XValidation:rule="!self.enabled || self.sealedAuthSecret != \"\"",message="sealedAuthSecret is required when confidential containers is enabled"
+// +kubebuilder:validation:XValidation:rule="!self.enabled || (has(self.initData) && self.initData.url != \"\")",message="initData.url is required when confidential containers is enabled"
+type ConfidentialContainersSpec struct {
+	// Enabled activates the confidential containers deployment path.
+	// +kubebuilder:default:=true
+	Enabled bool `json:"enabled"`
+
+	// DeploymentPhase controls whether Pod-bearing resources are applied.
+	// DryRun generates and publishes artifacts only.
+	// Active applies the frozen workload from dry-run artifacts.
+	//
+	// +kubebuilder:validation:Enum=DryRun;Active
+	// +kubebuilder:default:=DryRun
+	ConfidentialDeploymentPhase string `json:"deploymentPhase,omitempty"`
+
+	// InitData configures init-data input for GenPolicy and runtime encoding.
+	// +optional
+	InitData *InitDataSpec `json:"initData,omitempty"`
+
+	// Deployment provides an in-memory copy of the rendered Deployment to be verified with GenPolicy.
+	Deployment *appsv1.Deployment `json:"-"`
+
+	// SealedAuthSecret contains sealed secret reference.
+	SealedAuthSecret string `json:"sealedAuthSecret"`
+
+	// Model configures model delivery without NIMCache.
+	Model ConfidentialModelSpec `json:"model"`
+}
+
+func (n *NIMService) IsConfidentialContainersEnabled() bool {
+	return n != nil && n.Spec.ConfidentialContainers != nil && n.Spec.ConfidentialContainers.Enabled
+}
+
+func (n *NIMService) IsConfidentialDeploymentDryRun() bool {
+	if !n.IsConfidentialContainersEnabled() {
+		return false
+	}
+	phase := n.Spec.ConfidentialContainers.ConfidentialDeploymentPhase
+	return phase == "" || phase == ConfidentialDeploymentPhaseDryRun
+}
+
+// SetConfidentialDeployment stores a deep copy of the rendered Deployment for GenPolicy.
+func (n *NIMService) SetConfidentialDeployment(deployment *appsv1.Deployment) {
+	if !n.IsConfidentialContainersEnabled() {
+		return
+	}
+	if deployment == nil {
+		n.Spec.ConfidentialContainers.Deployment = nil
+		return
+	}
+	n.Spec.ConfidentialContainers.Deployment = deployment.DeepCopy()
+}
+
+// InitDataSpec is the common-case init-data input.
+// The operator generates standard aa.toml and cdh.toml from these fields.
+type InitDataSpec struct {
+	// URL is the KBS endpoint reachable from inside the confidential guest.
+	// Used for both Attestation Agent and CDH KBC configuration.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^https?://.+`
+	URL string `json:"url"`
+
+	// KBCName is the KBC name written to cdh.toml.
+	//
+	// +kubebuilder:default:="cc_kbc"
+	KBCName string `json:"kbcName,omitempty"`
+
+	// AttestationServiceURL is the URL for [token_configs.coco_as] in aa.toml.
+	// Defaults to URL when unset.
+	//
+	// +kubebuilder:validation:Pattern=`^https?://.+`
+	// +optional
+	AttestationServiceURL string `json:"attestationServiceUrl,omitempty"`
+
+	// CDHSocket is the CDH Unix socket path written to cdh.toml.
+	//
+	// +kubebuilder:default:="unix:///run/confidential-containers/cdh.sock"
+	CDHSocket string `json:"cdhSocket,omitempty"`
+}
+
+// ConfidentialModelSpec configures runtime model pull inside the TEE.
+// The model is downloaded by the NIM container at startup using API keys
+// from confidentialContainers.sealedAuthSecret (a sealed secret).
+// No NIMCache or cluster-visible model storage is used.
+//
+// +kubebuilder:validation:XValidation:rule="(has(self.ngc) ? 1 : 0) + (has(self.hf) ? 1 : 0) == 1",message="exactly one of ngc or hf must be set"
+type ConfidentialModelSpec struct {
+	// NGC configures pull from NVIDIA NGC.
+	// +optional
+	NGC *ConfidentialNGCModelSpec `json:"ngc,omitempty"`
+
+	// HF configures pull from Hugging Face Hub.
+	// +optional
+	HF *ConfidentialHFModelSpec `json:"hf,omitempty"`
+
+	// SizeLimit caps the emptyDir volume used as NIM_CACHE_PATH.
+	// +optional
+	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty"`
+}
+
+// ConfidentialNGCModelSpec identifies an NGC model for runtime pull inside the TEE.
+// NGC_API_KEY comes from confidentialContainers.sealedAuthSecret.
+type ConfidentialNGCModelSpec struct {
+	// Endpoint is the NGC API base URL. Defaults to the public NGC API.
+	// +kubebuilder:validation:Pattern=`^https?://.*$`
+	// +kubebuilder:default="https://api.ngc.nvidia.com"
+	Endpoint string `json:"endpoint,omitempty"`
+
+	// ModelURI is passed to the NIM container as NIM_MODEL_NAME.
+	// e.g. ngc://nvidia/nemo/llama-3_2-3b-instruct:2.0
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^ngc://.+`
+	ModelURI string `json:"modelUri"`
+}
+
+// ConfidentialHFModelSpec identifies a Hugging Face model for runtime pull.
+// HF_TOKEN (and optionally NGC_API_KEY) come from
+// confidentialContainers.sealedAuthSecret; they must not be specified here.
+type ConfidentialHFModelSpec struct {
+	// Endpoint is the Hugging Face Hub endpoint.
+	// +kubebuilder:validation:Pattern=`^https?://.*$`
+	// +kubebuilder:default="https://huggingface.co"
+	Endpoint string `json:"endpoint,omitempty"`
+
+	// Namespace is the model namespace (org or user).
+	// +kubebuilder:validation:MinLength=1
+	Namespace string `json:"namespace"`
+
+	// ModelName is the model repository name.
+	// +kubebuilder:validation:MinLength=1
+	ModelName string `json:"modelName"`
+
+	// Revision is a branch, tag, or commit hash.
+	// +optional
+	Revision *string `json:"revision,omitempty"`
 }
 
 // NimServiceMultiNodeConfig defines the configuration for multi-node NIMService.
