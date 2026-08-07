@@ -1031,3 +1031,49 @@ func TestGetPriorityClassName(t *testing.T) {
 		t.Errorf("GetInferenceServiceParams().PriorityClassName = %q, want %q", inferenceParams.PriorityClassName, "gpu-critical")
 	}
 }
+
+func TestGetStandardEnvAuthSecret(t *testing.T) {
+	base := NIMServiceSpec{
+		Image: Image{
+			Repository: "test-repo",
+			Tag:        "test-tag",
+		},
+		Expose: Expose{
+			Service: Service{
+				Port: ptr.To[int32](8000),
+			},
+		},
+	}
+
+	t.Run("with authSecret injects NGC_API_KEY", func(t *testing.T) {
+		nimService := &NIMService{Spec: base}
+		nimService.Spec.AuthSecret = "ngc-api-secret"
+		env := nimService.GetStandardEnv()
+		var ngc *corev1.EnvVar
+		for i := range env {
+			if env[i].Name == NGCAPIKey {
+				ngc = &env[i]
+				break
+			}
+		}
+		if ngc == nil {
+			t.Fatal("expected NGC_API_KEY to be injected when AuthSecret is set")
+		}
+		if ngc.ValueFrom == nil || ngc.ValueFrom.SecretKeyRef == nil {
+			t.Fatal("expected NGC_API_KEY to reference a secret")
+		}
+		if ngc.ValueFrom.SecretKeyRef.Name != "ngc-api-secret" {
+			t.Errorf("SecretKeyRef.Name = %q, want %q", ngc.ValueFrom.SecretKeyRef.Name, "ngc-api-secret")
+		}
+	})
+
+	t.Run("without authSecret omits NGC_API_KEY", func(t *testing.T) {
+		nimService := &NIMService{Spec: base}
+		env := nimService.GetStandardEnv()
+		for _, e := range env {
+			if e.Name == NGCAPIKey {
+				t.Fatalf("expected NGC_API_KEY to be omitted when AuthSecret is empty, got %+v", e)
+			}
+		}
+	})
+}
