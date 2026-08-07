@@ -591,64 +591,69 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			// standard env requires NGC_API_KEY, which breaks auth secrets that
 			// only carry an HF token. Make NGC_API_KEY optional and surface
 			// HF_TOKEN (also optional) so either credential works.
+			// When AuthSecret is unset (air-gapped / pre-cached), omit both keys.
 			deploymentParams.Env = utils.RemoveEnvVar(deploymentParams.Env, appsv1alpha1.NGCAPIKey)
-			deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
-				{
-					Name: appsv1alpha1.NGCAPIKey,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+			if nimService.Spec.AuthSecret != "" {
+				deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
+					{
+						Name: appsv1alpha1.NGCAPIKey,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key:      appsv1alpha1.NGCAPIKey,
+								Optional: &[]bool{true}[0],
 							},
-							Key:      appsv1alpha1.NGCAPIKey,
-							Optional: &[]bool{true}[0],
 						},
 					},
-				},
-				{
-					Name: appsv1alpha1.HFToken,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+					{
+						Name: appsv1alpha1.HFToken,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key:      appsv1alpha1.HFToken,
+								Optional: &[]bool{true}[0],
 							},
-							Key:      appsv1alpha1.HFToken,
-							Optional: &[]bool{true}[0],
 						},
 					},
-				},
-			})
+				})
+			}
 		}
 
 		// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, add the HF_TOKEN to the environment variables and make NGC_API_KEY optional
 		// For custom models stored in Datastore, the NIM Container needs to access NGC to download base model. However, NGC_API_KEY is not required for Hugging Face models.
 		if nimCache.IsHFModel() || nimService.IsHFModel() {
 			deploymentParams.Env = utils.RemoveEnvVar(deploymentParams.Env, appsv1alpha1.NGCAPIKey)
-			deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
-				{
-					Name: appsv1alpha1.NGCAPIKey,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+			if nimService.Spec.AuthSecret != "" {
+				deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
+					{
+						Name: appsv1alpha1.NGCAPIKey,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key:      appsv1alpha1.NGCAPIKey,
+								Optional: &[]bool{true}[0],
 							},
-							Key:      appsv1alpha1.NGCAPIKey,
-							Optional: &[]bool{true}[0],
 						},
 					},
-				},
-				{
-					Name: appsv1alpha1.HFToken,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+					{
+						Name: appsv1alpha1.HFToken,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key: appsv1alpha1.HFToken,
 							},
-							Key: appsv1alpha1.HFToken,
 						},
 					},
-				},
-			})
+				})
+			}
 		}
 
 		// Setup volume mounts with model store. Native (NIMCraft) single-model
