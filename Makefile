@@ -125,6 +125,25 @@ vet: ## Run go vet against code.
 check-vendor: vendor
 	git diff --quiet HEAD -- go.mod go.sum
 
+# Generate THIRD_PARTY_NOTICES.md: the license of every Go dependency, for both
+# the modules linked into the released image and the build toolchain.
+.PHONY: notices
+notices: go-licenses
+	@bash hack/generate-notices.sh
+
+# Verify THIRD_PARTY_NOTICES.md is in sync with the dependency tree.
+.PHONY: notices-check
+notices-check:
+	@echo "- Checking if THIRD_PARTY_NOTICES.md is up to date..."
+	@# Cheap gate first, before spending minutes regenerating. git diff reports
+	@# nothing for an untracked path, so an uncommitted notices file would
+	@# otherwise pass this gate silently.
+	@git ls-files --error-unmatch THIRD_PARTY_NOTICES.md >/dev/null 2>&1 \
+		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is not tracked. Run 'make notices' and commit the result."; exit 1; }
+	@$(MAKE) notices
+	@git diff --exit-code -- THIRD_PARTY_NOTICES.md \
+		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is stale. Run 'make notices' and commit the change."; exit 1; }
+
 COVERAGE_FILE := cover.out
 
 .PHONY: coverage
@@ -230,6 +249,7 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+GO_LICENSES = $(LOCALBIN)/go-licenses
 
 ## Tool Versions
 GINKGO_VERSION ?= $(shell $(GO_CMD) list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
@@ -257,6 +277,16 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	@GOBIN=$(PROJECT_DIR)/bin GO111MODULE=on $(GO_CMD) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+# go-licenses is pinned in tools/go.mod alongside the other build tools, so the
+# same version runs locally and in CI. Installed on its own rather than through
+# install-tools: that target also rebuilds controller-gen and kustomize from
+# tools/go.mod, and generating notices should not silently swap the binaries
+# the generate targets are using.
+.PHONY: go-licenses
+go-licenses: $(GO_LICENSES) ## Download go-licenses locally if necessary.
+$(GO_LICENSES): $(LOCALBIN)
+	@GOBIN=$(PROJECT_DIR)/bin GO111MODULE=on $(GO_CMD) install -mod=readonly -modfile=tools/go.mod github.com/google/go-licenses/v2
 
 GINKGO = $(PROJECT_DIR)/bin/ginkgo
 .PHONY: ginkgo

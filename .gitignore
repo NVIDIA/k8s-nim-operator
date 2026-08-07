@@ -33,3 +33,6 @@ kubeconfig
 
 # e2e logs
 e2e_logs
+
+# scratch tree written by hack/generate-notices.sh
+/.licenses-cache
