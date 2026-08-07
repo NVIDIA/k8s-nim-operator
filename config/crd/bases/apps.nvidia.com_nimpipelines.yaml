@@ -1019,8 +1019,9 @@ spec:
                             type: string
                           type: array
                         authSecret:
-                          description: The name of an existing pull secret containing
-                            the NGC_API_KEY
+                          description: |-
+                            AuthSecret is the name of an existing secret containing the NGC_API_KEY (and optionally HF_TOKEN).
+                            It is optional for air-gapped deployments that serve a pre-cached model
                           type: string
                         command:
                           items:
@@ -5162,7 +5163,6 @@ spec:
                           format: int64
                           type: integer
                       required:
-                      - authSecret
                       - image
                       type: object
                       x-kubernetes-validations:

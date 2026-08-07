@@ -1194,21 +1194,11 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			leaderEnv := utils.SortKeys(nimService.GetLWSLeaderEnv())
 			workerEnv := utils.SortKeys(nimService.GetLWSWorkerEnv())
 
+			// AuthSecret is unset, so NGC_API_KEY must be omitted from LWS env.
 			Expect(reflect.DeepEqual(leaderEnv, []corev1.EnvVar{
 				{
 					Name:  "NIM_CACHE_PATH",
 					Value: "/model-store",
-				},
-				{
-					Name: "NGC_API_KEY",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "",
-							},
-							Key: "NGC_API_KEY",
-						},
-					},
 				},
 				{
 					Name:  "OUTLINES_CACHE_DIR",
@@ -1300,17 +1290,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				{
 					Name:  "NIM_CACHE_PATH",
 					Value: "/model-store",
-				},
-				{
-					Name: "NGC_API_KEY",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "",
-							},
-							Key: "NGC_API_KEY",
-						},
-					},
 				},
 				{
 					Name:  "OUTLINES_CACHE_DIR",
