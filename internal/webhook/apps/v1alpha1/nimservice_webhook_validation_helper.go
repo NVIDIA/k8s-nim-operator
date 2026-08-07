@@ -446,8 +446,11 @@ func validateDRAResourceQuantitySelectorValue(value *apiresource.Quantity, fldPa
 func validateAuthSecret(authSecret *string, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
 	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
-	if *authSecret == "" {
-		errList = append(errList, field.Required(fldPath, "is required"))
+	// AuthSecret is optional for air-gapped deployments that serve a pre-cached
+	// model from local storage. Warn so users do not omit it unintentionally
+	// when they still need NGC/HF credentials for model download.
+	if authSecret == nil || *authSecret == "" {
+		warningList = append(warningList, fmt.Sprintf("%s is empty: NGC_API_KEY will not be injected. Omit this only for air-gapped deployments with a pre-populated local model cache", fldPath.String()))
 	}
 	return warningList, errList
 }
