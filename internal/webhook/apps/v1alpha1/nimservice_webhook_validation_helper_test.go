@@ -777,7 +777,7 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 	}
 }
 
-// TestValidateAuthSecret verifies required secret enforcement using table-driven cases.
+// TestValidateAuthSecret verifies authSecret is optional, with a warning when empty.
 func TestValidateAuthSecret(t *testing.T) {
 	fld := field.NewPath("spec").Child("authSecret")
 	cases := []struct {
@@ -787,7 +787,7 @@ func TestValidateAuthSecret(t *testing.T) {
 		wantWarnings int
 	}{
 		{"non-empty", "secret", 0, 0},
-		{"empty", "", 1, 0},
+		{"empty", "", 0, 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
