@@ -14,15 +14,18 @@
 # limitations under the License.
 #
 # Writes THIRD_PARTY_NOTICES.md: an index of every Go dependency plus the
-# verbatim text of each license, for ./cmd (from vendor/) and tools/go.mod
-# (from the module cache). Stdlib is excluded; the Go distribution covers it.
+# verbatim text of each license, for three surfaces — ./cmd (from vendor/),
+# tools/go.mod (from the module cache), and the second Go binary the image build
+# compiles out of another repository (from a pinned clone). Stdlib is excluded;
+# the Go distribution covers it.
 #
 # go-licenses resolves only the host platform, and build-tagged sources differ
 # per platform, so one run is both incomplete and host-dependent. There is no
 # union mode, so run it per target and merge, sorting with LC_ALL=C.
 #
-# Requires go (versions.mk) and go-licenses (tools/go.mod; make notices builds
-# it into ./bin).
+# Requires go (versions.mk), git, and go-licenses (tools/go.mod; make notices
+# builds it into ./bin). Needs network: the toolchain pass downloads modules and
+# the helper-binary pass clones the repository the Dockerfile builds it from.
 
 set -euo pipefail
 
@@ -34,6 +37,7 @@ TOOLS_DIR="${TOOLS_DIR:-tools}"
 TOOLS_FILE="${TOOLS_DIR}/tools.go"
 MULTI_ARCH_MK="${MULTI_ARCH_MK:-deployments/container/multi-arch.mk}"
 MODULES_TXT="${MODULES_TXT:-vendor/modules.txt}"
+DOCKERFILE="${DOCKERFILE:-deployments/container/Dockerfile}"
 
 # Exactly what the image build compiles: deployments/container/Dockerfile runs
 # 'go build ... cmd/main.go'. Excludes the never-shipped e2e suite under test/,
@@ -72,6 +76,20 @@ log() {
     printf '%s\n' "$*" >&2
 }
 
+# go-licenses decides a package is standard library by testing its source path
+# against the GOROOT compiled into its own binary, so if the go command resolves
+# a different toolchain than the one go-licenses was built with, every stdlib
+# package looks like a module-less third-party package and the run dies with
+# "Package os/signal does not have module info". That happens as soon as two
+# modules in the same tree name different go directives — this repository asks
+# for 1.26.5 while the helper binary's repository asks for 1.26.0. Export the
+# GOROOT the go command actually resolves in the current directory, which
+# go/build prefers over the compiled-in value. Must be called after any cd.
+export_matching_goroot() {
+    GOROOT="$(go env GOROOT)"
+    export GOROOT
+}
+
 # Licenses that are themselves Markdown close a fixed ``` fence early and invert
 # every block after it, so open with one backtick more than the file's longest run.
 fence_for() {
@@ -92,6 +110,8 @@ fence_for() {
 
 check_prerequisites() {
     command -v go >/dev/null 2>&1 || die "go is not installed."
+    # The helper-binary pass clones the repository the Dockerfile builds from.
+    command -v git >/dev/null 2>&1 || die "git is not installed."
 
     # Prefer the pinned repo-local copy; absolute, as the toolchain pass chdirs.
     if [[ -x "./bin/go-licenses" ]]; then
@@ -103,7 +123,7 @@ check_prerequisites() {
     fi
 
     local f
-    for f in "${TOOLS_FILE}" "${MULTI_ARCH_MK}" "${MODULES_TXT}"; do
+    for f in "${TOOLS_FILE}" "${MULTI_ARCH_MK}" "${MODULES_TXT}" "${DOCKERFILE}"; do
         [[ -f "${f}" ]] || die "${f} not found — run 'make notices' from the repo root."
     done
 
@@ -119,6 +139,55 @@ check_prerequisites() {
     # while still exiting 0.
     export GOFLAGS="-mod=vendor"
     export CGO_ENABLED=0
+    export_matching_goroot
+}
+
+# The image build compiles a second Go binary out of another repository: it
+# clones a repo, checks out a fixed commit and builds one package, then copies
+# the result into the final image. That module is not in this repo's vendor
+# tree, and at the pinned commit it resolves the Kubernetes libraries to
+# different versions than the operator does, so it needs its own pass.
+#
+# Read the clone URL, the commit and the built path out of the Dockerfile rather
+# than restating them here. Hard-coding would go stale silently the first time
+# someone bumps the pinned commit, which is exactly the failure the platform
+# matrix check exists to prevent.
+read_helper_binary() {
+    HELPER_REPO_URL=$(sed -n \
+        's/^RUN[[:space:]]\{1,\}git clone[[:space:]]\{1,\}\([^[:space:]]\{1,\}\).*/\1/p' \
+        "${DOCKERFILE}" | head -n 1)
+    [[ -n "${HELPER_REPO_URL}" ]] || die \
+        "could not find a 'RUN git clone <url>' line in ${DOCKERFILE}." \
+        "hack/generate-notices.sh reads the helper binary's source from there;" \
+        "teach it the new form rather than dropping the binary from the notices."
+
+    HELPER_COMMIT=$(sed -n \
+        's/^RUN[[:space:]]\{1,\}git checkout[[:space:]]\{1,\}\([0-9a-fA-F]\{40\}\).*/\1/p' \
+        "${DOCKERFILE}" | head -n 1)
+    [[ -n "${HELPER_COMMIT}" ]] || die \
+        "could not find a 'RUN git checkout <40-hex commit>' line in ${DOCKERFILE}." \
+        "A branch or tag would not pin the dependency set, so refusing to guess."
+
+    # "RUN go build -o <binary> <path>". The path is a file, which go-licenses
+    # cannot take: a .go file argument loads as the synthetic package
+    # "command-line-arguments", which carries no module info and makes it exit
+    # non-zero. Use the directory that contains it, which is the same package.
+    local build_line
+    build_line=$(LC_ALL=C grep -m 1 -E '^RUN[[:space:]]+go build[[:space:]]+-o[[:space:]]' \
+        "${DOCKERFILE}" || true)
+    [[ -n "${build_line}" ]] || die \
+        "could not find a 'RUN go build -o <binary> <path>' line in ${DOCKERFILE}."
+
+    HELPER_BINARY=$(printf '%s\n' "${build_line}" | awk '{ for (i = 1; i < NF; i++) if ($i == "-o") { print $(i + 1); exit } }')
+    local build_src
+    build_src=$(printf '%s\n' "${build_line}" | awk '{ print $NF }')
+    [[ -n "${HELPER_BINARY}" && -n "${build_src}" ]] || die \
+        "could not read the binary name and source path from: ${build_line}"
+
+    case "${build_src}" in
+        *.go) HELPER_PACKAGE="./$(dirname "${build_src}")" ;;
+        *)    HELPER_PACKAGE="./${build_src#./}" ;;
+    esac
 }
 
 verify_platform_matrix() {
@@ -144,7 +213,7 @@ prepare_workspace() {
             ;;
     esac
     rm -rf "${LICENSES_DIR}"
-    mkdir -p "${LICENSES_DIR}" "${LICENSES_DIR}/.tools"
+    mkdir -p "${LICENSES_DIR}" "${LICENSES_DIR}/.tools" "${LICENSES_DIR}/.helper"
 
     # Explicit templates: macOS mktemp ignores TMPDIR without one.
     local t="${TMPDIR:-/tmp}/k8s-nim-operator-notices"
@@ -153,8 +222,13 @@ prepare_workspace() {
     INDEX_FILE="$(mktemp "${t}-idx.XXXXXX")"
     TOOLS_CSV="$(mktemp "${t}-tools-csv.XXXXXX")"
     TOOLS_INDEX="$(mktemp "${t}-tools-idx.XXXXXX")"
+    HELPER_CSV="$(mktemp "${t}-helper-csv.XXXXXX")"
+    HELPER_INDEX="$(mktemp "${t}-helper-idx.XXXXXX")"
     OUT_TMP="$(mktemp "${t}-out.XXXXXX")"
-    trap 'rm -rf "${SAVE_ROOT}"; rm -f "${COMBINED_CSV}" "${INDEX_FILE}" "${TOOLS_CSV}" "${TOOLS_INDEX}" "${OUT_TMP}"' EXIT
+    # The helper repository is cloned inside SAVE_ROOT, never into the worktree,
+    # so it is removed with everything else here.
+    HELPER_SRC="${SAVE_ROOT}/helper-src"
+    trap 'rm -rf "${SAVE_ROOT}"; rm -f "${COMBINED_CSV}" "${INDEX_FILE}" "${TOOLS_CSV}" "${TOOLS_INDEX}" "${HELPER_CSV}" "${HELPER_INDEX}" "${OUT_TMP}"' EXIT
 }
 
 # --- collection ---
@@ -218,6 +292,65 @@ collect_toolchain() {
 
         # Separate subtree so a module in both graphs cannot clobber the other copy.
         merge_licenses "${save_dir}" "${LICENSES_DIR}/.tools"
+    done
+}
+
+collect_helper_binary() {
+    local platform goos goarch save_dir
+
+    log "Cloning ${HELPER_REPO_URL} at ${HELPER_COMMIT}..."
+    mkdir -p "${HELPER_SRC}"
+    (
+        cd "${HELPER_SRC}"
+        # Fetch the one commit rather than cloning and checking out as the
+        # Dockerfile does: same tree, a fraction of the transfer, and it fails
+        # loudly if the pinned commit ever stops being fetchable instead of
+        # quietly resolving to something else.
+        git init -q .
+        git remote add origin "${HELPER_REPO_URL}"
+        git fetch -q --depth 1 origin "${HELPER_COMMIT}"
+        git checkout -q FETCH_HEAD
+    ) || die \
+        "could not fetch ${HELPER_COMMIT} from ${HELPER_REPO_URL}." \
+        "This pass needs network access to the host serving that repository."
+
+    HELPER_MODULE=$( cd "${HELPER_SRC}" && GOFLAGS="-mod=readonly" go list -m 2>/dev/null || true )
+    [[ -n "${HELPER_MODULE}" ]] \
+        || die "could not determine the module path of the cloned ${HELPER_REPO_URL}."
+
+    ( cd "${HELPER_SRC}" && GOFLAGS="-mod=readonly" go mod download ) >&2
+
+    for platform in "${PLATFORMS[@]}"; do
+        goos="${platform%/*}"
+        goarch="${platform#*/}"
+        log "Collecting ${HELPER_BINARY} licenses for ${goos}/${goarch}..."
+
+        save_dir="${SAVE_ROOT}/helper/${goos}_${goarch}"
+        (
+            cd "${HELPER_SRC}"
+            # shellcheck disable=SC2031  # subshell-local on purpose, as above.
+            export GOFLAGS="-mod=readonly"
+            # That module's go directive differs from this repository's, so the
+            # go command may resolve a different toolchain here.
+            export_matching_goroot
+            # Only this repository's module is ignored, and it does not appear
+            # in this graph at all, so the ignore is a no-op here. That is
+            # deliberate: the cloned repository is a separate project with its
+            # own license, and from the point of view of the image being
+            # documented it is itself a third-party dependency, so it belongs in
+            # the table rather than being filtered out as "local".
+            GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" save "${HELPER_PACKAGE}" \
+                --save_path="${save_dir}" \
+                --force \
+                --ignore="${LOCAL_MODULE}" >&2
+            GOOS="${goos}" GOARCH="${goarch}" "${GO_LICENSES}" csv "${HELPER_PACKAGE}" \
+                --ignore="${LOCAL_MODULE}"
+        ) >> "${HELPER_CSV}"
+
+        # Third separate subtree: the same module paths appear in the runtime
+        # graph at different versions, and a shared tree would let one version's
+        # license text overwrite the other's.
+        merge_licenses "${save_dir}" "${LICENSES_DIR}/.helper"
     done
 }
 
@@ -316,15 +449,37 @@ annotate_modules() {
     '
 }
 
+# The cloned repository is its own main module, so go-licenses has no version
+# for it and falls back to a URL naming HEAD — with a warning and a zero exit.
+# That URL stops describing what was built the moment that repository's default
+# branch moves, the same objection that makes the runtime table use
+# module@version. The commit is pinned in the Dockerfile, so name it. Only rows
+# belonging to that module can be affected; its dependencies come from the
+# module cache and already carry versioned URLs.
+pin_helper_urls() {
+    awk -v mod="${HELPER_MODULE}" -v commit="${HELPER_COMMIT}" '
+        BEGIN { FS = OFS = "," }
+        {
+            if ($1 == mod || index($1, mod "/") == 1) {
+                sub(/\/blob\/HEAD\//, "/blob/" commit "/", $2)
+            }
+            print
+        }
+    '
+}
+
 build_indexes() {
     log "Generating dependency index..."
     collapse_index "${COMBINED_CSV}" | annotate_modules > "${INDEX_FILE}"
     collapse_index "${TOOLS_CSV}" > "${TOOLS_INDEX}"
+    collapse_index "${HELPER_CSV}" | pin_helper_urls > "${HELPER_INDEX}"
 
     [[ -s "${INDEX_FILE}" ]] \
         || die "go-licenses produced no entries for ${PACKAGES[*]} — refusing to write empty notices file."
     [[ -s "${TOOLS_INDEX}" ]] \
         || die "go-licenses produced no entries for the build toolchain — refusing to write incomplete notices file."
+    [[ -s "${HELPER_INDEX}" ]] \
+        || die "go-licenses produced no entries for ${HELPER_BINARY} — refusing to write incomplete notices file."
 
     # Runtime rows carry module@version from modules.txt; "unknown" means the
     # longest-prefix match found nothing, which would silently understate what
@@ -342,6 +497,22 @@ build_indexes() {
         die "go-licenses could not resolve source URLs for some toolchain modules." \
             "This usually means the network blocked a '?go-get=1' lookup. Re-run with" \
             "access to the module hosts rather than committing a degraded file."
+    fi
+
+    # Same guard for the helper binary, which uses the same provenance.
+    if cut -d, -f2 "${HELPER_INDEX}" | LC_ALL=C grep -qx 'Unknown'; then
+        die "go-licenses could not resolve source URLs for some ${HELPER_BINARY} modules." \
+            "This usually means the network blocked a '?go-get=1' lookup. Re-run with" \
+            "access to the module hosts rather than committing a degraded file."
+    fi
+
+    # A URL still naming HEAD would date the moment that branch moves. Only the
+    # cloned module should ever produce one, and pin_helper_urls rewrites it, so
+    # anything left here is a case this script does not understand.
+    if LC_ALL=C grep -q '/blob/HEAD/' "${HELPER_INDEX}"; then
+        die "some ${HELPER_BINARY} entries still reference a HEAD URL rather than a pinned revision." \
+            "Those links stop describing the built content once the branch moves;" \
+            "teach hack/generate-notices.sh how to pin them."
     fi
 }
 
@@ -422,6 +593,10 @@ emit_sections() {
     done < "${index}"
 }
 
+# Paragraphs that name the helper binary are printf rather than a quoted
+# heredoc, so the values parsed out of the Dockerfile appear in the prose
+# instead of being restated by hand and going stale.
+# shellcheck disable=SC2016  # backticks in these formats are literal markdown.
 compose_document() {
     log "Composing ${OUTPUT}..."
     # Build in a temp file and move into place, so a failure part way through
@@ -433,12 +608,22 @@ compose_document() {
 NVIDIA NIM Operator
 
 This file covers the **Go dependencies** of the NIM Operator, with the verbatim
-text of each one's license. Two surfaces are covered:
+text of each one's license. Three surfaces are covered:
 
 * **Runtime dependencies** — Go modules statically linked into the `manager`
   binary built from `cmd/`, resolved as the union across every released image
-  platform. That binary is the operator itself, and is the only Go program this
-  repository contributes to the released `k8s-nim-operator` image.
+  platform. That binary is the operator itself.
+EOF
+        printf '* **%s** — Go modules statically linked into the second Go binary\n' "${HELPER_BINARY}"
+        printf '  the released image carries. `%s` clones\n' "${DOCKERFILE}"
+        printf '  `%s`, checks out commit\n' "${HELPER_MODULE}"
+        printf '  `%s`, builds `%s` from it and\n' "${HELPER_COMMIT}" "${HELPER_BINARY}"
+        printf '  copies the result into the image. That repository is not part of this\n'
+        printf '  one'"'"'s vendor tree and resolves the Kubernetes client libraries to\n'
+        printf '  different versions than `manager` does, so the image ships two sets of\n'
+        printf '  them. Both are listed, in separate tables, because collapsing them\n'
+        printf '  would have to discard one version.\n'
+        cat <<'EOF'
 * **Build toolchain** — Go modules behind the code generators and helpers
   pinned in `tools/go.mod`, which `make install-tools` builds. They run at
   build time and are not shipped in the released image; they are listed here so
@@ -448,15 +633,11 @@ Go standard library packages are excluded; they are covered by the license of
 the Go distribution itself.
 
 Scope: this document does not inventory the non-Go contents of the released
-container image, nor the Go dependencies of code that lives in other
-repositories. Three things in particular are out of scope. The packages
-inherited from the distroless base image are covered by that image's own
-compliance process. `crd-apply-tool`, which the image build compiles from a
-pinned commit of `github.com/NVIDIA/k8s-operator-libs`, has its own dependency
-tree that is resolved outside this repository and is not visible to this file.
-The lint and test helpers pinned in `deployments/devel/go.mod` — golangci-lint
-and setup-envtest — produce no committed artifact and are not shipped, so they
-are not inventoried either.
+container image. The packages inherited from the distroless base image are
+covered by that image's own compliance process. The lint and test helpers
+pinned in `deployments/devel/go.mod` — golangci-lint and setup-envtest —
+produce no committed artifact and are not shipped, so they are not inventoried
+either.
 
 Go runtime entries identify their dependency as `module@version` rather than a
 URL. `go-licenses` in vendor mode reports a link into this repository at `HEAD`,
@@ -465,6 +646,12 @@ which stops describing the released content once `main` advances;
 `go.mod` replaces a module, the version shown is the replacement — that is what
 is vendored and shipped.
 
+EOF
+        printf 'The other two surfaces are not vendored, so their entries carry the versioned\n'
+        printf 'upstream URL `go-licenses` reports. For the module cloned from\n'
+        printf '`%s` there is no version to report, so its\n' "${HELPER_MODULE}"
+        printf 'link names the pinned commit instead of a branch.\n\n'
+        cat <<'EOF'
 This file is generated. Run `make notices` to regenerate it; `make
 notices-check` verifies it is current.
 
@@ -472,6 +659,9 @@ notices-check` verifies it is current.
 
 EOF
         emit_index_table "${INDEX_FILE}" module
+
+        printf '\n## %s Dependency Index\n\n' "${HELPER_BINARY}"
+        emit_index_table "${HELPER_INDEX}" source
 
         cat <<'EOF'
 
@@ -486,6 +676,9 @@ EOF
 
 EOF
         emit_sections "${INDEX_FILE}" "${LICENSES_DIR}" module
+
+        printf '## %s License Texts\n\n' "${HELPER_BINARY}"
+        emit_sections "${HELPER_INDEX}" "${LICENSES_DIR}/.helper" source
 
         cat <<'EOF'
 ## Build Toolchain License Texts
@@ -504,18 +697,22 @@ EOF
 main() {
     check_prerequisites
     verify_platform_matrix
+    read_helper_binary
     prepare_workspace
 
     collect_runtime
+    collect_helper_binary
     collect_toolchain
     build_indexes
     compose_document
 
     # Index rows are per package, not per module: one module can own several.
-    local runtime_count toolchain_count
+    local runtime_count helper_count toolchain_count
     runtime_count=$(wc -l < "${INDEX_FILE}" | tr -d ' ')
+    helper_count=$(wc -l < "${HELPER_INDEX}" | tr -d ' ')
     toolchain_count=$(wc -l < "${TOOLS_INDEX}" | tr -d ' ')
-    log "Wrote ${OUTPUT} (${runtime_count} Go runtime packages, ${toolchain_count} toolchain packages)"
+    log "Wrote ${OUTPUT} (${runtime_count} Go runtime packages," \
+        "${helper_count} ${HELPER_BINARY} packages, ${toolchain_count} toolchain packages)"
 }
 
 main "$@"
