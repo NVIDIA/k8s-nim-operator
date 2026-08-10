@@ -663,8 +663,7 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 		logger.Info("model manifest file not found", "output", output)
 		nimCache.Status.Type = appsv1alpha1.NIMCacheModelTypeModelFree
 	} else {
-		parser := nimparserutils.GetNIMParser([]byte(output))
-		manifest, err := parser.ParseModelManifestFromRawOutput([]byte(output))
+		manifest, err := nimparserutils.ParseModelManifest([]byte(output))
 		if err != nil {
 			logger.Error(err, "Failed to parse model manifest from the pod")
 			return false, err
@@ -1481,8 +1480,7 @@ func (r *NIMCacheReconciler) extractNIMManifest(ctx context.Context, configName,
 		return nil, fmt.Errorf("model_manifest.yaml not found in ConfigMap")
 	}
 
-	parser := nimparserutils.GetNIMParser([]byte(data))
-	manifest, err := parser.ParseModelManifestFromRawOutput([]byte(data))
+	manifest, err := nimparserutils.ParseModelManifest([]byte(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal manifest data: %w", err)
 	}

@@ -812,9 +812,7 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 		return nil
 	}
 
-	parser := nimparserutils.GetNIMParser([]byte(output))
-	// Parse the file
-	manifest, err := parser.ParseModelManifestFromRawOutput([]byte(output))
+	manifest, err := nimparserutils.ParseModelManifest([]byte(output))
 	if err != nil {
 		logger.Error(err, "Failed to parse model manifest from the pod")
 		return err

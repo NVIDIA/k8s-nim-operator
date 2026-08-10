@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -37,17 +38,32 @@ import (
 // Returns:
 // - A NIMParserInterface implementation based on the schema version.
 func GetNIMParser(data []byte) nimparser.NIMParserInterface {
+	if normalized, isLegacy, err := nimparser.NormalizeLegacyManifest(data); err == nil && isLegacy {
+		data = normalized
+	}
+
 	var config nimparser.NIMSchemaManifest
 	err := yaml.Unmarshal(data, &config)
 	if err != nil {
 		return nimparserv1.NIMParser{}
-	} else {
-		schemaVersion := strings.TrimSpace(config.SchemaVersion)
+	}
 
-		match, _ := regexp.MatchString("2\\.*\\.*", schemaVersion)
-		if match {
-			return nimparserv2.NIMParser{}
-		}
+	schemaVersion := strings.TrimSpace(config.SchemaVersion)
+
+	match, _ := regexp.MatchString("2\\.*\\.*", schemaVersion)
+	if match {
+		return nimparserv2.NIMParser{}
 	}
 	return nimparserv1.NIMParser{}
+}
+
+// ParseModelManifest selects the schema-appropriate NIM parser and parses the manifest.
+// Legacy wrapped manifests (e.g. MolMIM) are normalized by the v1 parser.
+func ParseModelManifest(data []byte) (nimparser.NIMManifestInterface, error) {
+	parser := GetNIMParser(data)
+	manifest, err := parser.ParseModelManifestFromRawOutput(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse model manifest: %w", err)
+	}
+	return manifest, nil
 }
