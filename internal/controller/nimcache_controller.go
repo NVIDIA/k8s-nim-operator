@@ -659,11 +659,35 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 		return true, nil
 	}
 
-	if strings.Contains(output, "model_manifest.yaml not found") {
-		logger.Info("model manifest file not found", "output", output)
+	caps, manifestOutput := parseProbeOutput(output)
+	if !caps.Complete() {
+		logger.Info("Requeuing to wait for probe capability markers", "output", output)
+		return true, nil
+	}
+	if strings.TrimSpace(manifestOutput) == "" {
+		logger.Info("Requeuing to wait for the manifest to be copied from the container")
+		return true, nil
+	}
+
+	if strings.Contains(manifestOutput, "model_manifest.yaml not found") {
+		logger.Info("model manifest file not found", "output", manifestOutput)
 		nimCache.Status.Type = appsv1alpha1.NIMCacheModelTypeModelFree
+		// Record download method when discoverable; model-free HF flows do not
+		// require nimlib and may use download-to-cache --model-uri or huggingface-cli.
+		if method, methodErr := resolveDownloadMethod(caps); methodErr == nil {
+			nimCache.Status.DownloadMethod = method
+		}
 	} else {
-		manifest, err := nimparserutils.ParseModelManifest([]byte(output))
+		// Manifest-backed NGC optimized NIMs must expose a cache entrypoint.
+		downloadMethod, err := resolveDownloadMethod(caps)
+		if err != nil {
+			logger.Error(err, "unsupported NIM image for caching", "output", output)
+			return false, err
+		}
+		nimCache.Status.DownloadMethod = downloadMethod
+		logger.Info("discovered NIM download method", "method", downloadMethod)
+
+		manifest, err := nimparserutils.ParseModelManifest([]byte(manifestOutput))
 		if err != nil {
 			logger.Error(err, "Failed to parse model manifest from the pod")
 			return false, err
@@ -979,6 +1003,18 @@ func getCommand() []string {
 		"sh",
 		"-c",
 		strings.Join([]string{
+			// Emit operator capability markers before the manifest body so the
+			// reconciler can choose download-to-cache vs nimlib.download_models.
+			"if command -v download-to-cache >/dev/null 2>&1; then",
+			"echo \"NIM_OPERATOR_CAP download_to_cache=yes\";",
+			"else",
+			"echo \"NIM_OPERATOR_CAP download_to_cache=no\";",
+			"fi;",
+			"if python3 -c 'from nimlib import nimutils' >/dev/null 2>&1; then",
+			"echo \"NIM_OPERATOR_CAP nimlib_download=yes\";",
+			"else",
+			"echo \"NIM_OPERATOR_CAP nimlib_download=no\";",
+			"fi;",
 			"if [ -f /opt/nim/etc/default/model_manifest.yaml ]; then",
 			"cat /opt/nim/etc/default/model_manifest.yaml;",
 			"elif [ -f /etc/nim/config/model_manifest.yaml ]; then",
@@ -989,6 +1025,73 @@ func getCommand() []string {
 			"sleep infinity",
 		}, " "),
 	}
+}
+
+// probeCapabilities captures download-related tools discovered in the NIM image.
+type probeCapabilities struct {
+	HasDownloadToCache bool
+	HasNimlibDownload  bool
+	// SawDownloadToCache / SawNimlibDownload track whether both capability
+	// markers have been observed. Partial pod logs can include only the first
+	// marker; callers should requeue until both are present.
+	SawDownloadToCache bool
+	SawNimlibDownload  bool
+}
+
+// Complete reports whether both expected capability markers were present in the
+// probe output. Incomplete output should be treated as "not ready yet".
+func (c probeCapabilities) Complete() bool {
+	return c.SawDownloadToCache && c.SawNimlibDownload
+}
+
+// parseProbeOutput splits capability markers from the model manifest body.
+func parseProbeOutput(output string) (probeCapabilities, string) {
+	caps := probeCapabilities{}
+	var manifestLines []string
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "NIM_OPERATOR_CAP ") {
+			kv := strings.TrimPrefix(trimmed, "NIM_OPERATOR_CAP ")
+			switch {
+			case strings.HasPrefix(kv, "download_to_cache="):
+				caps.SawDownloadToCache = true
+				caps.HasDownloadToCache = kv == "download_to_cache=yes"
+			case strings.HasPrefix(kv, "nimlib_download="):
+				caps.SawNimlibDownload = true
+				caps.HasNimlibDownload = kv == "nimlib_download=yes"
+			}
+			continue
+		}
+		manifestLines = append(manifestLines, line)
+	}
+	return caps, strings.Join(manifestLines, "\n")
+}
+
+// resolveDownloadMethod maps probe capabilities to a persisted download method.
+func resolveDownloadMethod(caps probeCapabilities) (string, error) {
+	if caps.HasDownloadToCache {
+		return appsv1alpha1.NIMCacheDownloadMethodCLI, nil
+	}
+	if caps.HasNimlibDownload {
+		return appsv1alpha1.NIMCacheDownloadMethodNIMLib, nil
+	}
+	return "", fmt.Errorf("image has neither download-to-cache nor nimlib.download_models support")
+}
+
+// nimlibDownloadCommand builds a Job command that caches models via nimlib and exits.
+func nimlibDownloadCommand(profiles []string) []string {
+	const downloadPy = "from nimlib import nimutils; nimutils.download_models()"
+	if slices.Contains(profiles, AllProfiles) {
+		return []string{"python3", "-c", downloadPy}
+	}
+
+	var b strings.Builder
+	b.WriteString("set -e\n")
+	for _, profile := range profiles {
+		// Profiles are operator-selected IDs (hashes or short names like MolMIM).
+		fmt.Fprintf(&b, "NIM_MANIFEST_PROFILE=%s python3 -c %q\n", profile, downloadPy)
+	}
+	return []string{"sh", "-c", b.String()}
 }
 
 // constructPodSpec constructs a Pod specification.
@@ -1288,11 +1391,37 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 		}
 
 	case nimCache.Spec.Source.NGC != nil && nimCache.Spec.Source.NGC.ModelEndpoint == nil:
+		// Pass specific profiles to download based on user selection or auto-selection
+		selectedProfiles, err := getSelectedProfiles(nimCache)
+		if err != nil {
+			logger.Error(err, "failed to get selected profiles for caching")
+			return nil, err
+		}
+
+		if len(selectedProfiles) == 0 {
+			return nil, fmt.Errorf("no profiles are selected for caching")
+		}
+
+		command := []string{"download-to-cache"}
+		var args []string
+		switch {
+		case nimCache.UsesNimlibDownload():
+			// BioNeMo-style NIMs (e.g. MolMIM) have no download-to-cache CLI.
+			// Cache via nimutils.download_models() which exits after download.
+			command = nimlibDownloadCommand(selectedProfiles)
+		case slices.Contains(selectedProfiles, AllProfiles):
+			args = append(args, "--all")
+		default:
+			args = append(args, "--profiles")
+			args = append(args, selectedProfiles...)
+		}
+
 		job.Spec.Template.Spec.Containers = []corev1.Container{
 			{
 				Name:    NIMCacheContainerName,
 				Image:   nimCache.Spec.Source.NGC.ModelPuller,
-				Command: []string{"download-to-cache"},
+				Command: command,
+				Args:    args,
 				EnvFrom: nimCache.Spec.Source.EnvFromSecrets(),
 				Env: []corev1.EnvVar{
 					{
@@ -1338,26 +1467,6 @@ func (r *NIMCacheReconciler) constructJob(ctx context.Context, nimCache *appsv1a
 			{
 				Name: nimCache.Spec.Source.NGC.PullSecret,
 			},
-		}
-
-		// Pass specific profiles to download based on user selection or auto-selection
-		selectedProfiles, err := getSelectedProfiles(nimCache)
-		if err != nil {
-			logger.Error(err, "failed to get selected profiles for caching")
-			return nil, err
-		}
-
-		if len(selectedProfiles) == 0 {
-			return nil, fmt.Errorf("no profiles are selected for caching")
-		}
-
-		if len(selectedProfiles) > 0 {
-			if slices.Contains(selectedProfiles, AllProfiles) {
-				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, "--all")
-			} else {
-				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, "--profiles")
-				job.Spec.Template.Spec.Containers[0].Args = append(job.Spec.Template.Spec.Containers[0].Args, selectedProfiles...)
-			}
 		}
 
 	case nimCache.Spec.Source.NGC != nil && nimCache.Spec.Source.NGC.ModelEndpoint != nil:

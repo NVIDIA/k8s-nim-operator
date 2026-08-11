@@ -825,6 +825,13 @@ spec:
                   - type
                   type: object
                 type: array
+              downloadMethod:
+                description: |-
+                  DownloadMethod records how model weights should be cached for this NIM
+                  image, as discovered by the manifest probe pod. Empty defaults to the
+                  standard download-to-cache CLI. "nimlib" is used for BioNeMo-style NIMs
+                  (e.g. MolMIM) that expose nimutils.download_models() but not download-to-cache.
+                type: string
               profiles:
                 items:
                   description: NIMProfile defines the profiles that were cached.

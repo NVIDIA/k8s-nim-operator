@@ -169,11 +169,17 @@ type NIMCacheStorage struct {
 
 // NIMCacheStatus defines the observed state of NIMCache.
 type NIMCacheStatus struct {
-	State      string             `json:"state,omitempty"`
-	Type       string             `json:"type,omitempty"`
-	PVC        string             `json:"pvc,omitempty"`
-	Profiles   []NIMProfile       `json:"profiles,omitempty"`
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+	State string `json:"state,omitempty"`
+	Type  string `json:"type,omitempty"`
+	// DownloadMethod records how model weights should be cached for this NIM
+	// image, as discovered by the manifest probe pod. Empty defaults to the
+	// standard download-to-cache CLI. "nimlib" is used for BioNeMo-style NIMs
+	// (e.g. MolMIM) that expose nimutils.download_models() but not download-to-cache.
+	// +optional
+	DownloadMethod string             `json:"downloadMethod,omitempty"`
+	PVC            string             `json:"pvc,omitempty"`
+	Profiles       []NIMProfile       `json:"profiles,omitempty"`
+	Conditions     []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // NIMProfile defines the profiles that were cached.
@@ -228,6 +234,13 @@ const (
 	// model_manifest.yaml, no download-to-cache/list-model-profiles commands,
 	// and download their single model on start when NGC_API_KEY/HF_TOKEN is set.
 	NIMCacheModelTypeNative = "native"
+
+	// NIMCacheDownloadMethodCLI indicates the image provides the standard
+	// download-to-cache CLI used by LLM/VLM NIMs.
+	NIMCacheDownloadMethodCLI = "download-to-cache"
+	// NIMCacheDownloadMethodNIMLib indicates the image has no download-to-cache
+	// CLI but exposes nimlib.nimutils.download_models() (BioNeMo-style NIMs).
+	NIMCacheDownloadMethodNIMLib = "nimlib"
 )
 
 // EnvFromSecrets return the list of secrets that should be mounted as env vars.
@@ -363,6 +376,12 @@ func (n *NIMCache) IsOptimizedNIM() bool {
 // the status so subsequent reconciles do not need to re-inspect the registry.
 func (n *NIMCache) IsNativeModelDownload() bool {
 	return n.Status.Type == NIMCacheModelTypeNative
+}
+
+// UsesNimlibDownload returns true if the manifest probe determined the image
+// caches models via nimlib.nimutils.download_models() rather than download-to-cache.
+func (n *NIMCache) UsesNimlibDownload() bool {
+	return n.Status.DownloadMethod == NIMCacheDownloadMethodNIMLib
 }
 
 // GetModelSpec returns the model spec for the NIMCache.
