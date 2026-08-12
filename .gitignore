@@ -33,3 +33,5 @@ kubeconfig
 
 # e2e logs
 e2e_logs
+
+/.licenses-cache
