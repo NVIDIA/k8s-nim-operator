@@ -279,8 +279,9 @@ var _ = Describe("NIMCache Controller", func() {
 	})
 
 	Context("when creating a NIMCache resource", func() {
-		It("should create a Role with SCC rules", func() {
+		It("should create a Role with SCC rules on OpenShift", func() {
 			ctx := context.TODO()
+			reconciler.orchestratorType = k8sutil.OpenShift
 			nimCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-nimcache",
@@ -312,8 +313,31 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(role.Rules[0]).To(Equal(expectedRule))
 		})
 
+		It("should not create an SCC Role on non-OpenShift", func() {
+			ctx := context.TODO()
+			reconciler.orchestratorType = k8sutil.K8s
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache-k8s",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+				},
+			}
+
+			err := reconciler.reconcileRole(ctx, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+
+			role := &rbacv1.Role{}
+			roleName := types.NamespacedName{Name: NIMCacheRole, Namespace: "default"}
+			err = cli.Get(ctx, roleName, role)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
 		It("should create a RoleBinding for the Role", func() {
 			ctx := context.TODO()
+			reconciler.orchestratorType = k8sutil.OpenShift
 			nimCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-nimcache",
