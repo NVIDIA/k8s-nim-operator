@@ -318,20 +318,28 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 		return ctrl.Result{}, err
 	}
 
-	// Sync role
-	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(nemoGuardrail.GetRoleParams())
-	}, "role", conditions.ReasonRoleFailed)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	// Sync role / rolebinding. SCC rules are OpenShift-only; clean up on other platforms.
+	if k8sutil.IsOpenShift(r.orchestratorType) {
+		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+			return renderer.Role(nemoGuardrail.GetRoleParams(true))
+		}, "role", conditions.ReasonRoleFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
-	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
-		return renderer.RoleBinding(nemoGuardrail.GetRoleBindingParams())
-	}, "rolebinding", conditions.ReasonRoleBindingFailed)
-	if err != nil {
-		return ctrl.Result{}, err
+		err = r.renderAndSyncResource(ctx, nemoGuardrail, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+			return renderer.RoleBinding(nemoGuardrail.GetRoleBindingParams())
+		}, "rolebinding", conditions.ReasonRoleBindingFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.Role{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.RoleBinding{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Sync ConfigStore PVC
@@ -427,6 +435,8 @@ func (r *NemoGuardrailReconciler) reconcileNemoGuardrail(ctx context.Context, ne
 	}
 
 	deploymentParams := nemoGuardrail.GetDeploymentParams()
+	deploymentParams.Annotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.Annotations, r.orchestratorType, nemoGuardrail.GetRequiredSCC())
+	deploymentParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.PodAnnotations, r.orchestratorType, nemoGuardrail.GetRequiredSCC())
 
 	// Setup volume mounts with model store
 	deploymentParams.Volumes = nemoGuardrail.GetVolumes()

@@ -146,20 +146,29 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	// Sync role
-	err = r.renderAndSyncResource(ctx, nimService, &rbacv1.Role{}, func() (client.Object, error) {
-		return r.renderer.Role(nimService.GetRoleParams())
-	}, "role", conditions.ReasonRoleFailed)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	// Sync role / rolebinding. SCC rules are OpenShift-only; clean up on other platforms.
+	namespacedNameForRBAC := types.NamespacedName{Name: nimService.GetName(), Namespace: nimService.GetNamespace()}
+	if k8sutil.IsOpenShift(r.orchestratorType) {
+		err = r.renderAndSyncResource(ctx, nimService, &rbacv1.Role{}, func() (client.Object, error) {
+			return r.renderer.Role(nimService.GetRoleParams(true))
+		}, "role", conditions.ReasonRoleFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
-	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, nimService, &rbacv1.RoleBinding{}, func() (client.Object, error) {
-		return r.renderer.RoleBinding(nimService.GetRoleBindingParams())
-	}, "rolebinding", conditions.ReasonRoleBindingFailed)
-	if err != nil {
-		return ctrl.Result{}, err
+		err = r.renderAndSyncResource(ctx, nimService, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+			return r.renderer.RoleBinding(nimService.GetRoleBindingParams())
+		}, "rolebinding", conditions.ReasonRoleBindingFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		if err = k8sutil.CleanupResource(ctx, r.Client, &rbacv1.Role{}, namespacedNameForRBAC); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		if err = k8sutil.CleanupResource(ctx, r.Client, &rbacv1.RoleBinding{}, namespacedNameForRBAC); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 	}
 
 	var modelPVC *appsv1alpha1.PersistentVolumeClaim
@@ -511,6 +520,8 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	}
 
 	isvcParams.OrchestratorType = string(r.orchestratorType)
+	isvcParams.Annotations = k8sutil.WithRequiredSCCAnnotation(isvcParams.Annotations, r.orchestratorType, nimService.GetRequiredSCC())
+	isvcParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(isvcParams.PodAnnotations, r.orchestratorType, nimService.GetRequiredSCC())
 
 	isvcParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 
