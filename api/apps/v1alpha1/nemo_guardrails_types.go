@@ -378,10 +378,14 @@ func (n *NemoGuardrail) GetSecretParams(secretMapData map[string]string) *render
 // GetStandardAnnotations returns default annotations to apply to the NemoGuardrail instance.
 func (n *NemoGuardrail) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
+}
+
+// GetRequiredSCC returns the OpenShift SCC name required by this resource.
+func (n *NemoGuardrail) GetRequiredSCC() string {
+	return "nonroot"
 }
 
 // GetNemoGuardrailAnnotations returns annotations to apply to the NemoGuardrail instance.
@@ -843,13 +847,18 @@ func (n *NemoGuardrail) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
 }
 
 // GetRoleParams returns params to render Role from templates.
-func (n *NemoGuardrail) GetRoleParams() *rendertypes.RoleParams {
+// When includeOpenShiftSCC is false, OpenShift SCC rules are omitted.
+func (n *NemoGuardrail) GetRoleParams(includeOpenShiftSCC bool) *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
+
+	if !includeOpenShiftSCC {
+		return params
+	}
 
 	// Set rules to use SCC
 	params.Rules = []rbacv1.PolicyRule{

@@ -206,20 +206,28 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	// Sync role
-	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(nimService.GetRoleParams())
-	}, "role", conditions.ReasonRoleFailed)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	// Sync role / rolebinding. SCC rules are OpenShift-only; clean up on other platforms.
+	if k8sutil.IsOpenShift(r.GetOrchestratorType()) {
+		err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+			return renderer.Role(nimService.GetRoleParams(true))
+		}, "role", conditions.ReasonRoleFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
-	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
-		return renderer.RoleBinding(nimService.GetRoleBindingParams())
-	}, "rolebinding", conditions.ReasonRoleBindingFailed)
-	if err != nil {
-		return ctrl.Result{}, err
+		err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+			return renderer.RoleBinding(nimService.GetRoleBindingParams())
+		}, "rolebinding", conditions.ReasonRoleBindingFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.Role{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.RoleBinding{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Sync service
@@ -471,6 +479,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		lwsParams := nimService.GetLWSParams()
 		lwsParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
+		lwsParams.Annotations = k8sutil.WithRequiredSCCAnnotation(lwsParams.Annotations, r.GetOrchestratorType(), nimService.GetRequiredSCC())
+		lwsParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(lwsParams.PodAnnotations, r.GetOrchestratorType(), nimService.GetRequiredSCC())
 		if nimCache.IsUniversalNIM() {
 			lwsParams.WorkerEnvs = utils.MergeEnvVars([]corev1.EnvVar{{
 				Name:  "NIM_MODEL_NAME",
@@ -554,6 +564,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	} else {
 		deploymentParams := nimService.GetDeploymentParams()
 		deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
+		deploymentParams.Annotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.Annotations, r.GetOrchestratorType(), nimService.GetRequiredSCC())
+		deploymentParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.PodAnnotations, r.GetOrchestratorType(), nimService.GetRequiredSCC())
 		deploymentParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 
 		modelLayout, err := nimsource.ResolveModelLayout(ctx, r.imageProtocolResolver, nimService, &nimCache)
