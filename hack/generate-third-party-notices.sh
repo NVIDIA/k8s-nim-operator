@@ -263,7 +263,7 @@ collapse_index() {
     '
 }
 
-# Rows carry module@version, not a URL: in vendor mode go-licenses links this
+# Rows carry the module path, not a URL: in vendor mode go-licenses links this
 # repo at HEAD. Longest-prefix match — a license may sit below the module root.
 annotate_modules() {
     awk -v modfile="${MODULES_TXT}" '
@@ -272,7 +272,7 @@ annotate_modules() {
             while ((getline line < modfile) > 0) {
                 if (line !~ /^# /) continue
                 split(line, f, " ")
-                # Report the replacement; a local path has no version to report.
+                # Report the replacement; a local path cannot be attributed.
                 if (f[4] == "=>" || f[3] == "=>") {
                     r = (f[4] == "=>") ? 5 : 4
                     if (f[r + 1] == "") {
@@ -281,10 +281,10 @@ annotate_modules() {
                         exit 1
                     }
                     mods[++m] = f[2]
-                    disp[f[2]] = f[r] "@" f[r + 1]
+                    disp[f[2]] = f[r]
                 } else {
                     mods[++m] = f[2]
-                    disp[f[2]] = f[2] "@" f[3]
+                    disp[f[2]] = f[2]
                 }
             }
             close(modfile)
@@ -329,7 +329,7 @@ build_indexes() {
         || die "go-licenses produced no entries for ${HELPER_BINARY} — refusing to write incomplete notices file."
 
     if cut -d, -f4 "${INDEX_FILE}" | LC_ALL=C grep -qx 'unknown'; then
-        die "could not resolve module@version for some manager packages from ${MODULES_TXT}." \
+        die "could not resolve modules for some manager packages from ${MODULES_TXT}." \
             "Run 'go mod vendor' and re-run, rather than committing a file with unattributed entries."
     fi
 
@@ -373,11 +373,11 @@ license_files_for() {
     done < <(find "${dir}" -maxdepth 1 -type f -print0 2>/dev/null | LC_ALL=C sort -z)
 }
 
-# ${2}: "module" for vendored rows (module@version), "source" for cloned ones.
+# ${2}: "module" for vendored rows, "source" for cloned ones.
 emit_index_table() {
     local index="$1" provenance="$2" pkg url license module
     if [[ "${provenance}" == "module" ]]; then
-        printf '| Package | License | Module |\n'
+        printf '| Package | License | Dependency |\n'
     else
         printf '| Package | License | Source |\n'
     fi
