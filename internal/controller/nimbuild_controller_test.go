@@ -751,6 +751,7 @@ var _ = Describe("NIMBuild Controller", func() {
 					Expect(env.ValueFrom.SecretKeyRef).NotTo(BeNil())
 					Expect(env.ValueFrom.SecretKeyRef.Name).To(Equal(nimCache.Spec.Source.NGC.AuthSecret))
 					Expect(env.ValueFrom.SecretKeyRef.Key).To(Equal("NGC_API_KEY"))
+					Expect(env.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To(true)))
 					ngcApiKeyFound = true
 				}
 			}

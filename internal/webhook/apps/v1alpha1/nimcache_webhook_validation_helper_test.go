@@ -46,7 +46,7 @@ func TestValidateNGCSource(t *testing.T) {
 			src: &appsv1alpha1.NGCSource{
 				Model: &appsv1alpha1.ModelSpec{},
 			},
-			wantErrs:     2,
+			wantErrs:     1, // modelPuller required; authSecret is optional
 			wantWarnings: 0,
 		},
 		{
@@ -305,7 +305,7 @@ func TestValidateNIMSourceConfiguration(t *testing.T) {
 					},
 				},
 			},
-			wantErrs:     5, // missing authSecret & modelPuller, profiles should only have one entry. If profiles is defined, all other model fields must be empty
+			wantErrs:     4, // modelPuller required; authSecret optional; profiles should only have one entry. If profiles is defined, all other model fields must be empty
 			wantWarnings: 0,
 		},
 	}

@@ -647,17 +647,6 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 					Name:  "NIM_MODEL_PROFILE",
 					Value: inputNimProfile.Name,
 				},
-				{
-					Name: appsv1alpha1.NGCAPIKey,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimCache.Spec.Source.NGC.AuthSecret,
-							},
-							Key: appsv1alpha1.NGCAPIKey,
-						},
-					},
-				},
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -723,6 +712,23 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 				RunAsUser:    nimCache.GetUserID(),
 			},
 		},
+	}
+
+	// Inject NGC_API_KEY when the backing NIMCache has an auth secret. Optional
+	// so certain NIMs can omit the key.
+	if nimCache.Spec.Source.NGC != nil && nimCache.Spec.Source.NGC.AuthSecret != "" {
+		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{
+			Name: appsv1alpha1.NGCAPIKey,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: nimCache.Spec.Source.NGC.AuthSecret,
+					},
+					Key:      appsv1alpha1.NGCAPIKey,
+					Optional: ptr.To(true),
+				},
+			},
+		})
 	}
 
 	// Merge env with the user provided values
