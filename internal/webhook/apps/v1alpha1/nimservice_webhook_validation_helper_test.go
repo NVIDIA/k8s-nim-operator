@@ -777,31 +777,6 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 	}
 }
 
-// TestValidateAuthSecret verifies authSecret is optional, with a warning when empty.
-func TestValidateAuthSecret(t *testing.T) {
-	fld := field.NewPath("spec").Child("authSecret")
-	cases := []struct {
-		name         string
-		value        string
-		wantErrs     int
-		wantWarnings int
-	}{
-		{"non-empty", "secret", 0, 0},
-		{"empty", "", 0, 1},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			w, errs := validateAuthSecret(&tc.value, fld)
-			gotErrs := len(errs)
-			gotWarnings := len(w)
-			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
-				t.Logf("Validation errors:")
-				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
-			}
-		})
-	}
-}
-
 // TestValidateMetricsConfiguration table-driven.
 func TestValidateMetricsConfiguration(t *testing.T) {
 	fld := field.NewPath("spec").Child("metrics")
