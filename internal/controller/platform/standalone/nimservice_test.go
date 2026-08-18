@@ -3465,6 +3465,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
 			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("ngc-secret"))
 			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal(appsv1alpha1.NGCAPIKey))
+			Expect(ngcKeyEnv.ValueFrom.SecretKeyRef.Optional).To(Equal(ptr.To(true)))
 
 			// HF_TOKEN should NOT be present
 			var hfTokenPresent bool
