@@ -970,7 +970,7 @@ spec:
               authSecret:
                 description: |-
                   AuthSecret is the name of an existing secret containing the NGC_API_KEY (and optionally HF_TOKEN).
-                  It is optional for air-gapped deployments that serve a pre-cached model
+                  Optional for certain NIMs.
                 type: string
               command:
                 items:

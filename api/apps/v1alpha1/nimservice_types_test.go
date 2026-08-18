@@ -1065,6 +1065,9 @@ func TestGetStandardEnvAuthSecret(t *testing.T) {
 		if ngc.ValueFrom.SecretKeyRef.Name != "ngc-api-secret" {
 			t.Errorf("SecretKeyRef.Name = %q, want %q", ngc.ValueFrom.SecretKeyRef.Name, "ngc-api-secret")
 		}
+		if ngc.ValueFrom.SecretKeyRef.Optional == nil || !*ngc.ValueFrom.SecretKeyRef.Optional {
+			t.Fatal("expected NGC_API_KEY SecretKeyRef to be optional")
+		}
 	})
 
 	t.Run("without authSecret omits NGC_API_KEY", func(t *testing.T) {
