@@ -526,15 +526,20 @@ func (n *NIMService) GetProxyEnv() []corev1.EnvVar {
 // GetStandardAnnotations returns default annotations to apply to the NIMService instance.
 func (n *NIMService) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
-	if n.GetProxyCertConfigMap() != "" {
-		standardAnnotations["openshift.io/required-scc"] = "anyuid"
-	} else if n.GetHostPath() != "" {
-		standardAnnotations["openshift.io/required-scc"] = "hostmount-anyuid"
-	}
 	return standardAnnotations
+}
+
+// GetRequiredSCC returns the OpenShift SCC name required by this NIMService, if any.
+func (n *NIMService) GetRequiredSCC() string {
+	if n.GetProxyCertConfigMap() != "" || n.GetProxySpec() != nil {
+		return "anyuid"
+	}
+	if n.GetHostPath() != "" {
+		return "hostmount-anyuid"
+	}
+	return "nonroot"
 }
 
 // GetNIMServiceAnnotations returns annotations to apply to the NIMService instance.
@@ -1645,13 +1650,18 @@ func (n *NIMService) GetGRPCRouteParams() *rendertypes.GRPCRouteParams {
 }
 
 // GetRoleParams returns params to render Role from templates.
-func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
+// When includeOpenShiftSCC is false, OpenShift SCC rules are omitted.
+func (n *NIMService) GetRoleParams(includeOpenShiftSCC bool) *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
+
+	if !includeOpenShiftSCC {
+		return params
+	}
 
 	// Set rules to use SCC
 	switch {
