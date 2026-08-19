@@ -50,6 +50,7 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nimsource"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
@@ -59,36 +60,47 @@ import (
 const (
 	// ManifestsDir is the directory to render k8s resource manifests.
 	ManifestsDir = "/manifests"
+
+	// inferenceServiceNotReadyRequeue is how long to wait before re-checking
+	// InferenceService readiness when the NIMService is not yet Ready.
+	// This bounds stuck NotReady status when the InferenceService informer was
+	// not registered at operator start-up (e.g. KServe installed later).
+	inferenceServiceNotReadyRequeue = 30 * time.Second
 )
 
 // NIMServiceReconciler represents the NIMService reconciler instance for KServe platform.
 type NIMServiceReconciler struct {
 	client.Client
-	scheme          *runtime.Scheme
-	log             logr.Logger
-	discoveryClient discovery.DiscoveryInterface
-
-	updater          conditions.Updater
-	renderer         render.Renderer
-	recorder         record.EventRecorder
-	apiReader        client.Reader
-	orchestratorType k8sutil.OrchestratorType
+	scheme                *runtime.Scheme
+	log                   logr.Logger
+	discoveryClient       discovery.DiscoveryInterface
+	updater               conditions.Updater
+	renderer              render.Renderer
+	recorder              record.EventRecorder
+	apiReader             client.Reader
+	orchestratorType      k8sutil.OrchestratorType
+	imageProtocolResolver nimsource.ProtocolResolver
 }
 
 // NewNIMServiceReconciler returns NIMServiceReconciler for KServe platform.
 func NewNIMServiceReconciler(ctx context.Context, r shared.Reconciler) *NIMServiceReconciler {
 	orchestratorType, _ := r.GetOrchestratorType(ctx)
+	registryReader := r.GetAPIReader()
+	if registryReader == nil {
+		registryReader = r.GetClient()
+	}
 
 	return &NIMServiceReconciler{
-		Client:           r.GetClient(),
-		scheme:           r.GetScheme(),
-		log:              r.GetLogger(),
-		discoveryClient:  r.GetDiscoveryClient(),
-		updater:          r.GetUpdater(),
-		renderer:         render.NewRenderer(ManifestsDir),
-		recorder:         r.GetEventRecorder(),
-		apiReader:        r.GetAPIReader(),
-		orchestratorType: orchestratorType,
+		Client:                r.GetClient(),
+		scheme:                r.GetScheme(),
+		log:                   r.GetLogger(),
+		discoveryClient:       r.GetDiscoveryClient(),
+		updater:               r.GetUpdater(),
+		renderer:              render.NewRenderer(ManifestsDir),
+		recorder:              r.GetEventRecorder(),
+		apiReader:             registryReader,
+		orchestratorType:      orchestratorType,
+		imageProtocolResolver: nimsource.NewProtocolResolver(registryReader),
 	}
 }
 
@@ -501,7 +513,13 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	isvcParams.OrchestratorType = string(r.orchestratorType)
 
 	isvcParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
-	if nimCache.IsUniversalNIM() {
+
+	modelLayout, err := nimsource.ResolveModelLayout(ctx, r.imageProtocolResolver, nimService, nimCache)
+	if err != nil {
+		return err
+	}
+
+	if nimCache.IsUniversalNIM() && !modelLayout.Protocol.IsNative() {
 		hfUri := nimCache.GetHFUri()
 		isvcParams.Env = utils.MergeEnvVars([]corev1.EnvVar{
 			{
@@ -516,40 +534,95 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 			},
 		}, isvcParams.Env)
 	}
+
+	// Native (NIMCraft) single-model NIMs read their weights from a per-instance
+	// directory under /model so multiple NIMs can share one PVC. This must match
+	// NIM_ENGINE_MODEL_PATH used by the NIMCache caching job. It is operator-owned
+	// (merged as the winning side) since it is tied to the mounted volume layout.
+	if modelLayout.Protocol.IsNative() {
+		isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{{
+			Name:  "NIM_ENGINE_MODEL_PATH",
+			Value: nimsource.NativeModelPathForCache(nimCache),
+		}})
+
+		// Native (NIMCraft) single-model NIMs resolve their model source at
+		// runtime and authenticate with either NGC_API_KEY or HF_TOKEN. The
+		// standard env requires NGC_API_KEY, which breaks auth secrets that only
+		// carry an HF token. Make NGC_API_KEY optional and surface HF_TOKEN (also
+		// optional) so either credential works.
+		// When AuthSecret is unset (air-gapped / pre-cached), omit both keys.
+		isvcParams.Env = utils.RemoveEnvVar(isvcParams.Env, appsv1alpha1.NGCAPIKey)
+		if nimService.Spec.AuthSecret != "" {
+			isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{
+				{
+					Name: appsv1alpha1.NGCAPIKey,
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: nimService.Spec.AuthSecret,
+							},
+							Key:      appsv1alpha1.NGCAPIKey,
+							Optional: &[]bool{true}[0],
+						},
+					},
+				},
+				{
+					Name: appsv1alpha1.HFToken,
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: nimService.Spec.AuthSecret,
+							},
+							Key:      appsv1alpha1.HFToken,
+							Optional: &[]bool{true}[0],
+						},
+					},
+				},
+			})
+		}
+	}
 	// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, add the HF_TOKEN to the environment variables and make NGC_API_KEY optional
 	// For custom models stored in Datastore, the NIM Container needs to access NGC to download base model. However, NGC_API_KEY is not required for Hugging Face models.
 	if nimCache.IsHFModel() || nimService.IsHFModel() {
 		isvcParams.Env = utils.RemoveEnvVar(isvcParams.Env, appsv1alpha1.NGCAPIKey)
-		isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{
-			{
-				Name: appsv1alpha1.NGCAPIKey,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: nimService.Spec.AuthSecret,
+		if nimService.Spec.AuthSecret != "" {
+			isvcParams.Env = utils.MergeEnvVars(isvcParams.Env, []corev1.EnvVar{
+				{
+					Name: appsv1alpha1.NGCAPIKey,
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: nimService.Spec.AuthSecret,
+							},
+							Key:      appsv1alpha1.NGCAPIKey,
+							Optional: &[]bool{true}[0],
 						},
-						Key:      appsv1alpha1.NGCAPIKey,
-						Optional: &[]bool{true}[0],
 					},
 				},
-			},
-			{
-				Name: appsv1alpha1.HFToken,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: nimService.Spec.AuthSecret,
+				{
+					Name: appsv1alpha1.HFToken,
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: nimService.Spec.AuthSecret,
+							},
+							Key: appsv1alpha1.HFToken,
 						},
-						Key: appsv1alpha1.HFToken,
 					},
 				},
-			},
-		})
+			})
+		}
 	}
 
-	// Setup volume mounts with model store
+	// Setup volume mounts with model store. Native (NIMCraft) single-model NIMs
+	// mount the model store PVC at /model and /opt/cache instead of /model-store,
+	// so weights and compiled CUDA kernels persist across restarts.
 	isvcParams.Volumes = nimService.GetVolumes(modelPVC)
-	isvcParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
+	if modelLayout.Protocol.IsNative() {
+		isvcParams.VolumeMounts = nimService.GetNativeVolumeMounts(modelPVC)
+	} else {
+		isvcParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
+	}
 	if profileEnv != nil {
 		isvcParams.Env = utils.MergeEnvVars(*profileEnv, isvcParams.Env)
 	}
@@ -557,7 +630,12 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 	if gpuResources != nil {
 		isvcParams.Resources = gpuResources
 	}
-	initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+	var initContainerVolumeMounts []corev1.VolumeMount
+	if modelLayout.Protocol.IsNative() {
+		initContainerVolumeMounts = nimService.GetNativeInitContainerVolumeMounts(modelPVC)
+	} else {
+		initContainerVolumeMounts = nimService.GetInitContainerVolumeMounts(modelPVC)
+	}
 	for idx := range isvcParams.InitContainers {
 		isvcParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
 	}
@@ -720,20 +798,27 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
 		r.recorder.Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
 			"NIMService %s not ready yet, msg: %s", nimService.Name, msg)
-	} else {
-		// Update NIMServiceStatus with model config.
-		updateErr := r.updateModelStatus(ctx, nimService, deploymentMode)
-		if updateErr != nil {
-			logger.Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
-			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		if err != nil {
+			logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.NotReady)
+			return &ctrl.Result{}, err
 		}
-
-		// Update status as ready
-		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
-		r.recorder.Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
-			"NIMService %s ready, msg: %s", nimService.Name, msg)
+		// Requeue so readiness converges even when the InferenceService watch was
+		// not registered (KServe CRD installed after the operator started) and no
+		// other owned-resource events wake this reconcile.
+		return &ctrl.Result{RequeueAfter: inferenceServiceNotReadyRequeue}, nil
 	}
 
+	// Update NIMServiceStatus with model config.
+	updateErr := r.updateModelStatus(ctx, nimService, deploymentMode)
+	if updateErr != nil {
+		logger.Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// Update status as ready
+	err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
+	r.recorder.Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
+		"NIMService %s ready, msg: %s", nimService.Name, msg)
 	if err != nil {
 		logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.Ready)
 		return &ctrl.Result{}, err
@@ -746,8 +831,15 @@ func (r *NIMServiceReconciler) checkInferenceServiceStatus(ctx context.Context, 
 func (r *NIMServiceReconciler) isInferenceServiceReady(ctx context.Context, nimService *appsv1alpha1.NIMService) (string, bool, error) {
 	logger := r.log
 
+	// Prefer the API reader so readiness is observed even when the InferenceService
+	// informer was not started (CRD missing at operator boot / not in filtered cache).
+	reader := client.Reader(r.Client)
+	if r.apiReader != nil {
+		reader = r.apiReader
+	}
+
 	isvc := &kservev1beta1.InferenceService{}
-	err := r.Get(ctx, client.ObjectKey{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)
+	err := reader.Get(ctx, client.ObjectKey{Name: nimService.Name, Namespace: nimService.Namespace}, isvc)
 	if err != nil {
 		logger.Error(err, "failed to fetch inferenceservice")
 		if apiErrors.IsNotFound(err) {

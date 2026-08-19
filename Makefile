@@ -125,6 +125,18 @@ vet: ## Run go vet against code.
 check-vendor: vendor
 	git diff --quiet HEAD -- go.mod go.sum
 
+.PHONY: third-party-notices
+third-party-notices: go-licenses
+	@bash hack/generate-third-party-notices.sh
+
+.PHONY: check-third-party-notices
+check-third-party-notices: third-party-notices
+	@echo "- Checking if THIRD_PARTY_NOTICES.md is up to date..."
+	@git ls-files --error-unmatch THIRD_PARTY_NOTICES.md >/dev/null 2>&1 \
+		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is not tracked. Run 'make third-party-notices' and commit the result."; exit 1; }
+	@git diff --exit-code -- THIRD_PARTY_NOTICES.md \
+		|| { echo "ERROR: THIRD_PARTY_NOTICES.md is stale. Run 'make third-party-notices' and commit the change."; exit 1; }
+
 COVERAGE_FILE := cover.out
 
 .PHONY: coverage
@@ -134,12 +146,12 @@ coverage: test
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -ldflags "-X github.com/NVIDIA/k8s-dra-driver-gpu/internal/info.version=$(NVIDIA_DRA_DRIVER_GPU_VERSION)" $$(go list ./... | grep -v test/ | grep -v api/) -coverprofile $(COVERAGE_FILE)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -ldflags "-X sigs.k8s.io/dra-driver-nvidia-gpu/internal/info.version=$(NVIDIA_DRA_DRIVER_GPU_VERSION)" $$(go list ./... | grep -v test/ | grep -v api/) -coverprofile $(COVERAGE_FILE)
 
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
 test-e2e:
-	go test -ldflags "-X github.com/NVIDIA/k8s-dra-driver-gpu/internal/info.version=$(NVIDIA_DRA_DRIVER_GPU_VERSION)" ./test/e2e/ -v -ginkgo.v
+	go test -ldflags "-X sigs.k8s.io/dra-driver-nvidia-gpu/internal/info.version=$(NVIDIA_DRA_DRIVER_GPU_VERSION)" ./test/e2e/ -v -ginkgo.v
 
 .PHONY: lint
 lint: golangci-lint
@@ -154,7 +166,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -ldflags "-X github.com/NVIDIA/k8s-dra-driver-gpu/internal/info.version=$(NVIDIA_DRA_DRIVER_GPU_VERSION)" -o bin/manager cmd/main.go
+	go build -ldflags "-X sigs.k8s.io/dra-driver-nvidia-gpu/internal/info.version=$(NVIDIA_DRA_DRIVER_GPU_VERSION)" -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -230,6 +242,7 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+GO_LICENSES = $(LOCALBIN)/go-licenses
 
 ## Tool Versions
 GINKGO_VERSION ?= $(shell $(GO_CMD) list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
@@ -257,6 +270,11 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	@GOBIN=$(PROJECT_DIR)/bin GO111MODULE=on $(GO_CMD) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+.PHONY: go-licenses
+go-licenses: $(GO_LICENSES) ## Download go-licenses locally if necessary.
+$(GO_LICENSES): $(LOCALBIN)
+	@GOBIN=$(PROJECT_DIR)/bin GO111MODULE=on $(GO_CMD) install -mod=readonly -modfile=tools/go.mod github.com/google/go-licenses/v2
 
 GINKGO = $(PROJECT_DIR)/bin/ginkgo
 .PHONY: ginkgo

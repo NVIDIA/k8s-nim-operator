@@ -99,8 +99,9 @@ type NIMServiceSpec struct {
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
-	// The name of an existing pull secret containing the NGC_API_KEY
-	AuthSecret string `json:"authSecret"`
+	// AuthSecret is the name of an existing secret containing the NGC_API_KEY (and optionally HF_TOKEN).
+	// It is optional for air-gapped deployments that serve a pre-cached model
+	AuthSecret string `json:"authSecret,omitempty"`
 	// Storage is the target storage for caching NIM model if NIMCache is not provided
 	Storage      NIMServiceStorage   `json:"storage,omitempty"`
 	Labels       map[string]string   `json:"labels,omitempty"`
@@ -308,17 +309,6 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 			Value: utils.DefaultModelStorePath,
 		},
 		{
-			Name: NGCAPIKey,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.AuthSecret,
-					},
-					Key: NGCAPIKey,
-				},
-			},
-		},
-		{
 			Name:  "OUTLINES_CACHE_DIR",
 			Value: "/tmp/outlines",
 		},
@@ -338,6 +328,23 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 			Name:  "NIM_LOG_LEVEL",
 			Value: "INFO",
 		},
+	}
+
+	// Only inject NGC_API_KEY when AuthSecret is set. Air-gapped deployments that
+	// serve a pre-populated local cache must omit AuthSecret so NIM does not
+	// attempt NGC authentication.
+	if n.Spec.AuthSecret != "" {
+		envVars = append(envVars, corev1.EnvVar{
+			Name: NGCAPIKey,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.AuthSecret,
+					},
+					Key: NGCAPIKey,
+				},
+			},
+		})
 	}
 	if n.Spec.Expose.Service.GRPCPort != nil {
 		envVars = append(envVars, corev1.EnvVar{
@@ -926,6 +933,73 @@ func (n *NIMService) GetInitContainerVolumeMounts(modelPVC *PersistentVolumeClai
 		{
 			Name:      "model-store",
 			MountPath: "/model-store",
+			SubPath:   subPath,
+		},
+	}
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "scratch",
+			MountPath: "/scratch",
+		})
+	}
+	if n.GetProxyCertConfigMap() != "" {
+		volumeMounts = append(volumeMounts, k8sutil.GetUpdateCaCertInitContainerVolumeMounts()...)
+	}
+	return volumeMounts
+}
+
+// GetNativeVolumeMounts returns the container volume mounts for a native
+// (NIMCraft) single-model NIM. The model store PVC is mounted at /model (weights)
+// and /opt/cache (compiled CUDA kernels) so both survive pod restarts.
+func (n *NIMService) GetNativeVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
+	subPath := ""
+	if modelPVC != nil {
+		subPath = modelPVC.SubPath
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "model-store",
+			MountPath: utils.NativeModelBasePath,
+			SubPath:   subPath,
+		},
+		{
+			Name:      "model-store",
+			MountPath: utils.NativeKernelCachePath,
+			SubPath:   subPath,
+		},
+		{
+			Name:      "dshm",
+			MountPath: "/dev/shm",
+		},
+	}
+	if n.scratchNeeded() {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "scratch",
+			MountPath: "/scratch",
+		})
+	}
+	if n.GetProxyCertConfigMap() != "" {
+		volumeMounts = append(volumeMounts, k8sutil.GetVolumesMountsForUpdatingCaCert()...)
+	}
+	return volumeMounts
+}
+
+// GetNativeInitContainerVolumeMounts returns init-container volume mounts for a
+// native NIM, mounting the model store PVC at /model and /opt/cache.
+func (n *NIMService) GetNativeInitContainerVolumeMounts(modelPVC *PersistentVolumeClaim) []corev1.VolumeMount {
+	subPath := ""
+	if modelPVC != nil {
+		subPath = modelPVC.SubPath
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "model-store",
+			MountPath: utils.NativeModelBasePath,
+			SubPath:   subPath,
+		},
+		{
+			Name:      "model-store",
+			MountPath: utils.NativeKernelCachePath,
 			SubPath:   subPath,
 		},
 	}

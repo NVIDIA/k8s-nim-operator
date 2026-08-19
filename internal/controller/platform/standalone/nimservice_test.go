@@ -62,7 +62,7 @@ import (
 	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
+	nvidiaresourcev1beta1 "sigs.k8s.io/dra-driver-nvidia-gpu/api/nvidia.com/resource/v1beta1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
@@ -486,7 +486,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Role should be created
 			role := &rbacv1.Role{}
@@ -852,7 +852,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// HPA should be deployed
 			hpa := &autoscalingv2.HorizontalPodAutoscaler{}
@@ -873,7 +873,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err = reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 			hpa = &autoscalingv2.HorizontalPodAutoscaler{}
 			err = client.Get(context.TODO(), namespacedName, hpa)
 			Expect(err).To(HaveOccurred())
@@ -882,6 +882,88 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			err = client.Get(context.TODO(), namespacedName, ingress)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsNotFound(err)).To(Equal(true))
+		})
+
+		It("should reset Deployment replicas after autoscaling is disabled even if parent hash is unchanged", func() {
+			namespacedName := types.NamespacedName{Name: nimService.Name, Namespace: nimService.Namespace}
+			Expect(client.Create(context.TODO(), nimService)).To(Succeed())
+
+			_, err := reconciler.reconcileNIMService(context.TODO(), nimService)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Simulate HPA scaling the Deployment up while autoscaling is enabled.
+			deployment := &appsv1.Deployment{}
+			Expect(client.Get(context.TODO(), namespacedName, deployment)).To(Succeed())
+			deployment.Spec.Replicas = ptr.To(int32(3))
+			Expect(client.Update(context.TODO(), deployment)).To(Succeed())
+
+			// Disable autoscaling and pin replicas to 1.
+			updated := &appsv1alpha1.NIMService{}
+			Expect(client.Get(context.TODO(), namespacedName, updated)).To(Succeed())
+			updated.Spec.Scale.Enabled = ptr.To(false)
+			updated.Spec.Replicas = ptr.To(int32(1))
+			updated.Spec.Expose.Router.Ingress = nil
+			Expect(client.Update(context.TODO(), updated)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), updated)
+			Expect(err).NotTo(HaveOccurred())
+			// Disable transition should either be waiting on rollout or scheduling a
+			// short follow-up after HPA deletion — never a silent no-op.
+			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+
+			Expect(client.Get(context.TODO(), namespacedName, deployment)).To(Succeed())
+			Expect(deployment.Spec.Replicas).NotTo(BeNil())
+			Expect(*deployment.Spec.Replicas).To(Equal(int32(1)))
+
+			hpa := &autoscalingv2.HorizontalPodAutoscaler{}
+			err = client.Get(context.TODO(), namespacedName, hpa)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+
+			// Simulate a late HPA write that bumps replicas back up without changing
+			// the parent-spec hash annotation (the Symptom 2 race).
+			parentHash := deployment.Annotations[utils.NvidiaAnnotationParentSpecHashKey]
+			Expect(parentHash).NotTo(BeEmpty())
+			deployment.Spec.Replicas = ptr.To(int32(3))
+			Expect(client.Update(context.TODO(), deployment)).To(Succeed())
+
+			Expect(client.Get(context.TODO(), namespacedName, updated)).To(Succeed())
+			_, err = reconciler.reconcileNIMService(context.TODO(), updated)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(client.Get(context.TODO(), namespacedName, deployment)).To(Succeed())
+			Expect(deployment.Annotations[utils.NvidiaAnnotationParentSpecHashKey]).To(Equal(parentHash))
+			Expect(deployment.Spec.Replicas).NotTo(BeNil())
+			Expect(*deployment.Spec.Replicas).To(Equal(int32(1)))
+
+			// Once replicas match and the Deployment is Ready, we must not keep
+			// requeueing on the 5s autoscaling-disable / drift path.
+			deployment.Status.Replicas = 1
+			deployment.Status.UpdatedReplicas = 1
+			deployment.Status.AvailableReplicas = 1
+			deployment.Status.Conditions = []appsv1.DeploymentCondition{{
+				Type:   appsv1.DeploymentProgressing,
+				Status: corev1.ConditionTrue,
+				Reason: "NewReplicaSetAvailable",
+			}}
+			Expect(client.Status().Update(context.TODO(), deployment)).To(Succeed())
+
+			Expect(client.Get(context.TODO(), namespacedName, updated)).To(Succeed())
+			result, err = reconciler.reconcileNIMService(context.TODO(), updated)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(client.Get(context.TODO(), namespacedName, deployment)).To(Succeed())
+			Expect(*deployment.Spec.Replicas).To(Equal(int32(1)))
+		})
+
+		It("deploymentSpecReplicasOutOfSync detects drift correctly", func() {
+			Expect(deploymentSpecReplicasOutOfSync(&appsv1.Deployment{}, nil)).To(BeFalse())
+			Expect(deploymentSpecReplicasOutOfSync(&appsv1.Deployment{}, ptr.To(int32(1)))).To(BeTrue())
+			Expect(deploymentSpecReplicasOutOfSync(&appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{Replicas: ptr.To(int32(3))},
+			}, ptr.To(int32(1)))).To(BeTrue())
+			Expect(deploymentSpecReplicasOutOfSync(&appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{Replicas: ptr.To(int32(1))},
+			}, ptr.To(int32(1)))).To(BeFalse())
 		})
 
 	})
@@ -1112,21 +1194,11 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			leaderEnv := utils.SortKeys(nimService.GetLWSLeaderEnv())
 			workerEnv := utils.SortKeys(nimService.GetLWSWorkerEnv())
 
+			// AuthSecret is unset, so NGC_API_KEY must be omitted from LWS env.
 			Expect(reflect.DeepEqual(leaderEnv, []corev1.EnvVar{
 				{
 					Name:  "NIM_CACHE_PATH",
 					Value: "/model-store",
-				},
-				{
-					Name: "NGC_API_KEY",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "",
-							},
-							Key: "NGC_API_KEY",
-						},
-					},
 				},
 				{
 					Name:  "OUTLINES_CACHE_DIR",
@@ -1218,17 +1290,6 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 				{
 					Name:  "NIM_CACHE_PATH",
 					Value: "/model-store",
-				},
-				{
-					Name: "NGC_API_KEY",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "",
-							},
-							Key: "NGC_API_KEY",
-						},
-					},
 				},
 				{
 					Name:  "OUTLINES_CACHE_DIR",
@@ -1816,7 +1877,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
@@ -1949,7 +2010,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
@@ -2057,7 +2118,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// LeaderWorkerSet should be created instead of Deployment
 			lws := &lwsv1.LeaderWorkerSet{}
@@ -2163,7 +2224,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
@@ -2280,7 +2341,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// LeaderWorkerSet should be created instead of Deployment
 			lws := &lwsv1.LeaderWorkerSet{}
@@ -2401,7 +2462,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			lws := &lwsv1.LeaderWorkerSet{}
 			lwsKey := types.NamespacedName{Name: testNimService.GetLWSName(), Namespace: testNimService.Namespace}
@@ -2755,7 +2816,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), nimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
@@ -2940,7 +3001,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
@@ -3089,7 +3150,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
@@ -3236,7 +3297,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
@@ -3379,7 +3440,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Deployment should be created
 			deployment := &appsv1.Deployment{}
@@ -3513,7 +3574,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Get the rendered Deployment
 			deployment := &appsv1.Deployment{}
@@ -3665,7 +3726,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			// Get the rendered LeaderWorkerSet
 			lws := &lwsv1.LeaderWorkerSet{}
@@ -3759,7 +3820,7 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 
 			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
 
 			deployment := &appsv1.Deployment{}
 			err = client.Get(context.TODO(), namespacedName, deployment)

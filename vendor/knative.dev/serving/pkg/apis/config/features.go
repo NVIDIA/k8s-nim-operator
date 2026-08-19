@@ -37,15 +37,15 @@ const (
 	// Allowed neither explicitly disables or enables a behavior.
 	// eg. allow a client to control behavior with an annotation or allow a new value through validation.
 	Allowed Flag = "Allowed"
+	// AllowRootBounded is used by secure-pod-defaults to apply secure defaults without enforcing strict policies;
+	// sets RunAsNonRoot to true if not already specified
+	AllowRootBounded Flag = "AllowRootBounded"
 )
 
 // service annotations under features.knative.dev/*
 const (
 	// QueueProxyPodInfoFeatureKey gates mouting of podinfo with the value 'enabled'
 	QueueProxyPodInfoFeatureKey = "features.knative.dev/queueproxy-podinfo"
-
-	// DryRunFeatureKey gates the podspec dryrun feature and runs with the value 'enabled'
-	DryRunFeatureKey = "features.knative.dev/podspec-dryrun"
 
 	// AllowHTTPFullDuplexFeatureKey gates the use of http1 full duplex per workload
 	AllowHTTPFullDuplexFeatureKey = "features.knative.dev/http-full-duplex"
@@ -57,7 +57,6 @@ const (
 	FeaturePodSpecAffinity                  = "kubernetes.podspec-affinity"
 	FeaturePodSpecDNSConfig                 = "kubernetes.podspec-dnsconfig"
 	FeaturePodSpecDNSPolicy                 = "kubernetes.podspec-dnspolicy"
-	FeaturePodSpecDryRun                    = "kubernetes.podspec-dryrun"
 	FeaturePodSpecEmptyDir                  = "kubernetes.podspec-volumes-emptydir"
 	FeaturePodSpecFieldRef                  = "kubernetes.podspec-fieldref"
 	FeaturePodSpecHostAliases               = "kubernetes.podspec-hostaliases"
@@ -65,7 +64,9 @@ const (
 	FeaturePodSpecHostNetwork               = "kubernetes.podspec-hostnetwork"
 	FeaturePodSpecHostPID                   = "kubernetes.podspec-hostpid"
 	FeaturePodSpecHostPath                  = "kubernetes.podspec-volumes-hostpath"
+	FeaturePodSpecVolumesCSI                = "kubernetes.podspec-volumes-csi"
 	FeaturePodSpecInitContainers            = "kubernetes.podspec-init-containers"
+	FeaturePodSpecVolumesMountPropagation   = "kubernetes.podspec-volumes-mount-propagation"
 	FeaturePodSpecNodeSelector              = "kubernetes.podspec-nodeselector"
 	FeaturePodSpecPVClaim                   = "kubernetes.podspec-persistent-volume-claim"
 	FeaturePodSpecPriorityClassName         = "kubernetes.podspec-priorityclassname"
@@ -75,6 +76,7 @@ const (
 	FeaturePodSpecShareProcessNamespace     = "kubernetes.podspec-shareprocessnamespace"
 	FeaturePodSpecTolerations               = "kubernetes.podspec-tolerations"
 	FeaturePodSpecTopologySpreadConstraints = "kubernetes.podspec-topologyspreadconstraints"
+	FeaturePodSpecVolumesImage              = "kubernetes.podspec-volumes-image"
 )
 
 func defaultFeaturesConfig() *Features {
@@ -83,7 +85,6 @@ func defaultFeaturesConfig() *Features {
 		MultiContainerProbing:            Disabled,
 		PodSpecAffinity:                  Disabled,
 		PodSpecTopologySpreadConstraints: Disabled,
-		PodSpecDryRun:                    Allowed,
 		PodSpecHostAliases:               Disabled,
 		PodSpecFieldRef:                  Disabled,
 		PodSpecNodeSelector:              Disabled,
@@ -99,6 +100,9 @@ func defaultFeaturesConfig() *Features {
 		PodSpecTolerations:               Disabled,
 		PodSpecVolumesEmptyDir:           Enabled,
 		PodSpecVolumesHostPath:           Disabled,
+		PodSpecVolumesMountPropagation:   Disabled,
+		PodSpecVolumesCSI:                Disabled,
+		PodSpecVolumesImage:              Disabled,
 		PodSpecPersistentVolumeClaim:     Disabled,
 		PodSpecPersistentVolumeWrite:     Disabled,
 		QueueProxyMountPodInfo:           Disabled,
@@ -118,13 +122,12 @@ func NewFeaturesConfigFromMap(data map[string]string) (*Features, error) {
 
 	if err := cm.Parse(data,
 		asFlag("autodetect-http2", &nc.AutoDetectHTTP2),
-		asFlag("kubernetes.podspec-dryrun", &nc.PodSpecDryRun),
 		asFlag("kubernetes.podspec-persistent-volume-write", &nc.PodSpecPersistentVolumeWrite),
 		asFlag("multi-container", &nc.MultiContainer),
 		asFlag("multi-container-probing", &nc.MultiContainerProbing),
 		asFlag("queueproxy.mount-podinfo", &nc.QueueProxyMountPodInfo),
 		asFlag("queueproxy.resource-defaults", &nc.QueueProxyResourceDefaults),
-		asFlag("secure-pod-defaults", &nc.SecurePodDefaults),
+		asSecurePodDefaultsFlag("secure-pod-defaults", &nc.SecurePodDefaults),
 		asFlag("tag-header-based-routing", &nc.TagHeaderBasedRouting),
 		asFlag(FeatureContainerSpecAddCapabilities, &nc.ContainerSpecAddCapabilities),
 		asFlag(FeaturePodSpecAffinity, &nc.PodSpecAffinity),
@@ -134,11 +137,13 @@ func NewFeaturesConfigFromMap(data map[string]string) (*Features, error) {
 		asFlag(FeaturePodSpecFieldRef, &nc.PodSpecFieldRef),
 		asFlag(FeaturePodSpecHostAliases, &nc.PodSpecHostAliases),
 		asFlag(FeaturePodSpecHostIPC, &nc.PodSpecHostIPC),
-		asFlag(FeaturePodSpecHostIPC, &nc.PodSpecHostIPC),
 		asFlag(FeaturePodSpecHostNetwork, &nc.PodSpecHostNetwork),
 		asFlag(FeaturePodSpecHostPID, &nc.PodSpecHostPID),
 		asFlag(FeaturePodSpecHostPath, &nc.PodSpecVolumesHostPath),
+		asFlag(FeaturePodSpecVolumesCSI, &nc.PodSpecVolumesCSI),
+		asFlag(FeaturePodSpecVolumesImage, &nc.PodSpecVolumesImage),
 		asFlag(FeaturePodSpecInitContainers, &nc.PodSpecInitContainers),
+		asFlag(FeaturePodSpecVolumesMountPropagation, &nc.PodSpecVolumesMountPropagation),
 		asFlag(FeaturePodSpecNodeSelector, &nc.PodSpecNodeSelector),
 		asFlag(FeaturePodSpecPVClaim, &nc.PodSpecPersistentVolumeClaim),
 		asFlag(FeaturePodSpecPriorityClassName, &nc.PodSpecPriorityClassName),
@@ -165,7 +170,6 @@ type Features struct {
 	MultiContainerProbing            Flag
 	PodSpecAffinity                  Flag
 	PodSpecTopologySpreadConstraints Flag
-	PodSpecDryRun                    Flag
 	PodSpecFieldRef                  Flag
 	PodSpecHostAliases               Flag
 	PodSpecNodeSelector              Flag
@@ -181,6 +185,9 @@ type Features struct {
 	PodSpecTolerations               Flag
 	PodSpecVolumesEmptyDir           Flag
 	PodSpecVolumesHostPath           Flag
+	PodSpecVolumesMountPropagation   Flag
+	PodSpecVolumesCSI                Flag
+	PodSpecVolumesImage              Flag
 	PodSpecInitContainers            Flag
 	PodSpecPersistentVolumeClaim     Flag
 	PodSpecPersistentVolumeWrite     Flag
@@ -194,10 +201,27 @@ type Features struct {
 }
 
 // asFlag parses the value at key as a Flag into the target, if it exists.
+// Only accepts Enabled, Disabled, and Allowed values.
 func asFlag(key string, target *Flag) cm.ParseFunc {
 	return func(data map[string]string) error {
 		if raw, ok := data[key]; ok {
 			for _, flag := range []Flag{Enabled, Allowed, Disabled} {
+				if strings.EqualFold(raw, string(flag)) {
+					*target = flag
+					return nil
+				}
+			}
+		}
+		return nil
+	}
+}
+
+// asSecurePodDefaultsFlag parses the value at key as a Flag into the target, if it exists.
+// Accepts Enabled, Disabled, Allowed, and SecureDefaultsOverridable values.
+func asSecurePodDefaultsFlag(key string, target *Flag) cm.ParseFunc {
+	return func(data map[string]string) error {
+		if raw, ok := data[key]; ok {
+			for _, flag := range []Flag{Disabled, AllowRootBounded, Enabled} {
 				if strings.EqualFold(raw, string(flag)) {
 					*target = flag
 					return nil

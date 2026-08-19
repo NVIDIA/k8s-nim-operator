@@ -44,7 +44,7 @@ jobs:
           echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION := }" >> $GITHUB_ENV
 
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@v0.3.4
+        uses: NVIDIA/holodeck@v0.3.7
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -52,7 +52,7 @@ jobs:
           holodeck_config: "test/e2e/infra/aws.yml"
 
       - name: Install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
@@ -99,7 +99,7 @@ jobs:
       - name: Send Slack alert notification
         id: slack
         if: false
-        uses: slackapi/slack-github-action@v3.0.3
+        uses: slackapi/slack-github-action@v4.0.0
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SUMMARY_URL: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}

@@ -3,17 +3,31 @@
 # SPDX-License-Identifier: Apache-2.0
 set -euo pipefail
 
+# Detach stdin so kubectl cannot block on an interactive credential prompt
+# (for example "Please enter Username:") when the kubeconfig lacks credentials.
+exec </dev/null
+
 namespace="${NIM_OPERATOR_NAMESPACE:-nim-operator}"
 release="${NIM_OPERATOR_RELEASE:-nim-operator}"
 gpu_namespace="${GPU_OPERATOR_NAMESPACE:-gpu-operator}"
+
+# Bound every kubectl call so an unreachable/black-hole API endpoint cannot
+# stall the diagnostics for the full default TCP timeout. Override via
+# KUBECTL_REQUEST_TIMEOUT (for example "30s") for slow or large clusters.
+kubectl() {
+  command kubectl --request-timeout="${KUBECTL_REQUEST_TIMEOUT:-10s}" "$@"
+}
 
 section() {
   printf '\n== %s ==\n' "$1"
 }
 
+# Report failures instead of aborting: this is a diagnostic script and must keep
+# running (and covering later sections) even when an individual probe fails
+# (for example an unreachable cluster, or "kubectl auth can-i" returning "no").
 run() {
   printf '+ %s\n' "$*"
-  "$@"
+  "$@" || printf '  (command failed: exit %s)\n' "$?"
 }
 
 section "Client tools"

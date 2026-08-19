@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -46,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	nvidiaresourcev1beta1 "sigs.k8s.io/dra-driver-nvidia-gpu/api/nvidia.com/resource/v1beta1"
 	inferencev1 "sigs.k8s.io/gateway-api-inference-extension/api/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	lws "sigs.k8s.io/lws/api/leaderworkerset/v1"
@@ -54,10 +54,20 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/nimmodels"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nimsource"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 	rendertypes "github.com/NVIDIA/k8s-nim-operator/internal/render/types"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
+)
+
+const (
+	// deploymentNotReadyRequeue is how long to wait before re-checking Deployment
+	// readiness when the NIMService is not yet Ready.
+	deploymentNotReadyRequeue = 30 * time.Second
+	// autoscalingDisableRequeue is a short requeue used after disabling
+	// autoscaling so a late HPA write cannot permanently pin Deployment replicas.
+	autoscalingDisableRequeue = 5 * time.Second
 )
 
 // GetScheme returns the scheme of the reconciler.
@@ -266,6 +276,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	// Sync HPA
+	autoscalingJustDisabled := false
 	if nimService.IsAutoScalingEnabled() {
 		err = r.renderAndSyncResource(ctx, nimService, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
 			return renderer.HPA(nimService.GetHPAParams())
@@ -274,10 +285,16 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			return ctrl.Result{}, err
 		}
 	} else {
-		// If autoscaling is disabled, ensure the HPA is deleted
+		// If autoscaling is disabled, ensure the HPA is deleted. Track whether an
+		// HPA existed so we can requeue once and win races with late HPA writes.
+		existingHPA := &autoscalingv2.HorizontalPodAutoscaler{}
+		hpaGetErr := r.Get(ctx, namespacedName, existingHPA)
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+		if hpaGetErr == nil {
+			autoscalingJustDisabled = true
 		}
 	}
 
@@ -538,7 +555,13 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		deploymentParams := nimService.GetDeploymentParams()
 		deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
 		deploymentParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
-		if nimCache.IsUniversalNIM() {
+
+		modelLayout, err := nimsource.ResolveModelLayout(ctx, r.imageProtocolResolver, nimService, &nimCache)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		if nimCache.IsUniversalNIM() && !modelLayout.Protocol.IsNative() {
 			hfUri := nimCache.GetHFUri()
 			deploymentParams.Env = utils.MergeEnvVars([]corev1.EnvVar{{
 				Name:  "NIM_MODEL_NAME",
@@ -552,40 +575,96 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			}}, deploymentParams.Env)
 		}
 
+		// Native (NIMCraft) single-model NIMs read their weights from a
+		// per-instance directory under /model so multiple NIMs can share one PVC.
+		// This must match NIM_ENGINE_MODEL_PATH used by the NIMCache caching job.
+		// It is operator-owned (merged as the winning side) since it is tied to
+		// the mounted volume layout.
+		if modelLayout.Protocol.IsNative() {
+			deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{{
+				Name:  "NIM_ENGINE_MODEL_PATH",
+				Value: nimsource.NativeModelPathForCache(&nimCache),
+			}})
+
+			// Native (NIMCraft) single-model NIMs resolve their model source at
+			// runtime and authenticate with either NGC_API_KEY or HF_TOKEN. The
+			// standard env requires NGC_API_KEY, which breaks auth secrets that
+			// only carry an HF token. Make NGC_API_KEY optional and surface
+			// HF_TOKEN (also optional) so either credential works.
+			// When AuthSecret is unset (air-gapped / pre-cached), omit both keys.
+			deploymentParams.Env = utils.RemoveEnvVar(deploymentParams.Env, appsv1alpha1.NGCAPIKey)
+			if nimService.Spec.AuthSecret != "" {
+				deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
+					{
+						Name: appsv1alpha1.NGCAPIKey,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key:      appsv1alpha1.NGCAPIKey,
+								Optional: &[]bool{true}[0],
+							},
+						},
+					},
+					{
+						Name: appsv1alpha1.HFToken,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key:      appsv1alpha1.HFToken,
+								Optional: &[]bool{true}[0],
+							},
+						},
+					},
+				})
+			}
+		}
+
 		// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, add the HF_TOKEN to the environment variables and make NGC_API_KEY optional
 		// For custom models stored in Datastore, the NIM Container needs to access NGC to download base model. However, NGC_API_KEY is not required for Hugging Face models.
 		if nimCache.IsHFModel() || nimService.IsHFModel() {
 			deploymentParams.Env = utils.RemoveEnvVar(deploymentParams.Env, appsv1alpha1.NGCAPIKey)
-			deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
-				{
-					Name: appsv1alpha1.NGCAPIKey,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+			if nimService.Spec.AuthSecret != "" {
+				deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
+					{
+						Name: appsv1alpha1.NGCAPIKey,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key:      appsv1alpha1.NGCAPIKey,
+								Optional: &[]bool{true}[0],
 							},
-							Key:      appsv1alpha1.NGCAPIKey,
-							Optional: &[]bool{true}[0],
 						},
 					},
-				},
-				{
-					Name: appsv1alpha1.HFToken,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+					{
+						Name: appsv1alpha1.HFToken,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key: appsv1alpha1.HFToken,
 							},
-							Key: appsv1alpha1.HFToken,
 						},
 					},
-				},
-			})
+				})
+			}
 		}
 
-		// Setup volume mounts with model store
+		// Setup volume mounts with model store. Native (NIMCraft) single-model
+		// NIMs mount the model store PVC at /model and /opt/cache instead of
+		// /model-store, so weights and compiled CUDA kernels persist across restarts.
 		deploymentParams.Volumes = nimService.GetVolumes(modelPVC)
-		deploymentParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
+		if modelLayout.Protocol.IsNative() {
+			deploymentParams.VolumeMounts = nimService.GetNativeVolumeMounts(modelPVC)
+		} else {
+			deploymentParams.VolumeMounts = nimService.GetVolumeMounts(modelPVC)
+		}
 		if profileEnv != nil {
 			deploymentParams.Env = utils.MergeEnvVars(*profileEnv, deploymentParams.Env)
 		}
@@ -593,7 +672,12 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		if gpuResources != nil {
 			deploymentParams.Resources = gpuResources
 		}
-		initContainerVolumeMounts := nimService.GetInitContainerVolumeMounts(modelPVC)
+		var initContainerVolumeMounts []corev1.VolumeMount
+		if modelLayout.Protocol.IsNative() {
+			initContainerVolumeMounts = nimService.GetNativeInitContainerVolumeMounts(modelPVC)
+		} else {
+			initContainerVolumeMounts = nimService.GetInitContainerVolumeMounts(modelPVC)
+		}
 		for idx := range deploymentParams.InitContainers {
 			deploymentParams.InitContainers[idx].VolumeMounts = initContainerVolumeMounts
 		}
@@ -654,25 +738,42 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
 			"NIMService %s not ready, msg: %s", nimService.Name, msg)
-	} else {
-		// Update NIMServiceStatus with model config.
-		updateErr := r.updateModelStatus(ctx, nimService)
-		if updateErr != nil {
-			logger.V(4).Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		if err != nil {
+			logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.NotReady)
+			return ctrl.Result{}, err
 		}
-
-		// Update status as ready
-		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
-		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
-			"NIMService %s ready, msg: %s", nimService.Name, msg)
+		return ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}, nil
 	}
 
+	// Update NIMServiceStatus with model config.
+	updateErr := r.updateModelStatus(ctx, nimService)
+	if updateErr != nil {
+		logger.V(4).Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// Update status as ready
+	err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
+	r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
+		"NIMService %s ready, msg: %s", nimService.Name, msg)
 	if err != nil {
 		logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.Ready)
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, nil
+
+	result := ctrl.Result{}
+	if autoscalingJustDisabled {
+		// Requeue so any late HPA mutation of Deployment replicas is overwritten
+		// with spec.replicas after the HPA is gone.
+		result.RequeueAfter = autoscalingDisableRequeue
+	} else if !nimService.IsAutoScalingEnabled() && nimService.Spec.MultiNode == nil {
+		if outOfSync, syncErr := r.deploymentReplicasOutOfSync(ctx, namespacedName, nimService.GetReplicas()); syncErr != nil {
+			return ctrl.Result{}, syncErr
+		} else if outOfSync {
+			result.RequeueAfter = autoscalingDisableRequeue
+		}
+	}
+	return result, nil
 }
 
 func (r *NIMServiceReconciler) createMultiNodeVolumeObjects(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
@@ -942,8 +1043,18 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	// Track an existing resource
 	found := getErr == nil
 
-	// Don't do anything if CR is unchanged.
-	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
+	parentSpecChanged := !found || utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec))
+	// When autoscaling is disabled, HPA may have left Deployment replicas drifted
+	// after the parent-spec hash was already written. Still sync in that case.
+	replicasOutOfSync := false
+	if found && !nimService.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			replicasOutOfSync = deploymentSpecReplicasOutOfSync(curr, nimService.GetReplicas())
+		}
+	}
+
+	// Don't do anything if CR is unchanged and replicas are already correct.
+	if found && !parentSpecChanged && !replicasOutOfSync {
 		return nil
 	}
 
@@ -955,6 +1066,22 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
 				replicas := *curr.Spec.Replicas
 				desired.Spec.Replicas = &replicas
+			}
+		}
+	}
+
+	// When autoscaling is off, live Deployment replicas can drift (e.g. late HPA
+	// writes) while the stored resource hash still matches the desired spec.
+	// Clear the hash annotation so SyncResource does not skip the update.
+	if found && !nimService.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			if desired, ok := resource.(*appsv1.Deployment); ok &&
+				deploymentSpecReplicasOutOfSync(curr, desired.Spec.Replicas) {
+				annotations := curr.GetAnnotations()
+				if annotations != nil {
+					delete(annotations, utils.NvidiaAnnotationHashKey)
+					curr.SetAnnotations(annotations)
+				}
 			}
 		}
 	}
@@ -1026,6 +1153,30 @@ func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespaced
 		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
 	}
 	return fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name), true, nil
+}
+
+// deploymentSpecReplicasOutOfSync reports whether the Deployment's spec.replicas
+// differs from the desired replica count.
+func deploymentSpecReplicasOutOfSync(deployment *appsv1.Deployment, desired *int32) bool {
+	if desired == nil {
+		return false
+	}
+	if deployment.Spec.Replicas == nil {
+		return true
+	}
+	return *deployment.Spec.Replicas != *desired
+}
+
+func (r *NIMServiceReconciler) deploymentReplicasOutOfSync(ctx context.Context, namespacedName types.NamespacedName, desired *int32) (bool, error) {
+	deployment := &appsv1.Deployment{}
+	err := r.Get(ctx, namespacedName, deployment)
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return deploymentSpecReplicasOutOfSync(deployment, desired), nil
 }
 
 func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.DeploymentConditionType) *appsv1.DeploymentCondition {

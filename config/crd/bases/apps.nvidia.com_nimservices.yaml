@@ -968,7 +968,9 @@ spec:
                   type: string
                 type: array
               authSecret:
-                description: The name of an existing pull secret containing the NGC_API_KEY
+                description: |-
+                  AuthSecret is the name of an existing secret containing the NGC_API_KEY (and optionally HF_TOKEN).
+                  It is optional for air-gapped deployments that serve a pre-cached model
                 type: string
               command:
                 items:
@@ -3961,8 +3963,8 @@ spec:
                                   and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
                                   triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
 
-                                  This is an beta field and requires the HPAConfigurableTolerance feature
-                                  gate to be enabled.
+                                  This is an alpha field and requires enabling the HPAConfigurableTolerance
+                                  feature gate.
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                             type: object
@@ -4036,8 +4038,8 @@ spec:
                                   and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
                                   triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
 
-                                  This is an beta field and requires the HPAConfigurableTolerance feature
-                                  gate to be enabled.
+                                  This is an alpha field and requires enabling the HPAConfigurableTolerance
+                                  feature gate.
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                             type: object
@@ -4984,10 +4986,9 @@ spec:
                     operator:
                       description: |-
                         Operator represents a key's relationship to the value.
-                        Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
+                        Valid operators are Exists and Equal. Defaults to Equal.
                         Exists is equivalent to wildcard for value, so that a pod can
                         tolerate all taints of a particular category.
-                        Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                       type: string
                     tolerationSeconds:
                       description: |-
@@ -5008,7 +5009,6 @@ spec:
                 format: int64
                 type: integer
             required:
-            - authSecret
             - image
             type: object
             x-kubernetes-validations:

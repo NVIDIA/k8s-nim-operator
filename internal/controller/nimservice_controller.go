@@ -18,10 +18,12 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"sync"
+	"time"
 
-	nvidiaresourcev1beta1 "github.com/NVIDIA/k8s-dra-driver-gpu/api/nvidia.com/resource/v1beta1"
 	"github.com/go-logr/logr"
 	kservev1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,11 +40,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+	nvidiaresourcev1beta1 "sigs.k8s.io/dra-driver-nvidia-gpu/api/nvidia.com/resource/v1beta1"
 	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -59,6 +64,12 @@ import (
 // NIMServiceFinalizer is the finalizer annotation.
 const NIMServiceFinalizer = "finalizer.nimservice.apps.nvidia.com"
 
+// inferenceServiceCRDRequeueInterval is how long to wait before retrying when a
+// KServe NIMService is reconciled but the InferenceService CRD is not yet installed.
+const inferenceServiceCRDRequeueInterval = 30 * time.Second
+
+var errInferenceServiceCRDMissing = errors.New("InferenceService CRD is not available")
+
 // NIMServiceReconciler reconciles a NIMService object.
 type NIMServiceReconciler struct {
 	client.Client
@@ -71,6 +82,15 @@ type NIMServiceReconciler struct {
 	orchestratorType k8sutil.OrchestratorType
 	recorder         record.EventRecorder
 	apiReader        client.Reader
+
+	// mgr and controller are retained so an InferenceService owner watch can be
+	// registered on first demand when a KServe NIMService is reconciled and the
+	// CRD was missing at operator start-up.
+	mgr        ctrl.Manager
+	controller controller.Controller
+
+	inferenceServiceWatchMu         sync.Mutex
+	inferenceServiceWatchRegistered bool
 }
 
 // Ensure NIMServiceReconciler implements the Reconciler interface.
@@ -137,6 +157,21 @@ func (r *NIMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	logger.Info("Reconciling", "NIMService", nimService.Name)
+
+	// For KServe NIMServices, ensure we are watching InferenceServices. If the
+	// CRD was missing at operator start-up, register the owner watch on first
+	// demand.
+	if nimService.Spec.InferencePlatform == appsv1alpha1.PlatformTypeKServe {
+		if err := r.ensureInferenceServiceWatch(); err != nil {
+			if errors.Is(err, errInferenceServiceCRDMissing) {
+				logger.Info("InferenceService CRD not available yet; requeueing",
+					"NIMService", nimService.Name)
+				return ctrl.Result{RequeueAfter: inferenceServiceCRDRequeueInterval}, nil
+			}
+			logger.Error(err, "failed to ensure InferenceService watch")
+			return ctrl.Result{}, err
+		}
+	}
 
 	// Get platform implementation based on NIMService's platform field
 	platformImpl, err := platform.GetInferencePlatform(nimService.Spec.InferencePlatform)
@@ -339,14 +374,14 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
-		r.discoveryClient,
-		nimServiceBuilder,
-		kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"),
-		&kservev1beta1.InferenceService{},
-	)
+	isvcGVR := kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices")
+	isvcCRDExists, err := k8sutil.CRDExists(r.discoveryClient, isvcGVR)
 	if err != nil {
 		return err
+	}
+	if isvcCRDExists {
+		nimServiceBuilder = nimServiceBuilder.Owns(&kservev1beta1.InferenceService{})
+		r.inferenceServiceWatchRegistered = true
 	}
 
 	nimServiceBuilder, err = k8sutil.ControllerOwnsIfCRDExists(
@@ -393,7 +428,66 @@ func (r *NIMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	return nimServiceBuilder.Complete(r)
+	c, err := nimServiceBuilder.Build(r)
+	if err != nil {
+		return err
+	}
+
+	// Retain manager/controller handles so a missing InferenceService watch can
+	// be registered later on the first KServe NIMService reconcile.
+	r.mgr = mgr
+	r.controller = c
+	return nil
+}
+
+// ensureInferenceServiceWatch registers an InferenceService owner watch on first
+// demand when a KServe NIMService is reconciled and the CRD is available.
+// If the CRD is still missing, it returns errInferenceServiceCRDMissing so the
+// caller can requeue.
+func (r *NIMServiceReconciler) ensureInferenceServiceWatch() error {
+	r.inferenceServiceWatchMu.Lock()
+	defer r.inferenceServiceWatchMu.Unlock()
+
+	if r.inferenceServiceWatchRegistered {
+		return nil
+	}
+	if r.controller == nil || r.mgr == nil {
+		return nil
+	}
+
+	isvcGVR := kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices")
+	exists, err := k8sutil.CRDExists(r.discoveryClient, isvcGVR)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errInferenceServiceCRDMissing
+	}
+
+	logger := r.log.WithName("inferenceServiceWatch")
+	logger.Info("registering InferenceService owner watch for KServe NIMService")
+
+	// Refresh the RESTMapper so the new CRD is resolvable without a restart.
+	if resettable, ok := r.mgr.GetRESTMapper().(interface{ Reset() }); ok {
+		resettable.Reset()
+	}
+
+	if err := r.controller.Watch(source.Kind(
+		r.mgr.GetCache(),
+		&kservev1beta1.InferenceService{},
+		handler.TypedEnqueueRequestForOwner[*kservev1beta1.InferenceService](
+			r.mgr.GetScheme(),
+			r.mgr.GetRESTMapper(),
+			&appsv1alpha1.NIMService{},
+			handler.OnlyControllerOwner(),
+		),
+	)); err != nil {
+		return err
+	}
+
+	r.inferenceServiceWatchRegistered = true
+	logger.Info("registered InferenceService owner watch")
+	return nil
 }
 
 func (r *NIMServiceReconciler) mapNIMCacheToNIMService(ctx context.Context, obj client.Object) []ctrl.Request {
