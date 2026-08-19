@@ -18,6 +18,7 @@ package standalone
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -127,7 +128,7 @@ func (s *Standalone) Sync(ctx context.Context, r shared.Reconciler, resource cli
 		if err != nil {
 			if errors.IsConflict(err) {
 				// Ignore conflict errors and retry.
-				return ctrl.Result{Requeue: true}, nil
+				return ctrl.Result{RequeueAfter: time.Second}, nil
 			}
 			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, "ReconcileFailed",
 				"NIMService %s failed, msg: %s", nimService.Name, err.Error())

@@ -1,0 +1,51 @@
+---
+# NIM Cache for NVIDIA NeMo Retriever Embedding NIM 2.x+.
+# These containers have no model_manifest.yaml / model profiles. The Operator
+# downloads weights without starting the service and reuses the PVC at deploy.
+# Default download provider is Hugging Face (authSecret must contain HF_TOKEN).
+# To use NGC instead, set authSecret to ngc-api-secret and add
+# NIM_MODEL_DOWNLOAD_PROVIDER=ngc on both resources.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: llama-nemotron-embed-vl-1b-v2
+  namespace: nim-service
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/nvidia/llama-nemotron-embed-vl-1b-v2:2.3.0
+      pullSecret: ngc-secret
+      authSecret: hf-api-secret
+  storage:
+    pvc:
+      create: true
+      storageClass: ""
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+
+---
+# NIMService for NeMo Retriever Embedding NIM 2.x+.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: llama-nemotron-embed-vl-1b-v2
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/llama-nemotron-embed-vl-1b-v2
+    tag: "2.3.0"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: hf-api-secret
+  storage:
+    nimCache:
+      name: llama-nemotron-embed-vl-1b-v2
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
