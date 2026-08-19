@@ -10,7 +10,7 @@ spec:
       spec:
         image:
           repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
-          tag: 1.3.3
+          tag: 1.15.5
           pullPolicy: IfNotPresent
           pullSecrets:
           - ngc-secret
@@ -32,7 +32,7 @@ spec:
       spec:
         image:
           repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
-          tag: 1.3.1
+          tag: "1.10"
           pullPolicy: IfNotPresent
           pullSecrets:
           - ngc-secret
@@ -56,7 +56,7 @@ spec:
       spec:
         image:
           repository: nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
-          tag: 1.3.1
+          tag: "1.8.0"
           pullPolicy: IfNotPresent
           pullSecrets:
           - ngc-secret

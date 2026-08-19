@@ -1,0 +1,55 @@
+---
+# NIM Cache for a NIM 3.0 model-specific container (Nemotron 3 Super).
+# This cache stores NGC model profiles/engines, not Hugging Face weights.
+# It cannot be reused by Model-Free NIM. Check the NIM LLM support matrix
+# for GPU count and product before applying.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: nemotron-3-super-120b-a12b
+  namespace: nim-service
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:3.0.0
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: vllm
+        tensorParallelism: "4"
+  storage:
+    pvc:
+      create: true
+      storageClass: ""
+      size: "250Gi"
+      volumeAccessMode: ReadWriteOnce
+
+---
+# NIMService for NIM 3.0 model-specific Nemotron 3 Super in standard (non-Dynamo) mode.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: nemotron-3-super-120b-a12b
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b
+    tag: "3.0.0"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: nemotron-3-super-120b-a12b
+      profile: ''
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 4
+    requests:
+      nvidia.com/gpu: 4
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000

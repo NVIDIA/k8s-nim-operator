@@ -7,7 +7,7 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.3
+      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.12.0
       pullSecret: ngc-secret
       authSecret: ngc-api-secret
       model:
@@ -44,7 +44,7 @@ spec:
             value: fast_outlines
         image:
           repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
-          tag: 1.8.3
+          tag: 1.12.0
           pullPolicy: IfNotPresent
           pullSecrets:
           - ngc-secret
