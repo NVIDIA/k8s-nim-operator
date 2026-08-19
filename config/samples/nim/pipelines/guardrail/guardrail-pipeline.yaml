@@ -10,7 +10,7 @@ spec:
       spec:
         image:
           repository: nvcr.io/nim/nvidia/llama-3.1-nemoguard-8b-content-safety
-          tag: 1.0.0
+          tag: "1.10.2"
           pullPolicy: IfNotPresent
           pullSecrets:
           - ngc-secret
@@ -32,7 +32,7 @@ spec:
       spec:
         image:
           repository: nvcr.io/nim/nvidia/llama-3.1-nemoguard-8b-topic-control
-          tag: 1.0.0
+          tag: "1.10.1"
           pullPolicy: IfNotPresent
           pullSecrets:
           - ngc-secret
@@ -54,7 +54,7 @@ spec:
       spec:
         image:
           repository: nvcr.io/nim/nvidia/nemoguard-jailbreak-detect
-          tag: 1.0.0
+          tag: "1.10.1"
           pullPolicy: IfNotPresent
           pullSecrets:
           - ngc-secret

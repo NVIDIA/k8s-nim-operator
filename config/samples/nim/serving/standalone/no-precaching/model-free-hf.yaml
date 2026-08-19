@@ -1,26 +1,31 @@
 ---
-# NIM Service with Multi-LLM NIM with model not pre-cached
+# Model-Free NIM 3.0 downloading from Hugging Face at startup (no NIMCache).
+# For production, prefer caching/hf/nimcache-model-free.yaml plus
+# serving/standalone/basic/model-free.yaml so weights are not re-downloaded
+# on every pod start.
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: meta-llama-3-2-1b-instruct
+  name: model-free-llama-3-2-1b-instruct
   namespace: nim-service
 spec:
   image:
-    repository: nvcr.io/nim/nvidia/llm-nim
-    tag: "1.15.0"
+    repository: nvcr.io/nim/nvidia/model-free-nim
+    tag: "3.0.0"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
-  authSecret: hf-secret # with HF_TOKEN set
+  authSecret: hf-secret # secret must contain HF_TOKEN
   env:
-    - name: NIM_MODEL_NAME
+    - name: NIM_MODEL_PATH
       value: hf://meta-llama/Llama-3.2-1B-Instruct
+    - name: NIM_SERVED_MODEL_NAME
+      value: meta-llama/Llama-3.2-1B-Instruct
   storage:
     pvc:
       create: true
       storageClass: ''
-      size: 10Gi
+      size: 50Gi
       volumeAccessMode: ReadWriteOnce
   resources:
     limits:
@@ -36,4 +41,3 @@ spec:
     service:
       type: ClusterIP
       port: 8000
-

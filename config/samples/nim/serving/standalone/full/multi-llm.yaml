@@ -11,7 +11,7 @@ spec:
       endpoint: "https://huggingface.co"
       namespace: "meta-llama"
       authSecret: hf-api-secret
-      modelPuller: nvcr.io/nim/nvidia/llm-nim:1.12
+      modelPuller: nvcr.io/nim/nvidia/llm-nim:1.15.0
       pullSecret: ngc-secret
       modelName: "Llama-3.2-1B-Instruct"
   storage:
@@ -32,7 +32,7 @@ metadata:
 spec:
   image:
     repository: nvcr.io/nim/nvidia/llm-nim
-    tag: "1.12"
+    tag: "1.15.0"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret

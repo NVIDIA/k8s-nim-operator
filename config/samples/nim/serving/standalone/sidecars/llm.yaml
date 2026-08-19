@@ -1,0 +1,44 @@
+---
+# NIMService demonstrating spec.initContainers and spec.sidecarContainers.
+# Use cases include proxy sidecars, agents, or loading LoRA adapters from
+# Hugging Face, NGC, or other sources before the NIM starts.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-3-2-1b-instruct-sidecars
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
+    tag: "1.12.0"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    emptyDir:
+      sizeLimit: 10Gi
+  initContainers:
+    - name: prepare-model-store
+      image:
+        repository: busybox
+        tag: "1.36"
+        pullPolicy: IfNotPresent
+      command: ["sh", "-c"]
+      args: ["mkdir -p /tmp/model-store && echo 'init complete'"]
+  sidecarContainers:
+    - name: log-sidecar
+      image:
+        repository: busybox
+        tag: "1.36"
+        pullPolicy: IfNotPresent
+      command: ["sh", "-c"]
+      args: ["while true; do sleep 3600; done"]
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
