@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -367,6 +368,8 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(*pod.Spec.SecurityContext.FSGroup).To(Equal(int64(2000)))
 			Expect(*pod.Spec.SecurityContext.RunAsNonRoot).To(Equal(true))
 			Expect(pod.Spec.NodeSelector["feature.node.kubernetes.io/pci-10de.present"]).To(Equal("true"))
+			Expect(strings.Join(pod.Spec.Containers[0].Command, " ")).To(ContainSubstring("NIM_OPERATOR_CAP download_to_cache"))
+			Expect(strings.Join(pod.Spec.Containers[0].Command, " ")).To(ContainSubstring("nimlib_download"))
 			// Add resource checks
 			resources := pod.Spec.Containers[0].Resources
 			Expect(resources.Requests.Cpu().String()).To(Equal("250m"))
@@ -507,6 +510,59 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(job.Spec.Template.Spec.ImagePullSecrets[0].Name).To(Equal("my-secret"))
 			Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElements("download-to-cache"))
 			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--all"))
+		})
+
+		It("should construct a nimlib download job when download-to-cache is unavailable", func() {
+			profiles := []string{"MolMIM"}
+			profilesJSON, err := json.Marshal(profiles)
+			Expect(err).ToNot(HaveOccurred())
+
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-molmim-cache",
+					Namespace:   "default",
+					Annotations: map[string]string{SelectedNIMProfilesAnnotationKey: string(profilesJSON)},
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim/nvidia/molmim:1.0.0", PullSecret: "my-secret"}},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					DownloadMethod: appsv1alpha1.NIMCacheDownloadMethodNIMLib,
+				},
+			}
+
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
+			Expect(err).ToNot(HaveOccurred())
+
+			container := job.Spec.Template.Spec.Containers[0]
+			Expect(container.Image).To(Equal("nvcr.io/nim/nvidia/molmim:1.0.0"))
+			Expect(container.Command).To(Equal([]string{"sh", "-c", "set -e\nNIM_MANIFEST_PROFILE=MolMIM python3 -c \"from nimlib import nimutils; nimutils.download_models()\"\n"}))
+			Expect(container.Args).To(BeEmpty())
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{Name: "NIM_CACHE_PATH", Value: "/model-store"}))
+			Expect(container.Command).ToNot(ContainElement("download-to-cache"))
+		})
+
+		It("should construct a nimlib download job for all profiles without NIM_MANIFEST_PROFILE", func() {
+			profiles := []string{AllProfiles}
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-molmim-cache",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim/nvidia/molmim:1.0.0", PullSecret: "my-secret", Model: &appsv1alpha1.ModelSpec{Profiles: profiles}}},
+				},
+				Status: appsv1alpha1.NIMCacheStatus{
+					DownloadMethod: appsv1alpha1.NIMCacheDownloadMethodNIMLib,
+				},
+			}
+
+			job, err := reconciler.constructJob(context.TODO(), nimCache, k8sutil.K8s)
+			Expect(err).ToNot(HaveOccurred())
+
+			container := job.Spec.Template.Spec.Containers[0]
+			Expect(container.Command).To(Equal([]string{"python3", "-c", "from nimlib import nimutils; nimutils.download_models()"}))
+			Expect(container.Args).To(BeEmpty())
 		})
 
 		It("should create a job with the correct specifications", func() {

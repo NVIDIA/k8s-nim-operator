@@ -1,0 +1,12 @@
+model_profile: MolMIM
+manifest:
+  - id: a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0
+    tags:
+      backend: tensorrt
+      precision: fp16
+      gpu: A100
+      product_name_regex: ^NVIDIA-A100.*
+  - id: 0fedcba9876543210fedcba9876543210fedcba9876543210fedcba987654321
+    tags:
+      backend: pytorch
+      precision: fp16

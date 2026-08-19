@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"maps"
 	"os"
 	"regexp"
@@ -281,19 +282,20 @@ func (NIMParser) ParseModelManifest(filePath string) (nimparser.NIMManifestInter
 	if err != nil {
 		return nil, err
 	}
-
-	var config NIMManifest
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return nil, err
-	}
-	return config, nil
-
+	return NIMParser{}.ParseModelManifestFromRawOutput(data)
 }
 
 func (NIMParser) ParseModelManifestFromRawOutput(data []byte) (nimparser.NIMManifestInterface, error) {
+	normalized, isLegacy, err := nimparser.NormalizeLegacyManifest(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to normalize legacy model manifest: %w", err)
+	}
+	if isLegacy {
+		data = normalized
+	}
+
 	var config NIMManifest
-	err := yaml.Unmarshal(data, &config)
+	err = yaml.Unmarshal(data, &config)
 	if err != nil {
 		return nil, err
 	}
