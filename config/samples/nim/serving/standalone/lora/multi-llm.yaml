@@ -10,7 +10,7 @@ metadata:
 spec:
   image:
     repository: nvcr.io/nim/nvidia/llm-nim
-    tag: "1.12"
+    tag: "1.15.0"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
