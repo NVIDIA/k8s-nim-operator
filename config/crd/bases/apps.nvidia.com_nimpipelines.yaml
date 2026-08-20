@@ -1109,6 +1109,7 @@ spec:
                                             required:
                                             - key
                                             - op
+                                            - value
                                             type: object
                                           type: array
                                         capacitySelectors:

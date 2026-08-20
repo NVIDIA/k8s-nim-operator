@@ -157,6 +157,11 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 		}
 		for deviceIdx, device := range resource.ClaimCreationSpec.Devices {
 			for attributeIdx, attribute := range device.AttributeSelectors {
+				if attribute.Value == nil {
+					msg := fmt.Sprintf("spec.draResources[%d].claimCreationSpec.devices[%d].attributeSelectors[%d].value: value is required", idx, deviceIdx, attributeIdx)
+					logger.Error(errors.New(msg), msg, "nimService", nimService.Name)
+					return false, msg, nil
+				}
 				if attribute.Value.VersionValue == nil {
 					continue
 				}
