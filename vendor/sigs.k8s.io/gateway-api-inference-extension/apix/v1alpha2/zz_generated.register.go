@@ -34,6 +34,7 @@ const GroupName = "inference.networking.x-k8s.io"
 var GroupVersion = v1.GroupVersion{Group: GroupName, Version: "v1alpha2"}
 
 // SchemeGroupVersion is group version used to register these objects
+//
 // Deprecated: use GroupVersion instead.
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha2"}
 
@@ -65,8 +66,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&InferenceModelRewriteList{},
 		&InferenceObjective{},
 		&InferenceObjectiveList{},
-		&InferencePool{},
-		&InferencePoolList{},
 	)
 	// AddToGroupVersion allows the serialization of client types like ListOptions.
 	v1.AddToGroupVersion(scheme, SchemeGroupVersion)
