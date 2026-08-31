@@ -1,0 +1,7 @@
+model_profile: MolMIM
+manifest:
+  - f1e2d3c4b5a697887766554433221100ffeeddccbbaa99887766554433221100:
+      tags:
+        backend: tensorrt
+        precision: fp16
+        product_name_regex: ^NVIDIA-L40S.*

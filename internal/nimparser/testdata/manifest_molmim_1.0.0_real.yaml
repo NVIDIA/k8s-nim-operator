@@ -1,0 +1,14 @@
+model_profile: MolMIM
+manifest:
+  # This is the ID of the profile that can be specified with the NIM_MANIFEST_PROFILE environment variable.
+  - id: MolMIM
+    model: MolMIM
+    nim_name: nvidia/molmim
+    release: '1.0.0'
+    tags:
+      backend: pytorch
+    workspace: 
+      components:
+      - dst: 'models/'
+        src:
+          repo_id: nim/nvidia/molmim:1.3
