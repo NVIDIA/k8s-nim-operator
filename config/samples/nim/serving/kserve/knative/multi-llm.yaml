@@ -11,7 +11,7 @@ spec:
       endpoint: "https://huggingface.co"
       namespace: "nvidia"
       authSecret: hf-api-secret
-      modelPuller: nvcr.io/nim/nvidia/llm-nim:1.12
+      modelPuller: nvcr.io/nim/nvidia/llm-nim:1.15.0
       pullSecret: ngc-secret
       modelName: "Llama-3.1-Nemotron-Nano-8B-v1"
   storage:
@@ -42,7 +42,7 @@ spec:
     autoscaling.knative.dev/max-scale: "10"
   image:
     repository: nvcr.io/nim/nvidia/llm-nim
-    tag: "1.12"
+    tag: "1.15.0"
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
