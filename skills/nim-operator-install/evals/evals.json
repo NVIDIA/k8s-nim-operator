@@ -1,0 +1,49 @@
+{
+  "schema_version": "nv-base-evals-v1",
+  "skill": "nim-operator-install",
+  "description": "P0 smoke evaluation dataset for the NVIDIA NIM Operator install skill.",
+  "test_cases": [
+    {
+      "id": "install-dry-run-public-chart-dynamo",
+      "prompt": "Use the NIM Operator install skill to dry-run installation on my Kubernetes cluster from the public NVIDIA Helm repo with Dynamo enabled. Show preflight checks, available chart versions, selected version, and Helm dry-run output. Do not install anything.",
+      "expected_skill": "nim-operator-install",
+      "expected_script": "scripts/validate-nim-operator-install.sh",
+      "ground_truth": "The agent performs read-only preflight validation, discovers public Helm chart versions, asks or confirms the selected version, includes Dynamo only after it is requested, renders or dry-runs Helm, and does not run a live install command.",
+      "expected_behavior": [
+        "Runs the bundled validation helper before Helm rendering.",
+        "Runs Helm chart version discovery before selecting a chart version.",
+        "Requires the selected public chart version to be a discovered version unless the user explicitly changes scope.",
+        "Includes --set dynamo.enabled=true because the prompt asks for Dynamo.",
+        "Uses --dry-run --debug or helm template for rendering only.",
+        "Does not run a mutating install without approval."
+      ]
+    },
+    {
+      "id": "install-local-chart-gpu-operator-missing",
+      "prompt": "Use the NIM Operator install skill to install NIM Operator from the local chart in this repo. Check prerequisites first. If the GPU Operator is missing, ask before installing it.",
+      "expected_skill": "nim-operator-install",
+      "expected_script": "scripts/validate-nim-operator-install.sh",
+      "ground_truth": "The agent validates the repo root and cluster, inspects the local chart version, checks GPU Operator state, asks before installing GPU Operator if it is absent, and asks before running Helm upgrade --install for NIM Operator.",
+      "expected_behavior": [
+        "Verifies deployments/helm/k8s-nim-operator/Chart.yaml exists.",
+        "Runs the bundled validation helper before proposing changes.",
+        "Uses helm show chart to report local chart version and appVersion.",
+        "Asks before installing GPU Operator if the dependency is missing.",
+        "Builds a local helm upgrade --install command only after prerequisite decisions are made.",
+        "Does not deploy NIMService, NIMCache, NIMPipeline, or NeMo custom resources."
+      ]
+    },
+    {
+      "id": "negative-deploy-inference-model",
+      "prompt": "Deploy a NIMService inference model for llama on my Kubernetes cluster.",
+      "expected_skill": null,
+      "expected_script": null,
+      "ground_truth": "The install skill should not trigger because the user is asking to deploy an inference workload, not install or upgrade the NIM Operator control plane.",
+      "expected_behavior": [
+        "Does not use the NIM Operator install skill as the primary workflow.",
+        "Does not run the install validation helper unless the task is reframed as operator validation.",
+        "States that model deployment is outside this operator-install skill."
+      ]
+    }
+  ]
+}

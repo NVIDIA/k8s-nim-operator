@@ -5,12 +5,13 @@ Use this reference to validate an uninstall plan and the final cluster state aft
 ## Package Validation
 
 ```sh
-test -f .agents/skills/nim-operator-uninstall/SKILL.md
-grep -q '^name: nim-operator-uninstall$' .agents/skills/nim-operator-uninstall/SKILL.md
-grep -q '^description:' .agents/skills/nim-operator-uninstall/SKILL.md
-test -f .agents/skills/nim-operator-uninstall/agents/openai.yaml
-test -f .agents/skills/nim-operator-uninstall/references/validation.md
-test -x .agents/skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
+test -f skills/nim-operator-uninstall/SKILL.md
+grep -q '^name: nim-operator-uninstall$' skills/nim-operator-uninstall/SKILL.md
+grep -q '^description:' skills/nim-operator-uninstall/SKILL.md
+test -L .agents/skills
+test "$(readlink .agents/skills)" = "../skills"
+test -f skills/nim-operator-uninstall/references/validation.md
+test -x skills/nim-operator-uninstall/scripts/validate-nim-operator-uninstall.sh
 ```
 
 ## Plan Validation
@@ -21,6 +22,7 @@ Before uninstalling, verify that the agent has:
 - identified the Helm release and namespace
 - inventoried NIM and NeMo custom resources
 - stated whether CRDs will be preserved or deleted
+- asked "Should I delete all CRDs associated with NIM Operator?" before CRD deletion
 - stated whether the namespace will be preserved or deleted
 - separated Helm uninstall from CRD deletion
 - asked for approval before every destructive step
