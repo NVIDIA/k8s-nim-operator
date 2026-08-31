@@ -100,7 +100,7 @@ type NIMServiceSpec struct {
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
 	// AuthSecret is the name of an existing secret containing the NGC_API_KEY (and optionally HF_TOKEN).
-	// It is optional for air-gapped deployments that serve a pre-cached model
+	// Optional for certain NIMs.
 	AuthSecret string `json:"authSecret,omitempty"`
 	// Storage is the target storage for caching NIM model if NIMCache is not provided
 	Storage      NIMServiceStorage   `json:"storage,omitempty"`
@@ -330,9 +330,8 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 		},
 	}
 
-	// Only inject NGC_API_KEY when AuthSecret is set. Air-gapped deployments that
-	// serve a pre-populated local cache must omit AuthSecret so NIM does not
-	// attempt NGC authentication.
+	// Only inject NGC_API_KEY when AuthSecret is set. The secret key is optional
+	// so certain NIMs can start without it.
 	if n.Spec.AuthSecret != "" {
 		envVars = append(envVars, corev1.EnvVar{
 			Name: NGCAPIKey,
@@ -341,7 +340,8 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: n.Spec.AuthSecret,
 					},
-					Key: NGCAPIKey,
+					Key:      NGCAPIKey,
+					Optional: ptr.To(true),
 				},
 			},
 		})
