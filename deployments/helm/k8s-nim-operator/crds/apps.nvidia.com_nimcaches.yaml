@@ -588,8 +588,9 @@ spec:
                     description: NGCSource represents models stored in NGC
                     properties:
                       authSecret:
-                        description: The name of an existing pull secret containing
-                          the NGC_API_KEY
+                        description: |-
+                          AuthSecret is the name of an existing secret containing the NGC_API_KEY.
+                          Optional for certain NIMs.
                         type: string
                       model:
                         description: Model spec for caching
@@ -662,7 +663,6 @@ spec:
                         description: PullSecret to pull the model puller image
                         type: string
                     required:
-                    - authSecret
                     - modelPuller
                     type: object
                     x-kubernetes-validations:
