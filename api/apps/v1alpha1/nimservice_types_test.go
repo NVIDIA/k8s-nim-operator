@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	kserveconstants "github.com/kserve/kserve/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -857,6 +858,123 @@ func TestGetInferenceServiceParams(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestParseKnativeScaleAnnotation covers parsing of the Knative scale annotations.
+func TestParseKnativeScaleAnnotation(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		present bool
+		want    *int32
+		wantErr bool
+	}{
+		{name: "absent", present: false, want: nil},
+		{name: "empty", present: true, value: "", want: nil},
+		{name: "zero (scale-to-zero)", present: true, value: "0", want: ptr.To[int32](0)},
+		{name: "positive", present: true, value: "5", want: ptr.To[int32](5)},
+		{name: "negative", present: true, value: "-1", wantErr: true},
+		{name: "non-numeric", present: true, value: "abc", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			annotations := map[string]string{}
+			if tt.present {
+				annotations[knativeMinScaleAnnotation] = tt.value
+			}
+			got, err := parseKnativeScaleAnnotation(annotations, knativeMinScaleAnnotation)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			switch {
+			case tt.want == nil && got != nil:
+				t.Fatalf("got %d, want nil", *got)
+			case tt.want != nil && got == nil:
+				t.Fatalf("got nil, want %d", *tt.want)
+			case tt.want != nil && got != nil && *got != *tt.want:
+				t.Fatalf("got %d, want %d", *got, *tt.want)
+			}
+		})
+	}
+}
+
+// TestGetInferenceServiceParamsKnativeScale verifies that Knative scale
+// annotations are translated into the typed predictor min/max replica fields in
+// serverless mode, enabling scale-to-zero.
+func TestGetInferenceServiceParamsKnativeScale(t *testing.T) {
+	newSvc := func(annotations map[string]string) *NIMService {
+		return &NIMService{
+			Spec: NIMServiceSpec{
+				Image:       Image{Repository: "test-repo", Tag: "test-tag"},
+				AuthSecret:  "test-secret",
+				Annotations: annotations,
+				Expose:      Expose{Service: Service{Port: ptr.To[int32](8000)}},
+			},
+		}
+	}
+
+	t.Run("scale-to-zero with max bound", func(t *testing.T) {
+		svc := newSvc(map[string]string{
+			knativeMinScaleAnnotation: "0",
+			knativeMaxScaleAnnotation: "2",
+		})
+		params := svc.GetInferenceServiceParams(kserveconstants.Knative)
+		if params.MinReplicas == nil {
+			t.Fatal("expected MinReplicas to be set, got nil")
+		}
+		if *params.MinReplicas != 0 {
+			t.Errorf("MinReplicas = %d, want 0", *params.MinReplicas)
+		}
+		if params.MaxReplicas == nil {
+			t.Fatal("expected MaxReplicas to be set, got nil")
+		}
+		if *params.MaxReplicas != 2 {
+			t.Errorf("MaxReplicas = %d, want 2", *params.MaxReplicas)
+		}
+		// HPA autoscaler class must NOT be applied in serverless mode.
+		if _, ok := params.Annotations[string(kserveconstants.AutoscalerClass)]; ok {
+			t.Errorf("HPA autoscaler class annotation must not be set in Knative mode")
+		}
+	})
+
+	t.Run("max-scale 0 leaves MaxReplicas unset (unbounded)", func(t *testing.T) {
+		svc := newSvc(map[string]string{
+			knativeMinScaleAnnotation: "1",
+			knativeMaxScaleAnnotation: "0",
+		})
+		params := svc.GetInferenceServiceParams(kserveconstants.Knative)
+		if params.MinReplicas == nil || *params.MinReplicas != 1 {
+			t.Errorf("MinReplicas = %v, want 1", params.MinReplicas)
+		}
+		if params.MaxReplicas != nil {
+			t.Errorf("MaxReplicas = %d, want nil (unbounded)", *params.MaxReplicas)
+		}
+	})
+
+	t.Run("no scale annotations leaves bounds unset", func(t *testing.T) {
+		svc := newSvc(nil)
+		params := svc.GetInferenceServiceParams(kserveconstants.Knative)
+		if params.MinReplicas != nil {
+			t.Errorf("MinReplicas = %d, want nil", *params.MinReplicas)
+		}
+		if params.MaxReplicas != nil {
+			t.Errorf("MaxReplicas = %d, want nil", *params.MaxReplicas)
+		}
+	})
+
+	t.Run("malformed annotation is ignored (no bound set)", func(t *testing.T) {
+		svc := newSvc(map[string]string{knativeMinScaleAnnotation: "abc"})
+		params := svc.GetInferenceServiceParams(kserveconstants.Knative)
+		if params.MinReplicas != nil {
+			t.Errorf("MinReplicas = %d, want nil for malformed input", *params.MinReplicas)
+		}
+	})
 }
 
 // TestReplicasMinimumValidation tests that zero replicas are now allowed.
