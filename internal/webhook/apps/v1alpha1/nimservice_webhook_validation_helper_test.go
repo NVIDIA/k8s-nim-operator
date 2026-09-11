@@ -581,6 +581,33 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 			wantWarnings:    0,
 		},
 		{
+			name: "claimCreationSpec with invalid attribute selector - nil value",
+			modify: func(ns *appsv1alpha1.NIMService) {
+				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
+					ClaimCreationSpec: &appsv1alpha1.DRAClaimCreationSpec{
+						Devices: []appsv1alpha1.DRADeviceSpec{{
+							Name:            "gpu",
+							Count:           1,
+							DeviceClassName: "gpu.nvidia.com",
+							DriverName:      "gpu.nvidia.com",
+							AttributeSelectors: []appsv1alpha1.DRADeviceAttributeSelector{
+								{
+									Key:   "memory",
+									Op:    appsv1alpha1.DRADeviceAttributeSelectorOpEqual,
+									Value: nil,
+								},
+							},
+						}},
+					},
+				}}
+			},
+			k8sVersion:      "v1.34.0",
+			wantErrs:        1,
+			wantErrMsgs:     []string{"spec.draResources[0].claimCreationSpec.devices[0].attributeSelectors[0].value: Required value: is required"},
+			wantWarningMsgs: nil,
+			wantWarnings:    0,
+		},
+		{
 			name: "claimCreationSpec with invalid attribute selector - no value",
 			modify: func(ns *appsv1alpha1.NIMService) {
 				ns.Spec.DRAResources = []appsv1alpha1.DRAResource{{
@@ -772,31 +799,6 @@ func TestValidateDRAResourcesConfiguration(t *testing.T) {
 						t.Errorf("\n  got:  %q\n  want: %q", got, expectedMsg)
 					}
 				}
-			}
-		})
-	}
-}
-
-// TestValidateAuthSecret verifies authSecret is optional, with a warning when empty.
-func TestValidateAuthSecret(t *testing.T) {
-	fld := field.NewPath("spec").Child("authSecret")
-	cases := []struct {
-		name         string
-		value        string
-		wantErrs     int
-		wantWarnings int
-	}{
-		{"non-empty", "secret", 0, 0},
-		{"empty", "", 0, 1},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			w, errs := validateAuthSecret(&tc.value, fld)
-			gotErrs := len(errs)
-			gotWarnings := len(w)
-			if gotErrs != tc.wantErrs || gotWarnings != tc.wantWarnings {
-				t.Logf("Validation errors:")
-				t.Fatalf("got %d errs, %d warnings, want %d errs, %d warnings", gotErrs, gotWarnings, tc.wantErrs, tc.wantWarnings)
 			}
 		})
 	}

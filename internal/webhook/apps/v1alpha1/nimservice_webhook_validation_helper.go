@@ -78,10 +78,6 @@ func validateNIMServiceSpec(ctx context.Context, nimservice *appsv1alpha1.NIMSer
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
-	w, err = validateAuthSecret(&spec.AuthSecret, fldPath.Child("authSecret"))
-	warningList = append(warningList, w...)
-	errList = append(errList, err...)
-
 	w, err = validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
@@ -389,6 +385,11 @@ func validateDRADeviceAttributeSelectorOp(op appsv1alpha1.DRADeviceAttributeSele
 
 func validateDRADeviceAttributeSelectorValue(attribute *appsv1alpha1.DRADeviceAttributeSelectorValue, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
+	if attribute == nil {
+		errList = append(errList, field.Required(fldPath, "is required"))
+		return errList
+	}
+
 	var fieldCount int
 	if attribute.BoolValue != nil {
 		fieldCount++
@@ -439,18 +440,6 @@ func validateDRAResourceQuantitySelectorValue(value *apiresource.Quantity, fldPa
 	errList := field.ErrorList{}
 	if value == nil {
 		errList = append(errList, field.Required(fldPath, "is required"))
-	}
-	return warningList, errList
-}
-
-func validateAuthSecret(authSecret *string, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
-	warningList := admission.Warnings{}
-	errList := field.ErrorList{}
-	// AuthSecret is optional for air-gapped deployments that serve a pre-cached
-	// model from local storage. Warn so users do not omit it unintentionally
-	// when they still need NGC/HF credentials for model download.
-	if authSecret == nil || *authSecret == "" {
-		warningList = append(warningList, fmt.Sprintf("%s is empty: NGC_API_KEY will not be injected. Omit this only for air-gapped deployments with a pre-populated local model cache", fldPath.String()))
 	}
 	return warningList, errList
 }
