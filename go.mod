@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/NVIDIA/k8s-test-infra v0.0.0-20240806103558-2d7411125519
+	github.com/NVIDIA/k8s-test-infra v0.3.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/go-git/go-git/v5 v5.19.1
 	github.com/go-logr/logr v1.4.3
@@ -20,10 +20,10 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.20.2
-	k8s.io/api v0.36.0-rc.0
-	k8s.io/apiextensions-apiserver v0.35.1
-	k8s.io/apimachinery v0.36.0-rc.0
-	k8s.io/client-go v0.36.0-rc.0
+	k8s.io/api v0.36.3
+	k8s.io/apiextensions-apiserver v0.36.3
+	k8s.io/apimachinery v0.36.3
+	k8s.io/client-go v0.36.3
 	k8s.io/dynamic-resource-allocation v0.36.0-rc.0
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	knative.dev/pkg v0.0.0-20260120122510-4a022ed9999a
@@ -76,7 +76,7 @@ require (
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
-	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
+	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
@@ -87,7 +87,7 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
@@ -142,7 +142,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
-	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
@@ -209,7 +209,7 @@ require (
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
@@ -230,16 +230,17 @@ require (
 	k8s.io/component-base v0.36.0-rc.0 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a // indirect
-	k8s.io/kubectl v0.35.1 // indirect
+	k8s.io/kubectl v0.35.3 // indirect
 	knative.dev/networking v0.0.0-20260120131110-a7cdca238a0d // indirect
 	knative.dev/serving v0.48.1 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
-	sigs.k8s.io/node-feature-discovery v0.15.4 // indirect
+	sigs.k8s.io/node-feature-discovery v0.19.0 // indirect
+	sigs.k8s.io/node-feature-discovery/api/nfd v0.19.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
 )
 
 // Keep Kubernetes below v0.36 so helm/kubectl still resolve
