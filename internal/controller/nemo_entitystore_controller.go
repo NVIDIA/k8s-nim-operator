@@ -320,20 +320,28 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 		return ctrl.Result{}, err
 	}
 
-	// Sync role
-	err = r.renderAndSyncResource(ctx, nemoEntitystore, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(nemoEntitystore.GetRoleParams())
-	}, "role", conditions.ReasonRoleFailed)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	// Sync role / rolebinding. SCC rules are OpenShift-only; clean up on other platforms.
+	if k8sutil.IsOpenShift(r.orchestratorType) {
+		err = r.renderAndSyncResource(ctx, nemoEntitystore, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+			return renderer.Role(nemoEntitystore.GetRoleParams(true))
+		}, "role", conditions.ReasonRoleFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
-	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, nemoEntitystore, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
-		return renderer.RoleBinding(nemoEntitystore.GetRoleBindingParams())
-	}, "rolebinding", conditions.ReasonRoleBindingFailed)
-	if err != nil {
-		return ctrl.Result{}, err
+		err = r.renderAndSyncResource(ctx, nemoEntitystore, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+			return renderer.RoleBinding(nemoEntitystore.GetRoleBindingParams())
+		}, "rolebinding", conditions.ReasonRoleBindingFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.Role{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.RoleBinding{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Sync service
@@ -401,6 +409,8 @@ func (r *NemoEntitystoreReconciler) reconcileNemoEntitystore(ctx context.Context
 	}
 
 	deploymentParams := nemoEntitystore.GetDeploymentParams()
+	deploymentParams.Annotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.Annotations, r.orchestratorType, nemoEntitystore.GetRequiredSCC())
+	deploymentParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.PodAnnotations, r.orchestratorType, nemoEntitystore.GetRequiredSCC())
 
 	// Setup volume mounts with model store
 	deploymentParams.Volumes = nemoEntitystore.GetVolumes()

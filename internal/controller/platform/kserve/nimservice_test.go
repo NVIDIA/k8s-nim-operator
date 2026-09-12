@@ -176,13 +176,14 @@ var _ = Describe("NIMServiceReconciler for a KServe platform", func() {
 		}
 
 		reconciler = &NIMServiceReconciler{
-			Client:          client,
-			scheme:          scheme,
-			updater:         conditions.NewUpdater(client),
-			renderer:        render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/kserve"), "manifests")),
-			recorder:        record.NewFakeRecorder(1000),
-			discoveryClient: discoveryClient,
-			apiReader:       client,
+			Client:           client,
+			scheme:           scheme,
+			updater:          conditions.NewUpdater(client),
+			renderer:         render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/kserve"), "manifests")),
+			recorder:         record.NewFakeRecorder(1000),
+			discoveryClient:  discoveryClient,
+			apiReader:        client,
+			orchestratorType: k8sutil.OpenShift, // exercise OpenShift SCC Role path in unit tests
 		}
 		pvcName := "test-pvc"
 		nimService = &appsv1alpha1.NIMService{

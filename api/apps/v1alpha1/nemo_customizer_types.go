@@ -463,10 +463,14 @@ func (n *NemoCustomizer) GetVolumeMounts() []corev1.VolumeMount {
 // GetStandardAnnotations returns default annotations to apply to the NemoCustomizer instance.
 func (n *NemoCustomizer) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
+}
+
+// GetRequiredSCC returns the OpenShift SCC name required by this resource.
+func (n *NemoCustomizer) GetRequiredSCC() string {
+	return "nonroot"
 }
 
 // GetNemoCustomizerAnnotations returns annotations to apply to the NemoCustomizer instance.
@@ -884,7 +888,8 @@ func (n *NemoCustomizer) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
 }
 
 // GetRoleParams returns params to render Role from templates.
-func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
+// When includeOpenShiftSCC is false, OpenShift SCC rules are omitted.
+func (n *NemoCustomizer) GetRoleParams(includeOpenShiftSCC bool) *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
 	// Set metadata
@@ -894,12 +899,6 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 
 	// Set rules for customizer
 	params.Rules = []rbacv1.PolicyRule{
-		{
-			APIGroups:     []string{"security.openshift.io"},
-			Resources:     []string{"securitycontextconstraints"},
-			ResourceNames: []string{"nonroot"},
-			Verbs:         []string{"use"},
-		},
 		{
 			APIGroups: []string{"batch"},
 			Resources: []string{"jobs"},
@@ -964,6 +963,16 @@ func (n *NemoCustomizer) GetRoleParams() *rendertypes.RoleParams {
 		params.Rules = append(params.Rules, volcanoRules...)
 	case SchedulerTypeRunAI:
 		params.Rules = append(params.Rules, runAIRules...)
+	}
+	if includeOpenShiftSCC {
+		params.Rules = append([]rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"nonroot"},
+				Verbs:         []string{"use"},
+			},
+		}, params.Rules...)
 	}
 
 	return params

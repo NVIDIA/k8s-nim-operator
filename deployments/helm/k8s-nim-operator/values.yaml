@@ -86,5 +86,11 @@ metricsService:
 nfd:
   nodeFeatureRules:
     deviceID: false
+
+# OpenShift-specific ClusterRole permissions (SCC, Routes, OpenShift config).
+# Enable on OpenShift installs. Leave false on vanilla Kubernetes.
+openshift:
+  enabled: false
+
 dynamo:
   enabled: false

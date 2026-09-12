@@ -320,7 +320,7 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, ne
 
 	// Sync role
 	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(nemoEvaluator.GetRoleParams())
+		return renderer.Role(nemoEvaluator.GetRoleParams(k8sutil.IsOpenShift(r.orchestratorType)))
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -419,6 +419,8 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, ne
 	}
 
 	deploymentParams := nemoEvaluator.GetDeploymentParams()
+	deploymentParams.Annotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.Annotations, r.orchestratorType, nemoEvaluator.GetRequiredSCC())
+	deploymentParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.PodAnnotations, r.orchestratorType, nemoEvaluator.GetRequiredSCC())
 
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {

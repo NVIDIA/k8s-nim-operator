@@ -408,10 +408,14 @@ func (n *NemoEvaluator) GeneratePostgresConnString(secretValue string) string {
 // GetStandardAnnotations returns default annotations to apply to the NemoEvaluator instance.
 func (n *NemoEvaluator) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
 	return standardAnnotations
+}
+
+// GetRequiredSCC returns the OpenShift SCC name required by this resource.
+func (n *NemoEvaluator) GetRequiredSCC() string {
+	return "nonroot"
 }
 
 // GetNemoEvaluatorAnnotations returns annotations to apply to the NemoEvaluator instance.
@@ -826,7 +830,8 @@ func (n *NemoEvaluator) GetHTTPRouteParams() *rendertypes.HTTPRouteParams {
 }
 
 // GetRoleParams returns params to render Role from templates.
-func (n *NemoEvaluator) GetRoleParams() *rendertypes.RoleParams {
+// When includeOpenShiftSCC is false, OpenShift SCC rules are omitted.
+func (n *NemoEvaluator) GetRoleParams(includeOpenShiftSCC bool) *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
 	// Set metadata
@@ -834,19 +839,22 @@ func (n *NemoEvaluator) GetRoleParams() *rendertypes.RoleParams {
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
 
-	// Set rules to use SCC
 	params.Rules = []rbacv1.PolicyRule{
-		{
-			APIGroups:     []string{"security.openshift.io"},
-			Resources:     []string{"securitycontextconstraints"},
-			ResourceNames: []string{"nonroot"},
-			Verbs:         []string{"use"},
-		},
 		{
 			APIGroups: []string{""},
 			Resources: []string{"secrets", "pods"},
 			Verbs:     []string{"get", "watch", "list", "create"},
 		},
+	}
+	if includeOpenShiftSCC {
+		params.Rules = append([]rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"nonroot"},
+				Verbs:         []string{"use"},
+			},
+		}, params.Rules...)
 	}
 
 	return params

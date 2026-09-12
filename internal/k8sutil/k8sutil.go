@@ -86,7 +86,34 @@ const (
 	K8s OrchestratorType = "Kubernetes"
 	// Unknown distribution type.
 	Unknown OrchestratorType = "Unknown"
+
+	// RequiredSCCAnnotation is the OpenShift annotation used to select an SCC.
+	RequiredSCCAnnotation = "openshift.io/required-scc"
 )
+
+// IsOpenShift reports whether the detected orchestrator is OpenShift.
+func IsOpenShift(t OrchestratorType) bool {
+	return t == OpenShift
+}
+
+// WithRequiredSCCAnnotation returns a copy of annotations with the OpenShift
+// required-SCC annotation set when running on OpenShift.
+func WithRequiredSCCAnnotation(annotations map[string]string, orchestrator OrchestratorType, scc string) map[string]string {
+	out := annotations
+	if out == nil {
+		out = map[string]string{}
+	} else {
+		copied := make(map[string]string, len(out)+1)
+		for k, v := range out {
+			copied[k] = v
+		}
+		out = copied
+	}
+	if IsOpenShift(orchestrator) && scc != "" {
+		out[RequiredSCCAnnotation] = scc
+	}
+	return out
+}
 
 // GetOrchestratorType checks the container orchestrator by looking for specific node labels that identify
 // TKGS, OpenShift, or CSP-specific Kubernetes distributions.

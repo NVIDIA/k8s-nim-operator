@@ -181,12 +181,13 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 		}
 
 		reconciler = &NIMServiceReconciler{
-			Client:          client,
-			scheme:          scheme,
-			updater:         conditions.NewUpdater(client),
-			renderer:        render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/standalone"), "manifests")),
-			recorder:        record.NewFakeRecorder(1000),
-			discoveryClient: discoveryClient,
+			Client:           client,
+			scheme:           scheme,
+			updater:          conditions.NewUpdater(client),
+			renderer:         render.NewRenderer(path.Join(strings.TrimSuffix(cwd, "internal/controller/platform/standalone"), "manifests")),
+			recorder:         record.NewFakeRecorder(1000),
+			discoveryClient:  discoveryClient,
+			orchestratorType: k8sutil.OpenShift, // exercise OpenShift SCC Role path in unit tests
 		}
 		pvcName := "test-pvc"
 		minReplicas := int32(1)

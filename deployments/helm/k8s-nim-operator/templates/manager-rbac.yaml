@@ -333,6 +333,7 @@ rules:
   - get
   - list
   - watch
+{{- if .Values.openshift.enabled }}
 - apiGroups:
   - config.openshift.io
   resources:
@@ -342,6 +343,7 @@ rules:
   - get
   - list
   - watch
+{{- end }}
 - apiGroups:
   - ""
   resources:
@@ -388,6 +390,7 @@ rules:
   - watch
   - create
   - delete
+{{- if .Values.openshift.enabled }}
 - apiGroups:
   - route.openshift.io
   resources:
@@ -399,6 +402,7 @@ rules:
   - patch
   - update
   - watch
+{{- end }}
 - apiGroups:
   - networking.k8s.io
   resources:
@@ -432,6 +436,7 @@ rules:
   - get
   - list
   - watch
+{{- if .Values.openshift.enabled }}
 - apiGroups:
   - security.openshift.io
   resourceNames:
@@ -454,6 +459,7 @@ rules:
   - patch
   - update
   - watch
+{{- end }}
 - apiGroups:
   - storage.k8s.io
   resources:
