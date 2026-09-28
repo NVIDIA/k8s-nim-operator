@@ -573,10 +573,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		deploymentParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.PodAnnotations, r.GetOrchestratorType(), nimService.GetRequiredSCC())
 		deploymentParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 
-		modelLayout, err := nimsource.ResolveModelLayout(ctx, r.imageProtocolResolver, nimService, &nimCache)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+		modelLayout := nimsource.ResolveAndPersistModelLayout(ctx, r.imageProtocolResolver, r.Client, nimService, &nimCache)
 
 		if nimCache.IsUniversalNIM() && !modelLayout.Protocol.IsNative() {
 			hfUri := nimCache.GetHFUri()

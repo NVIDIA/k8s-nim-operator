@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
@@ -82,10 +83,10 @@ type ModelLayout struct {
 // source of truth. Trusting it avoids a registry round-trip on every NIMService
 // reconcile (and the accompanying failure surface) for the common cached path.
 //
-// For a direct NIMService with no NIMCache, the serving image is inspected via
-// ResolveProtocolOrLegacy, which falls back to legacy if the image cannot be
-// inspected (or no resolver is configured), keeping the feature zero-impact for
-// legacy NIMs.
+// For a direct NIMService with no NIMCache, reuse a successful inspection
+// from status. A changed image reference triggers a new lookup.
+// Inspection failures fall back to legacy for this reconcile and are retried
+// on later reconciles until a lookup succeeds.
 func ResolveModelLayout(ctx context.Context, resolver ProtocolResolver, nimService *appsv1alpha1.NIMService, nimCache *appsv1alpha1.NIMCache) (ModelLayout, error) {
 	if nimService == nil {
 		return ModelLayout{}, fmt.Errorf("nil NIMService")
@@ -98,8 +99,54 @@ func ResolveModelLayout(ctx context.Context, resolver ProtocolResolver, nimServi
 		return ModelLayout{Protocol: Legacy}, nil
 	}
 
-	protocol := ResolveProtocolOrLegacy(ctx, resolver, nimService.GetImage(), nimService.Namespace, nimService.GetImagePullSecrets())
+	image := nimService.GetImage()
+	previous := nimService.Status.ImageProtocol
+	if previous != nil && previous.Image == image &&
+		(previous.Protocol == string(Legacy) || previous.Protocol == string(NativeV1)) {
+		return ModelLayout{Protocol: Protocol(previous.Protocol)}, nil
+	}
+	if resolver == nil {
+		return ModelLayout{Protocol: Legacy}, nil
+	}
+	protocol, err := resolver.Resolve(ctx, image, nimService.Namespace, nimService.GetImagePullSecrets())
+	if err != nil {
+		log.FromContext(ctx).Info("could not inspect image for model download protocol; assuming legacy",
+			"image", image, "error", err.Error())
+		return ModelLayout{Protocol: Legacy}, nil
+	}
+	nimService.Status.ImageProtocol = &appsv1alpha1.ImageProtocolStatus{
+		Image: image, Protocol: string(protocol),
+	}
 	return ModelLayout{Protocol: protocol}, nil
+}
+
+// ResolveAndPersistModelLayout saves a successful direct-image lookup
+// before readiness checks can requeue the NIMService.
+// Resolve or status-write failures are logged so callers can still apply the
+// resolved layout; the next reconcile retries the persist.
+func ResolveAndPersistModelLayout(ctx context.Context, resolver ProtocolResolver, c client.Client,
+	nimService *appsv1alpha1.NIMService, nimCache *appsv1alpha1.NIMCache) ModelLayout {
+	logger := log.FromContext(ctx)
+	previousProtocol := nimService.Status.ImageProtocol
+	layout, err := ResolveModelLayout(ctx, resolver, nimService, nimCache)
+	if err != nil {
+		logger.Error(err, "failed to resolve model layout; continuing with fallback layout")
+		return layout
+	}
+	if previousProtocol == nimService.Status.ImageProtocol {
+		return layout
+	}
+	resolved := nimService.Status.ImageProtocol
+	if persistErr := k8sutil.RetryStatusUpdate(ctx, c, nimService, func(obj client.Object) {
+		ns, ok := obj.(*appsv1alpha1.NIMService)
+		if !ok {
+			return
+		}
+		ns.Status.ImageProtocol = resolved
+	}); persistErr != nil {
+		logger.Error(persistErr, "could not persist image protocol status; continuing with resolved layout")
+	}
+	return layout
 }
 
 // ResolveProtocolOrLegacy resolves an image's model download protocol and defaults to Legacy.
