@@ -525,10 +525,7 @@ func (r *NIMServiceReconciler) renderAndSyncInferenceService(ctx context.Context
 
 	isvcParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 
-	modelLayout, err := nimsource.ResolveModelLayout(ctx, r.imageProtocolResolver, nimService, nimCache)
-	if err != nil {
-		return err
-	}
+	modelLayout := nimsource.ResolveAndPersistModelLayout(ctx, r.imageProtocolResolver, r.Client, nimService, nimCache)
 
 	if nimCache.IsUniversalNIM() && !modelLayout.Protocol.IsNative() {
 		hfUri := nimCache.GetHFUri()
