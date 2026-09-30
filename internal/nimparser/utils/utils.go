@@ -17,7 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -43,9 +42,8 @@ func GetNIMParser(data []byte) nimparser.NIMParserInterface {
 		return nimparserv1.NIMParser{}
 	} else {
 		schemaVersion := strings.TrimSpace(config.SchemaVersion)
-
-		match, _ := regexp.MatchString("2\\.*\\.*", schemaVersion)
-		if match {
+		// Major version 2 only. A later digit, as in 1.2.0, is not schema 2.
+		if schemaVersion == "2" || strings.HasPrefix(schemaVersion, "2.") {
 			return nimparserv2.NIMParser{}
 		}
 	}
