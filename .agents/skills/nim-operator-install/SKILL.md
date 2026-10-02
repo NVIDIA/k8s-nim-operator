@@ -353,6 +353,16 @@ Expose these Dynamo sub-options only when the customer asks for advanced Dynamo 
 
 Do not enable Dynamo or its sub-options by default.
 
+## OpenShift Options
+
+For OpenShift clusters, enable OpenShift-specific ClusterRole permissions (SCC, Routes, OpenShift config APIs):
+
+```sh
+--set openshift.enabled=true
+```
+
+Leave `openshift.enabled` false (the default) on vanilla Kubernetes.
+
 ## Admission Controller Choice
 
 If cert-manager is missing and the user wants to proceed without it, append:
