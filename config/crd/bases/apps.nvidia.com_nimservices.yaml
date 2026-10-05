@@ -5204,6 +5204,19 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              imageProtocol:
+                description: |-
+                  ImageProtocol records the download protocol resolved for a direct NIMService.
+                  It is reused while the image reference is unchanged.
+                properties:
+                  image:
+                    type: string
+                  protocol:
+                    type: string
+                required:
+                - image
+                - protocol
+                type: object
               model:
                 description: ModelStatus defines the configuration of the NIMService
                   model.
