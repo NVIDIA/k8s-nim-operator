@@ -205,12 +205,21 @@ type NIMServiceStatus struct {
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
 	State             string             `json:"state,omitempty"`
 	Model             *ModelStatus       `json:"model,omitempty"`
+	// ImageProtocol records the download protocol resolved for a direct NIMService.
+	// It is reused while the image reference is unchanged.
+	ImageProtocol *ImageProtocolStatus `json:"imageProtocol,omitempty"`
 	// DRAResourceStatuses is the status of the DRA resources.
 	// +listType=map
 	// +listMapKey=name
 	DRAResourceStatuses []DRAResourceStatus `json:"draResourceStatuses,omitempty"`
 	// ComputeDomainStatus is the status of the ComputeDomain for a multi-node NIMService.
 	ComputeDomainStatus *ComputeDomainStatus `json:"computeDomainStatus,omitempty"`
+}
+
+// ImageProtocolStatus is the last successful registry inspection of a serving image.
+type ImageProtocolStatus struct {
+	Image    string `json:"image"`
+	Protocol string `json:"protocol"`
 }
 
 // ModelStatus defines the configuration of the NIMService model.
@@ -528,15 +537,20 @@ func (n *NIMService) GetProxyEnv() []corev1.EnvVar {
 // GetStandardAnnotations returns default annotations to apply to the NIMService instance.
 func (n *NIMService) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
-	if n.GetProxyCertConfigMap() != "" {
-		standardAnnotations["openshift.io/required-scc"] = "anyuid"
-	} else if n.GetHostPath() != "" {
-		standardAnnotations["openshift.io/required-scc"] = "hostmount-anyuid"
-	}
 	return standardAnnotations
+}
+
+// GetRequiredSCC returns the OpenShift SCC name required by this NIMService, if any.
+func (n *NIMService) GetRequiredSCC() string {
+	if n.GetProxyCertConfigMap() != "" || n.GetProxySpec() != nil {
+		return "anyuid"
+	}
+	if n.GetHostPath() != "" {
+		return "hostmount-anyuid"
+	}
+	return "nonroot"
 }
 
 // GetNIMServiceAnnotations returns annotations to apply to the NIMService instance.
@@ -1647,13 +1661,18 @@ func (n *NIMService) GetGRPCRouteParams() *rendertypes.GRPCRouteParams {
 }
 
 // GetRoleParams returns params to render Role from templates.
-func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
+// When includeOpenShiftSCC is false, OpenShift SCC rules are omitted.
+func (n *NIMService) GetRoleParams(includeOpenShiftSCC bool) *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
+
+	if !includeOpenShiftSCC {
+		return params
+	}
 
 	// Set rules to use SCC
 	switch {
