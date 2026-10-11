@@ -336,7 +336,7 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 
 	// Sync role
 	err = r.renderAndSyncResource(ctx, nemoCustomizer, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(nemoCustomizer.GetRoleParams())
+		return renderer.Role(nemoCustomizer.GetRoleParams(k8sutil.IsOpenShift(r.orchestratorType)))
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -453,6 +453,8 @@ func (r *NemoCustomizerReconciler) reconcileNemoCustomizer(ctx context.Context, 
 
 	// Get params to render Deployment resource
 	deploymentParams := nemoCustomizer.GetDeploymentParams()
+	deploymentParams.Annotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.Annotations, r.orchestratorType, nemoCustomizer.GetRequiredSCC())
+	deploymentParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.PodAnnotations, r.orchestratorType, nemoCustomizer.GetRequiredSCC())
 
 	// Calculate the hash of the config data
 	configHash := utils.CalculateSHA256(string(customizerConfigYAML))
