@@ -18,6 +18,7 @@ package kserve
 
 import (
 	"context"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,7 +64,7 @@ func (s *KServe) Sync(ctx context.Context, r shared.Reconciler, resource client.
 		if err != nil {
 			if errors.IsConflict(err) {
 				// Ignore conflict errors and retry.
-				return ctrl.Result{Requeue: true}, nil
+				return ctrl.Result{RequeueAfter: time.Second}, nil
 			}
 
 			r.GetEventRecorder().Eventf(nimService, corev1.EventTypeWarning, "ReconcileFailed",

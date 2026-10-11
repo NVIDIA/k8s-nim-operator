@@ -116,8 +116,9 @@ type HuggingFaceHubSource struct {
 // NGCSource references a model stored on NVIDIA NGC.
 // +kubebuilder:validation:XValidation:rule="!(has(self.model) && has(self.modelEndpoint))",message="Only one of 'model' or 'modelEndpoint' can be specified"
 type NGCSource struct {
-	// The name of an existing pull secret containing the NGC_API_KEY
-	AuthSecret string `json:"authSecret"`
+	// AuthSecret is the name of an existing secret containing the NGC_API_KEY.
+	// Optional for certain NIMs.
+	AuthSecret string `json:"authSecret,omitempty"`
 	// ModelPuller is the container image that can pull the model
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="modelPuller is an immutable field. Please create a new NIMCache resource instead when you want to change this container."
 	ModelPuller string `json:"modelPuller"`
@@ -232,6 +233,7 @@ const (
 
 // EnvFromSecrets return the list of secrets that should be mounted as env vars.
 func (s *NIMSource) EnvFromSecrets() []corev1.EnvFromSource {
+	optional := true
 	if s.NGC != nil && s.NGC.AuthSecret != "" { // nolint:gocritic
 		return []corev1.EnvFromSource{
 			{
@@ -239,6 +241,7 @@ func (s *NIMSource) EnvFromSecrets() []corev1.EnvFromSource {
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: s.NGC.AuthSecret,
 					},
+					Optional: &optional,
 				},
 			},
 		}

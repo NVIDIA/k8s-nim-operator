@@ -61,6 +61,15 @@ import (
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
+const (
+	// deploymentNotReadyRequeue is how long to wait before re-checking Deployment
+	// readiness when the NIMService is not yet Ready.
+	deploymentNotReadyRequeue = 30 * time.Second
+	// autoscalingDisableRequeue is a short requeue used after disabling
+	// autoscaling so a late HPA write cannot permanently pin Deployment replicas.
+	autoscalingDisableRequeue = 5 * time.Second
+)
+
 // GetScheme returns the scheme of the reconciler.
 func (r *NIMServiceReconciler) GetScheme() *runtime.Scheme {
 	return r.scheme
@@ -148,6 +157,11 @@ func (r *NIMServiceReconciler) validateDRAResources(ctx context.Context, nimServ
 		}
 		for deviceIdx, device := range resource.ClaimCreationSpec.Devices {
 			for attributeIdx, attribute := range device.AttributeSelectors {
+				if attribute.Value == nil {
+					msg := fmt.Sprintf("spec.draResources[%d].claimCreationSpec.devices[%d].attributeSelectors[%d].value: value is required", idx, deviceIdx, attributeIdx)
+					logger.Error(errors.New(msg), msg, "nimService", nimService.Name)
+					return false, msg, nil
+				}
 				if attribute.Value.VersionValue == nil {
 					continue
 				}
@@ -197,20 +211,28 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		return ctrl.Result{}, err
 	}
 
-	// Sync role
-	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(nimService.GetRoleParams())
-	}, "role", conditions.ReasonRoleFailed)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	// Sync role / rolebinding. SCC rules are OpenShift-only; clean up on other platforms.
+	if k8sutil.IsOpenShift(r.GetOrchestratorType()) {
+		err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+			return renderer.Role(nimService.GetRoleParams(true))
+		}, "role", conditions.ReasonRoleFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
-	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
-		return renderer.RoleBinding(nimService.GetRoleBindingParams())
-	}, "rolebinding", conditions.ReasonRoleBindingFailed)
-	if err != nil {
-		return ctrl.Result{}, err
+		err = r.renderAndSyncResource(ctx, nimService, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+			return renderer.RoleBinding(nimService.GetRoleBindingParams())
+		}, "rolebinding", conditions.ReasonRoleBindingFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.Role{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.RoleBinding{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Sync service
@@ -267,6 +289,7 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	}
 
 	// Sync HPA
+	autoscalingJustDisabled := false
 	if nimService.IsAutoScalingEnabled() {
 		err = r.renderAndSyncResource(ctx, nimService, &renderer, &autoscalingv2.HorizontalPodAutoscaler{}, func() (client.Object, error) {
 			return renderer.HPA(nimService.GetHPAParams())
@@ -275,10 +298,16 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			return ctrl.Result{}, err
 		}
 	} else {
-		// If autoscaling is disabled, ensure the HPA is deleted
+		// If autoscaling is disabled, ensure the HPA is deleted. Track whether an
+		// HPA existed so we can requeue once and win races with late HPA writes.
+		existingHPA := &autoscalingv2.HorizontalPodAutoscaler{}
+		hpaGetErr := r.Get(ctx, namespacedName, existingHPA)
 		err = k8sutil.CleanupResource(ctx, r.GetClient(), &autoscalingv2.HorizontalPodAutoscaler{}, namespacedName)
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+		if hpaGetErr == nil {
+			autoscalingJustDisabled = true
 		}
 	}
 
@@ -455,6 +484,8 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		lwsParams := nimService.GetLWSParams()
 		lwsParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 		lwsParams.OrchestratorType = string(r.GetOrchestratorType())
+		lwsParams.Annotations = k8sutil.WithRequiredSCCAnnotation(lwsParams.Annotations, r.GetOrchestratorType(), nimService.GetRequiredSCC())
+		lwsParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(lwsParams.PodAnnotations, r.GetOrchestratorType(), nimService.GetRequiredSCC())
 		if nimCache.IsUniversalNIM() {
 			lwsParams.WorkerEnvs = utils.MergeEnvVars([]corev1.EnvVar{{
 				Name:  "NIM_MODEL_NAME",
@@ -538,12 +569,11 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 	} else {
 		deploymentParams := nimService.GetDeploymentParams()
 		deploymentParams.OrchestratorType = string(r.GetOrchestratorType())
+		deploymentParams.Annotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.Annotations, r.GetOrchestratorType(), nimService.GetRequiredSCC())
+		deploymentParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.PodAnnotations, r.GetOrchestratorType(), nimService.GetRequiredSCC())
 		deploymentParams.PodResourceClaims = namedDraResources.GetPodResourceClaims()
 
-		modelLayout, err := nimsource.ResolveModelLayout(ctx, r.imageProtocolResolver, nimService, &nimCache)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+		modelLayout := nimsource.ResolveAndPersistModelLayout(ctx, r.imageProtocolResolver, r.Client, nimService, &nimCache)
 
 		if nimCache.IsUniversalNIM() && !modelLayout.Protocol.IsNative() {
 			hfUri := nimCache.GetHFUri()
@@ -575,64 +605,69 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 			// standard env requires NGC_API_KEY, which breaks auth secrets that
 			// only carry an HF token. Make NGC_API_KEY optional and surface
 			// HF_TOKEN (also optional) so either credential works.
+			// When AuthSecret is unset (air-gapped / pre-cached), omit both keys.
 			deploymentParams.Env = utils.RemoveEnvVar(deploymentParams.Env, appsv1alpha1.NGCAPIKey)
-			deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
-				{
-					Name: appsv1alpha1.NGCAPIKey,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+			if nimService.Spec.AuthSecret != "" {
+				deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
+					{
+						Name: appsv1alpha1.NGCAPIKey,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key:      appsv1alpha1.NGCAPIKey,
+								Optional: &[]bool{true}[0],
 							},
-							Key:      appsv1alpha1.NGCAPIKey,
-							Optional: &[]bool{true}[0],
 						},
 					},
-				},
-				{
-					Name: appsv1alpha1.HFToken,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+					{
+						Name: appsv1alpha1.HFToken,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key:      appsv1alpha1.HFToken,
+								Optional: &[]bool{true}[0],
 							},
-							Key:      appsv1alpha1.HFToken,
-							Optional: &[]bool{true}[0],
 						},
 					},
-				},
-			})
+				})
+			}
 		}
 
 		// If NIMCache or NIMService is a Hugging Face Multi-LLM NIM, add the HF_TOKEN to the environment variables and make NGC_API_KEY optional
 		// For custom models stored in Datastore, the NIM Container needs to access NGC to download base model. However, NGC_API_KEY is not required for Hugging Face models.
 		if nimCache.IsHFModel() || nimService.IsHFModel() {
 			deploymentParams.Env = utils.RemoveEnvVar(deploymentParams.Env, appsv1alpha1.NGCAPIKey)
-			deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
-				{
-					Name: appsv1alpha1.NGCAPIKey,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+			if nimService.Spec.AuthSecret != "" {
+				deploymentParams.Env = utils.MergeEnvVars(deploymentParams.Env, []corev1.EnvVar{
+					{
+						Name: appsv1alpha1.NGCAPIKey,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key:      appsv1alpha1.NGCAPIKey,
+								Optional: &[]bool{true}[0],
 							},
-							Key:      appsv1alpha1.NGCAPIKey,
-							Optional: &[]bool{true}[0],
 						},
 					},
-				},
-				{
-					Name: appsv1alpha1.HFToken,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimService.Spec.AuthSecret,
+					{
+						Name: appsv1alpha1.HFToken,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: nimService.Spec.AuthSecret,
+								},
+								Key: appsv1alpha1.HFToken,
 							},
-							Key: appsv1alpha1.HFToken,
 						},
 					},
-				},
-			})
+				})
+			}
 		}
 
 		// Setup volume mounts with model store. Native (NIMCraft) single-model
@@ -717,25 +752,42 @@ func (r *NIMServiceReconciler) reconcileNIMService(ctx context.Context, nimServi
 		err = r.updater.SetConditionsNotReady(ctx, nimService, conditions.NotReady, msg)
 		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.NotReady,
 			"NIMService %s not ready, msg: %s", nimService.Name, msg)
-	} else {
-		// Update NIMServiceStatus with model config.
-		updateErr := r.updateModelStatus(ctx, nimService)
-		if updateErr != nil {
-			logger.V(4).Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		if err != nil {
+			logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.NotReady)
+			return ctrl.Result{}, err
 		}
-
-		// Update status as ready
-		err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
-		r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
-			"NIMService %s ready, msg: %s", nimService.Name, msg)
+		return ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}, nil
 	}
 
+	// Update NIMServiceStatus with model config.
+	updateErr := r.updateModelStatus(ctx, nimService)
+	if updateErr != nil {
+		logger.V(4).Info("WARN: Model status update failed, will retry in 5 seconds", "error", updateErr.Error())
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// Update status as ready
+	err = r.updater.SetConditionsReady(ctx, nimService, conditions.Ready, msg)
+	r.GetEventRecorder().Eventf(nimService, corev1.EventTypeNormal, conditions.Ready,
+		"NIMService %s ready, msg: %s", nimService.Name, msg)
 	if err != nil {
 		logger.Error(err, "failed to update status", "nimservice", nimService.Name, "state", conditions.Ready)
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, nil
+
+	result := ctrl.Result{}
+	if autoscalingJustDisabled {
+		// Requeue so any late HPA mutation of Deployment replicas is overwritten
+		// with spec.replicas after the HPA is gone.
+		result.RequeueAfter = autoscalingDisableRequeue
+	} else if !nimService.IsAutoScalingEnabled() && nimService.Spec.MultiNode == nil {
+		if outOfSync, syncErr := r.deploymentReplicasOutOfSync(ctx, namespacedName, nimService.GetReplicas()); syncErr != nil {
+			return ctrl.Result{}, syncErr
+		} else if outOfSync {
+			result.RequeueAfter = autoscalingDisableRequeue
+		}
+	}
+	return result, nil
 }
 
 func (r *NIMServiceReconciler) createMultiNodeVolumeObjects(ctx context.Context, nimService *appsv1alpha1.NIMService) error {
@@ -1005,8 +1057,18 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 	// Track an existing resource
 	found := getErr == nil
 
-	// Don't do anything if CR is unchanged.
-	if found && !utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec)) {
+	parentSpecChanged := !found || utils.IsParentSpecChanged(obj, utils.DeepHashObject(nimService.Spec))
+	// When autoscaling is disabled, HPA may have left Deployment replicas drifted
+	// after the parent-spec hash was already written. Still sync in that case.
+	replicasOutOfSync := false
+	if found && !nimService.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			replicasOutOfSync = deploymentSpecReplicasOutOfSync(curr, nimService.GetReplicas())
+		}
+	}
+
+	// Don't do anything if CR is unchanged and replicas are already correct.
+	if found && !parentSpecChanged && !replicasOutOfSync {
 		return nil
 	}
 
@@ -1018,6 +1080,22 @@ func (r *NIMServiceReconciler) renderAndSyncResource(ctx context.Context, nimSer
 			if desired, ok := resource.(*appsv1.Deployment); ok && curr.Spec.Replicas != nil {
 				replicas := *curr.Spec.Replicas
 				desired.Spec.Replicas = &replicas
+			}
+		}
+	}
+
+	// When autoscaling is off, live Deployment replicas can drift (e.g. late HPA
+	// writes) while the stored resource hash still matches the desired spec.
+	// Clear the hash annotation so SyncResource does not skip the update.
+	if found && !nimService.IsAutoScalingEnabled() {
+		if curr, ok := obj.(*appsv1.Deployment); ok {
+			if desired, ok := resource.(*appsv1.Deployment); ok &&
+				deploymentSpecReplicasOutOfSync(curr, desired.Spec.Replicas) {
+				annotations := curr.GetAnnotations()
+				if annotations != nil {
+					delete(annotations, utils.NvidiaAnnotationHashKey)
+					curr.SetAnnotations(annotations)
+				}
 			}
 		}
 	}
@@ -1089,6 +1167,30 @@ func (r *NIMServiceReconciler) isDeploymentReady(ctx context.Context, namespaced
 		return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
 	}
 	return fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name), true, nil
+}
+
+// deploymentSpecReplicasOutOfSync reports whether the Deployment's spec.replicas
+// differs from the desired replica count.
+func deploymentSpecReplicasOutOfSync(deployment *appsv1.Deployment, desired *int32) bool {
+	if desired == nil {
+		return false
+	}
+	if deployment.Spec.Replicas == nil {
+		return true
+	}
+	return *deployment.Spec.Replicas != *desired
+}
+
+func (r *NIMServiceReconciler) deploymentReplicasOutOfSync(ctx context.Context, namespacedName types.NamespacedName, desired *int32) (bool, error) {
+	deployment := &appsv1.Deployment{}
+	err := r.Get(ctx, namespacedName, deployment)
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return deploymentSpecReplicasOutOfSync(deployment, desired), nil
 }
 
 func getDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.DeploymentConditionType) *appsv1.DeploymentCondition {

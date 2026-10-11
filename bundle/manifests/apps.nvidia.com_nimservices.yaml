@@ -968,7 +968,9 @@ spec:
                   type: string
                 type: array
               authSecret:
-                description: The name of an existing pull secret containing the NGC_API_KEY
+                description: |-
+                  AuthSecret is the name of an existing secret containing the NGC_API_KEY (and optionally HF_TOKEN).
+                  Optional for certain NIMs.
                 type: string
               command:
                 items:
@@ -1051,6 +1053,7 @@ spec:
                                   required:
                                   - key
                                   - op
+                                  - value
                                   type: object
                                 type: array
                               capacitySelectors:
@@ -5007,7 +5010,6 @@ spec:
                 format: int64
                 type: integer
             required:
-            - authSecret
             - image
             type: object
             x-kubernetes-validations:
@@ -5202,6 +5204,19 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              imageProtocol:
+                description: |-
+                  ImageProtocol records the download protocol resolved for a direct NIMService.
+                  It is reused while the image reference is unchanged.
+                properties:
+                  image:
+                    type: string
+                  protocol:
+                    type: string
+                required:
+                - image
+                - protocol
+                type: object
               model:
                 description: ModelStatus defines the configuration of the NIMService
                   model.

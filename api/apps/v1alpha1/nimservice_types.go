@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strconv"
 	"strings"
 
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
@@ -37,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	sigsyaml "sigs.k8s.io/yaml"
 
@@ -99,8 +101,9 @@ type NIMServiceSpec struct {
 	Command []string        `json:"command,omitempty"`
 	Args    []string        `json:"args,omitempty"`
 	Env     []corev1.EnvVar `json:"env,omitempty"`
-	// The name of an existing pull secret containing the NGC_API_KEY
-	AuthSecret string `json:"authSecret"`
+	// AuthSecret is the name of an existing secret containing the NGC_API_KEY (and optionally HF_TOKEN).
+	// Optional for certain NIMs.
+	AuthSecret string `json:"authSecret,omitempty"`
 	// Storage is the target storage for caching NIM model if NIMCache is not provided
 	Storage      NIMServiceStorage   `json:"storage,omitempty"`
 	Labels       map[string]string   `json:"labels,omitempty"`
@@ -202,12 +205,21 @@ type NIMServiceStatus struct {
 	AvailableReplicas int32              `json:"availableReplicas,omitempty"`
 	State             string             `json:"state,omitempty"`
 	Model             *ModelStatus       `json:"model,omitempty"`
+	// ImageProtocol records the download protocol resolved for a direct NIMService.
+	// It is reused while the image reference is unchanged.
+	ImageProtocol *ImageProtocolStatus `json:"imageProtocol,omitempty"`
 	// DRAResourceStatuses is the status of the DRA resources.
 	// +listType=map
 	// +listMapKey=name
 	DRAResourceStatuses []DRAResourceStatus `json:"draResourceStatuses,omitempty"`
 	// ComputeDomainStatus is the status of the ComputeDomain for a multi-node NIMService.
 	ComputeDomainStatus *ComputeDomainStatus `json:"computeDomainStatus,omitempty"`
+}
+
+// ImageProtocolStatus is the last successful registry inspection of a serving image.
+type ImageProtocolStatus struct {
+	Image    string `json:"image"`
+	Protocol string `json:"protocol"`
 }
 
 // ModelStatus defines the configuration of the NIMService model.
@@ -308,17 +320,6 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 			Value: utils.DefaultModelStorePath,
 		},
 		{
-			Name: NGCAPIKey,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: n.Spec.AuthSecret,
-					},
-					Key: NGCAPIKey,
-				},
-			},
-		},
-		{
 			Name:  "OUTLINES_CACHE_DIR",
 			Value: "/tmp/outlines",
 		},
@@ -338,6 +339,23 @@ func (n *NIMService) GetStandardEnv() []corev1.EnvVar {
 			Name:  "NIM_LOG_LEVEL",
 			Value: "INFO",
 		},
+	}
+
+	// Only inject NGC_API_KEY when AuthSecret is set. The secret key is optional
+	// so certain NIMs can start without it.
+	if n.Spec.AuthSecret != "" {
+		envVars = append(envVars, corev1.EnvVar{
+			Name: NGCAPIKey,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: n.Spec.AuthSecret,
+					},
+					Key:      NGCAPIKey,
+					Optional: ptr.To(true),
+				},
+			},
+		})
 	}
 	if n.Spec.Expose.Service.GRPCPort != nil {
 		envVars = append(envVars, corev1.EnvVar{
@@ -519,15 +537,20 @@ func (n *NIMService) GetProxyEnv() []corev1.EnvVar {
 // GetStandardAnnotations returns default annotations to apply to the NIMService instance.
 func (n *NIMService) GetStandardAnnotations() map[string]string {
 	standardAnnotations := map[string]string{
-		"openshift.io/required-scc":             "nonroot",
 		utils.NvidiaAnnotationParentSpecHashKey: utils.DeepHashObject(n.Spec),
 	}
-	if n.GetProxyCertConfigMap() != "" {
-		standardAnnotations["openshift.io/required-scc"] = "anyuid"
-	} else if n.GetHostPath() != "" {
-		standardAnnotations["openshift.io/required-scc"] = "hostmount-anyuid"
-	}
 	return standardAnnotations
+}
+
+// GetRequiredSCC returns the OpenShift SCC name required by this NIMService, if any.
+func (n *NIMService) GetRequiredSCC() string {
+	if n.GetProxyCertConfigMap() != "" || n.GetProxySpec() != nil {
+		return "anyuid"
+	}
+	if n.GetHostPath() != "" {
+		return "hostmount-anyuid"
+	}
+	return "nonroot"
 }
 
 // GetNIMServiceAnnotations returns annotations to apply to the NIMService instance.
@@ -1638,13 +1661,18 @@ func (n *NIMService) GetGRPCRouteParams() *rendertypes.GRPCRouteParams {
 }
 
 // GetRoleParams returns params to render Role from templates.
-func (n *NIMService) GetRoleParams() *rendertypes.RoleParams {
+// When includeOpenShiftSCC is false, OpenShift SCC rules are omitted.
+func (n *NIMService) GetRoleParams(includeOpenShiftSCC bool) *rendertypes.RoleParams {
 	params := &rendertypes.RoleParams{}
 
 	// Set metadata
 	params.Name = n.GetName()
 	params.Namespace = n.GetNamespace()
 	params.Labels = n.GetServiceLabels()
+
+	if !includeOpenShiftSCC {
+		return params
+	}
 
 	// Set rules to use SCC
 	switch {
@@ -1840,6 +1868,34 @@ func (n *NIMService) GetHostPath() string {
 	return ""
 }
 
+const (
+	// knativeMinScaleAnnotation is the Knative annotation for the minimum number
+	// of pods (autoscaling.knative.dev/min-scale). A value of "0" enables
+	// scale-to-zero.
+	knativeMinScaleAnnotation = "autoscaling.knative.dev/min-scale"
+	// knativeMaxScaleAnnotation is the Knative annotation for the maximum number
+	// of pods (autoscaling.knative.dev/max-scale). A value of "0" means unbounded.
+	knativeMaxScaleAnnotation = "autoscaling.knative.dev/max-scale"
+)
+
+// parseKnativeScaleAnnotation parses a Knative scale annotation (min-scale /
+// max-scale) into an *int32. It returns (nil, nil) when the annotation is absent
+// or empty, and an error when the value is not a valid non-negative int32.
+func parseKnativeScaleAnnotation(annotations map[string]string, key string) (*int32, error) {
+	value, ok := annotations[key]
+	if !ok || value == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s annotation %q: %w", key, value, err)
+	}
+	if parsed < 0 {
+		return nil, fmt.Errorf("invalid %s annotation %q: must not be negative", key, value)
+	}
+	return ptr.To(int32(parsed)), nil
+}
+
 // GetInferenceServiceParams returns params to render InferenceService from templates.
 func (n *NIMService) GetInferenceServiceParams(
 	deploymentMode kserveconstants.DeploymentModeType) *rendertypes.InferenceServiceParams {
@@ -1885,6 +1941,30 @@ func (n *NIMService) GetInferenceServiceParams(
 			params.ScaleMetric = ""
 			params.ScaleMetricType = ""
 			params.ScaleTarget = nil
+		}
+	} else if utils.IsKServeKnativeDeploymentMode(deploymentMode) {
+		// In KServe serverless (Knative) mode, scaling is handled by the Knative
+		// KPA. KServe keeps autoscaling.knative.dev/min-scale and max-scale on its
+		// ServiceAnnotationDisallowedList and regenerates them from the typed
+		// predictor.minReplicas/maxReplicas fields (min-scale defaults to 1 when
+		// minReplicas is nil, which makes scale-to-zero impossible). HPA-based
+		// autoscaling (spec.scale.enabled) is rejected by the webhook in this mode,
+		// so users express scale bounds via the Knative annotations. Translate those
+		// annotations into the typed fields here so they survive KServe rendering.
+		// A minReplicas of 0 enables scale-to-zero.
+		minReplicas, err := parseKnativeScaleAnnotation(params.Annotations, knativeMinScaleAnnotation)
+		if err != nil {
+			log.Log.Error(err, "invalid Knative min-scale annotation; KServe will default minReplicas to 1", "nimservice", n.Name)
+		} else if minReplicas != nil {
+			params.MinReplicas = minReplicas
+		}
+		// max-scale of 0 means "unbounded" in Knative; leave MaxReplicas unset so
+		// KServe omits max-scale rather than pinning it to 0.
+		maxReplicas, err := parseKnativeScaleAnnotation(params.Annotations, knativeMaxScaleAnnotation)
+		if err != nil {
+			log.Log.Error(err, "invalid Knative max-scale annotation; maxReplicas will be left unset (unbounded)", "nimservice", n.Name)
+		} else if maxReplicas != nil && *maxReplicas > 0 {
+			params.MaxReplicas = maxReplicas
 		}
 	}
 

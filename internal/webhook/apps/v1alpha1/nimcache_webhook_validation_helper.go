@@ -56,11 +56,6 @@ func validateNGCSource(ngcSource *appsv1alpha1.NGCSource, fldPath *field.Path) (
 	// Evaluate NGCSource.Model fields
 	warnList, errList := validateModel(ngcSource.Model, fldPath.Child("model"))
 
-	// Ensure AuthSecret is a non-empty string
-	if ngcSource.AuthSecret == "" {
-		errList = append(errList, field.Required(fldPath.Child("authSecret"), "must be non-empty"))
-	}
-
 	// Ensure ModelPuller is a non-empty string
 	if ngcSource.ModelPuller == "" {
 		errList = append(errList, field.Required(fldPath.Child("modelPuller"), "must be non-empty"))

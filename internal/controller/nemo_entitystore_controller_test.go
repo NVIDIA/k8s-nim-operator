@@ -48,6 +48,7 @@ import (
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/conditions"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/render"
 )
 
@@ -118,11 +119,12 @@ var _ = Describe("NemoEntitystore Controller", func() {
 		Expect(err).ToNot(HaveOccurred())
 		renderer = render.NewRenderer(manifestsDir)
 		reconciler = &NemoEntitystoreReconciler{
-			Client:   client,
-			scheme:   scheme,
-			updater:  updater,
-			renderer: renderer,
-			recorder: record.NewFakeRecorder(1000),
+			Client:           client,
+			scheme:           scheme,
+			updater:          updater,
+			renderer:         renderer,
+			recorder:         record.NewFakeRecorder(1000),
+			orchestratorType: k8sutil.OpenShift, // exercise OpenShift SCC Role path in unit tests
 		}
 
 		nemoEntitystore = &appsv1alpha1.NemoEntitystore{

@@ -78,10 +78,6 @@ func validateNIMServiceSpec(ctx context.Context, nimservice *appsv1alpha1.NIMSer
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
 
-	w, err = validateAuthSecret(&spec.AuthSecret, fldPath.Child("authSecret"))
-	warningList = append(warningList, w...)
-	errList = append(errList, err...)
-
 	w, err = validateServiceStorageConfiguration(&spec.Storage, fldPath.Child("storage"))
 	warningList = append(warningList, w...)
 	errList = append(errList, err...)
@@ -389,6 +385,11 @@ func validateDRADeviceAttributeSelectorOp(op appsv1alpha1.DRADeviceAttributeSele
 
 func validateDRADeviceAttributeSelectorValue(attribute *appsv1alpha1.DRADeviceAttributeSelectorValue, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
+	if attribute == nil {
+		errList = append(errList, field.Required(fldPath, "is required"))
+		return errList
+	}
+
 	var fieldCount int
 	if attribute.BoolValue != nil {
 		fieldCount++
@@ -438,15 +439,6 @@ func validateDRAResourceQuantitySelectorValue(value *apiresource.Quantity, fldPa
 	warningList := admission.Warnings{}
 	errList := field.ErrorList{}
 	if value == nil {
-		errList = append(errList, field.Required(fldPath, "is required"))
-	}
-	return warningList, errList
-}
-
-func validateAuthSecret(authSecret *string, fldPath *field.Path) (admission.Warnings, field.ErrorList) {
-	warningList := admission.Warnings{}
-	errList := field.ErrorList{}
-	if *authSecret == "" {
 		errList = append(errList, field.Required(fldPath, "is required"))
 	}
 	return warningList, errList

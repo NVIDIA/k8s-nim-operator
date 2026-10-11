@@ -10,7 +10,7 @@ spec:
       endpoint: http://nemodatastore-sample.nemo.svc.cluster.local:8000/v1/hf
       modelName: "llama-3-1b-instruct"  # default/llama-3-1b-instruct model must be present in NeMo DataStore
       authSecret: hf-auth
-      modelPuller: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.06
+      modelPuller: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.08
       pullSecret: ngc-secret
   storage:
     pvc:

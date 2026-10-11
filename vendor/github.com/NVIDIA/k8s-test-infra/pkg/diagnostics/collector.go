@@ -1,18 +1,19 @@
-/**
-# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-**/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package diagnostics
 
@@ -23,9 +24,10 @@ import (
 	"os"
 	"path/filepath"
 
+	nfdclientset "sigs.k8s.io/node-feature-discovery/api/generated/clientset/versioned"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	nfdclient "sigs.k8s.io/node-feature-discovery/pkg/generated/clientset/versioned"
 	"sigs.k8s.io/yaml"
 )
 
@@ -35,7 +37,7 @@ type Collector interface {
 
 type Config struct {
 	Clientset kubernetes.Interface
-	NfdClient *nfdclient.Clientset
+	NfdClient *nfdclientset.Clientset
 
 	artifactDir string
 	namespace   string
@@ -51,7 +53,7 @@ func (c *Config) createFile(fp string) (io.WriteCloser, error) {
 	return outfile, nil
 }
 
-func (c *Config) writeToFile(w io.Writer, data interface{}) error {
+func (c *Config) writeToFile(w io.Writer, data any) error {
 	// Marshal data to YAML format
 	yamlBytes, err := yaml.Marshal(data)
 	if err != nil {
@@ -67,12 +69,12 @@ func (c *Config) writeToFile(w io.Writer, data interface{}) error {
 	return nil
 }
 
-func (c *Config) outputTo(filename string, objects interface{}) error {
+func (c *Config) outputTo(filename string, objects any) error {
 	outputfile, err := c.createFile(filename)
 	if err != nil {
 		return fmt.Errorf("error creating %v: %w", filename, err)
 	}
-	defer outputfile.Close()
+	defer outputfile.Close() //nolint:errcheck
 	if err = c.writeToFile(outputfile, objects); err != nil {
 		return fmt.Errorf("error writing to %v: %w", filename, err)
 	}
@@ -81,7 +83,7 @@ func (c *Config) outputTo(filename string, objects interface{}) error {
 
 func (d *Diagnostic) Collect(ctx context.Context) error {
 	// Create the artifact directory
-	if err := os.MkdirAll(filepath.Join(d.Config.artifactDir, d.Config.namespace), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Join(d.artifactDir, d.namespace), os.ModePerm); err != nil {
 		return fmt.Errorf("error creating artifact directory: %w", err)
 	}
 
@@ -90,7 +92,7 @@ func (d *Diagnostic) Collect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error creating collector log file: %w", err)
 	}
-	defer logFile.Close()
+	defer logFile.Close() //nolint:errcheck
 	d.log = logFile
 
 	// configure klog to write to the log file

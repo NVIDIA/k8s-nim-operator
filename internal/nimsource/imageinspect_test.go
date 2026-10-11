@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -195,6 +196,17 @@ func (f fixedResolver) Resolve(context.Context, string, string, []string) (Proto
 	return f.protocol, nil
 }
 
+type countingResolver struct {
+	protocol Protocol
+	err      error
+	calls    int
+}
+
+func (r *countingResolver) Resolve(context.Context, string, string, []string) (Protocol, error) {
+	r.calls++
+	return r.protocol, r.err
+}
+
 func TestResolveProtocolOrLegacy(t *testing.T) {
 	if got := ResolveProtocolOrLegacy(context.Background(), nil, "img", "ns", nil); got != Legacy {
 		t.Fatalf("nil resolver: got %q, want legacy", got)
@@ -253,6 +265,7 @@ func TestResolveModelLayout(t *testing.T) {
 	})
 
 	t.Run("direct NIMService with nil resolver defaults to legacy", func(t *testing.T) {
+		service.Status.ImageProtocol = nil
 		layout, err := ResolveModelLayout(context.Background(), nil, service, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -263,6 +276,7 @@ func TestResolveModelLayout(t *testing.T) {
 	})
 
 	t.Run("direct NIMService inspection error falls back to legacy without failing", func(t *testing.T) {
+		service.Status.ImageProtocol = nil
 		layout, err := ResolveModelLayout(context.Background(), failingResolver{}, service, nil)
 		if err != nil {
 			t.Fatalf("inspection error must not fail reconciliation: %v", err)
@@ -271,4 +285,117 @@ func TestResolveModelLayout(t *testing.T) {
 			t.Fatalf("protocol = %q, want legacy", layout.Protocol)
 		}
 	})
+}
+
+func TestDirectImageProtocolIsPersistedAndReused(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	service := &appsv1alpha1.NIMService{
+		ObjectMeta: metav1.ObjectMeta{Name: "svc", Namespace: "default"},
+		Spec: appsv1alpha1.NIMServiceSpec{
+			Image: appsv1alpha1.Image{Repository: "nvcr.io/nim/retriever", Tag: "2.0.0"},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(service).WithStatusSubresource(service).Build()
+	resolver := &countingResolver{protocol: NativeV1}
+	ResolveAndPersistModelLayout(context.Background(), resolver, cli, service, nil)
+	if resolver.calls != 1 {
+		t.Fatalf("first reconcile: got %d lookups, want 1", resolver.calls)
+	}
+
+	stored := &appsv1alpha1.NIMService{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(service), stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status.ImageProtocol == nil || stored.Status.ImageProtocol.Protocol != string(NativeV1) {
+		t.Fatalf("protocol was not persisted: %+v", stored.Status.ImageProtocol)
+	}
+	ResolveAndPersistModelLayout(context.Background(), resolver, cli, stored, nil)
+	if resolver.calls != 1 {
+		t.Fatalf("retry: got %d lookups, want 1", resolver.calls)
+	}
+
+	stored.Spec.Image.Tag = "2.0.1"
+	ResolveAndPersistModelLayout(context.Background(), resolver, cli, stored, nil)
+	if resolver.calls != 2 {
+		t.Fatalf("image change: got %d lookups, want 2", resolver.calls)
+	}
+}
+
+func TestFailedDirectImageLookupRetriesUntilSuccess(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	service := &appsv1alpha1.NIMService{
+		ObjectMeta: metav1.ObjectMeta{Name: "svc", Namespace: "default"},
+		Spec: appsv1alpha1.NIMServiceSpec{
+			Image: appsv1alpha1.Image{Repository: "nvcr.io/nim/retriever", Tag: "2.0.0"},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(service).WithStatusSubresource(service).Build()
+	resolver := &countingResolver{err: fmt.Errorf("registry unavailable")}
+	stored := service
+	const failedAttempts = 12
+	for attempt := 1; attempt <= failedAttempts; attempt++ {
+		layout := ResolveAndPersistModelLayout(context.Background(), resolver, cli, stored, nil)
+		if layout.Protocol != Legacy {
+			t.Fatalf("attempt %d: protocol = %q, want legacy", attempt, layout.Protocol)
+		}
+		if resolver.calls != attempt {
+			t.Fatalf("attempt %d: got %d lookups", attempt, resolver.calls)
+		}
+		stored = &appsv1alpha1.NIMService{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(service), stored); err != nil {
+			t.Fatal(err)
+		}
+		if stored.Status.ImageProtocol != nil {
+			t.Fatalf("failed lookup must not cache protocol: %+v", stored.Status.ImageProtocol)
+		}
+	}
+
+	resolver.err = nil
+	resolver.protocol = NativeV1
+	layout := ResolveAndPersistModelLayout(context.Background(), resolver, cli, stored, nil)
+	if !layout.Protocol.IsNative() {
+		t.Fatalf("after recovery: protocol = %q, want native", layout.Protocol)
+	}
+	if resolver.calls != failedAttempts+1 {
+		t.Fatalf("after recovery: got %d lookups, want %d", resolver.calls, failedAttempts+1)
+	}
+	stored = &appsv1alpha1.NIMService{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(service), stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status.ImageProtocol == nil || stored.Status.ImageProtocol.Protocol != string(NativeV1) {
+		t.Fatalf("successful lookup was not persisted: %+v", stored.Status.ImageProtocol)
+	}
+
+	ResolveAndPersistModelLayout(context.Background(), resolver, cli, stored, nil)
+	if resolver.calls != failedAttempts+1 {
+		t.Fatalf("cached success should skip lookup: got %d, want %d", resolver.calls, failedAttempts+1)
+	}
+}
+
+func TestPersistFailureDoesNotFailResolvedLayout(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	service := &appsv1alpha1.NIMService{
+		ObjectMeta: metav1.ObjectMeta{Name: "svc", Namespace: "default"},
+		Spec: appsv1alpha1.NIMServiceSpec{
+			Image: appsv1alpha1.Image{Repository: "nvcr.io/nim/retriever", Tag: "2.0.0"},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	layout := ResolveAndPersistModelLayout(context.Background(), &countingResolver{protocol: NativeV1}, cli, service, nil)
+	if !layout.Protocol.IsNative() {
+		t.Fatalf("protocol = %q, want native", layout.Protocol)
+	}
+	if service.Status.ImageProtocol == nil || service.Status.ImageProtocol.Protocol != string(NativeV1) {
+		t.Fatalf("in-memory protocol was not set: %+v", service.Status.ImageProtocol)
+	}
 }
