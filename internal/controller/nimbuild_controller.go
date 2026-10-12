@@ -223,7 +223,7 @@ func (r *NIMBuildReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.O
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMBuildReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nimbuild-controller")
+	r.recorder = mgr.GetEventRecorderFor("nimbuild-controller") //nolint:staticcheck // pending migration to the events.k8s.io API (Mgr.GetEventRecorder)
 	r.apiReader = mgr.GetAPIReader()
 
 	err := mgr.GetFieldIndexer().IndexField(
