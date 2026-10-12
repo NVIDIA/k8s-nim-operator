@@ -21,6 +21,7 @@ import (
 	clientset "github.com/NVIDIA/k8s-nim-operator/api/versioned"
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/apps/v1alpha1"
 	fakeappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/apps/v1alpha1/fake"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"

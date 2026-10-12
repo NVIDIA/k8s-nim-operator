@@ -18,8 +18,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
-
 	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	scheme "github.com/NVIDIA/k8s-nim-operator/api/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

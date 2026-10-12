@@ -19,6 +19,7 @@ package v1alpha1
 
 import (
 	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
