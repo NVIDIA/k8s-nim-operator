@@ -259,7 +259,7 @@ func (r *NIMCacheReconciler) GetOrchestratorType(ctx context.Context) (k8sutil.O
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NIMCacheReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nimcache-controller")
+	r.recorder = mgr.GetEventRecorderFor("nimcache-controller") //nolint:staticcheck // pending migration to the events.k8s.io API (Mgr.GetEventRecorder)
 	r.apiReader = mgr.GetAPIReader()
 	r.imageProtocolResolver = nimsource.NewProtocolResolver(r.apiReader)
 	return ctrl.NewControllerManagedBy(mgr).
