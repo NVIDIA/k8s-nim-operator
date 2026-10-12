@@ -240,7 +240,7 @@ func (r *NemoEvaluatorReconciler) GetOrchestratorType(ctx context.Context) (k8su
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nemo-evaluator-service-controller")
+	r.recorder = mgr.GetEventRecorderFor("nemo-evaluator-service-controller") //nolint:staticcheck // pending migration to the events.k8s.io API (Mgr.GetEventRecorder)
 	r.apiReader = mgr.GetAPIReader()
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoEvaluator{}).
@@ -275,7 +275,7 @@ func (r *NemoEvaluatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder, err := k8sutil.ControllerOwnsIfCRDExists(
 		r.discoveryClient,
 		builder,
-		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		k8sutil.GatewayGroupVersionResource("httproutes"),
 		&gatewayv1.HTTPRoute{},
 	)
 	if err != nil {
@@ -320,7 +320,7 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, ne
 
 	// Sync role
 	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(nemoEvaluator.GetRoleParams())
+		return renderer.Role(nemoEvaluator.GetRoleParams(k8sutil.IsOpenShift(r.orchestratorType)))
 	}, "role", conditions.ReasonRoleFailed)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -419,6 +419,8 @@ func (r *NemoEvaluatorReconciler) reconcileNemoEvaluator(ctx context.Context, ne
 	}
 
 	deploymentParams := nemoEvaluator.GetDeploymentParams()
+	deploymentParams.Annotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.Annotations, r.orchestratorType, nemoEvaluator.GetRequiredSCC())
+	deploymentParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.PodAnnotations, r.orchestratorType, nemoEvaluator.GetRequiredSCC())
 
 	// Sync deployment
 	err = r.renderAndSyncResource(ctx, nemoEvaluator, &renderer, &appsv1.Deployment{}, func() (client.Object, error) {

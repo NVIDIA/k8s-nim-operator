@@ -12,6 +12,16 @@
     profile: throughput
     tp: '8'
   container_url: nvcr.io/nim/meta/llama3-70b-instruct:1.0.0
+  workspace:
+    components:
+    - dst: trtllm_engine
+      src:
+        repo_id: nim/meta/llama3-70b-instruct
+        files:
+          - 'LICENSE.txt'
+          - 'checksums.blake3'
+          - 'config.json'
+          - 'rank0.engine'
 04fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc12345:
   model: meta/llama3-70b-instruct
   release: '1.0.0'

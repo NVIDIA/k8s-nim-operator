@@ -27,5 +27,5 @@ spec:
       type: ClusterIP
       port: 8000
   runtimeClassName: kata-qemu-nvidia-gpu
-  userID: 0
-  groupID: 0
+  userID: 1000
+  groupID: 1000

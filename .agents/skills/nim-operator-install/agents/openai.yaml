@@ -1,0 +1,3 @@
+display_name: NIM Operator Install
+short_description: Install, dry-run, upgrade, or validate NVIDIA NIM Operator with Helm.
+default_prompt: Use the NIM Operator install skill to dry-run or install NIM Operator on my Kubernetes cluster. Check prerequisites first, discover available chart versions, ask which version to use, and ask before running any mutating commands.

@@ -1,0 +1,3 @@
+display_name: NIM Operator Uninstall
+short_description: Inventory, uninstall, or validate removal of NVIDIA NIM Operator safely.
+default_prompt: Use the NIM Operator uninstall skill to inventory or uninstall NIM Operator from my Kubernetes cluster. Preserve CRDs, custom resources, namespace, GPU Operator, cert-manager, and KServe unless I explicitly approve deleting them.

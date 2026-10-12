@@ -94,6 +94,6 @@ spec:
               - ALL
           command: ["crd-apply-tool"]
           args:
-            - "--crds-dir=/opt/nim-operator/crds/"
+            - "--crds-path=/opt/nim-operator/crds/"
       restartPolicy: OnFailure
 {{- end }}

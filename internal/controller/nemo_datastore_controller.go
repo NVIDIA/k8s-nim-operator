@@ -240,7 +240,7 @@ func (r *NemoDatastoreReconciler) GetOrchestratorType(ctx context.Context) (k8su
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoDatastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nemo-datastore-service-controller")
+	r.recorder = mgr.GetEventRecorderFor("nemo-datastore-service-controller") //nolint:staticcheck // pending migration to the events.k8s.io API (Mgr.GetEventRecorder)
 	r.apiReader = mgr.GetAPIReader()
 	bd := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoDatastore{}).
@@ -276,7 +276,7 @@ func (r *NemoDatastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	bd, err := k8sutil.ControllerOwnsIfCRDExists(
 		r.discoveryClient,
 		bd,
-		gatewayv1.SchemeGroupVersion.WithResource("httproutes"),
+		k8sutil.GatewayGroupVersionResource("httproutes"),
 		&gatewayv1.HTTPRoute{},
 	)
 	if err != nil {
@@ -327,20 +327,28 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 		return ctrl.Result{}, err
 	}
 
-	// Sync role
-	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
-		return renderer.Role(nemoDatastore.GetRoleParams())
-	}, "role", conditions.ReasonRoleFailed)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	// Sync role / rolebinding. SCC rules are OpenShift-only; clean up on other platforms.
+	if k8sutil.IsOpenShift(r.orchestratorType) {
+		err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &rbacv1.Role{}, func() (client.Object, error) {
+			return renderer.Role(nemoDatastore.GetRoleParams(true))
+		}, "role", conditions.ReasonRoleFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
-	// Sync rolebinding
-	err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
-		return renderer.RoleBinding(nemoDatastore.GetRoleBindingParams())
-	}, "rolebinding", conditions.ReasonRoleBindingFailed)
-	if err != nil {
-		return ctrl.Result{}, err
+		err = r.renderAndSyncResource(ctx, nemoDatastore, &renderer, &rbacv1.RoleBinding{}, func() (client.Object, error) {
+			return renderer.RoleBinding(nemoDatastore.GetRoleBindingParams())
+		}, "rolebinding", conditions.ReasonRoleBindingFailed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.Role{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		if err = k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.RoleBinding{}, namespacedName); err != nil && !apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Sync service
@@ -408,6 +416,8 @@ func (r *NemoDatastoreReconciler) reconcileNemoDatastore(ctx context.Context, ne
 	}
 
 	deploymentParams := nemoDatastore.GetDeploymentParams()
+	deploymentParams.Annotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.Annotations, r.orchestratorType, nemoDatastore.GetRequiredSCC())
+	deploymentParams.PodAnnotations = k8sutil.WithRequiredSCCAnnotation(deploymentParams.PodAnnotations, r.orchestratorType, nemoDatastore.GetRequiredSCC())
 
 	// Setup volume mounts with model store
 	deploymentParams.Volumes = nemoDatastore.GetVolumes()

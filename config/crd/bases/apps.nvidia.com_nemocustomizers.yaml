@@ -2346,6 +2346,10 @@ spec:
                         maximum: 65535
                         minimum: 1
                         type: integer
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
                       metricsPort:
                         description: |-
                           MetricsPort is the port for metrics

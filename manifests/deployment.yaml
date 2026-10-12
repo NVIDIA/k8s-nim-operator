@@ -38,6 +38,9 @@ spec:
       {{- if .SchedulerName }}
       schedulerName: {{ .SchedulerName }}
       {{- end }}
+      {{- if .PriorityClassName }}
+      priorityClassName: {{ .PriorityClassName }}
+      {{- end }}
       {{- if .Affinity }}
       affinity:
         {{ .Affinity | yaml | nindent 8 }}

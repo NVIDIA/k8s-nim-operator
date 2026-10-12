@@ -42,8 +42,15 @@ import (
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	nimparserv1 "github.com/NVIDIA/k8s-nim-operator/internal/nimparser/v1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/nimsource"
 	"github.com/NVIDIA/k8s-nim-operator/internal/shared"
 )
+
+type legacyProtocolResolver struct{}
+
+func (legacyProtocolResolver) Resolve(context.Context, string, string, []string) (nimsource.Protocol, error) {
+	return nimsource.Legacy, nil
+}
 
 var _ = Describe("NIMCache Controller", func() {
 	var (
@@ -64,9 +71,10 @@ var _ = Describe("NIMCache Controller", func() {
 			WithStatusSubresource(&corev1.ConfigMap{}).
 			Build()
 		reconciler = &NIMCacheReconciler{
-			Client:   cli,
-			scheme:   scheme,
-			recorder: record.NewFakeRecorder(1000),
+			Client:                cli,
+			scheme:                scheme,
+			recorder:              record.NewFakeRecorder(1000),
+			imageProtocolResolver: &legacyProtocolResolver{},
 		}
 
 		nimCache := &appsv1alpha1.NIMCache{
@@ -271,8 +279,9 @@ var _ = Describe("NIMCache Controller", func() {
 	})
 
 	Context("when creating a NIMCache resource", func() {
-		It("should create a Role with SCC rules", func() {
+		It("should create a Role with SCC rules on OpenShift", func() {
 			ctx := context.TODO()
+			reconciler.orchestratorType = k8sutil.OpenShift
 			nimCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-nimcache",
@@ -304,8 +313,31 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(role.Rules[0]).To(Equal(expectedRule))
 		})
 
+		It("should not create an SCC Role on non-OpenShift", func() {
+			ctx := context.TODO()
+			reconciler.orchestratorType = k8sutil.K8s
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache-k8s",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+				},
+			}
+
+			err := reconciler.reconcileRole(ctx, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+
+			role := &rbacv1.Role{}
+			roleName := types.NamespacedName{Name: NIMCacheRole, Namespace: "default"}
+			err = cli.Get(ctx, roleName, role)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
 		It("should create a RoleBinding for the Role", func() {
 			ctx := context.TODO()
+			reconciler.orchestratorType = k8sutil.OpenShift
 			nimCache := &appsv1alpha1.NIMCache{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-nimcache",
@@ -713,6 +745,9 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(profile.Tags["llm_engine"]).To(Equal("tensorrt_llm"))
 			Expect(profile.Tags["precision"]).To(Equal("fp16"))
 			Expect(profile.ContainerURL).To(Equal("nvcr.io/nim/meta/llama3-70b-instruct:1.0.0"))
+			// Bulky workspace file lists must not be persisted in the ConfigMap.
+			Expect(profile.Workspace).To(BeNil())
+			Expect(createdConfigMap.Data["model_manifest.yaml"]).NotTo(ContainSubstring("workspace"))
 		})
 
 		It("should return an error if model_manifest.yaml is not found in ConfigMap", func() {
