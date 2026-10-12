@@ -18,13 +18,10 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -36,7 +33,7 @@ var nimcachelog = logf.Log.WithName("webhooks").WithName("NIMCache")
 
 // SetupNIMCacheWebhookWithManager registers the webhook for NIMCache in the manager.
 func SetupNIMCacheWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&appsv1alpha1.NIMCache{}).
+	return ctrl.NewWebhookManagedBy(mgr, &appsv1alpha1.NIMCache{}).
 		WithValidator(&NIMCacheCustomValidator{}).
 		Complete()
 }
@@ -57,15 +54,11 @@ type NIMCacheCustomValidator struct {
 	// TODO(user): Add more fields as needed for validation
 }
 
-var _ webhook.CustomValidator = &NIMCacheCustomValidator{}
+var _ admission.Validator[*appsv1alpha1.NIMCache] = &NIMCacheCustomValidator{}
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type NIMCache.
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type NIMCache.
 // Validate initial resource configuration, required fields, resource limits.
-func (v *NIMCacheCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	nimcache, ok := obj.(*appsv1alpha1.NIMCache)
-	if !ok {
-		return nil, fmt.Errorf("expected a NIMCache object but got %T", obj)
-	}
+func (v *NIMCacheCustomValidator) ValidateCreate(_ context.Context, nimcache *appsv1alpha1.NIMCache) (admission.Warnings, error) {
 	nimcachelog.V(4).Info("Validation for NIMCache upon creation", "name", nimcache.GetName())
 
 	fldPath := field.NewPath("nimcache").Child("spec")
@@ -79,28 +72,15 @@ func (v *NIMCacheCustomValidator) ValidateCreate(_ context.Context, obj runtime.
 	return warningList, nil
 }
 
-// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NIMCache.
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type NIMCache.
 // Check immutable fields haven't changed, validate transitions between states, ensure updates don't break existing functionality.
-func (v *NIMCacheCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	nimcache, ok := newObj.(*appsv1alpha1.NIMCache)
-	if !ok {
-		return nil, fmt.Errorf("expected a NIMCache object for the newObj but got %T", newObj)
-	}
-	nimcachelog.V(4).Info("Validation for NIMCache upon update", "name", nimcache.GetName())
+func (v *NIMCacheCustomValidator) ValidateUpdate(_ context.Context, oldNIMCache, newNIMCache *appsv1alpha1.NIMCache) (admission.Warnings, error) {
+	nimcachelog.V(4).Info("Validation for NIMCache upon update", "name", newNIMCache.GetName())
 
 	fldPath := field.NewPath("nimcache").Child("spec")
 
 	// Begin by validating the new spec structurally.
-	warningList, errList := validateNIMCacheSpec(&nimcache.Spec, fldPath)
-
-	oldNIMCache, ok := oldObj.(*appsv1alpha1.NIMCache)
-	if !ok {
-		return nil, fmt.Errorf("expected a NIMCache object for oldObj but got %T", oldObj)
-	}
-	newNIMCache, ok := newObj.(*appsv1alpha1.NIMCache)
-	if !ok {
-		return nil, fmt.Errorf("expected a NIMCache object for newObj but got %T", newObj)
-	}
+	warningList, errList := validateNIMCacheSpec(&newNIMCache.Spec, fldPath)
 
 	// Append immutability errors after structural checks.
 	wList, eList := validateImmutableNIMCacheSpec(oldNIMCache, newNIMCache, field.NewPath("nimcache"))
@@ -114,8 +94,8 @@ func (v *NIMCacheCustomValidator) ValidateUpdate(_ context.Context, oldObj, newO
 	return warningList, nil
 }
 
-// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type NIMCache.
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type NIMCache.
 // Verify safe deletion conditions, check for dependent resources, ensure cleanup requirements.
-func (v *NIMCacheCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *NIMCacheCustomValidator) ValidateDelete(ctx context.Context, nimcache *appsv1alpha1.NIMCache) (admission.Warnings, error) {
 	return nil, nil
 }
