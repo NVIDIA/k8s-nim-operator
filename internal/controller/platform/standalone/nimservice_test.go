@@ -2638,6 +2638,57 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(external).To(Equal("10.1.1.1:8123"))
 		})
 
+		// spec.loadBalancerIP is a request field and the operator never renders it
+		// (manifests/service.yaml has no such key), so the address a provider
+		// assigns is only ever in status.
+		loadBalancerWithStatus := func(ingresses []corev1.LoadBalancerIngress) {
+			Expect(client.Delete(context.TODO(), svc)).To(Succeed())
+			svc = &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimservice",
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					Type:      corev1.ServiceTypeLoadBalancer,
+					ClusterIP: "127.0.0.1",
+					Ports:     []corev1.ServicePort{{Port: 8123, Name: "service-port"}},
+				},
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{Ingress: ingresses},
+				},
+			}
+			Expect(client.Create(context.TODO(), svc)).To(Succeed())
+		}
+
+		It("should return the assigned address when spec.loadBalancerIP is unset", func() {
+			nimService.Spec.Expose.Router.Ingress = nil
+			loadBalancerWithStatus([]corev1.LoadBalancerIngress{{IP: "10.2.2.2"}})
+
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(internal).To(Equal("127.0.0.1:8123"))
+			Expect(external).To(Equal("10.2.2.2:8123"))
+		})
+
+		It("should prefer the load balancer hostname over its ip", func() {
+			nimService.Spec.Expose.Router.Ingress = nil
+			loadBalancerWithStatus([]corev1.LoadBalancerIngress{{IP: "10.2.2.2", Hostname: "lb.example.com"}})
+
+			_, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(external).To(Equal("lb.example.com:8123"))
+		})
+
+		It("should return no external endpoint while the load balancer has no address", func() {
+			nimService.Spec.Expose.Router.Ingress = nil
+			loadBalancerWithStatus(nil)
+
+			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(internal).To(Equal("127.0.0.1:8123"))
+			Expect(external).To(BeEmpty())
+		})
+
 		It("should return hostname from ingress rules as external endpoint", func() {
 			internal, external, err := reconciler.getNIMModelEndpoints(context.TODO(), nimService)
 			Expect(err).ToNot(HaveOccurred())
