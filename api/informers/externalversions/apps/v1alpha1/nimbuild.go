@@ -18,11 +18,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	context "context"
 	time "time"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	apiappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	internalinterfaces "github.com/NVIDIA/k8s-nim-operator/api/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/listers/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/listers/apps/v1alpha1"
 	versioned "github.com/NVIDIA/k8s-nim-operator/api/versioned"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +35,7 @@ import (
 // NIMBuilds.
 type NIMBuildInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.NIMBuildLister
+	Lister() appsv1alpha1.NIMBuildLister
 }
 
 type nIMBuildInformer struct {
@@ -60,16 +61,28 @@ func NewFilteredNIMBuildInformer(client versioned.Interface, namespace string, r
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().NIMBuilds(namespace).List(context.TODO(), options)
+				return client.AppsV1alpha1().NIMBuilds(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().NIMBuilds(namespace).Watch(context.TODO(), options)
+				return client.AppsV1alpha1().NIMBuilds(namespace).Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AppsV1alpha1().NIMBuilds(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AppsV1alpha1().NIMBuilds(namespace).Watch(ctx, options)
 			},
 		},
-		&appsv1alpha1.NIMBuild{},
+		&apiappsv1alpha1.NIMBuild{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,9 +93,9 @@ func (f *nIMBuildInformer) defaultInformer(client versioned.Interface, resyncPer
 }
 
 func (f *nIMBuildInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.NIMBuild{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiappsv1alpha1.NIMBuild{}, f.defaultInformer)
 }
 
-func (f *nIMBuildInformer) Lister() v1alpha1.NIMBuildLister {
-	return v1alpha1.NewNIMBuildLister(f.Informer().GetIndexer())
+func (f *nIMBuildInformer) Lister() appsv1alpha1.NIMBuildLister {
+	return appsv1alpha1.NewNIMBuildLister(f.Informer().GetIndexer())
 }

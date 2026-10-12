@@ -18,11 +18,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	context "context"
 	time "time"
 
-	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	apiappsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	internalinterfaces "github.com/NVIDIA/k8s-nim-operator/api/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/listers/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/listers/apps/v1alpha1"
 	versioned "github.com/NVIDIA/k8s-nim-operator/api/versioned"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +35,7 @@ import (
 // NemoDatastores.
 type NemoDatastoreInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.NemoDatastoreLister
+	Lister() appsv1alpha1.NemoDatastoreLister
 }
 
 type nemoDatastoreInformer struct {
@@ -60,16 +61,28 @@ func NewFilteredNemoDatastoreInformer(client versioned.Interface, namespace stri
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().NemoDatastores(namespace).List(context.TODO(), options)
+				return client.AppsV1alpha1().NemoDatastores(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().NemoDatastores(namespace).Watch(context.TODO(), options)
+				return client.AppsV1alpha1().NemoDatastores(namespace).Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AppsV1alpha1().NemoDatastores(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AppsV1alpha1().NemoDatastores(namespace).Watch(ctx, options)
 			},
 		},
-		&appsv1alpha1.NemoDatastore{},
+		&apiappsv1alpha1.NemoDatastore{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,9 +93,9 @@ func (f *nemoDatastoreInformer) defaultInformer(client versioned.Interface, resy
 }
 
 func (f *nemoDatastoreInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.NemoDatastore{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiappsv1alpha1.NemoDatastore{}, f.defaultInformer)
 }
 
-func (f *nemoDatastoreInformer) Lister() v1alpha1.NemoDatastoreLister {
-	return v1alpha1.NewNemoDatastoreLister(f.Informer().GetIndexer())
+func (f *nemoDatastoreInformer) Lister() appsv1alpha1.NemoDatastoreLister {
+	return appsv1alpha1.NewNemoDatastoreLister(f.Informer().GetIndexer())
 }
