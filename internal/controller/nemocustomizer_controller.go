@@ -254,7 +254,7 @@ func (r *NemoCustomizerReconciler) GetOrchestratorType(ctx context.Context) (k8s
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NemoCustomizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor("nemo-customizer-service-controller")
+	r.recorder = mgr.GetEventRecorderFor("nemo-customizer-service-controller") //nolint:staticcheck // pending migration to the events.k8s.io API (Mgr.GetEventRecorder)
 	r.apiReader = mgr.GetAPIReader()
 	bd := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.NemoCustomizer{}).
