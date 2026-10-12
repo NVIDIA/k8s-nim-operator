@@ -1,6 +1,6 @@
 module github.com/NVIDIA/k8s-nim-operator
 
-go 1.26.5
+go 1.27.1
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
