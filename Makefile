@@ -117,6 +117,7 @@ fmt: ## Run go fmt against code.
 vendor:
 	go mod tidy
 	go mod vendor
+	@bash hack/apply-vendor-patches.sh
 	go mod verify
 
 vet: ## Run go vet against code.
