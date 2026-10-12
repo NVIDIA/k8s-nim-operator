@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/google/go-licenses/v2 v2.0.1
-	k8s.io/code-generator v0.34.5
+	k8s.io/code-generator v0.36.0
 	sigs.k8s.io/controller-tools v0.21.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.8.3
 )
