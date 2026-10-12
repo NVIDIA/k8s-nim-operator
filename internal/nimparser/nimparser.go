@@ -40,4 +40,8 @@ type NIMManifestInterface interface {
 	GetProfileModel(profileID string) string
 	GetProfileTags(profileID string) map[string]string
 	GetProfileRelease(profileID string) string
+	// Minimal returns a copy of the manifest with bulky fields removed (e.g. workspace
+	// file lists) while retaining the metadata needed for profile matching and status.
+	// The result is safe to persist in a ConfigMap without exceeding etcd size limits.
+	Minimal() NIMManifestInterface
 }

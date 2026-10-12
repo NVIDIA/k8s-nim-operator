@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -55,7 +56,24 @@ const (
 
 	// DefaultModelStorePath is the default path for model store.
 	DefaultModelStorePath = "/model-store"
+
+	// NativeModelBasePath is the base path where the native (NIMCraft) runtime
+	// downloads and expects the single model's weights (e.g. Retriever 2.0
+	// Rust/CUDA runtime). Per-instance model directories live under this path.
+	NativeModelBasePath = "/model"
+
+	// NativeKernelCachePath is the path where the native runtime persists
+	// compiled CUDA kernels (e.g. cudnn-sdpa-plan) across restarts.
+	NativeKernelCachePath = "/opt/cache"
 )
+
+// NativeModelPath returns the per-instance model directory for a native NIM,
+// i.e. NativeModelBasePath/<name>. Both the caching job and the serving workload
+// point NIM_ENGINE_MODEL_PATH at this path so a single PVC can hold the weights
+// of multiple native NIMs without collision.
+func NativeModelPath(name string) string {
+	return path.Join(NativeModelBasePath, name)
+}
 
 const (
 	// MinSupportedClusterVersionForDRA is the minimum supported cluster version for integration with DRA resources.

@@ -1019,8 +1019,9 @@ spec:
                             type: string
                           type: array
                         authSecret:
-                          description: The name of an existing pull secret containing
-                            the NGC_API_KEY
+                          description: |-
+                            AuthSecret is the name of an existing secret containing the NGC_API_KEY (and optionally HF_TOKEN).
+                            Optional for certain NIMs.
                           type: string
                         command:
                           items:
@@ -3749,6 +3750,11 @@ spec:
                               type: array
                               x-kubernetes-list-type: atomic
                           type: object
+                        priorityClassName:
+                          description: |-
+                            PriorityClassName is the name of the PriorityClass to assign to pods created by this NIMService.
+                            If set, the Kubernetes scheduler uses the priority for preemption decisions.
+                          type: string
                         proxy:
                           description: ProxySpec defines the proxy configuration for
                             NIMService.
@@ -5157,7 +5163,6 @@ spec:
                           format: int64
                           type: integer
                       required:
-                      - authSecret
                       - image
                       type: object
                       x-kubernetes-validations:

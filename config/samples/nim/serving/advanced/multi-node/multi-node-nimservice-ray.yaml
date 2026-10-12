@@ -1,0 +1,60 @@
+---
+# NIM Cache for a NIM 2.0+ multi-node deployment. NIM 2.0 and later use Ray
+# for cluster formation (spec.multiNode.ray) instead of MPI.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: llama-3-1-8b-instruct-multinode
+  namespace: nim-service
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama-3.1-8b-instruct:2.0.10
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: vllm
+        tensorParallelism: "2"
+  storage:
+    pvc:
+      create: true
+      storageClass: '' # set to a storage class that supports RWX volumes
+      size: "100Gi"
+      volumeAccessMode: ReadWriteMany
+
+---
+# Multi-node NIMService using LeaderWorkerSet and Ray (NIM 2.0+).
+# mpi and ray are mutually exclusive. For NIM versions before 2.0, see
+# multi-node-nimservice.yaml which uses spec.multiNode.mpi.
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: llama-3-1-8b-instruct-multinode
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: "2.0.10"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: llama-3-1-8b-instruct-multinode
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 2
+    requests:
+      nvidia.com/gpu: 2
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  multiNode:
+    parallelism:
+      pipeline: 1
+      tensor: 2
+    ray:
+      rayPort: 6379

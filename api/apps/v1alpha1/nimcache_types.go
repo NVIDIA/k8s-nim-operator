@@ -116,8 +116,9 @@ type HuggingFaceHubSource struct {
 // NGCSource references a model stored on NVIDIA NGC.
 // +kubebuilder:validation:XValidation:rule="!(has(self.model) && has(self.modelEndpoint))",message="Only one of 'model' or 'modelEndpoint' can be specified"
 type NGCSource struct {
-	// The name of an existing pull secret containing the NGC_API_KEY
-	AuthSecret string `json:"authSecret"`
+	// AuthSecret is the name of an existing secret containing the NGC_API_KEY.
+	// Optional for certain NIMs.
+	AuthSecret string `json:"authSecret,omitempty"`
 	// ModelPuller is the container image that can pull the model
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="modelPuller is an immutable field. Please create a new NIMCache resource instead when you want to change this container."
 	ModelPuller string `json:"modelPuller"`
@@ -219,10 +220,20 @@ const (
 	NimCacheStatusPending = "Pending"
 	// NimCacheStatusFailed indicates that caching is failed.
 	NimCacheStatusFailed = "Failed"
+
+	// NIMCacheModelTypeModelFree indicates a NIM whose image ships without a
+	// model_manifest.yaml and downloads its model via the legacy HuggingFace flow.
+	NIMCacheModelTypeModelFree = "model-free"
+	// NIMCacheModelTypeNative indicates a NIM built on the native (NIMCraft)
+	// single-model runtime (e.g. Retriever 2.0 Rust/CUDA). Such NIMs have no
+	// model_manifest.yaml, no download-to-cache/list-model-profiles commands,
+	// and download their single model on start when NGC_API_KEY/HF_TOKEN is set.
+	NIMCacheModelTypeNative = "native"
 )
 
 // EnvFromSecrets return the list of secrets that should be mounted as env vars.
 func (s *NIMSource) EnvFromSecrets() []corev1.EnvFromSource {
+	optional := true
 	if s.NGC != nil && s.NGC.AuthSecret != "" { // nolint:gocritic
 		return []corev1.EnvFromSource{
 			{
@@ -230,6 +241,7 @@ func (s *NIMSource) EnvFromSecrets() []corev1.EnvFromSource {
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: s.NGC.AuthSecret,
 					},
+					Optional: &optional,
 				},
 			},
 		}
@@ -346,6 +358,14 @@ func (n *NIMCache) IsOptimizedNIM() bool {
 		return true
 	}
 	return false
+}
+
+// IsNativeModelDownload returns true if the NIMCache targets a NIM built on the
+// native (NIMCraft) single-model runtime. This is determined pre-start by
+// inspecting the image's model-download-protocol OCI label and is persisted on
+// the status so subsequent reconciles do not need to re-inspect the registry.
+func (n *NIMCache) IsNativeModelDownload() bool {
+	return n.Status.Type == NIMCacheModelTypeNative
 }
 
 // GetModelSpec returns the model spec for the NIMCache.

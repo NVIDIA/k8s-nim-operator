@@ -647,17 +647,6 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 					Name:  "NIM_MODEL_PROFILE",
 					Value: inputNimProfile.Name,
 				},
-				{
-					Name: appsv1alpha1.NGCAPIKey,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: nimCache.Spec.Source.NGC.AuthSecret,
-							},
-							Key: appsv1alpha1.NGCAPIKey,
-						},
-					},
-				},
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -723,6 +712,23 @@ func (r *NIMBuildReconciler) constructEngineBuildPod(nimBuild *appsv1alpha1.NIMB
 				RunAsUser:    nimCache.GetUserID(),
 			},
 		},
+	}
+
+	// Inject NGC_API_KEY when the backing NIMCache has an auth secret. Optional
+	// so certain NIMs can omit the key.
+	if nimCache.Spec.Source.NGC != nil && nimCache.Spec.Source.NGC.AuthSecret != "" {
+		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{
+			Name: appsv1alpha1.NGCAPIKey,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: nimCache.Spec.Source.NGC.AuthSecret,
+					},
+					Key:      appsv1alpha1.NGCAPIKey,
+					Optional: ptr.To(true),
+				},
+			},
+		})
 	}
 
 	// Merge env with the user provided values
@@ -1009,9 +1015,12 @@ func (r *NIMBuildReconciler) createPod(ctx context.Context, pod *corev1.Pod) err
 }
 
 // updateManifestConfigMap updates the manifest ConfigMap in the cluster with the local manifest data.
+// Only a minimal copy of the manifest (without bulky workspace file lists) is stored
+// to stay under the Kubernetes ConfigMap / etcd 1MiB object size limit.
 func (r *NIMBuildReconciler) updateManifestConfigMap(ctx context.Context, nimCache *appsv1alpha1.NIMCache, manifestData *nimparser.NIMManifestInterface) error {
-	// Convert manifestData to YAML
-	manifestBytes, err := yaml.Marshal(manifestData)
+	// Convert a stripped manifest to YAML. Full manifests can exceed the 1MiB ConfigMap limit
+	// due to per-profile workspace file lists that the operator never reads.
+	manifestBytes, err := yaml.Marshal((*manifestData).Minimal())
 	if err != nil {
 		return fmt.Errorf("failed to marshal manifest data: %w", err)
 	}

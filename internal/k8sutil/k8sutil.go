@@ -54,6 +54,14 @@ import (
 // ErrConfigMapKeyNotFound indicates an error that the given key is missing from the config map.
 var ErrConfigMapKeyNotFound = goerrors.New("configmap key not found")
 
+// GatewayGroupVersionResource returns a GroupVersionResource for Gateway API v1 resources.
+func GatewayGroupVersionResource(resource string) schema.GroupVersionResource {
+	return schema.GroupVersion{
+		Group:   gatewayv1.GroupVersion.Group,
+		Version: gatewayv1.GroupVersion.Version,
+	}.WithResource(resource)
+}
+
 // OrchestratorType is the underlying container orchestrator type.
 type OrchestratorType string
 
@@ -78,7 +86,34 @@ const (
 	K8s OrchestratorType = "Kubernetes"
 	// Unknown distribution type.
 	Unknown OrchestratorType = "Unknown"
+
+	// RequiredSCCAnnotation is the OpenShift annotation used to select an SCC.
+	RequiredSCCAnnotation = "openshift.io/required-scc"
 )
+
+// IsOpenShift reports whether the detected orchestrator is OpenShift.
+func IsOpenShift(t OrchestratorType) bool {
+	return t == OpenShift
+}
+
+// WithRequiredSCCAnnotation returns a copy of annotations with the OpenShift
+// required-SCC annotation set when running on OpenShift.
+func WithRequiredSCCAnnotation(annotations map[string]string, orchestrator OrchestratorType, scc string) map[string]string {
+	out := annotations
+	if out == nil {
+		out = map[string]string{}
+	} else {
+		copied := make(map[string]string, len(out)+1)
+		for k, v := range out {
+			copied[k] = v
+		}
+		out = copied
+	}
+	if IsOpenShift(orchestrator) && scc != "" {
+		out[RequiredSCCAnnotation] = scc
+	}
+	return out
+}
 
 // GetOrchestratorType checks the container orchestrator by looking for specific node labels that identify
 // TKGS, OpenShift, or CSP-specific Kubernetes distributions.
@@ -527,10 +562,10 @@ func BuildByObjectFilteredCache(discoveryClient discovery.DiscoveryInterface, ls
 	if err := addIfExists(monitoring.SchemeGroupVersion.WithResource("servicemonitors"), &monitoring.ServiceMonitor{}, "ServiceMonitor"); err != nil {
 		return nil, err
 	}
-	if err := addIfExists(gatewayv1.SchemeGroupVersion.WithResource("grpcroutes"), &gatewayv1.GRPCRoute{}, "GRPCRoute"); err != nil {
+	if err := addIfExists(GatewayGroupVersionResource("grpcroutes"), &gatewayv1.GRPCRoute{}, "GRPCRoute"); err != nil {
 		return nil, err
 	}
-	if err := addIfExists(gatewayv1.SchemeGroupVersion.WithResource("httproutes"), &gatewayv1.HTTPRoute{}, "HTTPRoute"); err != nil {
+	if err := addIfExists(GatewayGroupVersionResource("httproutes"), &gatewayv1.HTTPRoute{}, "HTTPRoute"); err != nil {
 		return nil, err
 	}
 	if err := addIfExists(kservev1beta1.SchemeGroupVersion.WithResource("inferenceservices"), &kservev1beta1.InferenceService{}, "InferenceService"); err != nil {
