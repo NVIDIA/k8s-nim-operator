@@ -122,9 +122,11 @@ type Gateway struct {
 	// Name of the gateway
 	Name string `json:"name"`
 
+	// +optional
 	// +kubebuilder:default:=true
 	// HTTPRoutesEnabled is a flag to enable HTTPRoutes for the created gateway.
-	HTTPRoutesEnabled bool `json:"httpRoutesEnabled,omitempty"`
+	// Explicit false disables HTTPRoutes; omitting the field defaults to true.
+	HTTPRoutesEnabled *bool `json:"httpRoutesEnabled,omitempty"`
 
 	// +kubebuilder:default:=false
 	// GRPCRoutesEnabled is a flag to enable GRPCRoutes for the created gateway.
@@ -284,7 +286,7 @@ func (i *IngressV1) GenerateNetworkingV1IngressSpec(name string) networkingv1.In
 }
 
 func (r *Router) GenerateGatewayHTTPRouteSpec(namespace, name string, port int32) gatewayv1.HTTPRouteSpec {
-	if r.Gateway == nil || !r.Gateway.HTTPRoutesEnabled {
+	if !r.Gateway.IsHTTPRoutesEnabled() {
 		return gatewayv1.HTTPRouteSpec{}
 	}
 
@@ -366,6 +368,15 @@ func (r *Router) GenerateGatewayGRPCRouteSpec(namespace, name string, port int32
 
 func (r *Router) getHostname(namespace, name string) string {
 	return fmt.Sprintf("%s.%s.%s", name, namespace, r.HostDomainName)
+}
+
+// IsHTTPRoutesEnabled reports whether HTTPRoutes should be created for this gateway.
+// A nil Gateway is treated as disabled. A nil flag defaults to true to match the CRD default.
+func (g *Gateway) IsHTTPRoutesEnabled() bool {
+	if g == nil {
+		return false
+	}
+	return ptr.Deref(g.HTTPRoutesEnabled, true)
 }
 
 func (r *Router) GenerateIngressSpec(namespace, name string) networkingv1.IngressSpec {

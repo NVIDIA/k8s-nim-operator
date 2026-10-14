@@ -33,12 +33,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	nvidiaresourcev1beta1 "sigs.k8s.io/dra-driver-nvidia-gpu/api/nvidia.com/resource/v1beta1"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	"github.com/NVIDIA/k8s-nim-operator/internal/k8sutil"
 	"github.com/NVIDIA/k8s-nim-operator/internal/utils"
 )
 
@@ -587,6 +589,87 @@ var _ = Describe("NIMService Controller", func() {
 
 			requests := reconciler.mapResourceClaimToNIMService(ctx, pod)
 			Expect(requests).To(BeEmpty())
+		})
+	})
+
+	Context("HTTPRoutesEnabled false-value persistence", func() {
+		It("should keep explicit false across finalizer update", func() {
+			namespacedName := types.NamespacedName{Name: "grpc-disable-http", Namespace: "default"}
+			nimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      namespacedName.Name,
+					Namespace: namespacedName.Namespace,
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/nvidia/test",
+						Tag:        "1.0",
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							GRPCPort: ptr.To[int32](8001),
+						},
+						Router: appsv1alpha1.Router{
+							HostDomainName: "example.com",
+							Gateway: &appsv1alpha1.Gateway{
+								Name:              "case-gateway",
+								Namespace:         "default",
+								HTTPRoutesEnabled: ptr.To(false),
+								GRPCRoutesEnabled: true,
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, nimService)).To(Succeed())
+			defer func() { _ = k8sClient.Delete(ctx, nimService) }()
+
+			created := &appsv1alpha1.NIMService{}
+			Expect(k8sClient.Get(ctx, namespacedName, created)).To(Succeed())
+			Expect(created.IsHTTPRouteEnabled()).To(BeFalse())
+			Expect(created.IsGRPCRouteEnabled()).To(BeTrue())
+
+			Expect(k8sutil.RetryUpdate(ctx, k8sClient, created, func(obj client.Object) {
+				controllerutil.AddFinalizer(obj, NIMServiceFinalizer)
+			})).To(Succeed())
+
+			afterUpdate := &appsv1alpha1.NIMService{}
+			Expect(k8sClient.Get(ctx, namespacedName, afterUpdate)).To(Succeed())
+			Expect(afterUpdate.IsHTTPRouteEnabled()).To(BeFalse())
+			Expect(afterUpdate.IsGRPCRouteEnabled()).To(BeTrue())
+			Expect(controllerutil.ContainsFinalizer(afterUpdate, NIMServiceFinalizer)).To(BeTrue())
+		})
+
+		It("should default omitted httpRoutesEnabled to true after create", func() {
+			namespacedName := types.NamespacedName{Name: "http-default-flag", Namespace: "default"}
+			nimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      namespacedName.Name,
+					Namespace: namespacedName.Namespace,
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nim/nvidia/test",
+						Tag:        "1.0",
+					},
+					Expose: appsv1alpha1.Expose{
+						Router: appsv1alpha1.Router{
+							HostDomainName: "example.com",
+							Gateway: &appsv1alpha1.Gateway{
+								Name:      "case-gateway",
+								Namespace: "default",
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, nimService)).To(Succeed())
+			defer func() { _ = k8sClient.Delete(ctx, nimService) }()
+
+			created := &appsv1alpha1.NIMService{}
+			Expect(k8sClient.Get(ctx, namespacedName, created)).To(Succeed())
+			Expect(created.IsHTTPRouteEnabled()).To(BeTrue())
+			Expect(ptr.Deref(created.Spec.Expose.Router.Gateway.HTTPRoutesEnabled, false)).To(BeTrue())
 		})
 	})
 })

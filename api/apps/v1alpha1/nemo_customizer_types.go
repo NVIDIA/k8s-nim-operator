@@ -670,7 +670,7 @@ func (n *NemoCustomizer) GetIngressSpec() networkingv1.IngressSpec {
 }
 
 func (n *NemoCustomizer) IsHTTPRouteEnabled() bool {
-	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
+	return n.Spec.Expose.Router.Gateway.IsHTTPRoutesEnabled()
 }
 
 func (n *NemoCustomizer) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {
