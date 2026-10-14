@@ -17,7 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	kserveconstants "github.com/kserve/kserve/pkg/constants"
@@ -174,10 +176,47 @@ func TestGetVolumes(t *testing.T) {
 	}
 }
 
-func TestHTTpRoute(t *testing.T) {
+func expectedHTTPRouteSpec(gatewayName, gatewayNamespace, hostname string, port gatewayv1.PortNumber) gatewayv1.HTTPRouteSpec {
 	prefixTypeMatch := gatewayv1.PathMatchPathPrefix
 	root := "/"
+	return gatewayv1.HTTPRouteSpec{
+		CommonRouteSpec: gatewayv1.CommonRouteSpec{
+			ParentRefs: []gatewayv1.ParentReference{
+				{
+					Name:      gatewayv1.ObjectName(gatewayName),
+					Namespace: ptr.To(gatewayv1.Namespace(gatewayNamespace)),
+				},
+			},
+		},
+		Hostnames: []gatewayv1.Hostname{gatewayv1.Hostname(hostname)},
+		Rules: []gatewayv1.HTTPRouteRule{
+			{
+				Matches: []gatewayv1.HTTPRouteMatch{
+					{
+						Path: &gatewayv1.HTTPPathMatch{
+							Type:  &prefixTypeMatch,
+							Value: &root,
+						},
+					},
+				},
+				BackendRefs: []gatewayv1.HTTPBackendRef{
+					{
+						BackendRef: gatewayv1.BackendRef{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
+								Name: "test-svc",
+								Port: &port,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestHTTpRoute(t *testing.T) {
 	var port gatewayv1.PortNumber = DefaultAPIPort
+	enabledSpec := expectedHTTPRouteSpec("istio-gateway", "istio-system", "test-svc.test-ns.foobar.nim", port)
 
 	tests := []struct {
 		name          string
@@ -192,7 +231,19 @@ func TestHTTpRoute(t *testing.T) {
 			desiredGWSpec: gatewayv1.HTTPRouteSpec{},
 		},
 		{
-			name: "should correctly translate to gatewayv1.HTTPRouteSpec",
+			name: "should return empty spec when HTTPRoutesEnabled is explicitly false",
+			router: Router{
+				HostDomainName: "foobar.nim",
+				Gateway: &Gateway{
+					Name:              "istio-gateway",
+					Namespace:         "istio-system",
+					HTTPRoutesEnabled: ptr.To(false),
+				},
+			},
+			desiredGWSpec: gatewayv1.HTTPRouteSpec{},
+		},
+		{
+			name: "should default HTTPRoutesEnabled to true when the flag is omitted",
 			router: Router{
 				HostDomainName: "foobar.nim",
 				Gateway: &Gateway{
@@ -200,50 +251,72 @@ func TestHTTpRoute(t *testing.T) {
 					Namespace: "istio-system",
 				},
 			},
-			desiredGWSpec: gatewayv1.HTTPRouteSpec{
-				CommonRouteSpec: gatewayv1.CommonRouteSpec{
-					ParentRefs: []gatewayv1.ParentReference{
-						{
-							Name: "istio-gateway",
-						},
-					},
-				},
-				Hostnames: []gatewayv1.Hostname{
-					"test.foobar.nim",
-				},
-				Rules: []gatewayv1.HTTPRouteRule{
-					{
-						Matches: []gatewayv1.HTTPRouteMatch{
-							{
-								Path: &gatewayv1.HTTPPathMatch{
-									Type:  &prefixTypeMatch,
-									Value: &root,
-								},
-							},
-						},
-						BackendRefs: []gatewayv1.HTTPBackendRef{
-							{
-								BackendRef: gatewayv1.BackendRef{
-									BackendObjectReference: gatewayv1.BackendObjectReference{
-										Name: "test",
-										Port: &port,
-									},
-								},
-							},
-						},
-					},
+			desiredGWSpec: enabledSpec,
+		},
+		{
+			name: "should correctly translate to gatewayv1.HTTPRouteSpec when HTTPRoutesEnabled is true",
+			router: Router{
+				HostDomainName: "foobar.nim",
+				Gateway: &Gateway{
+					Name:              "istio-gateway",
+					Namespace:         "istio-system",
+					HTTPRoutesEnabled: ptr.To(true),
 				},
 			},
+			desiredGWSpec: enabledSpec,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gwSpec := tt.router.GenerateGatewayHTTPRouteSpec("test", "test", DefaultAPIPort)
+			gwSpec := tt.router.GenerateGatewayHTTPRouteSpec("test-ns", "test-svc", DefaultAPIPort)
 			if !reflect.DeepEqual(gwSpec, tt.desiredGWSpec) {
 				t.Errorf("GenerateGatewayHTTPRouteSpec() = %+v, want %+v", gwSpec, tt.desiredGWSpec)
 			}
 		})
+	}
+}
+
+func TestGatewayHTTPRoutesEnabledJSONPreservesFalse(t *testing.T) {
+	disabled := Gateway{
+		Name:              "case-gateway",
+		Namespace:         "qa-grpc-repro",
+		HTTPRoutesEnabled: ptr.To(false),
+		GRPCRoutesEnabled: true,
+	}
+	b, err := json.Marshal(disabled)
+	if err != nil {
+		t.Fatalf("marshal disabled gateway: %v", err)
+	}
+	if !strings.Contains(string(b), `"httpRoutesEnabled":false`) {
+		t.Fatalf("explicit false was omitted from JSON: %s", b)
+	}
+
+	omitted := Gateway{
+		Name:      "case-gateway",
+		Namespace: "qa-grpc-repro",
+	}
+	b, err = json.Marshal(omitted)
+	if err != nil {
+		t.Fatalf("marshal gateway with omitted flag: %v", err)
+	}
+	if strings.Contains(string(b), "httpRoutesEnabled") {
+		t.Fatalf("nil HTTPRoutesEnabled should be omitted so CRD default applies, got %s", b)
+	}
+}
+
+func TestIsHTTPRoutesEnabled(t *testing.T) {
+	if got := (*Gateway)(nil).IsHTTPRoutesEnabled(); got {
+		t.Fatal("nil Gateway should not enable HTTPRoutes")
+	}
+	if got := (&Gateway{}).IsHTTPRoutesEnabled(); !got {
+		t.Fatal("omitted HTTPRoutesEnabled should default to true")
+	}
+	if got := (&Gateway{HTTPRoutesEnabled: ptr.To(false)}).IsHTTPRoutesEnabled(); got {
+		t.Fatal("explicit false should disable HTTPRoutes")
+	}
+	if got := (&Gateway{HTTPRoutesEnabled: ptr.To(true)}).IsHTTPRoutesEnabled(); !got {
+		t.Fatal("explicit true should enable HTTPRoutes")
 	}
 }
 

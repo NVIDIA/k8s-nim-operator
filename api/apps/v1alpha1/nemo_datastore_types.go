@@ -787,7 +787,7 @@ func (n *NemoDatastore) IsIngressEnabled() bool {
 }
 
 func (n *NemoDatastore) IsHTTPRouteEnabled() bool {
-	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
+	return n.Spec.Expose.Router.Gateway.IsHTTPRoutesEnabled()
 }
 
 // GetIngressSpec returns the Ingress spec NemoDatastore deployment.
