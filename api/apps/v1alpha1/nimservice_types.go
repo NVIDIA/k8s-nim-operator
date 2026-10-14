@@ -1206,7 +1206,7 @@ func (n *NIMService) GetIngressSpec() networkingv1.IngressSpec {
 }
 
 func (n *NIMService) IsHTTPRouteEnabled() bool {
-	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
+	return n.Spec.Expose.Router.Gateway.IsHTTPRoutesEnabled()
 }
 
 // IsHFModel returns true if the NIMService is using an HF model.

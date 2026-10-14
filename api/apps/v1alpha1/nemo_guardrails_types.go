@@ -630,7 +630,7 @@ func (n *NemoGuardrail) GetIngressSpec() networkingv1.IngressSpec {
 }
 
 func (n *NemoGuardrail) IsHTTPRouteEnabled() bool {
-	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
+	return n.Spec.Expose.Router.Gateway.IsHTTPRoutesEnabled()
 }
 
 func (n *NemoGuardrail) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {

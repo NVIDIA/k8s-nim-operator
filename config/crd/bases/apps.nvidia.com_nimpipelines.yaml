@@ -2778,8 +2778,9 @@ spec:
                                       type: boolean
                                     httpRoutesEnabled:
                                       default: true
-                                      description: HTTPRoutesEnabled is a flag to
-                                        enable HTTPRoutes for the created gateway.
+                                      description: |-
+                                        HTTPRoutesEnabled is a flag to enable HTTPRoutes for the created gateway.
+                                        Explicit false disables HTTPRoutes; omitting the field defaults to true.
                                       type: boolean
                                     name:
                                       description: Name of the gateway
