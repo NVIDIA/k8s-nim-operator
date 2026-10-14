@@ -604,7 +604,7 @@ func (n *NemoEvaluator) IsIngressEnabled() bool {
 }
 
 func (n *NemoEvaluator) IsHTTPRouteEnabled() bool {
-	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
+	return n.Spec.Expose.Router.Gateway.IsHTTPRoutesEnabled()
 }
 
 // GetIngressSpec returns the Ingress spec NemoEvaluator deployment.
