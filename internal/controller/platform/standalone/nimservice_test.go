@@ -3892,6 +3892,76 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(workerMonitorSidecar).NotTo(BeNil(), "Monitor sidecar should be present in worker")
 		})
 
+		It("should set LeaderWorkerSet leader and worker templates to the NIMService service account", func() {
+			testNimService := &appsv1alpha1.NIMService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "llm",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMServiceSpec{
+					Image: appsv1alpha1.Image{
+						Repository: "nvcr.io/nvidia/nim-llm",
+						Tag:        "1.0.0",
+					},
+					AuthSecret:       "ngc-secret",
+					Replicas:         ptr.To[int32](1),
+					RuntimeClassName: "nvidia",
+					SchedulerName:    "gpu-scheduler",
+					Storage: appsv1alpha1.NIMServiceStorage{
+						EmptyDir: &appsv1alpha1.EmptyDirSpec{},
+					},
+					MultiNode: &appsv1alpha1.NimServiceMultiNodeConfig{
+						BackendType: appsv1alpha1.NIMBackendTypeLWS,
+						Parallelism: &appsv1alpha1.ParallelismSpec{
+							Tensor:   ptr.To[uint32](1),
+							Pipeline: ptr.To[uint32](2),
+						},
+					},
+					Expose: appsv1alpha1.Expose{
+						Service: appsv1alpha1.Service{
+							Type: corev1.ServiceTypeClusterIP,
+							Port: ptr.To[int32](8000),
+						},
+					},
+				},
+			}
+
+			Expect(client.Create(context.TODO(), testNimService)).To(Succeed())
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), testNimService)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
+
+			saName := testNimService.GetServiceAccountName()
+			serviceAccount := &corev1.ServiceAccount{}
+			err = client.Get(context.TODO(), types.NamespacedName{Name: saName, Namespace: testNimService.Namespace}, serviceAccount)
+			Expect(err).NotTo(HaveOccurred())
+
+			roleBinding := &rbacv1.RoleBinding{}
+			err = client.Get(context.TODO(), types.NamespacedName{Name: testNimService.Name, Namespace: testNimService.Namespace}, roleBinding)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(roleBinding.Subjects).To(HaveLen(1))
+			Expect(roleBinding.Subjects[0].Kind).To(Equal("ServiceAccount"))
+			Expect(roleBinding.Subjects[0].Name).To(Equal(saName))
+
+			lws := &lwsv1.LeaderWorkerSet{}
+			err = client.Get(context.TODO(), types.NamespacedName{Name: testNimService.GetLWSName(), Namespace: testNimService.Namespace}, lws)
+			Expect(err).NotTo(HaveOccurred())
+
+			leaderSpec := lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec
+			workerSpec := lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec
+			Expect(leaderSpec.ServiceAccountName).To(Equal(saName))
+			Expect(workerSpec.ServiceAccountName).To(Equal(saName))
+			Expect(leaderSpec.RuntimeClassName).ToNot(BeNil())
+			Expect(*leaderSpec.RuntimeClassName).To(Equal("nvidia"))
+			Expect(workerSpec.RuntimeClassName).ToNot(BeNil())
+			Expect(*workerSpec.RuntimeClassName).To(Equal("nvidia"))
+			Expect(leaderSpec.SchedulerName).To(Equal("gpu-scheduler"))
+			Expect(workerSpec.SchedulerName).To(Equal("gpu-scheduler"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Annotations[k8sutil.RequiredSCCAnnotation]).To(Equal("nonroot"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Annotations[k8sutil.RequiredSCCAnnotation]).To(Equal("nonroot"))
+		})
+
 		It("should handle empty initContainers and sidecarContainers", func() {
 			testNimService := &appsv1alpha1.NIMService{
 				ObjectMeta: metav1.ObjectMeta{

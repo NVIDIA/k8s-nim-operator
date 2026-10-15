@@ -32,6 +32,10 @@ spec:
           - name: {{ . }}
           {{- end }}
         {{- end }}
+        serviceAccountName: {{ .ServiceAccountName }}
+        {{- if .RuntimeClassName }}
+        runtimeClassName: {{ .RuntimeClassName }}
+        {{- end }}
         securityContext:
           {{- if eq .OrchestratorType "TKGS" }}
           seccompProfile:
@@ -232,6 +236,10 @@ spec:
           - name: {{ . }}
           {{- end }}
         {{- end }}
+        serviceAccountName: {{ .ServiceAccountName }}
+        {{- if .RuntimeClassName }}
+        runtimeClassName: {{ .RuntimeClassName }}
+        {{- end }}
         securityContext:
           {{- if eq .OrchestratorType "TKGS" }}
           seccompProfile:
@@ -244,6 +252,9 @@ spec:
           runAsGroup: {{ .GroupID }}
           fsGroup: {{ .GroupID }}
           {{- end }}
+        {{- if .SchedulerName }}
+        schedulerName: {{ .SchedulerName }}
+        {{- end }}
         {{- if .PriorityClassName }}
         priorityClassName: {{ .PriorityClassName }}
         {{- end }}
