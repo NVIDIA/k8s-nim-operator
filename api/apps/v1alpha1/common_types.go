@@ -204,13 +204,15 @@ type Autoscaling struct {
 }
 
 // HorizontalPodAutoscalerSpec defines the parameters required to setup HPA.
+// +kubebuilder:validation:XValidation:rule="!has(self.minReplicas) || self.minReplicas > 0 || (has(self.metrics) && self.metrics.exists(m, m.type == 'External' || m.type == 'Object'))",message="minReplicas must be greater than 0 unless at least one External or Object metric is configured"
 type HorizontalPodAutoscalerSpec struct {
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default:=1
-	MinReplicas *int32                                         `json:"minReplicas,omitempty"`
-	MaxReplicas int32                                          `json:"maxReplicas"`
-	Metrics     []autoscalingv2.MetricSpec                     `json:"metrics,omitempty"`
-	Behavior    *autoscalingv2.HorizontalPodAutoscalerBehavior `json:"behavior,omitempty" `
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	MaxReplicas int32  `json:"maxReplicas"`
+	// +kubebuilder:validation:MaxItems=5
+	Metrics  []autoscalingv2.MetricSpec                     `json:"metrics,omitempty"`
+	Behavior *autoscalingv2.HorizontalPodAutoscalerBehavior `json:"behavior,omitempty" `
 }
 
 // Image defines image attributes.
