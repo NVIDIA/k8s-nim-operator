@@ -3555,15 +3555,22 @@ spec:
                           required:
                           - type
                           type: object
+                        maxItems: 5
                         type: array
                       minReplicas:
                         default: 1
                         format: int32
-                        minimum: 1
+                        minimum: 0
                         type: integer
                     required:
                     - maxReplicas
                     type: object
+                    x-kubernetes-validations:
+                    - message: minReplicas must be greater than 0 unless at least
+                        one External or Object metric is configured
+                      rule: '!has(self.minReplicas) || self.minReplicas > 0 || (has(self.metrics)
+                        && self.metrics.exists(m, m.type == ''External'' || m.type
+                        == ''Object''))'
                 type: object
               secrets:
                 description: Secrets contains the pre-requisite secrets that must
