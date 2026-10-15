@@ -1,6 +1,6 @@
 module github.com/NVIDIA/k8s-nim-operator
 
-go 1.26.5
+go 1.27.1
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -28,7 +28,7 @@ require (
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	knative.dev/pkg v0.0.0-20260120122510-4a022ed9999a
 	oras.land/oras-go/v2 v2.6.2
-	sigs.k8s.io/controller-runtime v0.22.4
+	sigs.k8s.io/controller-runtime v0.23.3
 	sigs.k8s.io/dra-driver-nvidia-gpu v0.4.1
 	sigs.k8s.io/gateway-api v1.5.1
 	sigs.k8s.io/gateway-api-inference-extension v1.3.0

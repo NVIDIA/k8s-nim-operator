@@ -423,7 +423,7 @@ func (n *NemoEntitystore) GetIngressSpec() networkingv1.IngressSpec {
 }
 
 func (n *NemoEntitystore) IsHTTPRouteEnabled() bool {
-	return n.Spec.Expose.Router.Gateway != nil && n.Spec.Expose.Router.Gateway.HTTPRoutesEnabled
+	return n.Spec.Expose.Router.Gateway.IsHTTPRoutesEnabled()
 }
 
 func (n *NemoEntitystore) GetHTTPRouteSpec() gatewayv1.HTTPRouteSpec {

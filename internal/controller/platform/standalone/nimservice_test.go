@@ -601,6 +601,65 @@ var _ = Describe("NIMServiceReconciler for a standalone platform", func() {
 			Expect(deployment.Spec.Template.Spec.Tolerations).To(Equal(nimService.Spec.Tolerations))
 		})
 
+		It("should not create an HTTPRoute when httpRoutesEnabled is explicitly false", func() {
+			grpcOnly := nimService.DeepCopy()
+			grpcOnly.Name = "grpc-only-nimservice"
+			grpcOnly.Spec.Expose.Service.GRPCPort = ptr.To[int32](8001)
+			grpcOnly.Spec.Expose.Router = appsv1alpha1.Router{
+				HostDomainName: "example.com",
+				Gateway: &appsv1alpha1.Gateway{
+					Name:              "case-gateway",
+					Namespace:         "default",
+					HTTPRoutesEnabled: ptr.To(false),
+					GRPCRoutesEnabled: true,
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: grpcOnly.Name, Namespace: grpcOnly.Namespace}
+			Expect(client.Create(context.TODO(), grpcOnly)).To(Succeed())
+			defer func() { _ = client.Delete(context.TODO(), grpcOnly) }()
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), grpcOnly)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
+
+			httpRoute := &gatewayv1.HTTPRoute{}
+			err = client.Get(context.TODO(), namespacedName, httpRoute)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+
+			grpcRoute := &gatewayv1.GRPCRoute{}
+			Expect(client.Get(context.TODO(), namespacedName, grpcRoute)).To(Succeed())
+			Expect(grpcRoute.Spec.Hostnames).To(ContainElement(gatewayv1.Hostname("grpc-only-nimservice.default.example.com")))
+		})
+
+		It("should create an HTTPRoute when httpRoutesEnabled is omitted", func() {
+			httpDefault := nimService.DeepCopy()
+			httpDefault.Name = "http-default-nimservice"
+			httpDefault.Spec.Expose.Router = appsv1alpha1.Router{
+				HostDomainName: "example.com",
+				Gateway: &appsv1alpha1.Gateway{
+					Name:      "case-gateway",
+					Namespace: "default",
+				},
+			}
+
+			namespacedName := types.NamespacedName{Name: httpDefault.Name, Namespace: httpDefault.Namespace}
+			Expect(client.Create(context.TODO(), httpDefault)).To(Succeed())
+			defer func() { _ = client.Delete(context.TODO(), httpDefault) }()
+
+			result, err := reconciler.reconcileNIMService(context.TODO(), httpDefault)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{RequeueAfter: deploymentNotReadyRequeue}))
+
+			httpRoute := &gatewayv1.HTTPRoute{}
+			Expect(client.Get(context.TODO(), namespacedName, httpRoute)).To(Succeed())
+			Expect(httpRoute.Spec.Hostnames).To(ContainElement(gatewayv1.Hostname("http-default-nimservice.default.example.com")))
+
+			grpcRoute := &gatewayv1.GRPCRoute{}
+			err = client.Get(context.TODO(), namespacedName, grpcRoute)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
 		Context("spec reconciliation with DRAResources", func() {
 			It("should request resource claims", func() {
 				nimService.Spec.DRAResources = []appsv1alpha1.DRAResource{
