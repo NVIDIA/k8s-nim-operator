@@ -132,14 +132,17 @@ var _ = Describe("K8s Resources Rendering", func() {
 	Context("Rendering templates", func() {
 		It("should render LeaderWorkerSet template correctly", func() {
 			params := types.LeaderWorkerSetParams{
-				Name:             "test-lws",
-				Namespace:        "default",
-				Labels:           map[string]string{"app": "test-app"},
-				Annotations:      map[string]string{"annotation-key": "annotation-value"},
-				Replicas:         ptr.To(int32(3)),
-				Size:             2,
-				Image:            "nim-llm:latest",
-				ImagePullSecrets: []string{"ngc-secret"},
+				Name:               "test-lws",
+				Namespace:          "default",
+				Labels:             map[string]string{"app": "test-app"},
+				Annotations:        map[string]string{"annotation-key": "annotation-value"},
+				Replicas:           ptr.To(int32(3)),
+				Size:               2,
+				Image:              "nim-llm:latest",
+				ImagePullSecrets:   []string{"ngc-secret"},
+				ServiceAccountName: "test-nimservice",
+				RuntimeClassName:   "nvidia",
+				SchedulerName:      "gpu-scheduler",
 				LeaderVolumes: []corev1.Volume{
 					{
 						Name: "test-leader-volume",
@@ -280,6 +283,14 @@ var _ = Describe("K8s Resources Rendering", func() {
 			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.NodeSelector).To(Equal(map[string]string{"disktype": "ssd"}))
 			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.Tolerations).To(Equal([]corev1.Toleration{{Key: "key1", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule}}))
 			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.Tolerations).To(Equal([]corev1.Toleration{{Key: "key1", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule}}))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.ServiceAccountName).To(Equal("test-nimservice"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.ServiceAccountName).To(Equal("test-nimservice"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.RuntimeClassName).ToNot(BeNil())
+			Expect(*lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.RuntimeClassName).To(Equal("nvidia"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.RuntimeClassName).ToNot(BeNil())
+			Expect(*lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.RuntimeClassName).To(Equal("nvidia"))
+			Expect(lws.Spec.LeaderWorkerTemplate.LeaderTemplate.Spec.SchedulerName).To(Equal("gpu-scheduler"))
+			Expect(lws.Spec.LeaderWorkerTemplate.WorkerTemplate.Spec.SchedulerName).To(Equal("gpu-scheduler"))
 		})
 		It("should render Deployment template correctly", func() {
 			params := types.DeploymentParams{
