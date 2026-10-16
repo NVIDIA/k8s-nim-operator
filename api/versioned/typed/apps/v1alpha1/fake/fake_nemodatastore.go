@@ -18,129 +18,34 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeNemoDatastores implements NemoDatastoreInterface
-type FakeNemoDatastores struct {
+// fakeNemoDatastores implements NemoDatastoreInterface
+type fakeNemoDatastores struct {
+	*gentype.FakeClientWithList[*v1alpha1.NemoDatastore, *v1alpha1.NemoDatastoreList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var nemodatastoresResource = v1alpha1.SchemeGroupVersion.WithResource("nemodatastores")
-
-var nemodatastoresKind = v1alpha1.SchemeGroupVersion.WithKind("NemoDatastore")
-
-// Get takes name of the nemoDatastore, and returns the corresponding nemoDatastore object, and an error if there is any.
-func (c *FakeNemoDatastores) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NemoDatastore, err error) {
-	emptyResult := &v1alpha1.NemoDatastore{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(nemodatastoresResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeNemoDatastores(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.NemoDatastoreInterface {
+	return &fakeNemoDatastores{
+		gentype.NewFakeClientWithList[*v1alpha1.NemoDatastore, *v1alpha1.NemoDatastoreList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("nemodatastores"),
+			v1alpha1.SchemeGroupVersion.WithKind("NemoDatastore"),
+			func() *v1alpha1.NemoDatastore { return &v1alpha1.NemoDatastore{} },
+			func() *v1alpha1.NemoDatastoreList { return &v1alpha1.NemoDatastoreList{} },
+			func(dst, src *v1alpha1.NemoDatastoreList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.NemoDatastoreList) []*v1alpha1.NemoDatastore {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.NemoDatastoreList, items []*v1alpha1.NemoDatastore) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.NemoDatastore), err
-}
-
-// List takes label and field selectors, and returns the list of NemoDatastores that match those selectors.
-func (c *FakeNemoDatastores) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NemoDatastoreList, err error) {
-	emptyResult := &v1alpha1.NemoDatastoreList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(nemodatastoresResource, nemodatastoresKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.NemoDatastoreList{ListMeta: obj.(*v1alpha1.NemoDatastoreList).ListMeta}
-	for _, item := range obj.(*v1alpha1.NemoDatastoreList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested nemoDatastores.
-func (c *FakeNemoDatastores) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(nemodatastoresResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a nemoDatastore and creates it.  Returns the server's representation of the nemoDatastore, and an error, if there is any.
-func (c *FakeNemoDatastores) Create(ctx context.Context, nemoDatastore *v1alpha1.NemoDatastore, opts v1.CreateOptions) (result *v1alpha1.NemoDatastore, err error) {
-	emptyResult := &v1alpha1.NemoDatastore{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(nemodatastoresResource, c.ns, nemoDatastore, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NemoDatastore), err
-}
-
-// Update takes the representation of a nemoDatastore and updates it. Returns the server's representation of the nemoDatastore, and an error, if there is any.
-func (c *FakeNemoDatastores) Update(ctx context.Context, nemoDatastore *v1alpha1.NemoDatastore, opts v1.UpdateOptions) (result *v1alpha1.NemoDatastore, err error) {
-	emptyResult := &v1alpha1.NemoDatastore{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(nemodatastoresResource, c.ns, nemoDatastore, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NemoDatastore), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNemoDatastores) UpdateStatus(ctx context.Context, nemoDatastore *v1alpha1.NemoDatastore, opts v1.UpdateOptions) (result *v1alpha1.NemoDatastore, err error) {
-	emptyResult := &v1alpha1.NemoDatastore{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(nemodatastoresResource, "status", c.ns, nemoDatastore, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NemoDatastore), err
-}
-
-// Delete takes name of the nemoDatastore and deletes it. Returns an error if one occurs.
-func (c *FakeNemoDatastores) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(nemodatastoresResource, c.ns, name, opts), &v1alpha1.NemoDatastore{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeNemoDatastores) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(nemodatastoresResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.NemoDatastoreList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched nemoDatastore.
-func (c *FakeNemoDatastores) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NemoDatastore, err error) {
-	emptyResult := &v1alpha1.NemoDatastore{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(nemodatastoresResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NemoDatastore), err
 }

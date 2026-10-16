@@ -18,9 +18,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	scheme "github.com/NVIDIA/k8s-nim-operator/api/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,33 +36,34 @@ type NIMServicesGetter interface {
 
 // NIMServiceInterface has methods to work with NIMService resources.
 type NIMServiceInterface interface {
-	Create(ctx context.Context, nIMService *v1alpha1.NIMService, opts v1.CreateOptions) (*v1alpha1.NIMService, error)
-	Update(ctx context.Context, nIMService *v1alpha1.NIMService, opts v1.UpdateOptions) (*v1alpha1.NIMService, error)
+	Create(ctx context.Context, nIMService *appsv1alpha1.NIMService, opts v1.CreateOptions) (*appsv1alpha1.NIMService, error)
+	Update(ctx context.Context, nIMService *appsv1alpha1.NIMService, opts v1.UpdateOptions) (*appsv1alpha1.NIMService, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, nIMService *v1alpha1.NIMService, opts v1.UpdateOptions) (*v1alpha1.NIMService, error)
+	UpdateStatus(ctx context.Context, nIMService *appsv1alpha1.NIMService, opts v1.UpdateOptions) (*appsv1alpha1.NIMService, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NIMService, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NIMServiceList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1alpha1.NIMService, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1alpha1.NIMServiceList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NIMService, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1alpha1.NIMService, err error)
 	NIMServiceExpansion
 }
 
 // nIMServices implements NIMServiceInterface
 type nIMServices struct {
-	*gentype.ClientWithList[*v1alpha1.NIMService, *v1alpha1.NIMServiceList]
+	*gentype.ClientWithList[*appsv1alpha1.NIMService, *appsv1alpha1.NIMServiceList]
 }
 
 // newNIMServices returns a NIMServices
 func newNIMServices(c *AppsV1alpha1Client, namespace string) *nIMServices {
 	return &nIMServices{
-		gentype.NewClientWithList[*v1alpha1.NIMService, *v1alpha1.NIMServiceList](
+		gentype.NewClientWithList[*appsv1alpha1.NIMService, *appsv1alpha1.NIMServiceList](
 			"nimservices",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.NIMService { return &v1alpha1.NIMService{} },
-			func() *v1alpha1.NIMServiceList { return &v1alpha1.NIMServiceList{} }),
+			func() *appsv1alpha1.NIMService { return &appsv1alpha1.NIMService{} },
+			func() *appsv1alpha1.NIMServiceList { return &appsv1alpha1.NIMServiceList{} },
+		),
 	}
 }

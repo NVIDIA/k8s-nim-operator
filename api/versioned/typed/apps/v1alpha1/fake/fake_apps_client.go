@@ -28,39 +28,39 @@ type FakeAppsV1alpha1 struct {
 }
 
 func (c *FakeAppsV1alpha1) NIMBuilds(namespace string) v1alpha1.NIMBuildInterface {
-	return &FakeNIMBuilds{c, namespace}
+	return newFakeNIMBuilds(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) NIMCaches(namespace string) v1alpha1.NIMCacheInterface {
-	return &FakeNIMCaches{c, namespace}
+	return newFakeNIMCaches(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) NIMPipelines(namespace string) v1alpha1.NIMPipelineInterface {
-	return &FakeNIMPipelines{c, namespace}
+	return newFakeNIMPipelines(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) NIMServices(namespace string) v1alpha1.NIMServiceInterface {
-	return &FakeNIMServices{c, namespace}
+	return newFakeNIMServices(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) NemoCustomizers(namespace string) v1alpha1.NemoCustomizerInterface {
-	return &FakeNemoCustomizers{c, namespace}
+	return newFakeNemoCustomizers(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) NemoDatastores(namespace string) v1alpha1.NemoDatastoreInterface {
-	return &FakeNemoDatastores{c, namespace}
+	return newFakeNemoDatastores(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) NemoEntitystores(namespace string) v1alpha1.NemoEntitystoreInterface {
-	return &FakeNemoEntitystores{c, namespace}
+	return newFakeNemoEntitystores(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) NemoEvaluators(namespace string) v1alpha1.NemoEvaluatorInterface {
-	return &FakeNemoEvaluators{c, namespace}
+	return newFakeNemoEvaluators(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) NemoGuardrails(namespace string) v1alpha1.NemoGuardrailInterface {
-	return &FakeNemoGuardrails{c, namespace}
+	return newFakeNemoGuardrails(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
