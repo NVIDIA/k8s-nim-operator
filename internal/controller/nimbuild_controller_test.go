@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,11 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -525,6 +528,109 @@ var _ = Describe("NIMBuild Controller", func() {
 			// Check if pod was deleted
 			deletedPod := &corev1.Pod{}
 			err = cli.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, deletedPod)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("should not fail when the manifest reader pod is not yet visible in the client cache", func() {
+			// The local model manifest configmap must already exist (created during
+			// the engine build) before the manifest reader pod is launched.
+			manifestConfig := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      getManifestConfigName(nimCache),
+					Namespace: nimBuild.Namespace,
+				},
+				Data: map[string]string{"model_manifest.yaml": ""},
+			}
+
+			// Simulate informer cache lag: the pod exists in the API server after
+			// creation, but reads through the cache return NotFound until it syncs.
+			laggingClient := fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(&appsv1alpha1.NIMBuild{}).
+				WithStatusSubresource(&appsv1alpha1.NIMCache{}).
+				WithStatusSubresource(&corev1.Pod{}).
+				WithStatusSubresource(&corev1.ConfigMap{}).
+				WithObjects(manifestConfig).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, isPod := obj.(*corev1.Pod); isPod && key.Name == nimBuild.GetLocalManifestReaderPodName() && key.Namespace == nimBuild.Namespace {
+							return errors.NewNotFound(schema.GroupResource{Resource: "pods"}, key.Name)
+						}
+						return cl.Get(ctx, key, obj, opts...)
+					},
+				}).Build()
+
+			lagReconciler := &NIMBuildReconciler{
+				Client:   laggingClient,
+				scheme:   scheme,
+				recorder: record.NewFakeRecorder(1000),
+			}
+
+			requeue, err := lagReconciler.reconcileLocalModelManifest(ctx, nimBuild, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(requeue).To(BeTrue())
+
+			// The manifest reader pod must still be created despite the cache lag.
+			podList := &corev1.PodList{}
+			Expect(laggingClient.List(ctx, podList, client.InNamespace(nimBuild.Namespace))).To(Succeed())
+			Expect(podList.Items).To(HaveLen(1))
+			Expect(podList.Items[0].Name).To(Equal(nimBuild.GetLocalManifestReaderPodName()))
+		})
+
+		It("should fail with a condition when the manifest reader pod exceeds the probe timeout", func() {
+			manifestConfig := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      getManifestConfigName(nimCache),
+					Namespace: nimBuild.Namespace,
+				},
+				Data: map[string]string{"model_manifest.yaml": ""},
+			}
+			stuckPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              nimBuild.GetLocalManifestReaderPodName(),
+					Namespace:         nimBuild.Namespace,
+					CreationTimestamp: metav1.NewTime(time.Now().Add(-2 * modelManifestProbeTimeout)),
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: NIMBuildManifestContainerName, Image: nimBuild.GetImage()}},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPending,
+					ContainerStatuses: []corev1.ContainerStatus{{
+						Name:  NIMBuildManifestContainerName,
+						State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ErrImagePull"}},
+					}},
+				},
+			}
+
+			timeoutClient := fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(&appsv1alpha1.NIMBuild{}).
+				WithStatusSubresource(&appsv1alpha1.NIMCache{}).
+				WithStatusSubresource(&corev1.ConfigMap{}).
+				WithObjects(nimBuild.DeepCopy(), manifestConfig, stuckPod).
+				Build()
+			timeoutReconciler := &NIMBuildReconciler{
+				Client:   timeoutClient,
+				scheme:   scheme,
+				recorder: record.NewFakeRecorder(1000),
+			}
+
+			requeue, err := timeoutReconciler.reconcileLocalModelManifest(ctx, nimBuild.DeepCopy(), nimCache.DeepCopy())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(requeue).To(BeTrue())
+
+			// The NIMBuild must be marked failed with a reason describing the stuck pod.
+			updated := &appsv1alpha1.NIMBuild{}
+			Expect(timeoutClient.Get(ctx, types.NamespacedName{Name: nimBuild.Name, Namespace: nimBuild.Namespace}, updated)).To(Succeed())
+			Expect(updated.Status.State).To(Equal(appsv1alpha1.NimBuildStatusFailed))
+			cond := meta.FindStatusCondition(updated.Status.Conditions, appsv1alpha1.NimBuildConditionModelManifestPodCompleted)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal("ModelManifestProbeTimeout"))
+			Expect(cond.Message).To(ContainSubstring("ErrImagePull"))
+
+			// The stuck pod must be cleaned up so a retry can start fresh.
+			deletedPod := &corev1.Pod{}
+			err = timeoutClient.Get(ctx, types.NamespacedName{Name: stuckPod.Name, Namespace: stuckPod.Namespace}, deletedPod)
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 	})
