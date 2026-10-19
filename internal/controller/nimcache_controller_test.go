@@ -532,8 +532,10 @@ var _ = Describe("NIMCache Controller", func() {
 			Expect(cond.Message).To(ContainSubstring("insufficient nvidia.com/gpu"))
 
 			// A warning event must be emitted to make the timeout visible.
+			fakeRecorder, ok := reconciler.recorder.(*record.FakeRecorder)
+			Expect(ok).To(BeTrue())
 			var event string
-			Eventually(reconciler.recorder.(*record.FakeRecorder).Events).Should(Receive(&event))
+			Eventually(fakeRecorder.Events).Should(Receive(&event))
 			Expect(event).To(ContainSubstring("ModelManifestProbeTimeout"))
 
 			// The stuck pod must be cleaned up so a retry can start fresh.
