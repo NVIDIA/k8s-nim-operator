@@ -37,7 +37,7 @@ import (
 // - A NIMParserInterface implementation based on the schema version.
 func GetNIMParser(data []byte) nimparser.NIMParserInterface {
 	var config nimparser.NIMSchemaManifest
-	err := yaml.Unmarshal(data, &config)
+	err := yaml.Unmarshal(nimparser.ExtractManifest(data), &config)
 	if err != nil {
 		return nimparserv1.NIMParser{}
 	} else {

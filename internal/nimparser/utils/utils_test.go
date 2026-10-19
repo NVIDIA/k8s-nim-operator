@@ -48,3 +48,20 @@ func TestGetNIMParserUsesMajorVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestGetNIMParserIgnoresLeadingRuntimeNoise(t *testing.T) {
+	// Pods that extract the manifest may emit container runtime noise (e.g. NVIDIA
+	// container toolkit messages) on stdout before the manifest content.
+	const noise = "nvidia driver modules are not yet loaded, invoking runc directly\n"
+
+	parser := GetNIMParser([]byte(noise + "schema_version: '2.0'\n"))
+	if _, isV2 := parser.(nimparserv2.NIMParser); !isV2 {
+		t.Errorf("v2 manifest with runtime noise: got %T, want v2", parser)
+	}
+
+	const v1Manifest = "03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61:\n  model: meta/llama3-70b-instruct\n"
+	parser = GetNIMParser([]byte(noise + v1Manifest))
+	if _, isV1 := parser.(nimparserv1.NIMParser); !isV1 {
+		t.Errorf("v1 manifest with runtime noise: got %T, want v1", parser)
+	}
+}
