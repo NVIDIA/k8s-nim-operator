@@ -293,7 +293,7 @@ func (NIMParser) ParseModelManifest(filePath string) (nimparser.NIMManifestInter
 
 func (NIMParser) ParseModelManifestFromRawOutput(data []byte) (nimparser.NIMManifestInterface, error) {
 	var config NIMManifest
-	err := yaml.Unmarshal(data, &config)
+	err := yaml.Unmarshal(nimparser.ExtractManifest(data), &config)
 	if err != nil {
 		return nil, err
 	}

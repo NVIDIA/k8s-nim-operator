@@ -336,7 +336,7 @@ func (r *NIMCacheReconciler) reconcileRole(ctx context.Context, nimCache *appsv1
 	// SCC Role rules are only meaningful on OpenShift. On other platforms, clean up
 	// any previously created OpenShift-only Role so vanilla clusters do not retain it.
 	if !k8sutil.IsOpenShift(r.orchestratorType) {
-		logger.Info("Skipping OpenShift SCC Role on non-OpenShift cluster", "Name", roleName, "orchestrator", r.orchestratorType)
+		logger.V(4).Info("Skipping OpenShift SCC Role on non-OpenShift cluster", "Name", roleName, "orchestrator", r.orchestratorType)
 		if err := k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.Role{}, roleNamespacedName); err != nil {
 			logger.Error(err, "Failed to cleanup OpenShift SCC Role", "Name", roleName)
 			return err
@@ -427,7 +427,7 @@ func (r *NIMCacheReconciler) reconcileRoleBinding(ctx context.Context, nimCache 
 
 	// RoleBinding is only needed for the OpenShift SCC Role.
 	if !k8sutil.IsOpenShift(r.orchestratorType) {
-		logger.Info("Skipping OpenShift SCC RoleBinding on non-OpenShift cluster", "Name", rbName, "orchestrator", r.orchestratorType)
+		logger.V(4).Info("Skipping OpenShift SCC RoleBinding on non-OpenShift cluster", "Name", rbName, "orchestrator", r.orchestratorType)
 		if err := k8sutil.CleanupResource(ctx, r.GetClient(), &rbacv1.RoleBinding{}, rbNamespacedName); err != nil {
 			logger.Error(err, "Failed to cleanup OpenShift SCC RoleBinding", "Name", rbName)
 			return err
