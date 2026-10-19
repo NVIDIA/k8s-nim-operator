@@ -26,11 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -526,6 +528,49 @@ var _ = Describe("NIMBuild Controller", func() {
 			deletedPod := &corev1.Pod{}
 			err = cli.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, deletedPod)
 			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("should not fail when the manifest reader pod is not yet visible in the client cache", func() {
+			// The local model manifest configmap must already exist (created during
+			// the engine build) before the manifest reader pod is launched.
+			manifestConfig := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      getManifestConfigName(nimCache),
+					Namespace: nimBuild.Namespace,
+				},
+				Data: map[string]string{"model_manifest.yaml": ""},
+			}
+
+			// Simulate informer cache lag: the pod exists in the API server after
+			// creation, but reads through the cache return NotFound until it syncs.
+			laggingClient := fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(&appsv1alpha1.NIMBuild{}).
+				WithStatusSubresource(&appsv1alpha1.NIMCache{}).
+				WithStatusSubresource(&corev1.Pod{}).
+				WithStatusSubresource(&corev1.ConfigMap{}).
+				WithObjects(manifestConfig).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, isPod := obj.(*corev1.Pod); isPod && key.Name == nimBuild.GetLocalManifestReaderPodName() && key.Namespace == nimBuild.Namespace {
+							return errors.NewNotFound(schema.GroupResource{Resource: "pods"}, key.Name)
+						}
+						return cl.Get(ctx, key, obj, opts...)
+					},
+				}).Build()
+
+			lagReconciler := &NIMBuildReconciler{
+				Client:   laggingClient,
+				scheme:   scheme,
+				recorder: record.NewFakeRecorder(1000),
+			}
+
+			Expect(lagReconciler.reconcileLocalModelManifest(ctx, nimBuild, nimCache)).To(Succeed())
+
+			// The manifest reader pod must still be created despite the cache lag.
+			podList := &corev1.PodList{}
+			Expect(laggingClient.List(ctx, podList, client.InNamespace(nimBuild.Namespace))).To(Succeed())
+			Expect(podList.Items).To(HaveLen(1))
+			Expect(podList.Items[0].Name).To(Equal(nimBuild.GetLocalManifestReaderPodName()))
 		})
 	})
 

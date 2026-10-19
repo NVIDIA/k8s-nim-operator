@@ -797,6 +797,12 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 	existingPod := &corev1.Pod{}
 	err = r.Get(ctx, client.ObjectKey{Name: pod.Name, Namespace: nimBuild.Namespace}, existingPod)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			// The pod was just created and may not be visible to the
+			// client cache yet, the pod's add event will trigger a new
+			// reconcile once it appears.
+			return nil
+		}
 		logger.Error(err, "failed to get pod for model selection", "pod", pod.Name)
 		return err
 	}

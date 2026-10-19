@@ -659,6 +659,11 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 	existingPod := &corev1.Pod{}
 	err = r.Get(ctx, client.ObjectKey{Name: pod.Name, Namespace: nimCache.Namespace}, existingPod)
 	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			// The pod was just created and may not be visible to the
+			// client cache yet, requeue until it appears.
+			return true, nil
+		}
 		logger.Error(err, "failed to get pod for model selection", "pod", pod.Name)
 		return false, err
 	}

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -447,6 +448,43 @@ var _ = Describe("NIMCache Controller", func() {
 				podName := types.NamespacedName{Name: getPodName(nimCache), Namespace: "default"}
 				return cli.Get(ctx, podName, pod)
 			}, time.Second*10).Should(Succeed())
+		})
+
+		It("should requeue without error when the manifest pod is not yet visible in the client cache", func() {
+			ctx := context.TODO()
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache-lag",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+				},
+			}
+
+			// Simulate informer cache lag: the pod exists in the API server after
+			// creation, but reads through the cache return NotFound until it syncs.
+			laggingClient := fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(&appsv1alpha1.NIMCache{}).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, isPod := obj.(*corev1.Pod); isPod && key.Name == getPodName(nimCache) && key.Namespace == nimCache.Namespace {
+							return errors.NewNotFound(schema.GroupResource{Resource: "pods"}, key.Name)
+						}
+						return cl.Get(ctx, key, obj, opts...)
+					},
+				}).Build()
+
+			lagReconciler := &NIMCacheReconciler{
+				Client:                laggingClient,
+				scheme:                scheme,
+				recorder:              record.NewFakeRecorder(1000),
+				imageProtocolResolver: &legacyProtocolResolver{},
+			}
+
+			requeue, err := lagReconciler.reconcileModelManifest(ctx, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(requeue).To(BeTrue())
 		})
 
 		It("should construct a job with a specific profile", func() {
