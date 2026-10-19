@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -359,10 +360,13 @@ func (r *NIMBuildReconciler) reconcileNIMBuild(ctx context.Context, nimBuild *ap
 	}
 
 	if meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionEngineBuildPodCompleted) && !meta.IsStatusConditionTrue(nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionModelManifestPodCompleted) {
-		err := r.reconcileLocalModelManifest(ctx, nimBuild, nimCache)
+		requeue, err := r.reconcileLocalModelManifest(ctx, nimBuild, nimCache)
 		if err != nil {
 			logger.Error(err, "reconciliation of nimbuild failed")
 			return ctrl.Result{}, err
+		}
+		if requeue {
+			return ctrl.Result{RequeueAfter: time.Second * 30}, nil
 		}
 	}
 
@@ -766,56 +770,67 @@ func (r *NIMBuildReconciler) deletePod(ctx context.Context, pod *corev1.Pod) err
 	return nil
 }
 
-func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache) error {
+func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild, nimCache *appsv1alpha1.NIMCache) (requeue bool, err error) {
 	logger := r.GetLogger()
 
 	// Model manifest is available only for NGC model pullers
 	if nimCache.Spec.Source.NGC == nil {
-		return nil
+		return false, nil
 	}
 
 	existingConfig := &corev1.ConfigMap{}
 	cmName := getManifestConfigName(nimCache)
-	err := r.Get(ctx, client.ObjectKey{Name: cmName, Namespace: nimBuild.Namespace}, existingConfig)
+	err = r.Get(ctx, client.ObjectKey{Name: cmName, Namespace: nimBuild.Namespace}, existingConfig)
 	if err != nil {
 		logger.Error(err, "failed to get configmap of the local model manifest", "name", cmName)
-		return err
+		return false, err
 	}
 
 	// Create a temporary pod for parsing local model manifest
 	pod := constructLocalManifestPodSpec(nimCache, nimBuild, r.orchestratorType)
 	// Add nimBuild as owner for watching on status change
 	if err := controllerutil.SetControllerReference(nimBuild, pod, r.GetScheme()); err != nil {
-		return err
+		return false, err
 	}
 	err = r.createPod(ctx, pod)
 	if err != nil {
 		logger.Error(err, "failed to create", "pod", pod.Name)
-		return err
+		return false, err
 	}
 
 	existingPod := &corev1.Pod{}
 	err = r.Get(ctx, client.ObjectKey{Name: pod.Name, Namespace: nimBuild.Namespace}, existingPod)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			// The pod was just created and may not be visible to the
+			// client cache yet, requeue until it appears.
+			return true, nil
+		}
 		logger.Error(err, "failed to get pod for model selection", "pod", pod.Name)
-		return err
+		return false, err
 	}
 
 	if existingPod.Status.Phase != corev1.PodRunning {
+		if time.Since(existingPod.CreationTimestamp.Time) > modelManifestProbeTimeout {
+			return true, r.failLocalModelManifestProbe(ctx, nimBuild, existingPod)
+		}
 		// requeue request with delay until the pod is ready
-		return nil
+		return true, nil
 	}
 
 	// Extract manifest file
 	output, err := k8sutil.GetPodLogs(ctx, existingPod, NIMBuildManifestContainerName)
 	if err != nil {
 		logger.Error(err, "failed to get pod logs for parsing model manifest file", "pod", pod.Name)
-		return err
+		return false, err
 	}
 
 	if output == "" {
+		if time.Since(existingPod.CreationTimestamp.Time) > modelManifestProbeTimeout {
+			return true, r.failLocalModelManifestProbe(ctx, nimBuild, existingPod)
+		}
 		logger.Info("Requeuing to wait for the manifest to be copied from the container")
-		return nil
+		return true, nil
 	}
 
 	parser := nimparserutils.GetNIMParser([]byte(output))
@@ -823,7 +838,7 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 	manifest, err := parser.ParseModelManifestFromRawOutput([]byte(output))
 	if err != nil {
 		logger.Error(err, "Failed to parse model manifest from the pod")
-		return err
+		return false, err
 	}
 	logger.V(2).Info("local manifest file", "nimbuild", nimBuild.Name, "manifest", manifest)
 
@@ -831,7 +846,7 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 	err = r.updateManifestConfigMap(ctx, nimCache, &manifest)
 	if err != nil {
 		logger.Error(err, "Failed to create model manifest config map")
-		return err
+		return false, err
 	}
 
 	// Model manifest is successfully extracted, cleanup temporary pod
@@ -840,7 +855,7 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 		logger.Error(err, "failed to delete", "pod", pod.Name)
 		// requeue request with delay until the pod is cleaned up
 		// this is required as NIM containers are resource heavy
-		return err
+		return false, err
 	}
 
 	// To Do: Explore changing the profile list on NIMCache to a map for faster lookups
@@ -875,11 +890,32 @@ func (r *NIMBuildReconciler) reconcileLocalModelManifest(ctx context.Context, ni
 		nc.Status = nimCache.Status
 	}); err != nil {
 		logger.Error(err, "Failed to update status", "NIMCache", nimCache.Name)
-		return err
+		return false, err
 	}
 	// Update the NIMBuild status
 	conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionModelManifestPodCompleted, metav1.ConditionTrue, "PodCompleted", "The Pod to read local model manifest is completed")
-	return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusReady)
+	return false, r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusReady)
+}
+
+// failLocalModelManifestProbe marks the NIMBuild as failed when the temporary
+// pod used to read the local model manifest does not become ready within
+// modelManifestProbeTimeout. The pod is deleted so that subsequent reconciles
+// retry the extraction with a fresh pod.
+func (r *NIMBuildReconciler) failLocalModelManifestProbe(ctx context.Context, nimBuild *appsv1alpha1.NIMBuild, pod *corev1.Pod) error {
+	logger := r.GetLogger()
+	msg := fmt.Sprintf("timed out after %s waiting for the local model manifest pod to be ready: %s",
+		modelManifestProbeTimeout, modelManifestPodDiagnostics(pod))
+	logger.Info("local model manifest probe timed out", "pod", pod.Name, "reason", msg)
+
+	conditions.UpdateCondition(&nimBuild.Status.Conditions, appsv1alpha1.NimBuildConditionModelManifestPodCompleted,
+		metav1.ConditionFalse, "ModelManifestProbeTimeout", msg)
+	r.GetEventRecorder().Event(nimBuild, corev1.EventTypeWarning, "ModelManifestProbeTimeout", msg)
+
+	if err := r.Delete(ctx, pod); err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, "failed to delete timed out local model manifest pod", "pod", pod.Name)
+		return err
+	}
+	return r.updateNIMBuildState(ctx, nimBuild, appsv1alpha1.NimBuildStatusFailed)
 }
 
 func isBuiltProfilePresentOnNIMCacheStatus(nimCache *appsv1alpha1.NIMCache, builtProfileName string) bool {
