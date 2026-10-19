@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -485,6 +486,60 @@ var _ = Describe("NIMCache Controller", func() {
 			requeue, err := lagReconciler.reconcileModelManifest(ctx, nimCache)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(requeue).To(BeTrue())
+		})
+
+		It("should fail with a condition when the manifest pod exceeds the probe timeout", func() {
+			ctx := context.TODO()
+			nimCache := &appsv1alpha1.NIMCache{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nimcache-timeout",
+					Namespace: "default",
+				},
+				Spec: appsv1alpha1.NIMCacheSpec{
+					Source: appsv1alpha1.NIMSource{NGC: &appsv1alpha1.NGCSource{ModelPuller: "nvcr.io/nim:test", PullSecret: "my-secret"}},
+				},
+			}
+			Expect(cli.Create(ctx, nimCache)).To(Succeed())
+
+			stuckPod := constructPodSpec(nimCache, k8sutil.K8s)
+			stuckPod.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * modelManifestProbeTimeout))
+			stuckPod.Status.Phase = corev1.PodPending
+			stuckPod.Status.Conditions = []corev1.PodCondition{{
+				Type:    corev1.PodScheduled,
+				Status:  corev1.ConditionFalse,
+				Reason:  "Unschedulable",
+				Message: "0/5 nodes are available: insufficient nvidia.com/gpu",
+			}}
+			stuckPod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:  NIMCacheContainerName,
+				State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ImagePullBackOff"}},
+			}}
+			Expect(cli.Create(ctx, stuckPod)).To(Succeed())
+
+			requeue, err := reconciler.reconcileModelManifest(ctx, nimCache)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(requeue).To(BeTrue())
+
+			// The NIMCache must be marked failed with a reason describing the stuck pod.
+			updated := &appsv1alpha1.NIMCache{}
+			Expect(cli.Get(ctx, types.NamespacedName{Name: nimCache.Name, Namespace: nimCache.Namespace}, updated)).To(Succeed())
+			Expect(updated.Status.State).To(Equal(appsv1alpha1.NimCacheStatusFailed))
+			cond := meta.FindStatusCondition(updated.Status.Conditions, appsv1alpha1.NimCacheConditionReconcileFailed)
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).To(Equal("ModelManifestProbeTimeout"))
+			Expect(cond.Message).To(ContainSubstring("ImagePullBackOff"))
+			Expect(cond.Message).To(ContainSubstring("insufficient nvidia.com/gpu"))
+
+			// A warning event must be emitted to make the timeout visible.
+			var event string
+			Eventually(reconciler.recorder.(*record.FakeRecorder).Events).Should(Receive(&event))
+			Expect(event).To(ContainSubstring("ModelManifestProbeTimeout"))
+
+			// The stuck pod must be cleaned up so a retry can start fresh.
+			deletedPod := &corev1.Pod{}
+			err = cli.Get(ctx, types.NamespacedName{Name: stuckPod.Name, Namespace: stuckPod.Namespace}, deletedPod)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
 		It("should construct a job with a specific profile", func() {

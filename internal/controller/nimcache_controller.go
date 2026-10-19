@@ -78,6 +78,11 @@ const (
 
 	// NIMCacheContainerName returns the name of the container used for NIM Cache operations.
 	NIMCacheContainerName = "nim-cache-ctr"
+
+	// modelManifestProbeTimeout is the maximum duration to wait for the
+	// temporary pod that extracts the model manifest to become ready before
+	// marking the reconcile as failed.
+	modelManifestProbeTimeout = 15 * time.Minute
 )
 
 // NIMCacheReconciler reconciles a NIMCache object.
@@ -669,6 +674,9 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 	}
 
 	if existingPod.Status.Phase != corev1.PodRunning {
+		if time.Since(existingPod.CreationTimestamp.Time) > modelManifestProbeTimeout {
+			return true, r.failModelManifestProbe(ctx, nimCache, existingPod)
+		}
 		// requeue request with delay until the pod is ready
 		return true, nil
 	}
@@ -681,6 +689,9 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 	}
 
 	if output == "" {
+		if time.Since(existingPod.CreationTimestamp.Time) > modelManifestProbeTimeout {
+			return true, r.failModelManifestProbe(ctx, nimCache, existingPod)
+		}
 		logger.Info("Requeuing to wait for the manifest to be copied from the container")
 		return true, nil
 	}
@@ -713,6 +724,50 @@ func (r *NIMCacheReconciler) reconcileModelManifest(ctx context.Context, nimCach
 		return true, err
 	}
 	return false, nil
+}
+
+// modelManifestPodDiagnostics summarizes why a model manifest probe pod is not
+// ready yet, e.g. image pull errors or scheduling failures.
+func modelManifestPodDiagnostics(pod *corev1.Pod) string {
+	details := []string{fmt.Sprintf("pod phase %q", pod.Status.Phase)}
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse && cond.Message != "" {
+			details = append(details, fmt.Sprintf("not scheduled: %s", cond.Message))
+		}
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.State.Waiting != nil && cs.State.Waiting.Reason != "" {
+			details = append(details, fmt.Sprintf("container %q is waiting: %s", cs.Name, cs.State.Waiting.Reason))
+		}
+	}
+	return strings.Join(details, ", ")
+}
+
+// failModelManifestProbe marks the NIMCache as failed when the temporary pod
+// used for model manifest extraction does not become ready within
+// modelManifestProbeTimeout. The pod is deleted so that subsequent reconciles
+// retry the extraction with a fresh pod.
+func (r *NIMCacheReconciler) failModelManifestProbe(ctx context.Context, nimCache *appsv1alpha1.NIMCache, pod *corev1.Pod) error {
+	logger := r.GetLogger()
+	msg := fmt.Sprintf("timed out after %s waiting for the model manifest pod to be ready: %s",
+		modelManifestProbeTimeout, modelManifestPodDiagnostics(pod))
+	logger.Info("model manifest probe timed out", "pod", pod.Name, "reason", msg)
+
+	conditions.UpdateCondition(&nimCache.Status.Conditions, appsv1alpha1.NimCacheConditionReconcileFailed,
+		metav1.ConditionTrue, "ModelManifestProbeTimeout", msg)
+	nimCache.Status.State = appsv1alpha1.NimCacheStatusFailed
+	r.GetEventRecorder().Event(nimCache, corev1.EventTypeWarning, "ModelManifestProbeTimeout", msg)
+
+	if err := r.updateNIMCacheStatus(ctx, nimCache); err != nil {
+		logger.Error(err, "Failed to update NIMCache status", "NIMCache", nimCache.Name)
+		return err
+	}
+
+	if err := r.Delete(ctx, pod); err != nil && !apiErrors.IsNotFound(err) {
+		logger.Error(err, "failed to delete timed out model manifest pod", "pod", pod.Name)
+		return err
+	}
+	return nil
 }
 
 func (r *NIMCacheReconciler) reconcileModelSelection(ctx context.Context, nimCache *appsv1alpha1.NIMCache) error {
