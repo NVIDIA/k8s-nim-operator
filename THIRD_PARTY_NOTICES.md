@@ -7,7 +7,7 @@ redistributes, along with the verbatim text of each license. The released
 image ships two Go binaries: `manager`, the operator itself, built from
 `cmd/` and run as the image entrypoint; and `crd-apply-tool`, built from
 `github.com/NVIDIA/k8s-operator-libs` at commit
-`8e59492a772c39f8e99eea9cfc42567fcc1d939a` and copied to `/usr/local/bin`.
+`42ee2fff224f2cbe97cbf05423b4c40f17793a76` and copied to `/usr/local/bin`.
 Both are resolved as the union across every released image platform, and
 the two resolve the Kubernetes client libraries to different versions, so
 each is listed in its own table. Go standard library packages are excluded;
@@ -194,7 +194,7 @@ packages and source included in this image can be found at
 
 | Package | License | Source |
 |---------|---------|--------|
-| `github.com/NVIDIA/k8s-operator-libs` | Apache-2.0 | https://github.com/NVIDIA/k8s-operator-libs/blob/8e59492a772c39f8e99eea9cfc42567fcc1d939a/LICENSE |
+| `github.com/NVIDIA/k8s-operator-libs` | Apache-2.0 | https://github.com/NVIDIA/k8s-operator-libs/blob/42ee2fff224f2cbe97cbf05423b4c40f17793a76/LICENSE |
 | `github.com/beorn7/perks/quantile` | MIT | https://github.com/beorn7/perks/blob/v1.0.1/LICENSE |
 | `github.com/cespare/xxhash/v2` | MIT | https://github.com/cespare/xxhash/blob/v2.3.0/LICENSE.txt |
 | `github.com/davecgh/go-spew/spew` | ISC | https://github.com/davecgh/go-spew/blob/d8f796af33cc/LICENSE |
@@ -224,12 +224,12 @@ packages and source included in this image can be found at
 | `github.com/x448/float16` | MIT | https://github.com/x448/float16/blob/v0.8.4/LICENSE |
 | `go.yaml.in/yaml/v2` | Apache-2.0 | https://github.com/yaml/go-yaml/blob/v2.4.3/LICENSE |
 | `go.yaml.in/yaml/v3` | MIT | https://github.com/yaml/go-yaml/blob/v3.0.4/LICENSE |
-| `golang.org/x/net` | BSD-3-Clause | https://cs.opensource.google/go/x/net/+/v0.55.0:LICENSE |
+| `golang.org/x/net` | BSD-3-Clause | https://cs.opensource.google/go/x/net/+/v0.60.0:LICENSE |
 | `golang.org/x/oauth2` | BSD-3-Clause | https://cs.opensource.google/go/x/oauth2/+/v0.34.0:LICENSE |
-| `golang.org/x/sync/errgroup` | BSD-3-Clause | https://cs.opensource.google/go/x/sync/+/v0.20.0:LICENSE |
-| `golang.org/x/sys/unix` | BSD-3-Clause | https://cs.opensource.google/go/x/sys/+/v0.45.0:LICENSE |
-| `golang.org/x/term` | BSD-3-Clause | https://cs.opensource.google/go/x/term/+/v0.43.0:LICENSE |
-| `golang.org/x/text` | BSD-3-Clause | https://cs.opensource.google/go/x/text/+/v0.37.0:LICENSE |
+| `golang.org/x/sync/errgroup` | BSD-3-Clause | https://cs.opensource.google/go/x/sync/+/v0.23.0:LICENSE |
+| `golang.org/x/sys/unix` | BSD-3-Clause | https://cs.opensource.google/go/x/sys/+/v0.48.0:LICENSE |
+| `golang.org/x/term` | BSD-3-Clause | https://cs.opensource.google/go/x/term/+/v0.46.0:LICENSE |
+| `golang.org/x/text` | BSD-3-Clause | https://cs.opensource.google/go/x/text/+/v0.42.0:LICENSE |
 | `golang.org/x/time/rate` | BSD-3-Clause | https://cs.opensource.google/go/x/time/+/v0.14.0:LICENSE |
 | `gomodules.xyz/jsonpatch/v2` | Apache-2.0 | https://github.com/gomodules/jsonpatch/blob/v2.4.0/v2/LICENSE |
 | `google.golang.org/protobuf` | BSD-3-Clause | https://github.com/protocolbuffers/protobuf-go/blob/f2248ac996af/LICENSE |
@@ -24938,7 +24938,7 @@ Apache license:
 ### github.com/NVIDIA/k8s-operator-libs
 
 * License: Apache-2.0
-* Source: https://github.com/NVIDIA/k8s-operator-libs/blob/8e59492a772c39f8e99eea9cfc42567fcc1d939a/LICENSE
+* Source: https://github.com/NVIDIA/k8s-operator-libs/blob/42ee2fff224f2cbe97cbf05423b4c40f17793a76/LICENSE
 
 #### LICENSE
 
@@ -28423,7 +28423,7 @@ limitations under the License.
 ### golang.org/x/net
 
 * License: BSD-3-Clause
-* Source: https://cs.opensource.google/go/x/net/+/v0.55.0:LICENSE
+* Source: https://cs.opensource.google/go/x/net/+/v0.60.0:LICENSE
 
 #### LICENSE
 
@@ -28501,7 +28501,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/sync/errgroup
 
 * License: BSD-3-Clause
-* Source: https://cs.opensource.google/go/x/sync/+/v0.20.0:LICENSE
+* Source: https://cs.opensource.google/go/x/sync/+/v0.23.0:LICENSE
 
 #### LICENSE
 
@@ -28540,7 +28540,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/sys/unix
 
 * License: BSD-3-Clause
-* Source: https://cs.opensource.google/go/x/sys/+/v0.45.0:LICENSE
+* Source: https://cs.opensource.google/go/x/sys/+/v0.48.0:LICENSE
 
 #### LICENSE
 
@@ -28579,7 +28579,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/term
 
 * License: BSD-3-Clause
-* Source: https://cs.opensource.google/go/x/term/+/v0.43.0:LICENSE
+* Source: https://cs.opensource.google/go/x/term/+/v0.46.0:LICENSE
 
 #### LICENSE
 
@@ -28618,7 +28618,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### golang.org/x/text
 
 * License: BSD-3-Clause
-* Source: https://cs.opensource.google/go/x/text/+/v0.37.0:LICENSE
+* Source: https://cs.opensource.google/go/x/text/+/v0.42.0:LICENSE
 
 #### LICENSE
 
