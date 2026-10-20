@@ -46,8 +46,9 @@ type LLMInferenceServiceValidator struct{}
 var _ webhook.CustomValidator = &LLMInferenceServiceValidator{}
 
 func (l *LLMInferenceServiceValidator) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr, &LLMInferenceService{}).
-		WithCustomValidator(l).
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(&LLMInferenceService{}).
+		WithValidator(l).
 		Complete()
 }
 
