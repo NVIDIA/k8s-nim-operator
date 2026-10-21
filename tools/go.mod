@@ -1,6 +1,6 @@
 module github.com/NVIDIA/k8s-nim-operator/tools
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/google/go-licenses/v2 v2.0.1
