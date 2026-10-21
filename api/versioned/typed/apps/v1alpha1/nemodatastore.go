@@ -18,9 +18,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	scheme "github.com/NVIDIA/k8s-nim-operator/api/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,33 +36,34 @@ type NemoDatastoresGetter interface {
 
 // NemoDatastoreInterface has methods to work with NemoDatastore resources.
 type NemoDatastoreInterface interface {
-	Create(ctx context.Context, nemoDatastore *v1alpha1.NemoDatastore, opts v1.CreateOptions) (*v1alpha1.NemoDatastore, error)
-	Update(ctx context.Context, nemoDatastore *v1alpha1.NemoDatastore, opts v1.UpdateOptions) (*v1alpha1.NemoDatastore, error)
+	Create(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore, opts v1.CreateOptions) (*appsv1alpha1.NemoDatastore, error)
+	Update(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore, opts v1.UpdateOptions) (*appsv1alpha1.NemoDatastore, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, nemoDatastore *v1alpha1.NemoDatastore, opts v1.UpdateOptions) (*v1alpha1.NemoDatastore, error)
+	UpdateStatus(ctx context.Context, nemoDatastore *appsv1alpha1.NemoDatastore, opts v1.UpdateOptions) (*appsv1alpha1.NemoDatastore, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NemoDatastore, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NemoDatastoreList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1alpha1.NemoDatastore, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1alpha1.NemoDatastoreList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NemoDatastore, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1alpha1.NemoDatastore, err error)
 	NemoDatastoreExpansion
 }
 
 // nemoDatastores implements NemoDatastoreInterface
 type nemoDatastores struct {
-	*gentype.ClientWithList[*v1alpha1.NemoDatastore, *v1alpha1.NemoDatastoreList]
+	*gentype.ClientWithList[*appsv1alpha1.NemoDatastore, *appsv1alpha1.NemoDatastoreList]
 }
 
 // newNemoDatastores returns a NemoDatastores
 func newNemoDatastores(c *AppsV1alpha1Client, namespace string) *nemoDatastores {
 	return &nemoDatastores{
-		gentype.NewClientWithList[*v1alpha1.NemoDatastore, *v1alpha1.NemoDatastoreList](
+		gentype.NewClientWithList[*appsv1alpha1.NemoDatastore, *appsv1alpha1.NemoDatastoreList](
 			"nemodatastores",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.NemoDatastore { return &v1alpha1.NemoDatastore{} },
-			func() *v1alpha1.NemoDatastoreList { return &v1alpha1.NemoDatastoreList{} }),
+			func() *appsv1alpha1.NemoDatastore { return &appsv1alpha1.NemoDatastore{} },
+			func() *appsv1alpha1.NemoDatastoreList { return &appsv1alpha1.NemoDatastoreList{} },
+		),
 	}
 }
