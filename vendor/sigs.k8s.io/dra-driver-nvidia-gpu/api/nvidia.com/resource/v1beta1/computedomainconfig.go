@@ -18,9 +18,33 @@ package v1beta1
 
 import (
 	"fmt"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
+
+// ValidateDomainID reports whether domainID is safe to use as a single path
+// component when constructing on-disk paths for a ComputeDomain.
+// DomainID always originates from an opaque, claim-author-controlled device
+// configuration, so it must never be allowed to contain a path separator or
+// resolve to "." or "..": either would let it escape the directory it is
+// joined into.
+func ValidateDomainID(domainID string) error {
+	if domainID == "" {
+		return fmt.Errorf("domainID cannot be empty")
+	}
+	if errs := content.IsPathSegmentName(domainID); len(errs) > 0 {
+		return fmt.Errorf("domainID %q is not a valid single path component: %s", domainID, strings.Join(errs, ", "))
+	}
+	// DomainID is also a node label value so this rejects over-long or invalid names that
+	// pass the path check but would fail later at MkdirAll or the label update.
+	if errs := validation.IsValidLabelValue(domainID); len(errs) != 0 {
+		return fmt.Errorf("domainID must be a valid label value: %s", strings.Join(errs, "; "))
+	}
+	return nil
+}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -46,12 +70,9 @@ func (c *ComputeDomainChannelConfig) Normalize() error {
 	return nil
 }
 
-// Validate ensures that ComputeDomainDaemonConfig has a valid set of values.
+// Validate ensures that ComputeDomainChannelConfig has a valid set of values.
 func (c *ComputeDomainChannelConfig) Validate() error {
-	if c.DomainID == "" {
-		return fmt.Errorf("domainID cannot be empty")
-	}
-	return nil
+	return ValidateDomainID(c.DomainID)
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -79,8 +100,5 @@ func (c *ComputeDomainDaemonConfig) Normalize() error {
 
 // Validate ensures that ComputeDomainDaemonConfig has a valid set of values.
 func (c *ComputeDomainDaemonConfig) Validate() error {
-	if c.DomainID == "" {
-		return fmt.Errorf("domainID cannot be empty")
-	}
-	return nil
+	return ValidateDomainID(c.DomainID)
 }
