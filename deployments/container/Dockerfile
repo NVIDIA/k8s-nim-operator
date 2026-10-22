@@ -44,7 +44,7 @@ RUN git checkout 42ee2fff224f2cbe97cbf05423b4c40f17793a76
 RUN go build -o crd-apply-tool examples/apply-crds/main.go
 
 # Use distroless as minimal base image to package the manager binary
-FROM nvcr.io/nvidia/distroless/go:v4.1.6
+FROM nvcr.io/nvidia/distroless/go:v4.1.7
 
 ARG VERSION="unknown"
 
