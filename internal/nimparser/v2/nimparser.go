@@ -19,6 +19,7 @@ package v2
 import (
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -241,54 +242,43 @@ func matchGPUProfile(modelSpec appsv1alpha1.ModelSpec, p NIMProfile, discoveredG
 		return true
 	}
 
-	// If IDs are specified in any of the requested GPUs, enforce gpu_device match
-	if hasAnyIDs(modelSpec) {
-		tagID := strings.TrimSuffix(p.Tags["gpu_device"], ":10de")
-		if tagID == "" {
-			return false
+	// Each requested GPU is matched on its own, so the product and the IDs
+	// of one entry are never combined with those of another entry
+	if len(modelSpec.GPUs) > 0 {
+		for _, g := range modelSpec.GPUs {
+			if gpuSpecMatchesProfile(g, p) {
+				return true
+			}
 		}
-		if !anyIDEquals(modelSpec, tagID) {
-			return false
-		}
-	}
-
-	// If Product is specified, require product to match "gpu" or "key"
-	if hasAnyProduct(modelSpec) {
-		if !anyProductMatchesProfile(modelSpec, p) {
-			return false
-		}
-	}
-
-	// If nothing specified in modelSpec.GPUs matched yet and we have GPU identity tags,
-	// try discovered GPUs
-	if len(modelSpec.GPUs) == 0 && hasGPUIdentityTags && len(discoveredGPUs) > 0 {
-		if discoveredMatchesProfile(discoveredGPUs, p) {
-			return true
-		}
-		// No discovered GPU matched
 		return false
 	}
 
-	return true
+	// No GPUs requested, try discovered GPUs
+	return discoveredMatchesProfile(discoveredGPUs, p)
 }
 
-func anyProductMatchesProfile(modelSpec appsv1alpha1.ModelSpec, p NIMProfile) bool {
-	gpuTag := strings.ToLower(p.Tags["gpu"])
-	keyTag := strings.ToLower(p.Tags["key"])
-
-	for _, g := range modelSpec.GPUs {
-		if g.Product == "" {
-			continue
-		}
+func gpuSpecMatchesProfile(g appsv1alpha1.GPUSpec, p NIMProfile) bool {
+	// If Product is specified, require product to match "gpu" or "key"
+	if g.Product != "" {
+		gpuTag := strings.ToLower(p.Tags["gpu"])
+		keyTag := strings.ToLower(p.Tags["key"])
 		prod := strings.ToLower(g.Product)
-
 		// match against "gpu" or "key"
-		if (gpuTag != "" && strings.Contains(gpuTag, prod)) ||
-			(keyTag != "" && strings.Contains(keyTag, prod)) {
-			return true
+		matched := (gpuTag != "" && strings.Contains(gpuTag, prod)) ||
+			(keyTag != "" && strings.Contains(keyTag, prod))
+		if !matched {
+			return false
 		}
 	}
-	return false
+
+	// If IDs are specified, enforce gpu_device match
+	if len(g.IDs) > 0 {
+		tagID := strings.TrimSuffix(p.Tags["gpu_device"], ":10de")
+		if tagID == "" || !slices.Contains(g.IDs, tagID) {
+			return false
+		}
+	}
+	return true
 }
 
 func discoveredMatchesProfile(discovered []string, p NIMProfile) bool {
@@ -310,35 +300,6 @@ func discoveredMatchesProfile(discovered []string, p NIMProfile) bool {
 			if ok, _ := matchesRegex(label, regex); ok {
 				return true
 			}
-		}
-	}
-	return false
-}
-
-func hasAnyIDs(modelSpec appsv1alpha1.ModelSpec) bool {
-	for _, g := range modelSpec.GPUs {
-		if len(g.IDs) > 0 {
-			return true
-		}
-	}
-	return false
-}
-
-func anyIDEquals(modelSpec appsv1alpha1.ModelSpec, tagID string) bool {
-	for _, g := range modelSpec.GPUs {
-		for _, id := range g.IDs {
-			if id == tagID {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func hasAnyProduct(modelSpec appsv1alpha1.ModelSpec) bool {
-	for _, g := range modelSpec.GPUs {
-		if g.Product != "" {
-			return true
 		}
 	}
 	return false

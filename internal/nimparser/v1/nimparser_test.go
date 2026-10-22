@@ -280,4 +280,35 @@ var _ = Describe("NIMParser", func() {
 			Expect(matchedProfiles).To(HaveLen(1))
 		})
 	})
+
+	DescribeTable("MatchProfiles with multiple GPUs",
+		func(gpus []appsv1alpha1.GPUSpec, expected []string) {
+			nimManifest := NIMManifest{
+				"a100": NIMProfile{Tags: map[string]string{"llm_engine": "tensorrt_llm", "gpu": "A100", "gpu_device": "20b2:10de"}},
+				"h100": NIMProfile{Tags: map[string]string{"llm_engine": "tensorrt_llm", "gpu": "H100", "gpu_device": "2330:10de"}},
+			}
+			modelSpec := appsv1alpha1.ModelSpec{Engine: "tensorrt_llm", GPUs: gpus}
+			matchedProfiles, err := nimManifest.MatchProfiles(modelSpec, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(matchedProfiles).To(ConsistOf(expected))
+		},
+		Entry("products only",
+			[]appsv1alpha1.GPUSpec{{Product: "a100"}, {Product: "h100"}},
+			[]string{"a100", "h100"}),
+		Entry("IDs on the second entry only",
+			[]appsv1alpha1.GPUSpec{{Product: "a100"}, {Product: "h100", IDs: []string{"2330"}}},
+			[]string{"a100", "h100"}),
+		Entry("IDs on the first entry only",
+			[]appsv1alpha1.GPUSpec{{Product: "h100", IDs: []string{"2330"}}, {Product: "a100"}},
+			[]string{"a100", "h100"}),
+		Entry("IDs on every entry",
+			[]appsv1alpha1.GPUSpec{{Product: "a100", IDs: []string{"20b2"}}, {Product: "h100", IDs: []string{"2330"}}},
+			[]string{"a100", "h100"}),
+		Entry("IDs of another product",
+			[]appsv1alpha1.GPUSpec{{Product: "a100", IDs: []string{"2330"}}, {Product: "h100", IDs: []string{"20b2"}}},
+			[]string{}),
+		Entry("unknown IDs on one entry",
+			[]appsv1alpha1.GPUSpec{{Product: "a100", IDs: []string{"20b2"}}, {Product: "h100", IDs: []string{"abcd"}}},
+			[]string{"a100"}),
+	)
 })
