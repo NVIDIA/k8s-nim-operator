@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Preview Fern Docs
+
+on:
+  push:
+    branches:
+      - 'pull-request/[0-9]+'
+    paths:
+      - 'fern/docs.yml'
+      - 'fern/current.yml'
+      - 'fern/pages/**'
+      - 'fern/versions/**'
+
+concurrency:
+  group: fern-docs-preview-copy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  preview:
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: NVIDIA/docs-builder/.github/workflows/_fern_docs_preview_copy.yml@main # zizmor: ignore[unpinned-uses] -- Fern OIDC trust pins refs/heads/main
+    with:
+      fern-directory: fern
+      node-version: '24'
+      fern-package: https://github.com/mikemckiernan/fern/releases/download/v5.143.2-nvidia.3/fern-api-5.143.2-nvidia.3.tgz
+      fern-package-sha256: f25bca570f33affa92db4c5831eb432a53bab33f4c0bd036826f7ecfbe407fd4
+    secrets:
+      DOCS_FERN_AWS_ROLE_TO_ASSUME: ${{ secrets.DOCS_FERN_AWS_ROLE_TO_ASSUME }}
+      DOCS_FERN_SECRET_ID: ${{ secrets.DOCS_FERN_SECRET_ID }}
