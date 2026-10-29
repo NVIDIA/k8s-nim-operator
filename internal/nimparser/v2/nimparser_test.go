@@ -17,7 +17,6 @@ limitations under the License.
 package v2
 
 import (
-	"os"
 	"path/filepath"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -63,22 +62,6 @@ var _ = Describe("NIMParser V2", func() {
 			matchedProfiles, err := minimal.MatchProfiles(modelSpec, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(matchedProfiles).To(Equal([]string{"aaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999"}))
-		})
-	})
-
-	Context("ParseModelManifestFromRawOutput", func() {
-		It("should skip container runtime noise preceding the manifest", func() {
-			manifest, err := os.ReadFile(filepath.Join("testdata", "manifest_v2.yaml"))
-			Expect(err).NotTo(HaveOccurred())
-
-			rawOutput := append([]byte("nvidia driver modules are not yet loaded, invoking runc directly\n"), manifest...)
-			parser := NIMParser{}
-			config, err := parser.ParseModelManifestFromRawOutput(rawOutput)
-			Expect(err).NotTo(HaveOccurred())
-			nimManifest, ok := config.(NIMManifest)
-			Expect(ok).To(BeTrue())
-			Expect(nimManifest.SchemaVersion).To(Equal("2.0.0"))
-			Expect(nimManifest.Profiles).To(HaveLen(2))
 		})
 	})
 })

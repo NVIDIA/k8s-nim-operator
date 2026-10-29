@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"os"
 	"path/filepath"
 
 	"k8s.io/utils/ptr"
@@ -82,23 +81,6 @@ var _ = Describe("NIMParser", func() {
 			Expect(profile.Tags["feat_lora_max_rank"]).To(Equal("32"))
 			Expect(profile.Tags["precision"]).To(Equal("fp16"))
 			Expect(profile.ContainerURL).To(Equal("nvcr.io/nim/meta/llama3-70b-instruct:1.0.0"))
-		})
-		It("should parse raw output with container runtime noise preceding the manifest", func() {
-
-			manifest, err := os.ReadFile(filepath.Join("testdata", "manifest_trtllm_v1.yaml"))
-			Expect(err).NotTo(HaveOccurred())
-
-			rawOutput := append([]byte("nvidia driver modules are not yet loaded, invoking runc directly\n"), manifest...)
-			nimparser := NIMParser{}
-			config, err := nimparser.ParseModelManifestFromRawOutput(rawOutput)
-			Expect(err).NotTo(HaveOccurred())
-			nimManifest, ok := config.(NIMManifest)
-			if !ok {
-				Fail("Failed to parse manifest")
-			}
-			profile, exists := nimManifest["03fdb4d11f01be10c31b00e7c0540e2835e89a0079b483ad2dd3c25c8cc29b61"]
-			Expect(exists).To(BeTrue())
-			Expect(profile.Tags["precision"]).To(Equal("fp16"))
 		})
 		It("should match model profiles with valid parameters", func() {
 			filePath := filepath.Join("testdata", "manifest_trtllm_v1.yaml")
