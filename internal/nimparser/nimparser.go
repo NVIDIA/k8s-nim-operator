@@ -19,6 +19,8 @@ package nimparser
 import (
 	"regexp"
 
+	"gopkg.in/yaml.v3"
+
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 )
 
@@ -32,8 +34,8 @@ type NIMSchemaManifest struct {
 }
 
 var (
-	// v2 manifests begin with a schema_version key at the document root.
-	v2ManifestStartPattern = regexp.MustCompile(`(?m)^schema_version\s*:`)
+	// Any v2 root key can precede schema_version in serialized manifests.
+	v2ManifestStartPattern = regexp.MustCompile(`(?m)^['"]?(schema_version|profile_selection_criteria|profiles)['"]?\s*:`)
 	// v1 manifests are a map keyed by 64-char hex profile hashes. Profile IDs
 	// nested inside v2 manifests are indented, so they never match this pattern.
 	v1ManifestStartPattern = regexp.MustCompile(`(?m)^[0-9a-f]{64}:`)
@@ -44,6 +46,13 @@ var (
 // toolkit messages) that precede the manifest document. If no manifest start is
 // found, the input is returned unchanged so parse errors surface as-is.
 func ExtractManifest(data []byte) []byte {
+	// A stored manifest is already YAML, and root key order is not significant.
+	// Only search for a manifest boundary when the input is not such a document.
+	var manifest NIMSchemaManifest
+	if err := yaml.Unmarshal(data, &manifest); err == nil && manifest.SchemaVersion != "" {
+		return data
+	}
+
 	start := -1
 	for _, pattern := range []*regexp.Regexp{v2ManifestStartPattern, v1ManifestStartPattern} {
 		if loc := pattern.FindIndex(data); loc != nil && (start == -1 || loc[0] < start) {
