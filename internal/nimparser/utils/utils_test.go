@@ -48,4 +48,3 @@ func TestGetNIMParserUsesMajorVersion(t *testing.T) {
 		}
 	}
 }
-
