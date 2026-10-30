@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package zap contains helpers for setting up a new logr.Logger instance
+// using the Zap logging framework.
 package zap
 
 import (
