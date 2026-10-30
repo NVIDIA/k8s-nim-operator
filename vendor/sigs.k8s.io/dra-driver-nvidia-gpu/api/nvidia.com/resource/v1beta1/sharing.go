@@ -86,6 +86,9 @@ type MpsConfig struct {
 	// DefaultPerDevicePinnedMemoryLimit represents the pinned memory limit per device associated with an MPS daemon.
 	// This is defined as a map of device index or UUI to a memory limit and overrides a setting applied using DefaultPinnedDeviceMemoryLimit.
 	DefaultPerDevicePinnedMemoryLimit MpsPerDevicePinnedMemoryLimit `json:"defaultPerDevicePinnedMemoryLimit,omitempty"`
+	// MultiUser controls if the nvidia-cuda-mps-control daemon should be started in Multi user mode, which allows sharing between users with different uids.
+	// If not provided it will default to not enabled.
+	MultiUser *bool `json:"multiUser,omitempty"`
 }
 
 // IsTimeSlicing checks if the TimeSlicing strategy is applied.
