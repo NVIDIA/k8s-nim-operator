@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
@@ -41,7 +43,7 @@ func SetupNIMServiceWebhookWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
-	return ctrl.NewWebhookManagedBy(mgr, &appsv1alpha1.NIMService{}).
+	return ctrl.NewWebhookManagedBy(mgr).For(&appsv1alpha1.NIMService{}).
 		WithValidator(validator).
 		Complete()
 }
@@ -66,7 +68,7 @@ type NIMServiceCustomValidator struct {
 	apiReader  client.Reader
 }
 
-var _ admission.Validator[*appsv1alpha1.NIMService] = &NIMServiceCustomValidator{}
+var _ webhook.CustomValidator = &NIMServiceCustomValidator{}
 
 // NewNIMServiceCustomValidator fetches and caches the Kubernetes version.
 func NewNIMServiceCustomValidator(k8sClient client.Client, apiReader client.Reader) (*NIMServiceCustomValidator, error) {
@@ -89,8 +91,12 @@ func NewNIMServiceCustomValidator(k8sClient client.Client, apiReader client.Read
 	}, nil
 }
 
-// ValidateCreate implements admission.Validator so a webhook will be registered for the type NIMService.
-func (v *NIMServiceCustomValidator) ValidateCreate(ctx context.Context, nimservice *appsv1alpha1.NIMService) (admission.Warnings, error) {
+// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type NIMService.
+func (v *NIMServiceCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	nimservice, ok := obj.(*appsv1alpha1.NIMService)
+	if !ok {
+		return nil, fmt.Errorf("expected a NIMService object but got %T", obj)
+	}
 	nimservicelog.V(4).Info("Validation for NIMService upon creation", "name", nimservice.GetName())
 
 	fldPath := field.NewPath("nimservice").Child("spec")
@@ -105,8 +111,16 @@ func (v *NIMServiceCustomValidator) ValidateCreate(ctx context.Context, nimservi
 	return warningList, nil
 }
 
-// ValidateUpdate implements admission.Validator so a webhook will be registered for the type NIMService.
-func (v *NIMServiceCustomValidator) ValidateUpdate(ctx context.Context, oldNIMService, newNIMService *appsv1alpha1.NIMService) (admission.Warnings, error) {
+// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NIMService.
+func (v *NIMServiceCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	oldNIMService, ok := oldObj.(*appsv1alpha1.NIMService)
+	if !ok {
+		return nil, fmt.Errorf("expected a NIMService object for oldObj but got %T", oldObj)
+	}
+	newNIMService, ok := newObj.(*appsv1alpha1.NIMService)
+	if !ok {
+		return nil, fmt.Errorf("expected a NIMService object for newObj but got %T", newObj)
+	}
 	nimservicelog.V(4).Info("Validation for NIMService upon update", "name", newNIMService.GetName())
 
 	fldPath := field.NewPath("nimservice").Child("spec")
@@ -132,7 +146,7 @@ func (v *NIMServiceCustomValidator) ValidateUpdate(ctx context.Context, oldNIMSe
 	return warningList, nil
 }
 
-func (v *NIMServiceCustomValidator) ValidateDelete(_ context.Context, nimservice *appsv1alpha1.NIMService) (admission.Warnings, error) {
+func (v *NIMServiceCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
 	// No deletion-time validation logic for NIMService. Returning nil allows deletes without extra checks.
 	return nil, nil
 }

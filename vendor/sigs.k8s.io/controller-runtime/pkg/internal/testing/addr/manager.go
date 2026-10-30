@@ -124,16 +124,14 @@ func suggest(listenHost string) (*net.TCPListener, int, string, error) {
 // Suggest suggests an address a process can listen on. It returns
 // a tuple consisting of a free port and the hostname resolved to its IP.
 // It makes sure that new port allocated does not conflict with old ports
-// allocated within 2 minute.
+// allocated within 1 minute.
 func Suggest(listenHost string) (int, string, error) {
-	for range portConflictRetry {
+	for i := 0; i < portConflictRetry; i++ {
 		listener, port, resolvedHost, err := suggest(listenHost)
 		if err != nil {
 			return -1, "", err
 		}
-		if err := listener.Close(); err != nil {
-			return -1, "", err
-		}
+		defer listener.Close()
 		if ok, err := cache.add(port); ok {
 			return port, resolvedHost, nil
 		} else if err != nil {
