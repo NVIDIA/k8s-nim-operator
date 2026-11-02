@@ -1009,7 +1009,18 @@ func (r *NIMServiceReconciler) getNIMModelEndpoints(ctx context.Context, nimServ
 			}
 		}
 	} else if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
-		externalEndpoint = utils.FormatEndpoint(svc.Spec.LoadBalancerIP, port)
+		// The address a provider assigns lands in status, the same place the
+		// ingress branch above reads it from. spec.loadBalancerIP is the request
+		// field, it is deprecated upstream, and the operator never renders it, so
+		// reading it here always produced an empty endpoint.
+		if len(svc.Status.LoadBalancer.Ingress) > 0 {
+			ing := svc.Status.LoadBalancer.Ingress[0]
+			address := ing.IP
+			if ing.Hostname != "" {
+				address = ing.Hostname
+			}
+			externalEndpoint = utils.FormatEndpoint(address, port)
+		}
 	}
 
 	return utils.FormatEndpoint(svc.Spec.ClusterIP, port), externalEndpoint, nil
