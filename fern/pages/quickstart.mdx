@@ -1,0 +1,90 @@
+---
+title: "NIM Operator Quick Start"
+description: "Follow the examples in the tiles to deploy NIM. NVIDIA highly recommends that you cache models for low inference latency and faster auto-scaling."
+slug: quickstart
+---
+
+<Anchor id="nim-operator-quick-start" />
+
+Follow the examples in the tiles to deploy NIM.
+NVIDIA highly recommends that you cache models for low inference latency and faster auto-scaling.
+
+<CardGroup cols={3}>
+<Card title="Non-LLM NIM">
+Domain-specific, RAG, BioNeMo, and Riva.
+
+---
+
+[Docs](/service?nim=non-llm#about-nim-services) |
+[NIMCache](/cache-non-llm#non-llm-nim-cache-sources) |
+[NIMService](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml#L25)
+
+</Card>
+
+<Card title="LLM-specific NIM">
+Optimized NVIDIA NIM.
+
+---
+
+[Docs](/service?nim=llm-specific#about-nim-services) |
+[NIMCache](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml#L2) |
+[NIMService](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml#L25)
+
+</Card>
+
+<Card title="Multi-LLM compatible NIM deployment">
+Broad range of LLMs, such as from Hugging Face.
+
+---
+
+[Docs](/service?nim=multi-llm#about-nim-services) |
+[NIMCache](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml#L2) |
+[NIMService](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml#L25)
+
+</Card>
+
+<Card title="Multi-node NIM deployment">
+Deploy large LLMs across several interconnected nodes.
+
+---
+
+[Docs](/multi-node) |
+[NIMCache](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml#L2) |
+[NIMService](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml#L22)
+
+</Card>
+
+<Card title="NIM on KServe serverless deployment">
+Serverless deployment, scale-to-zero, and canary rollouts.
+
+---
+
+[Docs](/kserve) |
+[NIMCache](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/kserve/knative/llm.yaml#) |
+[NIMService](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/kserve/knative/llm.yaml)
+
+</Card>
+
+<Card title="NIM with DRA">
+Advanced GPU allocation and scheduling.
+
+---
+
+[Docs](/dra) |
+[NIMCache](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml#L2) |
+[NIMService](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml#L24)
+
+</Card>
+
+<Card title="NIM with LoRA">
+Enhance LLMs with domain-specific adapters.
+
+---
+
+[Docs](/cache-llm#lora-models-and-adapters) |
+[NIMCache](/cache-llm#lora-models-and-adapters) |
+[NIMService](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/lora/llm.yaml#L2)
+
+</Card>
+
+</CardGroup>

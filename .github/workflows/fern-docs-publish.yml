@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Publish Fern Docs
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: fern-docs-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  publish:
+    if: github.repository == 'NVIDIA/k8s-nim-operator'
+    permissions:
+      contents: read
+      id-token: write
+    uses: NVIDIA/docs-builder/.github/workflows/_fern_docs_publish.yml@main # zizmor: ignore[unpinned-uses] -- Fern OIDC trust pins refs/heads/main
+    with:
+      fern-directory: fern
+      fern-version: '5.193.2'
+    secrets:
+      DOCS_FERN_AWS_ROLE_TO_ASSUME: ${{ secrets.DOCS_FERN_AWS_ROLE_TO_ASSUME }}
+      DOCS_FERN_SECRET_ID: ${{ secrets.DOCS_FERN_SECRET_ID }}

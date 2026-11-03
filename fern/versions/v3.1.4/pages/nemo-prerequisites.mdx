@@ -1,0 +1,365 @@
+---
+title: "NeMo Microservices Prerequisites"
+license: Apache-2.0
+copyright: "Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "The NIM Operator is deprecating support for the NeMo Microservices CRDs and deployments in the next release. The NeMo Microservices are transitioning into the NeMo Platform. Refer to the NeMo Platform"
+slug: nemo-prerequisites
+---
+
+<Anchor id="nemo-microservices-prerequisites" />
+
+<Warning>
+The NIM Operator is deprecating support for the NeMo Microservices CRDs and deployments in the next release.
+The NeMo Microservices are transitioning into the NeMo Platform.
+Refer to the [NeMo Platform documentation](https://docs.nvidia.com/nemo-platform/documentation/home#what-you-can-do) for details on continuing to use NeMo Microservices.
+
+</Warning>
+
+NeMo microservices have some shared prerequisites to configure on your Kubernetes cluster before deploying a NeMo microservice with the NVIDIA NIM Operator.
+The prerequisites include:
+
+1. [Creating a namespace](#create-nemo-namespace) to deploy your NeMo microservices.
+
+1. [Creating image pull secrets](#create-ngc-api-key-image-pull-secrets) that contain your NGC API key.
+
+1. Optionally, [deploy NeMo dependencies with Ansible](#deploy-nemo-dependencies-with-ansible).
+Each NeMo microservice has per-component dependencies in addition to the prerequisites on this page.
+The NIM Operator maintains Ansible playbooks to help you quickly deploy these microservice-specific dependencies to test the NeMo microservices.
+
+1. Optionally, if you are installing NeMo Customizer, [install NeMo Operator](#install-nemo-operator) which provides custom resources that help manage NeMo Customizer jobs.
+
+After configuring the prerequisites on this page, you can continue to the [NeMo microservices deployment guide](/deploy-nemo-microservices) or deploy each microservice individually by reviewing the microservice-specific page.
+
+<Anchor id="create-nemo-namespace" />
+
+## 1. Create NeMo Namespace
+
+NVIDIA recommends that you deploy all NeMo microservices in a single namespace:
+
+```console
+$ kubectl create namespace nemo
+```
+
+You should also consider applying a Kubernetes [resource quota](/resource-quotas) to your NeMo namespace. If you deploy using the Ansible NeMo Dependency playbook, a default `nemo` namespace will be created by the playbook.
+
+<Anchor id="create-ngc-api-key-image-pull-secrets" />
+
+## 2. Create NGC API Key Image Pull Secrets
+
+You must create the [required image pull secrets](/image-pull-secrets) in your `nemo` namespace to be able to pull NeMo microservice images from NVIDIA NGC.
+Refer to [Generating Your NGC API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key)
+in the *NVIDIA NGC User Guide* for more information.
+
+1. Add a Docker registry secret for downloading container images from NVIDIA NGC:
+
+   ```console
+   $ kubectl create secret -n nemo docker-registry ngc-secret \
+       --docker-server=nvcr.io \
+       --docker-username='$oauthtoken' \
+       --docker-password=<ngc-api-key>
+   ```
+
+1. Add a generic secret that the model puller containers use to download models from NVIDIA NGC:
+
+   ```console
+   $ kubectl create secret -n nemo generic ngc-api-secret \
+       --from-literal=NGC_API_KEY=<ngc-api-key>
+   ```
+
+<Anchor id="deploy-nemo-dependencies-with-ansible" />
+
+## 3. Deploy NeMo Dependencies With Ansible
+
+Each NeMo microservice relies on several dependencies, for things like databases or Kubernetes secrets.
+The NIM Operator team maintains Ansible playbooks to help you quickly install most dependencies on your cluster.
+
+<Note>
+While these playbooks are helpful for testing, they may not be suitable for production environments.
+Refer to each microservice’s configuration page for specific dependency requirements.
+
+</Note>
+
+Using this playbook you can choose to install dependencies for one or more of the following NeMo microservices:
+
+<table>
+<thead>
+<tr>
+<th>
+
+NeMo Microservice
+
+</th>
+<th>
+
+Dependencies Deployed with Ansible
+
+</th>
+<th>
+
+Additional Dependencies You Create
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+NeMo Data Store
+
+</td>
+<td>
+
+PostgreSQL, MinIO, Kubernetes storage provisioner*, Kubernetes secrets (database user, object storage user, Data Store default)
+
+</td>
+<td>
+
+Image pull secret
+
+</td>
+</tr>
+<tr>
+<td>
+
+NeMo Entity Store
+
+</td>
+<td>
+
+PostgreSQL, Kubernetes storage provisioner*, Kubernetes secrets (database user)
+
+</td>
+<td>
+
+Image pull secret, NeMo Data Store
+
+</td>
+</tr>
+<tr>
+<td>
+
+NeMo Evaluator
+
+</td>
+<td>
+
+PostgreSQL, Kubernetes secrets (database user), Argo Workflows, Milvus
+
+</td>
+<td>
+
+Image pull secret, NeMo Data Store, NeMo Entity Store
+
+</td>
+</tr>
+<tr>
+<td>
+
+NeMo Customizer
+
+</td>
+<td>
+
+PostgreSQL, Kubernetes storage provisioner*, Kubernetes secrets (database user, W&B API Key), Kubernetes ConfigMap for training and model downloads, OpenTelemetry, Volcano Scheduler
+
+</td>
+<td>
+
+Image pull secret, NeMo Data Store, NeMo Entity Store, [NeMo Operator](#install-nemo-operator)
+
+</td>
+</tr>
+<tr>
+<td>
+
+NeMo Guardrails
+
+</td>
+<td>
+
+PostgreSQL, OpenTelemetry, Kubernetes storage provisioner*, NIM Endpoint as a NIMPipeline
+
+</td>
+<td>
+
+Image pull secret
+
+</td>
+</tr>
+</tbody>
+</table>
+
+<Note>
+*By default the NeMo Dependency playbook will install [Local Path Provisioner](https://github.com/rancher/local-path-provisioner) to use as the default StorageClass.
+You can configure a different one by specifying your desired `pvc`, described in more [detail below](#install-dependencies).
+
+</Note>
+
+### Install Dependencies
+
+1. Clone the NIM Operator repository:
+
+   ```console
+   $ git clone https://github.com/NVIDIA/k8s-nim-operator.git
+   ```
+
+1. Navigate to the `nemo-dependencies` directory:
+
+   ```console
+   $ cd k8s-nim-operator/test/e2e/nemo-dependencies
+   ```
+
+1. Checkout version tag:
+
+   ```console
+   $ git checkout v3.1.4
+   ```
+
+1. Configure the playbook to install all dependencies by updating each microservice to `yes` in the `values.yaml`:
+
+   <Code src="../../../../manifests/docs/current/input/ansible-playbook-values.yaml" language="yaml" startLine="1" />
+
+   Additional configuration options:
+
+   -    Change the namespace to deploy all NeMo dependencies.<br />
+By default, the playbook creates and deploys services into the `nemo` namespace.
+You can change this by updating the `installation_namespace`.
+
+   -    By default the playbook will deploy [Local Path Provisioner](https://github.com/rancher/local-path-provisioner) to use as the default StorageClass.
+If a default StorageClass is already provisioned in the cluster, set `localPathProvisioner.enabled:false` then specify a custom StorageClass and volume access mode the playbook should use for all PVCs, for example `ReadWriteMany` for NFS storage class.
+
+   Refer to the [NeMo dependencies documentation](https://github.com/NVIDIA/k8s-nim-operator/tree/main/test/e2e/nemo-dependencies) for full details on available configuration options.
+
+1. Run the Ansible playbook:
+
+   ```console
+   $ ansible-playbook -c local -i localhost install.yaml
+   ```
+
+   The playbook will take several minutes to complete.
+
+### Verify Dependencies
+
+1. Check that pods are running:
+
+   ```console
+   $ kubectl get pods -n nemo
+   ```
+
+   *Example output*
+
+   ```output
+   NAME                                                      READY   STATUS      RESTARTS   AGE
+   argo-workflows-server-85d8489c58-l5fnc                    1/1     Running     0          10m
+   argo-workflows-workflow-controller-698f7bb767-dhr9l       1/1     Running     0          10m
+   customizer-otel-opentelemetry-collector-7ff98567c5-slg8v  1/1     Running     0          10m
+   customizer-pg-postgresql-0                                1/1     Running     0          10m
+   datastore-pg-postgresql-0                                 1/1     Running     0          10m
+   entity-store-pg-postgresql-0                              1/1     Running     0          10m
+   evaluator-otel-opentelemetry-collector-6cf75b448-f2m6h    1/1     Running     0          10m
+   evaluator-pg-postgresql-0                                 1/1     Running     0          10m
+   guardrail-otel-opentelemetry-collector-5d88cf46f5-jjjbw   1/1     Running     0          10m
+   guardrail-pg-postgresql-0                                 1/1     Running     0          10m
+   jupyter-notebook-f4cdbc988-cgc8z                          1/1     Running     0          10m
+   meta-llama3-1b-instruct-5cbd55b49b-nrt9j                  1/1     Running     0          10m
+   milvus-standalone-8fbb48495-dfrhr                         1/1     Running     0          10m
+   mlflow-minio-568b6bc597-nx647                             1/1     Running     0          10m
+   mlflow-minio-provisioning-vfvr9                           0/1     Completed   0          10m
+   mlflow-postgresql-0                                       1/1     Running     0          10m
+   mlflow-tracking-6fbc46b567-6q6n8                          1/1     Running     0          10m
+   volcano-admission-5c5c96b944-pfltc                        1/1     Running     0          10m
+   volcano-admission-init-stkhm                              0/1     Completed   0          10m
+   volcano-controllers-699b864756-rnvqb                      1/1     Running     0          10m
+   volcano-scheduler-5f77fc8fb9-cjqht                        1/1     Running     0          10m
+   ```
+
+1. Verify the Kubernetes secrets for the dependencies have been created:
+
+   ```console
+   $ kubectl get secrets -n nemo
+   ```
+
+<Anchor id="install-nemo-operator" />
+
+## 4. Install NeMo Operator
+
+When you want to run a NeMo Customizer workflow, you need to install the NeMo Operator microservice.
+This microservice manages custom resources around LLM training workload for NeMo Customizer jobs.
+It does not manage any other NeMo microservice.
+Refer to the NeMo microservice documentation for details about the [NeMo Operator and the training CRDs it manages](https://docs.nvidia.com/nemo/microservices/25.8.0/set-up/manage-custom-resources/custom-resources.html#custom-resource-definitions-managed-by-nemo-operator).
+
+### Prerequisites
+
+- Create the [image pull secrets](/image-pull-secrets) in the `nemo` namespace, or the namespace you plan to install the NeMo Operator.
+You also need to pass your [NVIDIA NGC API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key) to fetch the NeMo Operator Helm chart.
+
+- Access to an NFS-backed Persistent Volume that supports `ReadWriteMany` access mode.
+The NeMo Operator microservice dynamically provisions NFS-backed persistent volumes using Kubernetes storage classes.
+
+- Install Volcano scheduler on your cluster.
+Use the [NeMo Dependency Ansible playbooks](#deploy-nemo-dependencies-with-ansible) to install Volcano, or refer to the [Volcano install](https://volcano.sh/en/docs/installation/) documentation.
+
+- NVIDIA recommends that you use the latest version of the NeMo Operator.
+View available [NeMo Operator versions](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo-microservices/helm-charts/nemo-operator) on NVIDIA NGC and update the `VERSION` variable to pull your desired version.
+
+  ```console
+  $ export VERSION=25.6.0
+  ```
+
+### Install the NeMo Operator With Helm
+
+1. Fetch the NeMo Operator Helm chart.
+
+   ```console
+   $ helm fetch https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nemo-operator-${VERSION}.tgz --username='$oauthtoken' --password=<YOUR NGC API Key>
+   ```
+
+1. Install the NeMo Operator.
+
+   ```console
+   $ helm upgrade --install nemo-operator nemo-operator-${VERSION}.tgz -n nemo --set imagePullSecrets[0].name=ngc-secret --set controllerManager.manager.scheduler=volcano
+   ```
+
+1. Verify the NeMo Operator was installed.
+
+   ```console
+   $ kubectl get pods -n nemo | grep "nemo-operator"
+   ```
+
+<Note>
+When upgrading Nemo-operator from a previous release, CRDs have to be manually upgraded. Follow these steps:
+
+1. Fetch the helm chart
+
+   ```console
+   $ helm fetch https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nemo-operator-${VERSION}.tgz --username='$oauthtoken' --password=<YOUR NGC API Key>
+   ```
+
+1. Upgrade CRDs
+
+   ```console
+   $ helm template --include-crds ./nemo-operator-${VERSION}.tgz | yq 'select(.kind == "CustomResourceDefinition")' | kubectl apply -f -
+   ```
+
+1. Upgrade the helm chart
+
+   ```console
+   $ helm upgrade --install nemo-operator nemo-operator-${VERSION}.tgz -n nemo --set imagePullSecrets[0].name=ngc-secret --set controllerManager.manager.scheduler=volcano
+   ```
+
+</Note>
+
+## Next Steps
+
+- [Deploy all NeMo Microservices](/deploy-nemo-microservices)
+
+- [Manage NeMo Data Store](/data-store)
+
+- [Manage NeMo Entity Store](/entity-store)
+
+- [Manage NeMo Customizer](/customizer)
+
+- [Manage NeMo Evaluator](/evaluator)
+
+- [Manage NeMo Guardrails](/guardrail)

@@ -35,3 +35,8 @@ kubeconfig
 e2e_logs
 
 /.licenses-cache
+
+# Documentation dependencies and local build state
+/fern/node_modules/
+/.fern/
+/fern/.fern/

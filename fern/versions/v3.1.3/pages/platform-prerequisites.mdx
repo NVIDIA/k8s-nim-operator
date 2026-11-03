@@ -1,0 +1,75 @@
+---
+title: "Platform-specific Prerequisites"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "This page covers any platform-specific prerequisites for installing the NVIDIA NIM Operator."
+slug: platform-prerequisites
+---
+
+<Anchor id="platform-specific-prerequisites" />
+
+This page covers any platform-specific prerequisites for installing the NVIDIA NIM Operator.
+
+## Google Kubernetes Engine (GKE)
+
+If you are installing on GKE, you must also set [resource quotas](/resource-quotas) for the NIM Operator namespace.
+
+## Red Hat OpenShift
+
+- The NIM Operator requires the NVIDIA GPU Operator to be installed on your cluster.
+
+  To install the NVIDIA GPU Operator on Red Hat OpenShift:
+
+  1.   Install the Node Feature Discovery Operator.
+
+     -      Refer to [Node Feature Discovery Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/specialized_hardware_and_driver_enablement/psap-node-feature-discovery-operator)
+in the OpenShift Container Platform documentation for installation information.
+
+     -      Refer to [Installing the Node Feature Discovery Operator on OpenShift](https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/install-nfd.html) for information about creating a node feature discovery instance.
+
+  1.   Install the GPU Operator.
+
+     Refer to [Installing the NVIDIA GPU Operator on OpenShift](https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/install-gpu-ocp.html) for information about installing the Operator and creating a cluster policy instance.
+
+If you are planning to install using the OpenShift CLI, you must also have the following prerequisites:
+
+- A Red Hat OpenShift Container Platform cluster and the cluster-admin role.
+Refer to [Platform Support](/platform-support) for information about supported operating systems and Kubernetes platforms.
+
+- An installation of the Operator SDK and the `operator-sdk` command in your path.
+Refer to [Installation](https://sdk.operatorframework.io/docs/installation/)
+in the Operator SDK documentation for more information.
+
+- OpenShift CLI.
+Refer to [Installing the OpenShift CLI](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands)
+in the OpenShift documentation for more information.
+
+- An NGC CLI API key.
+Pods use the API key as an image pull secret to download container images and models from NVIDIA NGC.
+Refer to [Generating Your NGC API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key)
+in the *NVIDIA NGC User Guide* for more information.
+
+## VMware Tanzu
+
+Installing on VMware Tanzu requires the following prerequisites:
+
+- A TKG cluster and the cluster-admin role.
+Refer to [Platform Support](/platform-support) for information about supported operating systems and Kubernetes platforms.
+
+- A persistent volume provisioner that supports network access, such as vSAN.
+
+- Kubernetes CLI tools for VMware vSphere.
+Refer to
+[Download and Install the Kubernetes CLI Tools for vSphere](https://techdocs.broadcom.com/us/en/vmware-cis/vsphere/vsphere-supervisor/8-0/using-tkg-service-with-vsphere-supervisor/configuring-identity-and-access-for-tkg-service-clusters/installing-cli-tools-for-tkg-service-clusters/install-the-kubernetes-cli-tools-for-vsphere.html)
+
+- The NIM Operator requires the NVIDIA GPU Operator be installed on your cluster.
+When installing the NVIDIA GPU Operator, create and label the GPU Operator namespace first to prevent the admission controller from enforcing the pod security policy for pods that are created with a service account:
+
+  ```console
+  $ kubectl create namespace gpu-operator
+  $ kubectl label --overwrite ns gpu-operator pod-security.kubernetes.io/warn=privileged pod-security.kubernetes.io/enforce=privileged
+  ```
+
+## Next Steps
+
+- [Installing NVIDIA NIM Operator](/install)

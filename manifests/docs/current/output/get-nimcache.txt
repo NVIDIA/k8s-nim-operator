@@ -1,0 +1,4 @@
+NAME                        STATUS    PVC                             AGE
+meta-llama3-8b-instruct     Ready     meta-llama3-8b-instruct         2024-08-09T20:54:28Z
+nv-embedqa-e5-v5            Ready     nv-embedqa-e5-v5-pvc            2024-08-09T20:54:28Z
+nv-rerankqa-mistral-4b-v3   Ready     nv-rerankqa-mistral-4b-v3-pvc   2024-08-09T20:54:28Z

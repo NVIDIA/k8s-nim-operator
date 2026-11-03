@@ -1,0 +1,21 @@
+instances:
+- url: nim-operator-nvidia.docs.buildwithfern.com/nim-operator
+  custom-domain: docs.nvidia.com/nim-operator
+  multi-source: true
+title: NVIDIA NIM Operator
+global-theme: nvidia
+navbar-links:
+- type: github
+  value: https://github.com/NVIDIA/k8s-nim-operator
+versions:
+- display-name: 3.1.4
+  path: ./versions/v3.1.4.yml
+  slug: 3.1.4
+  default: true
+- display-name: 3.1.3
+  path: ./versions/v3.1.3.yml
+  slug: 3.1.3
+- display-name: Dev
+  path: ./current.yml
+  slug: dev
+  availability: beta
