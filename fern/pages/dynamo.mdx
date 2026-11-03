@@ -1,0 +1,278 @@
+---
+title: "Dynamo (Experimental)"
+description: "This feature is experimental and is not fully supported. It is included here as a preview for testing environments and is not recommended for production use cases. There may be changes to functionalit"
+slug: dynamo
+---
+
+<Anchor id="dynamo-experimental" />
+
+<Warning>
+This feature is experimental and is not fully supported.
+It is included here as a preview for testing environments and is not recommended for production use cases.
+There may be changes to functionality, implementation, and APIs in future releases.
+
+</Warning>
+
+Dynamo is NVIDIA’s AI inference platform that provides an OpenAI-compatible frontend for running large language models (LLMs) with multiple backend options.
+It’s designed to simplify the deployment and management of AI models for inference workloads.
+Refer to the [Dynamo documentation](https://docs.nvidia.com/dynamo/v-0-9-0/getting-started/quickstart) for more details.
+
+Using the NIM Operator, you can deploy [Dynamo Custom Resource Definitions (CRDs)](https://github.com/ai-dynamo/dynamo/tree/main/deploy/operator/config/crd/bases) when the `dynamo.enabled=true` flag is set in the NIM Operator Helm chart.
+
+<Note>
+Currently, the feature is supported on any upstream-compatible Kubernetes deployment.
+OpenShift support is planned for a future release.
+
+</Note>
+
+Steps to deploy with Dynamo:
+
+- [Prerequisites](#prerequisites)
+
+- [Configure NIM Operator with Dynamo Enabled](#configure-nim-operator-with-dynamo-enabled)
+
+- [Dynamo vLLM Deployment (Qwen Example)](#dynamo-vllm-deployment-qwen-example)
+
+- [Testing the Deployment](#testing-the-deployment)
+
+## Prerequisites
+
+The following are prerequisites for running Dynamo sample manifests.
+
+1. Create a target namespace for Dynamo deployments, like `dynamo-examples`.
+
+   ```console
+   $ kubectl create namespace dynamo-examples
+   ```
+
+1. Create an image pull secret and NIM authentication secret in your target namespace using your NGC API token.
+The examples below use `dynamo-examples`. Refer to [Generating Your NGC API Key](https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key) for more details on obtaining your NGC API key.
+
+   Create image pull secret:
+
+   ```console
+   $ kubectl create secret docker-registry ngc-secret \
+   --docker-server=nvcr.io \
+   --docker-username='$oauthtoken' \
+   --docker-password="<your-NGC-API-key>" \
+   -n dynamo-examples
+   ```
+
+   Create NIM authentication secret
+
+   ```console
+   $ kubectl create secret generic ngc-api-secret \
+   --from-literal=NGC_API_KEY="<your-NGC-API-key>" \
+   -n dynamo-examples
+   ```
+
+2. Create a Hugging Face token.
+Generate a Read token at [Hugging Face Settings](https://huggingface.co/settings/tokens), then create the secret in your target namespace.
+The example below uses `dynamo-examples`.
+
+   ```console
+   $ kubectl create secret generic hf-token-secret \
+   --from-literal=HF_TOKEN="<your-huggingface-token>" \
+   -n dynamo-examples
+   ```
+
+## Configure NIM Operator with Dynamo Enabled
+
+The following steps will install or update the NIM Operator with Dynamo enabled.
+The NIM Operator will configure the Dynamo CRDs and deploy Dynamo management pods on your cluster.
+
+<Note>
+The NIM Operator will deploy Dynamo CRDs v0.9.0.
+
+</Note>
+
+1. Add NGC Repository.
+
+   ```console
+   $ helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
+   $ helm repo update
+   ```
+
+1. Install Operator.
+
+   ```console
+   $ helm upgrade --install nim-operator \
+     nvidia/k8s-nim-operator -n nim-operator --create-namespace \
+     --version=3.1.4 --set dynamo.enabled=true
+   ```
+
+   The NIM Operator supports configuring Dynamo values including `etcd`, `nats`, `dynamo-operator`, `grove`, and `kai-scheduler`.
+Refer to the [dynamo-platform chart](https://github.com/ai-dynamo/dynamo/blob/main/deploy/helm/charts/platform/values.yaml) for more details on these configuration settings.
+
+   For example, you could enable Dynamo and override [grove](https://github.com/ai-dynamo/grove) and [kai-scheduler](https://github.com/kai-scheduler/KAI-Scheduler) by including `--set dynamo.grove.enabled=true` and
+`--set dynamo.kai-scheduler.enabled=true` in the above Helm command.
+
+   Alternatively, you can configure Dynamo using a values file.
+Use a top-level `dynamo:` key so the NIM Operator chart passes them to the Dynamo subchart.
+The following is an example `values.yaml` file with `dynamo` configuration options.
+
+   ```yaml
+   dynamo:
+     enabled: true
+     grove:
+       enabled: true
+     kai-scheduler:
+       enabled: true
+     # Add other dynamo-platform keys as needed
+   ```
+
+1. Update the `nim-operator-dynamo-operator-controller-manager` Deployment to use a different kube-rbac-proxy image.
+The default image repository in the Dynamo v0.9.0 Helm chart [has been deprecated](https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/issues/318).
+
+   ```console
+   $ kubectl set image deployment/nim-operator-dynamo-operator-controller-manager \
+     kube-rbac-proxy=registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.16.0 \
+     -n nim-operator
+   ```
+
+### Verify Dynamo CRDs and NIM Operator
+
+Optional: You can verify that Dynamo is available on your cluster.
+
+1. Validate that Dynamo CRDs were installed on your cluster.
+
+   ```console
+   $  kubectl get crd | grep -E dynamo
+   ```
+
+   Example output:
+
+   ```output
+   dynamocomponentdeployments.nvidia.com                   2026-03-11T17:22:11Z
+   dynamographdeploymentrequests.nvidia.com                2026-03-11T17:22:11Z
+   dynamographdeployments.nvidia.com                       2026-03-11T17:22:11Z
+   dynamographdeploymentscalingadapters.nvidia.com         2026-03-11T17:22:11Z
+   dynamomodels.nvidia.com                                 2026-03-11T17:22:11Z
+   dynamoworkermetadatas.nvidia.com                        2026-03-11T17:22:11Z
+   ```
+
+1. Validate that the Dynamo pods are running on your cluster.
+
+   ```console
+   $ kubectl get pods -n nim-operator
+   ```
+
+   Example output for a default Dynamo deployment without optional configuration settings:
+
+   ```output
+   NAME                                                              READY   STATUS      RESTARTS   AGE
+   nim-operator-dynamo-operator-controller-manager-6f8575d6986zxbm   2/2     Running     0          24h
+   nim-operator-dynamo-operator-webhook-ca-inject-1-ttfqd            0/1     Completed   0          24h
+   nim-operator-dynamo-operator-webhook-cert-gen-1-b9j7c             0/1     Completed   0          24h
+   nim-operator-etcd-0                                               1/1     Running     0          24h
+   nim-operator-k8s-nim-operator-54dc697cc7-nbh2b                    1/1     Running     0          24h
+   nim-operator-nats-0                                               2/2     Running     0          24h
+   ```
+
+## Dynamo vLLM Deployment (Qwen Example)
+
+The Dynamo repo has several example manifests available.
+Refer to the [Dynamo v0.9.0 example folder](https://github.com/ai-dynamo/dynamo/blob/release/0.9.0/examples/backends/vllm/deploy) for detailed examples.
+The following example manifest uses Qwen/Qwen3-0.6B and is based off the [Dynamo agg.yaml example manifest](https://github.com/ai-dynamo/dynamo/blob/release/0.9.0/examples/backends/vllm/deploy/agg.yaml).
+
+To run a Dynamo example manifest with the NIM Operator, update the manifest to include `extraPodSpec.imagePullSecret.name: ngc-secret` to pull images from NGC (`nvcr.io`).
+Steps for creating the `ngc-secret` and `hf-token-secret` (already included in examples) secrets can be found in the [prerequisites](#prerequisites) section.
+
+1. Create a spec like the following example, called `agg.yaml`.
+
+   ```yaml
+   apiVersion: nvidia.com/v1alpha1
+   kind: DynamoGraphDeployment
+   metadata:
+     name: vllm-agg
+     namespace: dynamo-examples
+   spec:
+     services:
+       Frontend:
+         componentType: frontend
+         replicas: 1
+         extraPodSpec:
+           imagePullSecrets:
+             - name: ngc-secret # ADDED: For NGC image pull
+           mainContainer:
+             image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.9.0
+       VllmDecodeWorker:
+         envFromSecret: hf-token-secret
+         componentType: worker
+         replicas: 1
+         resources:
+           limits:
+             gpu: "1"
+         extraPodSpec:
+           imagePullSecrets:
+             - name: ngc-secret # ADDED: For NGC image pull
+           mainContainer:
+             image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.9.0
+             workingDir: /workspace/examples/backends/vllm
+             command: ["python3", "-m", "dynamo.vllm"]
+             args: ["--model", "Qwen/Qwen3-0.6B"]
+   ```
+
+1. Apply the manifest.
+
+   ```console
+   $ kubectl apply -f agg.yaml -n dynamo-examples
+   ```
+
+   It may take a few minutes to pull the images and the pods to start.
+
+1. Optional: Check that pods are running.
+
+   ```console
+   $ kubectl get pods -n dynamo-examples
+   ```
+
+## Testing the Deployment
+
+1. Create an example manifest, `curl.yaml`, like the following example:
+
+   ```yaml
+   apiVersion: v1
+   kind: Pod
+   metadata:
+     name: curl
+     labels:
+       app: curl
+     namespace: dynamo-examples
+   spec:
+     containers:
+       - name: curl
+       image: curlimages/curl:7.83.1
+       imagePullPolicy: IfNotPresent
+       command:
+         - tail
+         - -f
+         - /dev/null
+     restartPolicy: Never
+   ```
+
+1. Deploy a test pod.
+
+   ```console
+   $ kubectl apply -f curl.yaml -n dynamo-examples
+   ```
+
+1. Execute inference request using one of the following methods.
+
+   Standard Completion:
+
+   ```console
+   $ kubectl exec curl -n dynamo-examples -- curl -i \
+   http://vllm-agg-frontend:8000/v1/completions \
+   -H 'Content-Type: application/json' \
+   -d '{"model": "Qwen/Qwen3-0.6B","prompt": "Write as if you were a critic: San Francisco","max_tokens": 100,"temperature": 0}'
+   ```
+
+   Chat Completion:
+
+   ```console
+   $ kubectl exec curl -n dynamo-examples -- curl -i \
+   http://vllm-agg-frontend:8000/v1/chat/completions \
+   -H 'Content-Type: application/json' \
+   -d '{"model": "Qwen/Qwen3-0.6B","messages": [{"role": "user","content": "Write as if you were a critic: San Francisco"}],"max_tokens": 100,"temperature": 0}'
+   ```

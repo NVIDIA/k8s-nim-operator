@@ -1,0 +1,66 @@
+---
+# Create a ResourceClaimTemplate for GPU allocation
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: gpu-resourceclaimtemplate
+  namespace: nim-service
+spec:
+  spec:
+    devices:
+      requests:
+      - exactly:
+          allocationMode: ExactCount
+          count: 1
+          deviceClassName: gpu.nvidia.com
+        name: gpu
+
+---
+# NIM Cache with LLM-Specific NIM from NGC
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: meta-llama3-2-1b-instruct
+  namespace: nim-service
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama-3.2-1b-instruct:1.12.0
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: tensorrt_llm
+        tensorParallelism: "1"
+  storage:
+    pvc:
+      create: true
+      storageClass: ""
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+
+---
+# NIM Service with a pre-created resource claim template
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama3-2-1b-instruct
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
+    tag: "1.12.0"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama3-2-1b-instruct
+      profile: ''
+  replicas: 1
+  draResources:
+  - resourceClaimTemplateName: gpu-resourceclaimtemplate
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000

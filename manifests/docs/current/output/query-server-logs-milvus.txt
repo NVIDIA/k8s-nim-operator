@@ -1,0 +1,19 @@
+INFO:example:Ingesting dgxh100-user-guide.pdf in vectorDB
+INFO:RetrievalAugmentedGeneration.common.utils:Using milvus as vector store
+DEBUG:pymilvus.milvus_client.milvus_client:Created new connection using: b83ee3672c404217bd5e62a3da774ed0
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: intfloat/e5-large-v2
+.gitattributes: 100%|██████████| 1.48k/1.48k [00:00<00:00, 3.38MB/s]
+1_Pooling/config.json: 100%|██████████| 201/201 [00:00<00:00, 478kB/s]
+README.md: 100%|██████████| 67.8k/67.8k [00:00<00:00, 70.1MB/s]
+config.json: 100%|██████████| 616/616 [00:00<00:00, 1.41MB/s]
+handler.py: 100%|██████████| 1.12k/1.12k [00:00<00:00, 2.83MB/s]
+model.safetensors: 100%|██████████| 1.34G/1.34G [00:03<00:00, 349MB/s]
+pytorch_model.bin: 100%|██████████| 1.34G/1.34G [00:04<00:00, 315MB/s]
+sentence_bert_config.json: 100%|██████████| 57.0/57.0 [00:00<00:00, 138kB/s]
+special_tokens_map.json: 100%|██████████| 125/125 [00:00<00:00, 241kB/s]
+tokenizer.json: 100%|██████████| 711k/711k [00:00<00:00, 2.95MB/s]
+tokenizer_config.json: 100%|██████████| 314/314 [00:00<00:00, 527kB/s]
+vocab.txt: 100%|██████████| 232k/232k [00:00<00:00, 3.94MB/s]
+modules.json: 100%|██████████| 387/387 [00:00<00:00, 891kB/s]
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device: cuda
+INFO:example:Document dgxh100-user-guide.pdf ingested successfully

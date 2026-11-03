@@ -1,0 +1,34 @@
+Status:
+  Conditions:
+    Last Transition Time:  2025-04-17T15:47:29Z
+    Message:               The PVC has been created for caching NIM model
+    Reason:                PVCCreated
+    Status:                True
+    Type:                  NIM_CACHE_PVC_CREATED
+    Last Transition Time:  2025-04-17T15:50:36Z
+    Message:
+    Reason:                Reconciled
+    Status:                False
+    Type:                  NIM_CACHE_RECONCILE_FAILED
+    Last Transition Time:  2025-04-17T15:50:36Z
+    Message:               The Job to cache NIM is in pending state
+    Reason:                JobPending
+    Status:                True
+    Type:                  NIM_CACHE_JOB_PENDING
+    Last Transition Time:  2025-04-17T15:50:36Z
+    Message:               The Job to cache NIM has successfully completed
+    Reason:                JobCompleted
+    Status:                True
+    Type:                  NIM_CACHE_JOB_COMPLETED
+
+...
+
+  State:           Ready
+Events:
+  Type     Reason           Age                    From                 Message
+  ----     ------           ----                   ----                 -------
+  Warning  ReconcileFailed  6m                     nimcache-controller  NIMCache meta-llama3-8b-instruct reconcile failed, msg: Pod "meta-llama3-8b-instruct-pod" not found
+  Normal   Started          3m28s                  nimcache-controller  NIMCache meta-llama3-8b-instruct reconcile success, new state: Started
+  Normal   InProgress       3m28s                  nimcache-controller  NIMCache meta-llama3-8b-instruct reconcile success, new state: InProgress
+  Normal   Pending          2m53s (x2 over 3m28s)  nimcache-controller  NIMCache meta-llama3-8b-instruct reconcile success, new state: Pending
+  Normal   Ready            2m53s                  nimcache-controller  NIMCache meta-llama3-8b-instruct reconcile success, new state: Ready

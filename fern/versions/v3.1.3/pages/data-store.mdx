@@ -1,0 +1,1088 @@
+---
+title: "Managing NeMo Data Stores"
+license: Apache-2.0
+copyright: "Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "The NIM Operator is deprecating support for the NeMo Microservices CRDs and deployments in the next release. The NeMo Microservices are transitioning into the NeMo Platform. Refer to the NeMo Platform"
+slug: data-store
+---
+
+<Anchor id="managing-nemo-data-stores" />
+
+<Warning>
+The NIM Operator is deprecating support for the NeMo Microservices CRDs and deployments in the next release.
+The NeMo Microservices are transitioning into the NeMo Platform.
+Refer to the [NeMo Platform documentation](https://docs.nvidia.com/nemo-platform/documentation/home#what-you-can-do) for details on continuing to use NeMo Microservices.
+
+</Warning>
+
+## About NeMo Data Store
+
+NVIDIA NeMo Data Store manages the lifecycle of models and datasets in your projects. It simplifies the storage and retrieval of models, datasets, and evaluation results in your applications.
+
+The NIM Operator deploys a NeMo Data Store as a Kubernetes custom resource, `nemodatastores.apps.nvidia.com`. A NeMo Data Store resource relies on a database and object store that are configured to hold model data.
+
+Read the [NeMo Data Store documentation](https://docs.nvidia.com/nemo/microservices/25.8.0/manage-entities/index.html) for details on using a data store.
+
+## Prerequisites
+
+- All the common [NeMo microservice prerequisites](/nemo-prerequisites).
+
+<Note>
+You can use the [NeMo Dependencies Ansible Playbook](/nemo-prerequisites#deploy-nemo-dependencies-with-ansible) to deploy all the following NeMo Data Store microservice dependencies.
+
+</Note>
+
+**Storage**
+
+- A [PostgreSQL](https://www.postgresql.org/docs/) database to store repository, branch, and LFS metadata. It can be externally provisioned or hosted in your cluster.
+Refer to the [Helm installation guide](https://artifacthub.io/packages/helm/bitnami/postgresql) for more information on installing a PostgreSQL database.
+
+**Kubernetes**
+
+- Access to an NFS-backed Persistent Volume that supports `ReadWriteMany` access mode.
+Stores Git history for models and datasets.
+
+  You can create a PVC and specify the name when you create the NeMo Data Store resource
+or you can request that the Operator creates the PVC.
+
+- The NeMo Data Store relies on several Kubernetes secrets to manage model data.
+The default secrets are created as part of NeMo Dependency Ansible playbooks, or you can apply the secrets file manually if you are deploying a NeMo Datastore as a separate component.
+
+  Download the <Download src="_includes/downloads/nemo-datastore-default-secrets.yaml"><Button intent="primary">`NeMo Data Store default secrets file`</Button></Download>.
+
+  ```console
+  $ kubectl apply -f nemo-datastore-default-secrets.yaml -n nemo
+  ```
+
+- Create a secret for your database by creating a file called `nemo-datastore-secrets.yaml`, like the following example.
+
+  <Code src="../../../../manifests/docs/current/input/nemo-datastore-secrets.yaml" language="yaml" startLine="1" />
+
+  Apply the manifest:
+
+  ```console
+  $ kubectl apply -f nemo-datastore-secrets.yaml -n nemo
+  ```
+
+## Deploying a NeMo Datastore
+
+Update the following sample scripts `<inputs>` with values for your cluster configuration.
+
+1. Create a file, such as `nemo-datastore.yaml`, with contents like the following example:
+
+   <Code src="../../../../manifests/docs/current/input/nemo-datastore.yaml" language="yaml" startLine="1" />
+
+   Refer to the [Configuring a NeMo Data Store](#configuring-a-nemo-data-store) section for more details on configuration options.
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -n nemo -f nemo-datastore.yaml
+   ```
+
+1. Optional: View NeMo Data Store status:
+
+   ```console
+   $ kubectl get nemodatastores.apps.nvidia.com -n nemo
+   ```
+
+   *Partial Output*
+
+   ```output
+   NAME                   STATUS     AGE
+   nemodatastore-sample   Ready      5m
+   ```
+
+1. Optional: View information about the NeMo Data Store:
+
+   ```console
+   $ kubectl describe nemodatastore nemodatastore-sample -n nemo
+   ```
+
+   *Partial Output*
+
+   ```output
+   ...
+   Conditions:
+    Last Transition Time:  2025-04-24T02:02:36Z
+    Message:               deployment "nemodatastore-sample" successfully rolled out
+
+    Reason:                Ready
+    Status:                True
+    Type:                  Ready
+    Last Transition Time:  2025-04-24T01:57:35Z
+    Message:
+    Reason:                Ready
+    Status:                False
+    Type:                  Failed
+   State:                   Ready
+   ```
+
+## Verify NeMo Data store
+
+1. List the NeMo Data store services.
+
+   ```console
+   $ kubectl get services -n nemo
+   ```
+
+   *Example output*
+
+   ```output
+   nemodatastore-sample     ClusterIP   XX.XXX.XXX.XXX   <none>        8000/TCP               31m
+   ```
+
+1. Start a pod that has access to the `curl` command.
+Substitute any pod that has the command and meets your organization’s security requirements:
+
+   ```console
+   $ kubectl run --rm -it -n default curl --image=curlimages/curl:latest -- ash
+   ```
+
+   After the pod starts, you are connected to the `ash` shell in the pod.
+
+1. Verify NeMo Data Store.
+
+   ```console
+   curl -X GET "http://nemodatastore-sample.nemo:8000/v1/hf/api/datasets"
+   ```
+
+## Configuring a NeMo Data Store
+
+The following table shows more information about the commonly modified fields for the NeMo Data Store custom resource.
+
+<table>
+<thead>
+<tr>
+<th>
+
+Field
+
+</th>
+<th>
+
+Description
+
+</th>
+<th>
+
+Default Value
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`spec.annotations`
+
+</td>
+<td>
+
+Specifies to add the user-supplied annotations to the pod.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.authSecret` (required)
+
+</td>
+<td>
+
+Specifies the name of a generic secret that contains NGC_API_KEY.
+This allows deployments to pull images from the [NVIDIA GPU Cloud](https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#what-is-nvidia-ngc)image catalog.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.databaseConfig` (required)
+
+</td>
+<td>
+
+Specifies the external PostgreSQL configuration details.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.databaseConfig.credentials.passwordKey`
+
+</td>
+<td>
+
+Specifies the password key used in the database credentials secret.
+
+</td>
+<td>
+
+`password`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.databaseConfig.credentials.secretName` (required)
+
+</td>
+<td>
+
+Specifies the secret name for the database credentials.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.databaseConfig.credentials.user` (required)
+
+</td>
+<td>
+
+Specifies the user for the database.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.databaseConfig.databaseName` (required)
+
+</td>
+<td>
+
+Specifies the name for the database.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.databaseConfig.host` (required)
+
+</td>
+<td>
+
+Specifies the host for the database.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.databaseConfig.port`
+
+</td>
+<td>
+
+Specifies the port for the database.
+
+</td>
+<td>
+
+`5432`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.ingress.enabled` **Deprecated.**
+
+</td>
+<td>
+
+Use `spec.expose.router` to define ingress setup instead.
+
+When set to `true`, the Operator creates a Kubernetes Ingress resource for the NeMo Data Store.
+Specify the ingress specification in the `spec.expose.ingress.spec` field.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router`
+
+</td>
+<td>
+
+Configures routing for the NeMo Data Store using either Ingress or [Gateway API](https://gateway-api.sigs.k8s.io/) resources.
+Use this field to expose the service through an ingress controller or gateway.
+The router generates hostnames in the format `<resourceName>.<namespace>.<hostDomainName>`.
+Refer to the router subfields below for configuration options.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.annotations`
+
+</td>
+<td>
+
+Specifies annotations to add to the router resources (Ingress or HTTPRoute).
+Common use cases include SSL redirects, rate limiting, or gateway metadata.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.gateway`
+
+</td>
+<td>
+
+Configures [Gateway API](https://gateway-api.sigs.k8s.io/) routing for the NeMo Data Store.
+When specified, the Operator creates HTTPRoute resources that reference the specified gateway.
+This field cannot be used at the same time as `spec.expose.router.ingress`.
+Before configuring a gateway router, Gateway API CRDs must be installed and a Gateway resource must exist.
+NeMo microservices support HTTP routes only, `spec.expose.router.gateway.grpcRoutesEnabled` is not supported.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.gateway.httpRoutesEnabled`
+
+</td>
+<td>
+
+When set to `true`, the Operator creates an HTTPRoute resource for the NeMo Data Store.
+The HTTPRoute matches requests with path prefix `/` and routes them to the service.
+
+</td>
+<td>
+
+`true`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.gateway.name`
+
+</td>
+<td>
+
+Specifies the name of the Gateway resource to attach the routes to.
+Required when using `spec.expose.router.gateway`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.gateway.namespace`
+
+</td>
+<td>
+
+Specifies the namespace where the Gateway resource is located.
+Required when using `spec.expose.router.gateway`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.hostDomainName`
+
+</td>
+<td>
+
+Specifies the base domain name of the hostname matched by the router.
+Required when using `spec.expose.router`.
+The Operator constructs the full hostname as: `<resourceName>.<namespace>.<hostDomainName>`.
+Must be a valid DNS domain name.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.ingress`
+
+</td>
+<td>
+
+Configures Ingress-based routing for the NeMo Data Store.
+When specified, the Operator creates a Kubernetes Ingress resource.
+Cannot be used with `spec.expose.router.gateway`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.ingress.ingressClass`
+
+</td>
+<td>
+
+Specifies the ingress class name to use for the created Kubernetes Ingress resource.
+Required when using `spec.expose.router.ingress`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.ingress.tlsSecretName`
+
+</td>
+<td>
+
+Specifies the name of a Kubernetes Secret containing TLS certificate and key for HTTPS termination.
+The secret must be of type `kubernetes.io/tls` and contain `tls.crt` and `tls.key` fields.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.annotations`
+
+</td>
+<td>
+
+Specifies annotations to add to the Kubernetes Service resource created for the NeMo Data Store.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.labels`
+
+</td>
+<td>
+
+Specifies labels to add to the Kubernetes Service resource created for the NeMo Data Store.
+Operator-generated labels and values from `spec.labels` take precedence when the same key is also present in this field.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.port` (required)
+
+</td>
+<td>
+
+Specifies the network port number for the NeMo Data Store microservice.
+
+</td>
+<td>
+
+`8000`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.type`
+
+</td>
+<td>
+
+Specifies the Kubernetes [service type](https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types) to create for the NIM microservice.
+
+</td>
+<td>
+
+`ClusterIP`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.groupID`
+
+</td>
+<td>
+
+Specifies the group for the pods.
+This value is used to set the security context of the pod in the `runAsGroup` and `fsGroup` fields.
+
+</td>
+<td>
+
+`2000`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.image` (required)
+
+</td>
+<td>
+
+Specifies repository, tag, pull policy, and pull secret for the container image.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.labels`
+
+</td>
+<td>
+
+Specifies user-supplied labels to add to resources that the Operator creates for the NeMo Data Store.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.metrics.enabled`
+
+</td>
+<td>
+
+When set to `true`, the Operator configures a Prometheus service monitor for the service.
+Specify the service monitor specification in the `spec.metrics.serviceMonitor` field. Refer to the [Observability](/observability) page for more details.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.objectStoreConfig`
+
+</td>
+<td>
+
+Specifies the location and credentials for accessing the external object store.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.objectStoreConfig.bucketName`
+
+</td>
+<td>
+
+Specifies the bucket name where LFS files are stored.
+This can be the name of an existing bucket, or the name of a bucket the NIM Operator will create for you.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.objectStoreConfig.credentials.passwordKey`
+
+</td>
+<td>
+
+Specifies the password key in the `CredentialsSecret` secret for the object store credentials.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.objectStoreConfig.credentials.secretName`
+
+</td>
+<td>
+
+Specifies the secret name for the object store login.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.objectStoreConfig.credentials.user`
+
+</td>
+<td>
+
+Specifies the user for the object store.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.objectStoreConfig.endpoint`
+
+</td>
+<td>
+
+Specifies the fully qualified object store endpoint.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.objectStoreConfig.region`
+
+</td>
+<td>
+
+Specifies the CSP region where bucket is hosted.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.objectStoreConfig.serveDirect`
+
+</td>
+<td>
+
+When `true` specifies if traffic should be served directly from the object store.
+
+</td>
+<td>
+
+`true`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.objectStoreConfig.ssl`
+
+</td>
+<td>
+
+Specifies if SSL transport for the object store should be enabled.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.pvc.create`
+
+</td>
+<td>
+
+When set to `true`, the Operator creates the PVC for you.
+If you delete a NeMo Data Store resource and this field was set to `true`, the Operator also deletes the PVC.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.pvc.name`
+
+</td>
+<td>
+
+Specifies the name for the PVC.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.pvc.size`
+
+</td>
+<td>
+
+Specifies the size, in Gi, for the PVC to create.
+
+This field is required if you specify `create: true`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.pvc.storageClass`
+
+</td>
+<td>
+
+Specifies the [StorageClass](https://kubernetes.io/docs/concepts/storage/storage-classes/) for the PVC to create.
+Omit this field if you have `create` set to `false` and you already created the PVC.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc.subPath`
+
+</td>
+<td>
+
+Specifies to create a subpath on the PVC and cache the model profiles in the directory.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc.volumeAccessMode`
+
+</td>
+<td>
+
+Specifies the
+[access mode](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes)
+for the PVC to create.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.replicas`
+
+</td>
+<td>
+
+Specifies the number of Nemo Data Store replicas to have on the cluster.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.resources.requests`
+
+</td>
+<td>
+
+Specifies the memory and CPU request for the Nemo Data Store.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.resources.limits`
+
+</td>
+<td>
+
+Specifies the memory and CPU limits for the Nemo Data Store.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.scale.enabled`
+
+</td>
+<td>
+
+When set to `true`, the Operator creates a Kubernetes horizontal pod autoscaler for the Nemo Data Store.
+Specify the HPA specification in the `spec.scale.hpa` field.
+
+The `spec.scale.hpa` field supports the following subfields: `minReplicas`, `maxReplicas`, `metrics`, and `behavior`.
+These fields correspond to the same fields in a horizontal pod autoscaler resource specification.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.secrets.datastoreConfigSecret` (required)
+
+</td>
+<td>
+
+Specifies the required default secrets needed by the NeMo Data Store Microservice.
+A default configuration of these secrets is availble in the <Download src="_includes/downloads/nemo-datastore-default-secrets.yaml"><Button intent="primary">`NeMo Data Store default secrets file`</Button></Download>.
+For details on configuring these secrets, refer to the [Gitea configuration](https://docs.gitea.com/administration/config-cheat-sheet) documentation.
+
+```yaml
+secrets:
+  datastoreConfigSecret: "<nemo-ms-nemo-datastore>"
+  datastoreInitSecret: "<nemo-ms-nemo-datastore-init>"
+  datastoreInlineConfigSecret: "<nemo-ms-nemo-datastore-inline-config>"
+  giteaAdminSecret: "<gitea-admin-credentials>"
+  lfsJwtSecret: "nemo-ms-nemo-datastore--lfs-jwt"
+```
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.tolerations`
+
+</td>
+<td>
+
+Specifies the tolerations for the pods.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.userID`
+
+</td>
+<td>
+
+Specifies the user ID for the pod.
+This value is used to set the security context of the pod in the `runAsUser` fields.
+
+</td>
+<td>
+
+`1000`
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## Next Steps
+
+- [Managing NeMo Entity Store](/entity-store)
+
+- [Managing NeMo Customizer](/customizer)
+
+- [Managing NeMo Evaluator](/evaluator)
+
+- Refer to the NeMo microservices documentation for details on
+
+  -   [Entity management tutorials](https://docs.nvidia.com/nemo/microservices/25.8.0/manage-entities/datasets/index.html)
+
+  -   [Working with datasets](https://docs.nvidia.com/nemo/microservices/25.8.0/manage-entities/datasets/index.html)

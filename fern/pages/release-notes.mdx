@@ -1,0 +1,732 @@
+---
+title: "Release Notes"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "Fixed an issue where automatic profile selection for a NIM cache failed when a stored schema v2 model manifest listed schema_version after profiles. The manifest parser now preserves profile data rega"
+slug: release-notes
+---
+
+<Warning>
+These docs track development on the `main` branch and can describe unreleased changes. Select a numbered version for a released snapshot.
+</Warning>
+
+{/* SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. */}
+
+<Anchor id="release-notes" />
+
+<Anchor id="v3-1-4"></Anchor>
+
+
+
+<Anchor id="id1" />
+
+## v3.1.4
+
+<Anchor id="v3-1-4-fixes"></Anchor>
+
+
+
+### Bug Fixes
+
+- Fixed an issue where automatic profile selection for a NIM cache failed when a stored schema v2 model manifest listed `schema_version` after `profiles`. The manifest parser now preserves profile data regardless of key order. ([PR #977](https://github.com/NVIDIA/k8s-nim-operator/pull/977))
+
+<Anchor id="v3-1-3"></Anchor>
+
+
+
+<Anchor id="id2" />
+
+## v3.1.3
+
+<Info>
+Support for managing NeMo Microservices CRDs and deployments is deprecated.
+
+The NeMo Microservices are transitioning into the NeMo Platform.
+Refer to the [NeMo Platform documentation](https://docs.nvidia.com/nemo-platform/documentation/home#what-you-can-do) for details on continuing to use NeMo Microservices.
+
+</Info>
+
+<Anchor id="v3-1-3-features"></Anchor>
+
+
+
+### Features
+
+- Made the NGC API key optional.
+You no longer need to set `spec.authSecret` on a NIM service or `spec.source.ngc.authSecret` on a NIM cache.
+If you omit `spec.authSecret`, the Operator does not inject the `NGC_API_KEY` environment variable into the NIM pod, so air-gapped deployments that serve a pre-cached model no longer need an NGC API key secret.
+If you set `spec.authSecret`, the Operator references the secret as optional, so the pod starts even if the secret or the `NGC_API_KEY` key in the secret does not exist.
+Refer to [Serving a Pre-Cached Model Without an NGC API Key](/air-gap#serving-a-pre-cached-model-without-an-ngc-api-key).
+([PR #910](https://github.com/NVIDIA/k8s-nim-operator/pull/910), [PR #921](https://github.com/NVIDIA/k8s-nim-operator/pull/921))
+
+- Added support for scaling a NIM service to zero replicas with a horizontal pod autoscaler.
+You can set `spec.scale.hpa.minReplicas` to `0` when `spec.scale.hpa.metrics` includes at least one `External` or `Object` metric.
+The CRD limits `spec.scale.hpa.metrics` to five metrics.
+Scaling to zero requires the Kubernetes `HPAScaleToZero` feature gate.
+Kubernetes v1.37 enables the feature gate by default.
+Refer to [Scaling a NIM Service to Zero](/service#scaling-a-nim-service-to-zero).
+([PR #942](https://github.com/NVIDIA/k8s-nim-operator/pull/942))
+
+- Updated the sample manifests in the Operator repository for current NIM images and added samples for Model-Free NIM, including KServe standard deployment, NIM 2.0+ multi-node deployment with Ray, NeMo Retriever 2.x caching, init and sidecar containers, priority classes and affinity, and a NIM 3.0 model-specific NIM.
+([PR #919](https://github.com/NVIDIA/k8s-nim-operator/pull/919))
+
+- You can deploy NVIDIA NIM for LLMs 3.0 and NIM for LLMs 2.x with NIM Operator v3.1.3.
+Refer to [NVIDIA NIM for LLMs Version Compatibility](/platform-support#nvidia-nim-for-llms-version-compatibility).
+
+<Anchor id="v3-1-3-fixes"></Anchor>
+
+
+
+<Anchor id="id3" />
+
+### Bug Fixes
+
+- Fixed an issue where a NIM service or NIM pipeline that specified a DRA device attribute selector without a `value` passed schema validation and caused the Operator to fail during validation or reconciliation.
+The CRD now requires the `attributeSelectors[].value` field.
+Refer to the [NIM Service configuration reference](/service#nim-service-configuration-reference).
+([PR #872](https://github.com/NVIDIA/k8s-nim-operator/pull/872))
+
+- Fixed an issue where the Operator Helm chart and the Operator always requested OpenShift-specific permissions, such as security context constraints and routes, on Kubernetes clusters that are not OpenShift.
+The Helm chart adds the `openshift.enabled` value, which defaults to `false`.
+If you install the Operator on OpenShift by using Helm instead of OLM, set `openshift.enabled=true`.
+([PR #914](https://github.com/NVIDIA/k8s-nim-operator/pull/914), fixes [issue #406](https://github.com/NVIDIA/k8s-nim-operator/issues/406))
+
+- Fixed an issue where a NIM service that runs a model image directly, without a NIM cache, and that does not become ready sent repeated requests to the registry for the image manifest and configuration.
+The Operator inspected the image on every reconcile, which occurs every few seconds while the service is not ready.
+The Operator now records the resolved protocol in the NIM service status and reuses it while the image is unchanged.
+If the inspection fails, the Operator uses the legacy model layout for that reconcile.
+([PR #934](https://github.com/NVIDIA/k8s-nim-operator/pull/934))
+
+- Fixed an issue where the Operator could parse a model manifest with schema version `1.2.0` as a schema version 2 manifest when the Operator read the model manifest for a NIM cache or NIM build.
+The Operator matched the `schema_version` value in the manifest against an imprecise regular expression.
+The Operator now parses the semantic version and uses the schema version 2 parser only when the major version is 2.
+([PR #935](https://github.com/NVIDIA/k8s-nim-operator/pull/935))
+
+- Fixed an issue where the Operator could fail to parse the model manifest for a NIM cache or NIM build when the container runtime wrote a message, such as `nvidia driver modules are not yet loaded, invoking runc directly`, before the manifest in the pod output.
+The Operator now ignores any lines that precede the start of the manifest.
+([PR #949](https://github.com/NVIDIA/k8s-nim-operator/pull/949))
+
+- Fixed an issue where a NIM cache or NIM build reported a reconcile error while the Operator created the temporary pod that reads the model manifest, before the pod was visible to the Operator.
+The Operator now waits for the pod instead of reporting an error.
+If the pod is not running or has not written the model manifest 15 minutes after the Operator creates it, the Operator now sets the NIM cache or NIM build status to `Failed`, records a `ModelManifestProbeTimeout` warning event that includes the pod phase and any scheduling or container waiting reason, and deletes the pod.
+([PR #951](https://github.com/NVIDIA/k8s-nim-operator/pull/951))
+
+- Fixed an issue where a NIM service with `spec.expose.router.gateway.httpRoutesEnabled: false` reverted to `true` after an update to the NIM service, so the Operator created an HTTPRoute resource.
+The Operator now preserves an explicit `false` value.
+If you omit the `httpRoutesEnabled` field, the default value remains `true`.
+([PR #943](https://github.com/NVIDIA/k8s-nim-operator/pull/943))
+
+- Fixed an issue where the leader and worker pods of a multi-node NIM service ran with the `default` service account of the namespace instead of the service account that the Operator creates for the NIM service.
+On OpenShift, the security context constraint rejected the pods.
+The leader and worker pods also ignored `spec.runtimeClassName`, and the worker pods ignored `spec.schedulerName`.
+The Operator now sets the service account, runtime class name, and scheduler name on the leader and worker pods.
+([PR #944](https://github.com/NVIDIA/k8s-nim-operator/pull/944))
+
+<Anchor id="v3-1-2"></Anchor>
+
+
+
+<Anchor id="id4" />
+
+## v3.1.2
+
+<Info>
+Support for managing NeMo Microservices CRDs and deployments is deprecated.
+
+The NeMo Microservices are transitioning into the NeMo Platform.
+Refer to the [NeMo Platform documentation](https://docs.nvidia.com/nemo-platform/documentation/home#what-you-can-do) for details on continuing to use NeMo Microservices.
+
+</Info>
+
+<Anchor id="v3-1-2-features"></Anchor>
+
+
+
+<Anchor id="id5" />
+
+### Features
+
+- Added support for caching model weights for NVIDIA NeMo Retriever NIM 2.x+ containers.
+NIM Operator detects the image’s model download workflow, downloads model weights without starting the service, and reuses the persistent storage when it deploys the NIM.
+Model profiles are not used for NeMo Retriever 2.x+ containers because the 2.0 release introduces a purpose-built runtime.
+Refer to [Cache NVIDIA NeMo Retriever NIM 2.x+](/cache-non-llm#cache-retriever-embedding-nim) for configuration instructions and an example.
+([PR #888](https://github.com/NVIDIA/k8s-nim-operator/pull/888))
+
+- Added support for assigning an existing Kubernetes priority class to pods for standalone, multi-node, and KServe NIM service deployments by setting `spec.priorityClassName`.
+Refer to the [NIM Service configuration reference](/service#nim-service-configuration-reference).
+([PR #866](https://github.com/NVIDIA/k8s-nim-operator/pull/866))
+
+- Added support for applying labels only to generated Kubernetes Service resources by setting `spec.expose.service.labels` for NIM service and NeMo microservice resources.
+Refer to the [NIM Service configuration reference](/service#nim-service-configuration-reference).
+([PR #864](https://github.com/NVIDIA/k8s-nim-operator/pull/864))
+
+<Anchor id="v3-1-2-fixes"></Anchor>
+
+
+
+<Anchor id="id6" />
+
+### Bug Fixes
+
+- Fixed an issue where model manifests with large workspace file lists could exceed the Kubernetes config map size limit during NIM caching or building.
+The Operator now retains only the metadata required for model-profile matching and status reporting.
+([PR #891](https://github.com/NVIDIA/k8s-nim-operator/pull/891))
+
+- Clarified in the documentation to omit the `storageClass`, `nodeSelector`, or `tolerations` fields to use the default unset values.
+The documentation is also update to show the corresponding unset values, `""` for storage class, `{}` for node selector, and `[]` for tolerations.
+
+<Anchor id="v3-1-1"></Anchor>
+
+
+
+<Anchor id="id7" />
+
+## v3.1.1
+
+<Info>
+The NIM Operator is deprecating support for the NeMo Microservices CRDs and deployments in the next release.
+The NeMo Microservices are transitioning into the NeMo Platform.
+Refer to the [NeMo Platform documentation](https://docs.nvidia.com/nemo-platform/documentation/home#what-you-can-do) for details on continuing to use NeMo Microservices.
+
+</Info>
+
+<Anchor id="v3-1-1-features"></Anchor>
+
+
+
+<Anchor id="id8" />
+
+### Features
+
+- Added support for deploying Multi-node NIMs in NIM v2.0 later
+Multi-node NIMs now use Ray for cluster formation and vLLM for distributed model execution across the cluster.
+Configure NIM 2.0+ multi-node deployments through the new `spec.multiNode.ray` field on the NIMService.
+Refer to the [Multi-Node NIM Deployment](/multi-node) page for the NIM Operator walkthrough, or to the NIM for LLMs [Multi-Node Deployment](https://docs.nvidia.com/nim/large-language-models/latest/deployment/multi-node-deployment.html) documentation for background.
+
+- Added support for Model-Free NIM mode, enabling deployment of NIM Service instances without specifying a model upfront. ([PR #835](https://github.com/NVIDIA/k8s-nim-operator/pull/835))
+Model-Free NIM uses the same NIM Cache shape as Multi-LLM NIM; refer to [Caching Multi-LLM Compatible NIM](/cache-llm#caching-multi-llm-compatible-nim) for the cache configuration.
+For more details on Model-Free mode, refer to the NVIDIA NIM for LLM [Model-Free NIM](https://docs.nvidia.com/nim/large-language-models/latest/deployment/model-free-nim.html) documentation.
+
+- Added Agent Skills for installing and uninstalling the NIM Operator.
+Refer to the [Agent Skills](https://github.com/NVIDIA/k8s-nim-operator/tree/main/.agents/skills) folder in the repository for details.
+
+<Anchor id="id9" />
+
+### Bug Fixes
+
+- Fixed an issue where deploying a NIMService with KServe could fail with `failed to find the namespace of KServe Deployment` after recent KServe label changes.
+The Operator now discovers the KServe controller deployment using a more stable label, and you can also set the `KSERVE_NAMESPACE` environment variable to point the Operator directly at the namespace where KServe is installed. ([PR #833](https://github.com/NVIDIA/k8s-nim-operator/pull/833))
+
+- Made the certificate ConfigMap optional for proxy settings in NIMCache, allowing proxy configuration in deployments that do not require a custom CA bundle. ([PR #845](https://github.com/NVIDIA/k8s-nim-operator/pull/845))
+
+<Anchor id="v3-1-0"></Anchor>
+
+
+
+<Anchor id="id10" />
+
+## v3.1.0
+
+<Anchor id="v3-1-0-features"></Anchor>
+
+
+
+<Anchor id="id11" />
+
+### Features
+
+- Added support for [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/) for routing in addition to traditional ingress routing for NIM Service and NeMo microservice deployments.
+You can specify your gateway configuration in your service configurations using the new `spec.expose.router.gateway` field in your NIM Service or NeMo microservice custom resource spec.
+
+  Traditional ingress API routing is still supported, but should now be defined in the `spec.expose.router.ingress` field.
+The `spec.expose.ingress` field has been deprecated.
+It is recommended that you migrate your routing configurations to use the new field.
+
+- Added support for NVIDIA DRA Driver for GPUs v25.12.0 for GPU allocation.
+This version implements DRA with `apiVersion: resource.k8s.io/v1`; the v1beta2 API is no longer supported.
+Update your samples to use `apiVersion: resource.k8s.io/v1`.
+
+- Improved memory footprint. ([PR #741](https://github.com/NVIDIA/k8s-nim-operator/pull/741))
+
+- Added experimental support for deploying NIMs in Kata sandbox environment.
+Refer to the [Kata](/kata-sandbox) page for more details.
+
+  NIM Operator is adding confidential computing support incrementally.
+Confidential computing enhances the security of workloads such as NIM by providing isolation, encryption, and attestation, ensuring that data remains protected while in use. Enabling confidential computing requires multiple layers across the stack, and the first foundational step is running workloads inside a sandboxed execution environment.
+
+- Added experimental support for deploying Dynamo CRDs with the NIM Operator.
+Refer to the [Dynamo](/dynamo) page for more details.
+
+- Added support for init containers and sidecar containers to NIM Service.
+You can add your configuration in the `spec.initContainers` and `spec.sidecarContainers` fields respectively.
+Use cases include proxy containers for other services, agents, or loading LoRA adapters from different sources (for example, Hugging Face, NGC, or NMP Files Service).
+([PR #752](https://github.com/NVIDIA/k8s-nim-operator/pull/752))
+
+<Anchor id="id12" />
+
+### Bug Fixes
+
+- Fixed the replica count when auto scaling is disabled when inference platform is KServe. ([Issue #710](https://github.com/NVIDIA/k8s-nim-operator/issues/710))
+
+- Fixed an issue where the NIM Operator overrode the KServe network visibility configuration when it was explicitly set on a NIMService. ([PR #742](https://github.com/NVIDIA/k8s-nim-operator/pull/742))
+
+- Fixed a bug where the NGC_API_KEY environment variable was being required when the model was a Hugging Face model. ([PR #750](https://github.com/NVIDIA/k8s-nim-operator/pull/750))
+
+- Fixed getting NIM Service model details when token-based authentication is enabled. ([PR #764](https://github.com/NVIDIA/k8s-nim-operator/pull/764))
+
+- Fixed the logic to update resources when update conflicts occur.
+
+- Fixed logic for checking KServe deployment mode to address a compatibility issue with Open Data Hub (ODH) 3.0 ([PR #739](https://github.com/NVIDIA/k8s-nim-operator/pull/739))
+
+<Anchor id="v3-0-2"></Anchor>
+
+
+
+<Anchor id="id13" />
+
+## v3.0.2
+
+<Anchor id="v3-0-2-features"></Anchor>
+
+
+
+<Anchor id="id14" />
+
+### Features
+
+- Added validation webhooks for NIM Operator custom resources to enforce schema validation using the `dry-run` option and immutability checks.
+This feature enabled by default on OpenShift and disabled by default on other Kubernetes platforms.
+Enable validation webhooks by installing cert-manager and installing or upgrading via Helm with the `operator.admissionController.enabled=true` value.
+
+  Validation webhooks use self-signed certificates by default.
+For production environments, consider configuring custom certificates via Helm values if your organization requires certificates signed by a trusted certificate authority.
+
+- Added support for NeMo Guardrails v25.10 and guardrail event tracing with OpenTelemetry.
+You can enable distributed tracing and observability for guardrails services by configuring `spec.otel.enabled` and `spec.otel.exporterOtlpEndpoint` in your NeMo Guardrails custom resource, with support for logs, traces, and metrics exporters.
+
+- Enhanced GPU filtering support when caching model profiles to include vLLM and SGLang engines in addition to TensorRT-LLM.
+Specify `nimcache.spec.source.ngc.model.engine` as `vllm` or `sglang` along with `nimcache.spec.source.ngc.model.tensorParallelism` to filter and cache only the profiles matching your target engine and tensor parallelism configuration.
+
+- Added support for ephemeral storage using `emptyDir` volumes in NIM Service custom resources with `spec.storage.emptyDir`.
+This enables fast temporary storage for testing, demos, or stateless workloads without requiring persistent volume claims, with optional size limits in `spec.storage.emptyDir.sizeLimit`.
+
+  When using ephemeral storage with `emptyDir` in NIM Service, data is not retained after pod restarts.
+This storage type is intended for temporary workloads only and should not be used for production deployments requiring data persistence.
+
+- Added support for `hostPath` volumes in NIM Service custom resources using `spec.storage.hostPath`.
+This enables a NIM Service to store models to a local node directory in single-node environments or proof-of-concept deployments where centralized storage is unavailable.
+
+- Added support for pod affinity, pod anti-affinity, and node affinity configurations in NIM Service and NeMo custom resources using the `spec.affinity` field.
+You can now control pod placement and co-location behavior to optimize resource utilization and meet application topology requirements. ([Issue 635](https://github.com/NVIDIA/k8s-nim-operator/issues/635))
+
+<Anchor id="id15" />
+
+### Bug Fixes
+
+- Fixed an issue where `spec.replicas` and `spec.scale.enabled` could both be set in NIM Service custom resources.
+Now, when horizontal pod autoscaling (HPA) is enabled with `spec.scale.enabled: true`, you cannot set `spec.replicas`, as HPA manages replica count automatically using `spec.scale.hpa.minReplicas` and `spec.scale.hpa.maxReplicas`.
+
+- Fixed an issue where GPU filtering was not applied to vLLM and SGLang model profiles during caching, causing unnecessary profile downloads when `nimcache.spec.source.ngc.model.engine` was set to `vllm` or `sglang`.
+
+- Fixed an issue to support custom command and arguments in NIM Service custom resources using `spec.command` and `spec.args` fields.
+This allows you to override the default container entrypoint and arguments for specialized deployment scenarios or debugging purposes.
+
+- Fixed an issue to allow a Multi-LLM NIM Service to run without pre-cached models.
+Use on-demand caching by specifying your model and PVC requirements in the NIM Service.
+
+- Fixed an issue to update CA certificates only when a custom ConfigMap is provided.
+
+- Fixed NIM Service status handling when scaling deployments to zero replicas to prevent excessive log output and reconciliation loops.
+The NIM Service status is now set to `NotReady` and logging verbosity is set to `-v=4` by default. ([Issue #710](https://github.com/NVIDIA/k8s-nim-operator/issues/710))
+
+- Fixed an issue where proxy settings were not applied when NIM Cache or NIM Service `spec.proxy.certConfigMap` was not specified. ([Issue #700](https://github.com/NVIDIA/k8s-nim-operator/issues/700))
+
+- Updated Bitnami images in NeMo Microservices dependency Ansible deployment playbooks.
+
+<Anchor id="v3-0-1"></Anchor>
+
+
+
+<Anchor id="id16" />
+
+## v3.0.1
+
+<Anchor id="v3-0-1-features"></Anchor>
+
+
+
+<Anchor id="id17" />
+
+### Features
+
+- NVIDIA NIM Operator is now government ready, NVIDIA’s designation for software that meets applicable security requirements for deployment in your FedRAMP High or equivalent sovereign use case.
+NVIDIA AI Enterpise customers can start using this feature by deploying government ready NIM Operator, NVIDIA GPU Operator, and NIM components.
+
+  For more information on NVIDIA’s government ready support, refer to the white paper [AI Software for Regulated Environments](https://docs.nvidia.com/ai-enterprise/planning-resource/ai-software-regulated-environments-white-paper/latest/index.html).
+
+<Anchor id="v3-0-0"></Anchor>
+
+
+
+<Anchor id="id18" />
+
+## v3.0.0
+
+<Anchor id="v3-0-0-features"></Anchor>
+
+
+
+<Anchor id="id19" />
+
+### Features
+
+- Added support for Multi-LLM NIM container that enables you to deploy a wide variety of models from a single container.
+The NIM Operator can now cache and serve LLM-Specific and Multi-LLM NIM from NVIDIA NGC, NVIDIA NeMo Data Store, or the Hugging Face Hub.
+
+  Learn more about when to use a Multi-LLM NIM container or LLM-Specific container from the
+[NVIDIA NIM for LLMs Overview: Core Concepts documentation](https://docs.nvidia.com/nim/large-language-models/latest/about-nim-llm/overview.html#core-concepts).
+For details on Multi-LLM NIM container supported architectures, refer to the
+[Supported Architectures for NVIDIA NIM for LLMs documentation](https://docs.nvidia.com/nim/large-language-models/latest/supported-architectures.html).
+
+- Added [NIM Build](/nim-build) as a new custom resource to support building and caching TensorRT-LLM model engines from built-in LLM buildable profiles.
+
+- Added support for using Kubernetes [Dynamic Resource Allocation (DRA)](/dra) for GPU allocation
+to NIM Operator deployments.
+
+- Added support for deploying large NIM that require [multi-node](/multi-node) GPUs using `LeaderWorkerSets`.
+
+- Added support for the deployment and management of NIM through [KServe](/kserve),
+including both raw and serverless deployments.
+
+- NeMo Customizer, NeMo Data Store, NeMo Entity Store, and NeMo Guardrails have been updated to v25.8.0.
+
+  <Note>
+  NeMo Evaluator remains at v25.6.0 due to an architecture change in how evaluation jobs are managed, but it will be updated in a subsequent release.
+
+  </Note>
+
+### Known Issues
+
+- For large models (49+ billion parameters), you may encounter the `Too many open files` download error during caching.
+To avoid this error, you must update the max open file limit for the container runtime.
+For example, if you are using `containerd` as the container runtime, run the following commands:
+
+  ```console
+  $ sudo mkdir -p /etc/systemd/system/containerd.service.d
+  $ echo "[Service]" | sudo tee /etc/systemd/system/containerd.service.d/override.conf
+  $ echo "LimitNOFILE=65536" | sudo tee -a /etc/systemd/system/containerd.service.d/override.conf
+  $ sudo systemctl daemon-reload
+  $ sudo systemctl restart containerd
+  $ sudo systemctl restart kubelet
+  ```
+
+- There is a known issue with NVIDIA NeMo Retriever models where filtering is not working correctly
+when `nimcache.spec.source.ngc.model.engine` is set to “tensorrt”.
+Caching of NeMo retriever embedding, reranking models will fail when
+`nimcache.spec.source.ngc.model.engine` is specified as `tensorrt`.
+NVIDIA recommends caching all model profiles without filtering for these models.
+
+- When downloading models from Hugging Face for Multi-LLM NIM, log files may show permission denied warnings that can be safely ignored.
+
+<Anchor id="v2-0-2"></Anchor>
+
+
+
+<Anchor id="id20" />
+
+## v2.0.2
+
+<Anchor id="id21" />
+
+### Bug Fixes
+
+- Fixed an issue where model caching was failing with some older NIM containers due to errors when parsing v1 `model_manifest.yaml` files.
+For example, with Mistral NIM `nvcr.io/nim/nv-mistralai/mistral-nemo-12b-instruct:1.2.2`.
+
+- Added support for the `—revision` flag when pulling models/datasets with HF compatible data sources, such as NeMo Datastore.
+
+- Fixed an [issue](https://github.com/NVIDIA/k8s-nim-operator/issues/594), where deletions of operator custom resources, such as NIMService, are stuck with foreground deletion.
+
+- Increased the startup probe timeout to 20 minutes for NIMService pods. This helps to avoid restarts when the model is not pre-cached and takes a long time to download and build.
+
+<Anchor id="id22" />
+
+### Known Issues
+
+- Permission denied errors during caching using NIMCache of some older NIMs, such as with Mistral NIM `nvcr.io/nim/nv-mistralai/mistral-nemo-12b-instruct:1.2.2`.
+This happens due to the container not honoring the `NIM_CACHE_PATH` env variable and instead caching into internal directories.
+One workaround is to explicitly specify the `HF_HOME` and `NGC_HOME` variables in the NIMCache instance, such as in the example below:
+
+  ```yaml {7,8,9,10}
+    apiVersion: apps.nvidia.com/v1alpha1
+    kind: NIMCache
+    metadata:
+      name: meta-llama3.1-8b-instruct
+    spec:
+      env:
+        - name: NGC_HOME
+          value: /model-store/ngc
+        - name: HF_HOME
+          value: /model-store/huggingface
+      source:
+        ngc:
+          modelPuller: nvcr.io/nim/mistralai/mixtral-8x22b-instruct-v01:latest
+          pullSecret: ngc-secret
+          authSecret: ngc-api-secret
+          model:
+            profiles: [28a820fc752f0964280f0e4eba7e0490b95b790b5e3c4fff218ef9d2b12b9f76]
+      storage:
+        pvc:
+          create: true
+          storageClass: local-path
+          size: "100Gi"
+          volumeAccessMode: ReadWriteOnce
+  ```
+
+<Anchor id="v2-0-1"></Anchor>
+
+
+
+<Anchor id="id23" />
+
+## v2.0.1
+
+<Anchor id="v2-0-1-features"></Anchor>
+
+
+
+<Anchor id="id24" />
+
+### Features
+
+- Added support for NeMo microservices v25.6.0.
+Updated the following NeMo microservices custom resources to support NeMo microservices v25.6.0:
+
+  -   NeMo Evaluator custom resource now supports updated `evaluationImages` for evaluation jobs.
+
+  -   NeMo Customizer custom resource now supports Customization Targets to represent a model that can be customized (fine-tuned) using the Customizer service.
+Use `data.customizationTargets` to define your model targets in you Customizer model Configmap instead of `data.models`, used in previous versions.
+Refer to the [NeMo Customization Targets documentation](https://docs.nvidia.com/nemo/microservices/25.8.0/fine-tune/manage-customization-targets/index.html#ft-manage-customization-targets) for more details.
+Refer to the [NeMo microservices release notes](https://docs.nvidia.com/nemo/microservices/25.8.0/about/release-notes/index.html) for a full list of changes in this release.
+
+- Added the `spec.proxy` parameter to NIM cache and NIM service custom resource.
+This improves support for clusters operating behind HTTP proxies by allowing you to specify your proxy configuration using the `spec.proxy` parameter.
+This must be configured in both your NIM cache and NIM service custom resources.
+This parameter replaces the `spec.certConfig` parameter, which is now deprecated.
+
+- Added support for specifying GRPC and metrics ports in NIM services custom resource for non-LLM NIM running a [Triton
+Inference Server](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/introduction/index.html).
+([PR#490](https://github.com/NVIDIA/k8s-nim-operator/pull/490)).
+
+- Added support for specifying a custom scheduler in a NIM service custom resource.
+Use `spec.schedulerName` to specify the name of the scheduler to use for NIM jobs.
+If no custom scheduler name is set, your default Kubernetes scheduler is used.
+([PR#489](https://github.com/NVIDIA/k8s-nim-operator/pull/489)).
+
+- Added support for size limits for a emptyDir volume created for NIMService Deployments and NeMoCustomizer training jobs.
+Specify either `.spec.storage.sharedMemorySizeLimit` in NIM service custom resource or `.spec.training.sharedMemorySizeLimit` in the NeMo Customizer custom resources to set a shared memory limit.
+By default, an emptyDir volume is created with no size limit.
+([PR#492](https://github.com/NVIDIA/k8s-nim-operator/pull/492)).
+
+- Added support for setting annotations for NIM Operator created PVCs.
+([PR#508](https://github.com/NVIDIA/k8s-nim-operator/pull/508)).
+
+- Added support for pulling models and datasets from HuggingFace Hub and NeMo Data Store into your NIM cache using the `spec.source.hf` and `spec.source.dataStore` parameters.
+
+<Anchor id="id25" />
+
+### Bug Fixes
+
+- Updated the NIM service status to include model information for non-LLM NIM.
+([PR#498](https://github.com/NVIDIA/k8s-nim-operator/pull/498))
+
+- [Fixed an issue](https://github.com/NVIDIA/k8s-nim-operator/issues/477) where the resource field was missing in Helm upgrade hooks that could prevent the upgrade CRD jobs from running properly.
+
+- Fixed a bug where the NIM pipeline and NIM service status was incorrectly being marked as `Failed` when the NIM cache was still in progress.
+
+- [Fixed an issue](https://github.com/NVIDIA/k8s-nim-operator/issues/477) where the resource field was missing in Helm upgrade hooks that could prevent the upgrade CRD jobs from running properly.
+
+- Fixed a bug where the NIM pipeline and NIM service status was incorrectly being marked as `Failed` when the NIM cache was still in progress.
+([PR#504](https://github.com/NVIDIA/k8s-nim-operator/pull/504))
+
+- Fixed an issue where the NIM cache would fail to find non-LLM models when no profile was specified in NIM cache custom resource. ([PR#513](https://github.com/NVIDIA/k8s-nim-operator/pull/513))
+
+- Fixed an issue in the Data Flywheel with Jupyter notebook tutorial where the NIM Operator was not creating PVCs when the default storage class was something other than “local-path” provisioner.
+
+### Removals and Deprecations
+
+- Deprecated NIM cache `spec.certConfig` parameter.
+If you were using the `spec.certConfig` parameter to specify custom CA certificates in previous versions, you should update your NIM cache resources to use `spec.proxy` and add your proxy configuration to the NIM service.
+Refer to [Proxy Support](/air-gap#proxy-support) for details.
+
+<Anchor id="id26" />
+
+### Known Issues
+
+- There is a known issue with NVIDIA NeMo Retriever models where filtering is not working correctly when `nimcache.spec.source.ngc.model.engine` is set to “tensorrt”.
+This issue is due to the swap in product-name string between the node label and model manifest.
+
+<Anchor id="v2-0"></Anchor>
+
+<Anchor id="v2-0-0" />
+
+
+
+## v2.0.0
+
+<Anchor id="v2-0-0-features"></Anchor>
+
+
+
+<Anchor id="id27" />
+
+### Features
+
+- Added support for deploying the NVIDIA NeMo microservices as custom resources with the NVIDIA NIM Operator.
+NVIDIA NeMo microservices are a modular set of tools that you can use to customize, evaluate, and secure large language models (LLMs) while optimizing AI applications across on-premises or cloud-based Kubernetes clusters.
+Deploying these microservices with the NIM Operator provides the ability to manage your AI workflows across your Kubernetes cluster.
+
+  The NIM Operator supports deploying the following NeMo microservices to your cluster as custom resources:
+
+  -   NeMo core microservices
+
+    -     NeMo Customizer
+
+    -     NeMo Evaluator
+
+    -     NeMo Guardrails
+
+  -   NeMo platform microservices
+
+    -     NeMo Data Store
+
+    -     NeMo Entity Store
+
+  [Get started with the NeMo microservices](/deploy-nemo-microservices).
+
+  Refer to the [NeMo microservices documentation](https://docs.nvidia.com/nemo/microservices/25.8.0/about/index.html) for details on using these microservices.
+
+- Improved NIMService status to detail model information including the cluster endpoint, external endpoint, and name of the model the service is connected to.
+
+- Updated required fields for NIMService and NIMPipeline custom resources including:
+
+  -   `nimservice.spec.image.repository`
+
+  -   `nimservice.spec.image.tag`
+
+  -   `nimpipeline.spec.image.repository`
+
+  -   `nimpipeline.spec.image.tag`
+
+  -   `nimpipeline.spec.expose`
+
+- Enable caching of pre-built TRT-LLM engines and optimized artifacts for non-LLM, such as Riva and BioNeMo NIM.
+
+- Add support for configuring annotations and security contexts for the NIM Operator deployment using Helm values, fixing [issue #333](https://github.com/NVIDIA/k8s-nim-operator/issues/333).
+
+- Decouple NIM Operator upgrades from NIMService upgrades. NIMService pods are now only restarted when their corresponding CR specifications are updated.
+
+- Improve support for clusters operating behind HTTP proxies, including injection of proxy environment variables and custom CA certificates.
+
+<Anchor id="id28" />
+
+### Bug Fixes
+
+- Fixed an [issue](https://github.com/NVIDIA/k8s-nim-operator/issues/347) where an empty storage class was set in the PVCs created by the NIM Operator for caching NIM.
+
+<Anchor id="v1-0-1"></Anchor>
+
+
+
+<Anchor id="id29" />
+
+## v1.0.1
+
+<Anchor id="v1-0-1-breaking-changes"></Anchor>
+
+
+
+### Breaking Changes
+
+- Renamed the `spec.gpuSelectors` field in the NIM cache custom resource to `spec.nodeSelector`.
+The purpose of the field remains the same–to specify the node selector labels for scheduling the caching job.
+Refer to [Air-Gapped Environments](/air-gap).
+
+- Changed the Operator pod metrics from HTTPS protocol on port `8443` to HTTP protocol on port `8080`.
+
+<Anchor id="v1-0-1-features"></Anchor>
+
+
+
+<Anchor id="id30" />
+
+### Features
+
+- Added a `spec.env` field to the NIM cache custom resource to support environment variables.
+One use of the field is to specify variables such as `HTTPS_PROXY` for air-gapped and specialized networks.
+Refer to [Air-Gapped Environments](/air-gap).
+
+- Updated the `spec.expose.service.type` field in the NIM service custom resource to support common service types, such as `LoadBalancer`.
+
+- Added a `spec.runtimeClassName` field to the NIM service custom resource to support setting the runtime class on a NIM service deployment.
+
+- Removed the `kube-rbac-proxy` container from the Operator pod.
+This change improves the security posture of the Operator.
+Previously, you might need to provide TLS certificates when you configured Prometheus.
+With this release, you no longer need to provide the certificates.
+
+- Certified the Operator for use with Red Hat OpenShift Container Platform.
+
+<Anchor id="v1-0-0"></Anchor>
+
+
+
+<Anchor id="id31" />
+
+## v1.0.0
+
+<Anchor id="v1-0-0-features"></Anchor>
+
+
+
+<Anchor id="id32" />
+
+### Features
+
+- NVIDIA NIM Operator is new.
+
+<Anchor id="v1-0-0-known-issues"></Anchor>
+
+
+
+<Anchor id="id33" />
+
+### Known Issues
+
+- The container versions for the NeMo Retriever Text Embedding NIM and NeMo Retriever Text Reranking NIM are not publicly available
+and result in an image pull back off error.
+The Operator and documentation were developed with release candidate versions of these microservices.
+
+- The Operator does not support configuring NIM microservices in a multi-node deployment.
+
+- For VMware vSphere with Tanzu clusters using vGPU software, to use an inference model that requires more than one GPU, the NVIDIA A100 or H100 GPUs must be connected with NVLink or NVLink Switch.
+These clusters also do not support multi-GPU models with L40S GPUs and vGPU software.
+
+- The Operator is not verified in an air-gapped network environment.
+
+- The sample RAG application cannot be deployed on Red Hat OpenShift Container Platform.
+
+- The Operator has transitive dependency on [go.uber.org/zap v1.26.0](https://pkg.go.dev/go.uber.org/zap). Findings indicate Cross-Site Scripting (XSS) vulnerabilities in the Zap package.
