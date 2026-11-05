@@ -40,3 +40,5 @@ e2e_logs
 /fern/node_modules/
 /.fern/
 /fern/.fern/
+.docsfab/
+.docsfab-init.*
