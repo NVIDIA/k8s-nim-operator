@@ -1,20 +1,15 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
-title: ''
-labels: enhancement
+about: Submit a feature request
+title: "[Feature]: "
+labels: ["feature", "needs-triage"]
 assignees: shivamerla, visheshtanksale
-
 ---
+**Motivation**
+<!-- A clear and concise description of your motivation: e.g. would this feature greatly help your use-case, and why? -->
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**Check here if you would like to work on this issue**
+- [ ]
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
-
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
-
-**Additional context**
-Add any other context or screenshots about the feature request here.
+**Describe the feature**
+<!-- A clear and concise description of the feature request. What alternatives did you consider? What impact will this have on users? If this is related to another GitHub issue, please link it here too. -->
