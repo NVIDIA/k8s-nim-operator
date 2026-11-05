@@ -154,7 +154,7 @@ Specifies node selector labels to schedule the caching job.
 </td>
 <td>
 
-None, `{}`
+When `spec.nodeSelector` is absent, the NIMCache getter returns `feature.node.kubernetes.io/pci-10de.present: "true"`. An explicitly supplied map, including `{}`, overrides that selector.
 
 </td>
 </tr>
@@ -252,7 +252,7 @@ None
 <td>
 
 Specifies the underlying container runtime class name to be used for running NIM with NVIDIA GPUs allocated.
-If not set, the default `nvidia` runtime class is assigned automatically. This runtime class is created by the NVIDIA GPU Operator.
+If you leave `spec.runtimeClassName` empty, the NIMCache getter returns no runtime class; set the field to select a runtime class.
 
 </td>
 <td>
@@ -269,31 +269,7 @@ None
 </td>
 <td>
 
-Specifies the revision of the object to be cached. This is either a commit hash, branch name, or tag.
-
-For example, you can start a training job, such as in the NeMo [Data Flywheel Jupyter notebook](https://github.com/NVIDIA/k8s-nim-operator/blob/main/test/e2e/jupyter-notebook/e2e-notebook.ipynb), then create a NIM Cache with a revision:
-
-```yaml {14}
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: meta-llama3-1b-instruct-datastore-e2e
-spec:
-  source:
-    dataStore:
-      endpoint: http://10.105.55.171:8000/v1/hf
-      modelName: "llama-3.2-1b-xlam-run1" # default/llama-3-1b-instruct model must be present in NeMo DataStore
-      namespace: xlam-tutorial-ns
-      authSecret: hf-auth
-      modelPuller: nvcr.io/nvidia/nemo-microservices/nds-v2-huggingface-cli:25.04
-      pullSecret: ngc-secret
-      revision: "cust-3VpkN1ve1GMkwsYqEptoij"
-  storage:
-    pvc:
-      create: true
-      size: "50Gi"
-      volumeAccessMode: ReadWriteOnce
-```
+The NIMCache API declares this optional revision as a commit hash, branch name, or tag. This API declaration does not establish access to a configured NeMo Data Store endpoint.
 
 </td>
 <td>
@@ -509,7 +485,7 @@ You can pull models from a variety of sources using various protocols:
 
     -     Hugging Face Hub Data Store
 
-    -     NVIDIA NeMo Data Store
+    -     NVIDIA NeMo Data Store (`dataStore` is declared in the NIMCache API; verify the endpoint, secret, and image access in your environment before using it)
 
   -   Local File Data Store
 
@@ -522,7 +498,7 @@ You can pull models from a variety of sources using various protocols:
   Refer to [Caching LLM-Specific NIM](/cache-llm#id1) for examples.
 
 <Note>
-Each cache can only be configured to pull from one source.
+The NIMCache source schema requires exactly one of `ngc`, `dataStore`, or `hf`. For `dataStore`, specify exactly one of `modelName` and `datasetName`; the declared endpoint pattern accepts HTTP or HTTPS URLs ending in `/v1/hf`, optionally followed by `/`.
 
 </Note>
 

@@ -36,24 +36,6 @@ navigation:
         path: ./pages/pipelines.mdx
       - page: Upgrade NIM Microservices
         path: ./pages/nim-upgrade.mdx
-  - section: NeMo Microservices
-    contents:
-      - page: NeMo Microservices Prerequisites
-        path: ./pages/nemo-prerequisites.mdx
-      - page: "Quick Start: Deploy All NeMo Microservices"
-        path: ./pages/deploy-nemo-microservices.mdx
-      - page: NeMo Data Store
-        path: ./pages/data-store.mdx
-      - page: NeMo Entity Store
-        path: ./pages/entity-store.mdx
-      - page: NeMo Customizer
-        path: ./pages/customizer.mdx
-      - page: NeMo Evaluator
-        path: ./pages/evaluator.mdx
-      - page: NeMo Guardrails
-        path: ./pages/guardrail.mdx
-      - page: Upgrade NeMo Microservices
-        path: ./pages/nemo-upgrade.mdx
   - section: Advanced Configurations
     contents:
       - page: Observability

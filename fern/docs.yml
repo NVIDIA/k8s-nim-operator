@@ -3,6 +3,24 @@ instances:
   custom-domain: docs.nvidia.com/nim-operator
   multi-source: true
 title: NVIDIA NIM Operator
+# Dev-only: preserve numbered-release pages and routes.
+redirects:
+  - source: /nim-operator/dev/nemo-prerequisites
+    destination: /nim-operator/dev/release-notes
+  - source: /nim-operator/dev/deploy-nemo-microservices
+    destination: /nim-operator/dev/release-notes
+  - source: /nim-operator/dev/data-store
+    destination: /nim-operator/dev/release-notes
+  - source: /nim-operator/dev/entity-store
+    destination: /nim-operator/dev/release-notes
+  - source: /nim-operator/dev/customizer
+    destination: /nim-operator/dev/release-notes
+  - source: /nim-operator/dev/evaluator
+    destination: /nim-operator/dev/release-notes
+  - source: /nim-operator/dev/guardrail
+    destination: /nim-operator/dev/release-notes
+  - source: /nim-operator/dev/nemo-upgrade
+    destination: /nim-operator/dev/release-notes
 global-theme: nvidia
 navbar-links:
 - type: github
