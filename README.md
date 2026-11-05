@@ -107,3 +107,6 @@ make build IMAGE_NAME=<your-private-registry>/k8s-nim-operator VERSION=<tag> -f 
 Run `make help` for more information about additional `make` targets.
 
 More information can be found in the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html).
+
+## Support and Getting Help
+You can join our [community Slack](https://inviter.co/dsx-ai-factory). Your feedback is appreciated.

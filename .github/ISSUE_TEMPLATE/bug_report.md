@@ -2,10 +2,16 @@
 name: Bug report
 about: Create a report to help us improve
 title: Bug report template
-labels: ''
+labels: ["bug", "needs-triage"]
 assignees: shivamerla, visheshtanksale
 
 ---
+
+**Motivation**
+<!-- A clear and concise description of your motivation: is this a real issue you ran into while using the product? -->
+
+**Check here if you would like to work on this issue**
+- [ ]
 
 ### 1. Quick Debug Information
 * OS/Version(e.g. RHEL8.6, Ubuntu22.04):
