@@ -264,23 +264,6 @@ None
 <tr>
 <td>
 
-`spec.source.dataStore.revision`
-
-</td>
-<td>
-
-The NIMCache API declares this optional revision as a commit hash, branch name, or tag. This API declaration does not establish access to a configured NeMo Data Store endpoint.
-
-</td>
-<td>
-
-None
-
-</td>
-</tr>
-<tr>
-<td>
-
 `spec.storage.pvc.annotations`
 
 </td>
@@ -473,6 +456,8 @@ Enable the deployment of a broad range of Large Language Models, offering maximu
 
 ### Supported Sources and Protocols
 
+{/* The API continues to accept spec.source.dataStore for compatibility, but NeMo microservices support is deprecated. Do not document or recommend dataStore as a supported source. */}
+
 You can easily deploy custom, fine-tuned models on NIM. NIM automatically builds an optimized TensorRT-LLM locally-built engine given the weights in the HuggingFace format.
 
 You can pull models from a variety of sources using various protocols:
@@ -481,11 +466,7 @@ You can pull models from a variety of sources using various protocols:
 
 - For Multi-LLM NIM microservices, the following registry types are also supported:
 
-  -   Registries using the Hugging Face Protocol, such as
-
-    -     Hugging Face Hub Data Store
-
-    -     NVIDIA NeMo Data Store (`dataStore` is declared in the NIMCache API; verify the endpoint, secret, and image access in your environment before using it)
+  -   Hugging Face Hub
 
   -   Local File Data Store
 
@@ -498,7 +479,7 @@ You can pull models from a variety of sources using various protocols:
   Refer to [Caching LLM-Specific NIM](/cache-llm#id1) for examples.
 
 <Note>
-The NIMCache source schema requires exactly one of `ngc`, `dataStore`, or `hf`. For `dataStore`, specify exactly one of `modelName` and `datasetName`; the declared endpoint pattern accepts HTTP or HTTPS URLs ending in `/v1/hf`, optionally followed by `/`.
+Each cache can only be configured to pull from one source.
 
 </Note>
 

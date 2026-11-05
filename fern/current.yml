@@ -60,7 +60,5 @@ navigation:
         path: ./pages/dynamo.mdx
   - section: Sample Applications
     contents:
-      - link: Data Flywheel Jupyter Notebook
-        href: https://github.com/NVIDIA/k8s-nim-operator/blob/main/test/e2e/jupyter-notebook/README.md
       - link: Deploy NVIDIA RAG Blueprint on Kubernetes with NIM Operator
         href: https://docs.nvidia.com/rag/2.3.0/deploy-nim-operator.html
