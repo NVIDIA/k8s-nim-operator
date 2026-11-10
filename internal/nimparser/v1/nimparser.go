@@ -202,41 +202,23 @@ func isOptimizedEngine(engine string) bool {
 }
 
 func matchGPUProfile(modelSpec appsv1alpha1.ModelSpec, profile NIMProfile, discoveredGPUs []string) bool {
-	foundGPU := false
-
 	for _, gpu := range modelSpec.GPUs {
-		// Check for GPU product match
-		if gpu.Product != "" {
-			// Check if the product matches the "gpu" tag
-			if strings.Contains(strings.ToLower(profile.Tags["gpu"]), strings.ToLower(gpu.Product)) {
-				foundGPU = true
-			}
-
-			// Check if the product matches the "key" tag
-			if strings.Contains(strings.ToLower(profile.Tags["key"]), strings.ToLower(gpu.Product)) {
-				foundGPU = true
-			}
-
-			// If the GPU product matches, check the GPU IDs
-			if foundGPU && len(gpu.IDs) > 0 {
-				foundID := false
-				for _, id := range gpu.IDs {
-					if id == strings.TrimSuffix(profile.Tags["gpu_device"], ":10de") {
-						foundID = true
-						break
-					}
-				}
-
-				// If the GPU product matches but no IDs match, return false
-				if !foundID {
-					return false
-				}
-			}
+		if gpu.Product == "" {
+			continue
 		}
-	}
 
-	// If a GPU product was matched and IDs (if any) also matched, return true
-	if foundGPU {
+		// Check if the product matches the "gpu" or "key" tag
+		product := strings.ToLower(gpu.Product)
+		if !strings.Contains(strings.ToLower(profile.Tags["gpu"]), product) &&
+			!strings.Contains(strings.ToLower(profile.Tags["key"]), product) {
+			continue
+		}
+
+		// The GPU IDs, if any, must match within the same GPU entry
+		if len(gpu.IDs) > 0 && !slices.Contains(gpu.IDs, strings.TrimSuffix(profile.Tags["gpu_device"], ":10de")) {
+			continue
+		}
+
 		return true
 	}
 
