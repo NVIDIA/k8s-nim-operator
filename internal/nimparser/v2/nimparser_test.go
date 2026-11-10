@@ -100,5 +100,11 @@ var _ = Describe("NIMParser V2", func() {
 		Entry("IDs without a product",
 			[]appsv1alpha1.GPUSpec{{IDs: []string{"2330"}}},
 			[]string{"h100"}),
+		Entry("an empty entry next to a product",
+			[]appsv1alpha1.GPUSpec{{Product: "a100"}, {}},
+			[]string{"a100"}),
+		Entry("only an empty entry",
+			[]appsv1alpha1.GPUSpec{{}},
+			[]string{"a100", "h100"}),
 	)
 })

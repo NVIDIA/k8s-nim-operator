@@ -245,12 +245,20 @@ func matchGPUProfile(modelSpec appsv1alpha1.ModelSpec, p NIMProfile, discoveredG
 	// Each requested GPU is matched on its own, so the product and the IDs
 	// of one entry are never combined with those of another entry
 	if len(modelSpec.GPUs) > 0 {
+		constrained := false
 		for _, g := range modelSpec.GPUs {
+			// An entry with neither a product nor IDs doesn't narrow anything,
+			// so it must not make every profile match next to other entries
+			if g.Product == "" && len(g.IDs) == 0 {
+				continue
+			}
+			constrained = true
 			if gpuSpecMatchesProfile(g, p) {
 				return true
 			}
 		}
-		return false
+		// Only empty entries means no GPU filter at all
+		return !constrained
 	}
 
 	// No GPUs requested, try discovered GPUs
