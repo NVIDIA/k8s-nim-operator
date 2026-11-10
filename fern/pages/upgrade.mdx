@@ -1,0 +1,82 @@
+---
+title: "Upgrading NVIDIA NIM Operator"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "This page outlines how to perform Kubernetes rolling upgrades on the NIM Operator container. You can upgrade the NIM Operator even if you have operands (microservices) running. Upgrading the NIM Opera"
+slug: upgrade
+---
+
+<Anchor id="upgrading-nvidia-nim-operator" />
+
+This page outlines how to perform Kubernetes rolling upgrades on the NIM Operator container.
+You can upgrade the NIM Operator even if you have operands (microservices) running. Upgrading the NIM Operator does not impact running NIM microservices custom resources (CR).
+
+## Using Helm
+
+Because Helm [does not support](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations) automatic upgrade of existing CRDs,
+you can upgrade the CRDs by enabling a Helm hook or manually.
+
+## Procedure
+
+By default, the Helm chart enables a `pre-upgrade` Helm [hook](https://helm.sh/docs/topics/charts_hooks/#the-available-hooks) to update the CRDs during the Operator upgrade.
+
+1. Update the information about the Operator chart:
+
+   ```console
+   $ helm repo update nvidia
+   ```
+
+1. Fetch the values from the chart:
+
+   ```console
+   $ helm show values nvidia/k8s-nim-operator --version=v3.1.4 > values-3.1.4.yaml
+   ```
+
+1. Update the values file as needed.
+
+1. Upgrade the Operator:
+
+   ```console
+   $ helm upgrade nim-operator nvidia/k8s-nim-operator -n nim-operator -f values-3.1.4.yaml
+   ```
+
+Helm hooks used with the Operator use the Operator image itself.
+If the Operator image itself cannot be pulled successfully, such as due to network error, the hooks fail.
+In this case, you need to delete the chart using the `--no-hooks` argument to avoid hanging the deletion due to hook failures.
+
+## Alternative: Manually Upgrading CRDs
+
+With this procedure, you can update all existing Operator custom resources.
+
+1. Apply the custom resource definitions:
+
+   ```console
+   $ kubectl apply -f \
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/tags/v3.1.4/deployments/helm/k8s-nim-operator/crds/apps.nvidia.com_nimcaches.yaml
+
+   $ kubectl apply -f \
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/tags/v3.1.4/deployments/helm/k8s-nim-operator/crds/apps.nvidia.com_nimpipelines.yaml
+
+   $ kubectl apply -f \
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/tags/v3.1.4/deployments/helm/k8s-nim-operator/crds/apps.nvidia.com_nimservices.yaml
+   ```
+
+1. Update the information about the Operator chart:
+
+   ```console
+   $ helm repo update nvidia
+   ```
+
+1. Fetch the values from the chart:
+
+   ```console
+   $ helm show values nvidia/k8s-nim-operator --version=v3.1.4 > values-3.1.4.yaml
+   ```
+
+1. Update the values file as needed.
+
+1. Upgrade the Operator:
+
+   ```console
+   $ helm upgrade nim-operator nvidia/k8s-nim-operator -n nim-operator -f values-3.1.4.yaml
+   ```

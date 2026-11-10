@@ -1,0 +1,46 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama3-8b-instruct
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: 1.3.3
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama3-8b-instruct
+      profile: ''
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  metrics:
+    enabled: true
+    serviceMonitor:
+      additionalLabels:
+        release: kube-prometheus-stack
+  scale:
+    enabled: true
+    hpa:
+      maxReplicas: 2
+      minReplicas: 1
+      metrics:
+      - type: Object
+        object:
+          metric:
+            name: gpu_cache_usage_perc
+          describedObject:
+            apiVersion: v1
+            kind: Service
+            name: meta-llama3-8b-instruct
+          target:
+            type: Value
+            value: "0.5"

@@ -1,0 +1,171 @@
+---
+title: "Platform Support"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "This page outlines the platform requirements for the NVIDIA NIM Operator and the hardware and storage requirements for its supported microservices."
+slug: platform-support
+---
+
+<Anchor id="platform-support" />
+
+This page outlines the platform requirements for the NVIDIA NIM Operator and the hardware and storage requirements for its supported microservices.
+
+## NVIDIA NIM Operator Life Cycle
+
+When a new major version of NVIDIA NIM Operator is released, the previous major version enters deprecated support and only receives patch release updates for critical bug and CVE fixes.
+All prior major versions enter end of support and are no longer supported and do not receive patch release updates.
+
+The product life cycle and versioning are subject to change in the future.
+
+<Note>
+Upgrades are only supported within a major release or to the next major release.
+
+</Note>
+
+### Support Status for Releases
+
+<table>
+<thead>
+<tr>
+<th>
+
+NIM Operator Version
+
+</th>
+<th>
+
+Status
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+3.x.x
+
+</td>
+<td>
+
+Supported
+
+</td>
+</tr>
+<tr>
+<td>
+
+2.x.x
+
+</td>
+<td>
+
+Deprecated
+
+</td>
+</tr>
+<tr>
+<td>
+
+1.x.x
+
+</td>
+<td>
+
+End of Support
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## NVIDIA NIM Microservices
+
+The NIM Operator supports deployment of NVIDIA NIM across various domains such as reasoning, retrieval, speech, and biology.
+For a full list of supported NIM, refer to [build.nvidia.com](https://build.nvidia.com/search/models?q=NVIDIA+NIM&amp;filters=nimType%3Anim_type_run_anywhere).
+Refer to documentation for a specific NIM to learn more about its features and capabilities.
+
+For details on supported architectures for the Multi-LLM NIM container, refer to the [Supported Architectures for NVIDIA NIM for LLMs documentation](https://docs.nvidia.com/nim/large-language-models/latest/supported-architectures.html)
+
+### NVIDIA NIM for LLMs Version Compatibility
+
+You can deploy NVIDIA NIM for LLMs 3.0 and NIM for LLMs 2.x with NIM Operator v3.1.3.
+NIM for LLMs 3.0 adds a sidecar container to the NIM.
+You don’t need to change the NIM Operator configuration to deploy NIM for LLMs 3.0 with a NIM service or NIM cache.
+
+### NIM Microservice System Requirements
+
+The GPU requirements for the NIM microservices depend on the workload and model.
+Depending on the microservice and model, supported GPUs include NVIDIA B300, H100, A100 80 GB, and L40S GPUs.
+For example, large models can exceed the memory capacity of one GPU, meaning you will need to add more GPUs to your cluster.
+
+When you deploy a [NIM  Service](/service) or [NIM pipeline](/pipelines), you can specify more than one GPU for a workload.
+You can download your models using [NIM Cache](/cache).
+
+You can view supported models and their resource requirements on [build.nvidia.com](https://build.nvidia.com/search/models?q=NVIDIA+NIM&amp;filters=nimType%3Anim_type_run_anywhere).
+Refer to the model details on [build.nvidia.com](https://build.nvidia.com/search/models?q=NVIDIA+NIM&amp;filters=nimType%3Anim_type_run_anywhere) for specific details on storage, GPU model, and GPU count for the NVIDIA NIM you want to use.
+
+To find details on supported models on [build.nvidia.com](https://build.nvidia.com):
+
+1. Use the **Filter by text** to search for `NVIDIA NIM` models and select `Run Anywhere` from the **NIM Type** drop down menu.
+Use the additional filter options to find the exact model you want.
+
+1. Click on the model you want to use.
+
+1. Click **Model Card** to view details about the NIM deployment requirements.
+
+## Operating Systems and Kubernetes Platforms
+
+NVIDIA NIM Operator requires NVIDIA GPU Operator version 24.3.0 or higher to be installed on your cluster.
+Refer to
+[Supported Operating Systems and Kubernetes Platforms](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/platform-support.html#supported-operating-systems-and-kubernetes-platforms)
+in the GPU Operator documentation for supported operating systems and Kubernetes platforms.
+
+## Command-Line Tools
+
+<table>
+<thead>
+<tr>
+<th>
+
+Tool
+
+</th>
+<th>
+
+Installation Documentation
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+kubectl (version matching your Kubernetes cluster)
+
+</td>
+<td>
+
+Refer to
+[Install Tools](https://kubernetes.io/docs/tasks/tools/)
+in the Kubernetes documentation for more information.
+
+</td>
+</tr>
+<tr>
+<td>
+
+Helm v3 and higher
+
+</td>
+<td>
+
+Refer to
+[Install Helm](https://helm.sh/docs/intro/install/)
+in the Helm documentation for more information.
+
+</td>
+</tr>
+</tbody>
+</table>

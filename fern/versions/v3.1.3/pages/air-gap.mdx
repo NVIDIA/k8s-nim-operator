@@ -1,0 +1,90 @@
+---
+title: "Air-Gapped Environments"
+description: "NVIDIA NIM for large language models (LLMs) supports serving models in an air-gapped system (also known as air wall, air-gapping, or disconnected network). In an air-gapped system, you can run a NIM w"
+slug: air-gap
+---
+
+<Anchor id="air-gapped-environments" />
+
+NVIDIA NIM for large language models (LLMs) supports serving models in an air-gapped system (also known as air wall, air-gapping, or disconnected network). In an air-gapped system, you can run a NIM with no internet connection and with no connection to the NGC registry or Hugging Face Hub.
+
+You have two options for air-gapped deployment: accessing NGC through [proxy](#proxy-support) and [mirrored local model registries](/cache-llm#llm-specific-nim-cache-sources).
+
+## File Ownership and Permissions for Pre-Populated Caches
+
+When you pre-populate a persistent volume claim (PVC) with model files outside the NIM Operator, for example by copying a cache from a connected system, the NIM container must be able to read those files.
+The NIM Cache and NIM Service pods run with a non-root security context, so the files must be readable by that user and group:
+
+- `spec.userID` sets `runAsUser` for the pod. The default is `1000`.
+
+- `spec.groupID` sets `runAsGroup` and `fsGroup` for the pod. The default is `2000`.
+
+Either make the files on the PVC readable by UID `1000` and GID `2000`, or set `spec.userID` and `spec.groupID` on the NIM Cache and NIM Service resources to match the ownership of the existing files.
+Set the same values on both resources when they share a PVC.
+For example, if the files on the PVC are owned by UID and GID `2500`:
+
+```yaml
+spec:
+  userID: 2500
+  groupID: 2500
+```
+
+If you already set `spec.userID` or `spec.groupID`, the files must be readable by those IDs rather than by the defaults.
+The same fields and defaults apply to NIM Services deployed through KServe.
+
+Storage classes that honor `fsGroup` apply the group ownership automatically when the volume is mounted.
+Storage classes that do not, such as many NFS provisioners, require you to set the ownership or read permissions on the files yourself.
+Permission-related errors are reported in the NIM Service status and pod events.
+
+Refer to `spec.userID` and `spec.groupID` in [NIM Cache configuration](/cache#nim-cache-configuration) and [Managing NIM Services](/service) for more information about these fields.
+
+## Serving a Pre-Cached Model Without an NGC API Key
+
+The `spec.authSecret` field is optional on a NIM Service.
+If the model is already present in the NIM cache and the NIM never contacts NGC, you can omit the field.
+If you omit `spec.authSecret`, the Operator does not inject the `NGC_API_KEY` environment variable into the NIM pod.
+
+Omit the field only when every model the NIM Service uses is pre-cached.
+If the NIM must download from NGC or from a [mirrored local model registry](/cache-llm#llm-specific-nim-cache-sources) that requires a credential, set `spec.authSecret` as described in [NIM Service](/service#nim-service-configuration-reference).
+
+## Proxy Support
+
+If your cluster has a proxy that requires custom certificates, you can add them in a config map and mount them into the NIM cache job.
+You can use self-signed or custom CA certificates.
+
+1. Create a ConfigMap with the certificates:
+
+   ```console
+   $ kubectl create configmap -n nim-service ca-certs --from-file=<path-to-cert-file-1> --from-file=<path-to-cert-file-2>
+   ```
+
+1. When you create the NIM Cache job and NIM Service deployment, specify the name of the config map and the path to mount them in the container, and specify the proxy information:
+
+   ```yaml
+   spec:
+     proxy:
+       httpsProxy: "https://<node-ip>:<port>"                 # address of a proxy server that should be used for outbound HTTPS requests
+       httpProxy: "http://<node-ip>:<port>"                   # address of a proxy server that should be used for outbound HTTP requests
+       noProxy: "http://example.com, http://example2.com"     # comma-separated list of domain names, IP addresses, or IP ranges for which proxying should be bypassed
+       certConfigMap: "ca-certs"                              # the ConfigMap name that holds your CA certificates
+   ```
+
+   <Note>
+   Refer to [Prerequisites](/cache#prerequisites) for more information on using NIM Cache.
+
+   </Note>
+
+1. For OpenShift Container Platform installations, you must enable certificate injection.
+
+   1.    Create a file, such as ca-inject.yaml, with contents like the following example:
+
+      <Code src="../../../../manifests/docs/current/input/ca-inject.yaml" language="yaml" startLine="1" />
+
+   1.    Apply the manifest:
+
+      ```console
+      $ oc apply -n nim-service -f ca-inject.yaml
+      ```
+
+For more information, refer to [Certificate injection using Operators](https://github.com/openshift/openshift-docs/blob/main/modules/certificate-injection-using-operators.adoc)
+in the OpenShift Container Platform documentation.

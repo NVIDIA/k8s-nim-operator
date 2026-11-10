@@ -1,0 +1,224 @@
+---
+title: "Quick Start: Deploy All NeMo Microservices"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "The NIM Operator is deprecating support for the NeMo Microservices CRDs and deployments in the next release. The NeMo Microservices are transitioning into the NeMo Platform. Refer to the NeMo Platform"
+slug: deploy-nemo-microservices
+---
+
+<Anchor id="quick-start-deploy-all-nemo-microservices" />
+
+<Warning>
+The NIM Operator is deprecating support for the NeMo Microservices CRDs and deployments in the next release.
+The NeMo Microservices are transitioning into the NeMo Platform.
+Refer to the [NeMo Platform documentation](https://docs.nvidia.com/nemo-platform/documentation/home#what-you-can-do) for details on continuing to use NeMo Microservices.
+
+</Warning>
+
+NVIDIA NeMo microservices are a modular set of tools that you can use to customize, evaluate, and secure large language models (LLMs) while optimizing AI applications across on-premises or cloud-based Kubernetes clusters.
+
+This page covers how to deploy all NeMo microservices to your Kubernetes cluster using the NIM Operator NeMo CRDs.
+For more details about using the NeMo microservices together, refer to the [NeMo microservices documentation](https://docs.nvidia.com/nemo/microservices/25.8.0/about/index.html).
+
+To deploy all the NeMo microservices, follow these steps:
+
+1. Configure your cluster with the [NeMo prerequisites](#prerequisites).
+
+1. [Deploy the NeMo microservices custom resource samples](#deploy-the-nemo-microservices).
+
+1. [Verify the microservices deployments](#verify-the-nemo-microservices).
+
+Optionally, after completing this Quick Start, you can continue with the [NeMo Data Flywheel Tutorial with a Jupyter notebook](https://github.com/NVIDIA/k8s-nim-operator/tree/main/test/e2e/jupyter-notebook).
+
+<Anchor id="prerequisites" />
+
+## 1. Prerequisites
+
+- All the [common NeMo microservices prerequisites](/nemo-prerequisites), including:
+
+  -   Configuring necessary secrets and namespaces.
+
+  -   Deploying all the NeMo dependencies with the Ansible playbook.
+
+  -   Installing the NeMo Operator.
+
+### Minimum System Requirements
+
+- A single-node Kubernetes cluster on a Linux host and cluster-admin level permissions.
+
+- At least 200 GB of free disk space.
+
+- At least one dedicated GPUs (A100 80 GB or H100 80 GB)
+
+If you are planning to also deploy the NeMo Data Flywheel Tutorial with a Jupyter notebook, you must have two available GPUs.
+Refer to the [NVIDIA NeMo Microservices](/platform-support#nvidia-nemo-microservices) Platform Support section for details on required resources.
+
+<Anchor id="deploy-the-nemo-microservices" />
+
+## 2. Deploy the NeMo Microservices
+
+1. Clone the NIM Operator repository:
+
+   ```console
+   $ git clone https://github.com/NVIDIA/k8s-nim-operator.git
+   ```
+
+1. Checkout version tag:
+
+   ```console
+   $ git checkout v3.1.3
+   ```
+
+1. Apply all the NeMo microservices sample files in the NIM Operator repository:
+
+   ```console
+   $ kubectl apply -n nemo -f k8s-nim-operator/config/samples/nemo/latest/
+   ```
+
+   *Example output*
+
+   ```output
+   nemocustomizer.apps.nvidia.com/nemocustomizer-sample created
+   nemodatastore.apps.nvidia.com/nemodatastore-sample created
+   nemoentitystore.apps.nvidia.com/nemoentitystore-sample created
+   nemoevaluator.apps.nvidia.com/nemoevaluator-sample created
+   nemoguardrail.apps.nvidia.com/nemoguardrails-sample created
+   nimcache.apps.nvidia.com/meta-llama3-1b-instruct created
+   nimpipeline.apps.nvidia.com/llama3-1b-pipeline created
+   configmap/nemo-training-config created
+   configmap/nemo-model-config created
+   ```
+
+   It will take several minutes for all the microservices to deploy and be ready.
+
+1. View all the NeMo microservices:
+
+   ```console
+   $ kubectl get -n nemo nemoentitystore,nemodatastore,nemoguardrails,nemocustomizer,nemoevaluator
+   ```
+
+   *Example output*
+
+   ```output
+   NAME                                                     STATUS   AGE
+   nemoentitystore.apps.nvidia.com/nemoentitystore-sample   Ready    23m
+   nemodatastore.apps.nvidia.com/nemodatastore-sample       Ready    23m
+   nemoguardrail.apps.nvidia.com/nemoguardrails-sample      Ready    23m  
+   nemocustomizer.apps.nvidia.com/nemocustomizer-sample     Ready    23m
+   nemoevaluator.apps.nvidia.com/nemoevaluator-sample       Ready    23m
+   ```
+
+1. View all the NeMo Customizer ConfigMaps:
+
+   ```console
+   $ kubectl get -n nemo configmap | grep "nemo"
+   ```
+
+   *Example output*
+
+   ```output
+   nemo-model-config                              1      42m
+   nemo-training-config                           1      42m
+   nemocustomizer-sample                          1      42m
+   ```
+
+1. View all the NIM microservices:
+
+   ```console
+   $ kubectl get -n nemo nimpipeline,nimcache,nimservice
+   ```
+
+   *Example output*
+
+   ```output
+   NAME                                                 STATUS   AGE
+   nimpipeline.apps.nvidia.com/llama3-1b-pipeline       Ready    40m
+
+   NAME                                                 STATUS   PVC                           AGE
+   nimcache.apps.nvidia.com/meta-llama3-1b-instruct     Ready    meta-llama3-1b-instruct-pvc   40m
+
+   NAME                                                 STATUS   AGE
+   nimservice.apps.nvidia.com/meta-llama3-1b-instruct   Ready    40m
+   ```
+
+<Anchor id="verify-the-nemo-microservices" />
+
+## 3. Verify the NeMo Microservices
+
+To verify that all microservices are working correctly, you can test their API endpoints using a temporary pod with curl installed.
+
+1. List the NeMo microservices services to confirm they are running:
+
+   ```console
+   $ kubectl get services -n nemo | grep "nemo"
+   ```
+
+   *Example output*
+
+   ```output
+   nemocustomizer-sample    ClusterIP   XX.XXX.XXX.XXX   <none>        8000/TCP,9009/TCP      31m
+   nemodatastore-sample     ClusterIP   XX.XXX.XXX.XXX   <none>        8000/TCP               31m
+   nemoentitystore-sample   ClusterIP   XX.XXX.XXX.XXX   <none>        8000/TCP               31m
+   nemoevaluator-sample     ClusterIP   XX.XXX.XXX.XXX   <none>        8000/TCP               31m
+   nemoguardrails-sample    ClusterIP   XX.XXX.XXX.XXX   <none>        8000/TCP               31m
+   ```
+
+1. Start a temporary pod with curl installed to test the services:
+
+   ```console
+   $ kubectl run --rm -it -n default curl --image=curlimages/curl:latest -- ash
+   ```
+
+   Substitute any pod that has the command and meets your organization’s security requirements.
+
+1. Test each microservice’s API endpoint:
+
+   -    NeMo Customizer:
+
+   ```console
+   curl -X GET "http://nemocustomizer-sample.nemo:8000/v1/customization/configs"
+   ```
+
+   Expected output: A JSON response with configuration details
+
+   -    NeMo Evaluator:
+
+   ```console
+   curl -X GET "http://nemoevaluator-sample.nemo:8000/v1/evaluation/configs"
+   ```
+
+   Expected output: A JSON response with evaluation configurations.
+
+   -    NeMo Entity Store:
+
+   ```console
+   curl -X GET "http://nemoentitystore-sample.nemo:8000/v1/base-urls"
+   ```
+
+   Expected output: A JSON response with base URLs.
+
+   -    NeMo Data Store:
+
+   ```console
+   curl -X GET "http://nemodatastore-sample.nemo:8000/v1/hf/api/datasets"
+   ```
+
+   Expected output: A JSON response with dataset information.
+
+   -    NeMo Guardrails:
+
+   ```console
+   curl -X GET "http://nemoguardrails-sample.nemo:8000/v1/guardrail/configs"
+   ```
+
+   Expected output: A JSON response with guardrail configurations
+
+1. Press Ctrl+D to exit and delete the temporary pod.
+
+## Next Steps
+
+- Continue with the [NeMo Data Flywheel Tutorial with a Jupyter notebook](https://github.com/NVIDIA/k8s-nim-operator/tree/main/test/e2e/jupyter-notebook)
+
+- To customize individual NeMo microservice configurations, refer to the individual NeMo microservice page.
+
+- For upgrades, NIM Operator configuration sample files for each NeMo microservice release are available in the directory. Apply the sample files for your respective NeMo microservice release for rolling upgrades.

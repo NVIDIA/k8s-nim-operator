@@ -1,0 +1,84 @@
+landing-page:
+  page: About NIM Operator
+  path: ./v3.1.4/pages/index.mdx
+navigation:
+- section: NVIDIA NIM Operator
+  contents:
+  - page: About NIM Operator
+    path: ./v3.1.4/pages/index.mdx
+  - page: Release Notes
+    path: ./v3.1.4/pages/release-notes.mdx
+  - page: Platform Support
+    path: ./v3.1.4/pages/platform-support.mdx
+  - page: Platform-specific Prerequisites
+    path: ./v3.1.4/pages/platform-prerequisites.mdx
+  - page: Install
+    path: ./v3.1.4/pages/install.mdx
+  - page: Image Pull Secrets
+    path: ./v3.1.4/pages/image-pull-secrets.mdx
+  - page: Upgrade
+    path: ./v3.1.4/pages/upgrade.mdx
+  - page: Uninstall
+    path: ./v3.1.4/pages/uninstall.mdx
+- section: NIM Microservices
+  contents:
+  - page: Quick Start
+    path: ./v3.1.4/pages/quickstart.mdx
+  - page: Caching Models
+    path: ./v3.1.4/pages/cache.mdx
+  - page: '- Non-LLM NIM'
+    path: ./v3.1.4/pages/cache-non-llm.mdx
+  - page: '- LLM NIM'
+    path: ./v3.1.4/pages/cache-llm.mdx
+  - page: NIM Services
+    path: ./v3.1.4/pages/service.mdx
+  - page: NIM Pipelines
+    path: ./v3.1.4/pages/pipelines.mdx
+  - page: Upgrade NIM Microservices
+    path: ./v3.1.4/pages/nim-upgrade.mdx
+- section: NeMo Microservices
+  contents:
+  - page: NeMo Microservices Prerequisites
+    path: ./v3.1.4/pages/nemo-prerequisites.mdx
+  - page: 'Quick Start: Deploy All NeMo Microservices'
+    path: ./v3.1.4/pages/deploy-nemo-microservices.mdx
+  - page: NeMo Data Store
+    path: ./v3.1.4/pages/data-store.mdx
+  - page: NeMo Entity Store
+    path: ./v3.1.4/pages/entity-store.mdx
+  - page: NeMo Customizer
+    path: ./v3.1.4/pages/customizer.mdx
+  - page: NeMo Evaluator
+    path: ./v3.1.4/pages/evaluator.mdx
+  - page: NeMo Guardrails
+    path: ./v3.1.4/pages/guardrail.mdx
+  - page: Upgrade NeMo Microservices
+    path: ./v3.1.4/pages/nemo-upgrade.mdx
+- section: Advanced Configurations
+  contents:
+  - page: Observability
+    path: ./v3.1.4/pages/observability.mdx
+  - page: Resource Quotas
+    path: ./v3.1.4/pages/resource-quotas.mdx
+  - page: Air-Gapped Environments
+    path: ./v3.1.4/pages/air-gap.mdx
+  - page: Caching Locally Built LLM NIM Engines
+    path: ./v3.1.4/pages/nim-build.mdx
+  - page: Dynamic Resource Allocation (DRA) for NIM
+    path: ./v3.1.4/pages/dra.mdx
+  - page: Multi-Node NIM Deployment
+    path: ./v3.1.4/pages/multi-node.mdx
+  - page: KServe Support
+    path: ./v3.1.4/pages/kserve.mdx
+  - page: Validation Webhooks
+    path: ./v3.1.4/pages/configure-webhooks.mdx
+  - page: Kata Containers (Experimental)
+    path: ./v3.1.4/pages/kata-sandbox.mdx
+  - page: Dynamo (Experimental)
+    path: ./v3.1.4/pages/dynamo.mdx
+- section: Sample Applications
+  contents:
+  - link: Data Flywheel Jupyter Notebook
+    href: https://github.com/NVIDIA/k8s-nim-operator/blob/main/test/e2e/jupyter-notebook/README.md
+  - link: Deploy NVIDIA RAG Blueprint on Kubernetes with NIM Operator
+    href: https://docs.nvidia.com/rag/2.3.0/deploy-nim-operator.html

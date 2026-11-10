@@ -1,0 +1,104 @@
+---
+title: "Configuring Validation Webhooks"
+description: "NIM Operator supports validation admission webhooks for NIMCache and NIMService custom resource definitions. Webhooks validate resource specifications when you create or update them, catching configur"
+slug: configure-webhooks
+---
+
+<Anchor id="configuring-validation-webhooks" />
+
+NIM Operator supports validation admission webhooks for NIMCache and NIMService custom resource definitions. Webhooks validate resource specifications when you create or update them, catching configuration errors before deployment.
+
+To enable webhooks, you must install [cert-manager](https://cert-manager.io/docs) to manage the TLS certificates required for webhook communication.
+
+<Note>
+Webhooks are enabled by default on OpenShift in NIM Operator v3.0.0 and later, and they need to be explicitly enabled on all other Kubernetes platforms.
+
+</Note>
+
+## Install cert-manager
+
+Before enabling validating webhooks, you must install cert-manager on your cluster.
+
+1. Add the Helm repository:
+
+   ```console
+   $ helm repo add jetstack https://charts.jetstack.io
+   $ helm repo update
+   ```
+
+1. Install cert-manager:
+
+   ```console
+   $ helm install cert-manager jetstack/cert-manager \
+       --namespace cert-manager \
+       --create-namespace \
+       --set crds.enabled=true
+   ```
+
+   For more information on cert-manager installation options, refer to the [cert-manager documentation](https://cert-manager.io/docs/installation/).
+
+1. Optional: Verify that cert-manager is running:
+
+   ```console
+   $ kubectl get pods -n cert-manager
+   $ kubectl get crds | grep cert-manager
+   ```
+
+   All cert-manager pods should be in the `Running` state.
+
+## Enable Validation Webhooks
+
+After cert-manager is installed, upgrade your NIM Operator installation to enable the admission controller:
+
+```console
+$ helm upgrade nim-operator nvidia/k8s-nim-operator \
+    --set operator.admissionController.enabled=true \
+    -n nim-operator
+```
+
+Verify that the webhooks are enabled:
+
+```console
+$ kubectl get validatingwebhookconfiguration
+```
+
+Example output:
+
+```console
+NAME                                                             WEBHOOKS   AGE
+cert-manager-webhook                                             1          7m26s
+nim-operator-k8s-nim-operator-validating-webhook-configuration   2          49s
+```
+
+## Validate Custom Resource Files
+
+After webhooks are enabled, you can use the `--dry-run=server` option to validate your custom resources before applying them to your cluster.
+This checks for schema validation errors and immutability violations without creating the resources.
+
+```console
+$ kubectl apply -f nimservice.yaml --dry-run=server
+```
+
+If validation succeeds, you see output similar to the following:
+
+```console
+nimservice.apps.nvidia.com/my-nim-service created (server dry run)
+```
+
+If validation fails, the webhook returns an error message describing the issue:
+
+```console
+The NIMService "nv-embedqa-e5-v5" is invalid:
+* spec.expose.service.port: Invalid value: "string": spec.expose.service.port in body must be of type integer: "string"
+* <nil>: Invalid value: "null": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation
+```
+
+## Disable Validation Webhooks
+
+If you want to disable validation webhooks:
+
+```console
+$ helm upgrade nim-operator nvidia/k8s-nim-operator \
+    --set operator.admissionController.enabled=false \
+    -n nim-operator
+```

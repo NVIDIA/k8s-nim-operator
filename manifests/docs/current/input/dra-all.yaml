@@ -1,0 +1,350 @@
+# Full GPU resource claim
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+    name: gpu-claim
+spec:
+    devices:
+      requests:
+      - exactly:
+          allocationMode: ExactCount
+          count: 1
+          deviceClassName: gpu.nvidia.com
+        name: gpu
+---
+# MIG (1g.10gb) resource claim with time slicing strategy
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: mig-ts-claim
+spec:
+  devices:
+    config:
+    - requests:
+      - mig
+      opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: MigDeviceConfig
+          sharing:
+            strategy: TimeSlicing
+    requests:
+    - exactly:
+        allocationMode: ExactCount
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.attributes['gpu.nvidia.com'].profile == '1g.10gb'"
+      name: mig
+---
+# MIG (1g.10g) resource claim with MPS strategy
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: mig-mps-claim
+spec:
+  devices:
+    config:
+    - requests:
+      - mig
+      opaque:
+        driver: gpu.nvidia.com
+        parameters:
+          apiVersion: resource.nvidia.com/v1beta1
+          kind: MigDeviceConfig
+          sharing:
+            strategy: MPS
+    requests:
+    - exactly:
+        allocationMode: ExactCount
+        count: 1
+        deviceClassName: mig.nvidia.com
+        selectors:
+        - cel:
+            expression: "device.attributes['gpu.nvidia.com'].profile == '1g.10gb'"
+      name: mig
+---
+# NIMService with a 1-GPU resource claim and a NIMCache with tp=1 model profiles
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-31-8b-instruct
+spec:
+  image:
+      repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+      tag: 1.8.3
+      pullPolicy: IfNotPresent
+      pullSecrets:
+        - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+      nimCache:
+        name: meta-llama-31-8b-instruct
+        profile: ''
+  replicas: 1
+  draResources:
+  - resourceClaimName: gpu-claim
+  expose:
+      service:
+        type: ClusterIP
+        port: 8000
+---
+# NIMService with a 1-GPU resource claim template and a NIMCache with tp=1 model profiles
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-31-8b-instruct
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: 1.8.3
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama-31-8b-instruct
+      profile: ''
+  replicas: 1
+  draResources:
+  - resourceClaimTemplateName: gpu-claim-template
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# NIMService with a 2-GPU resource claim template and a NIMCache with tp=2 model profiles
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-31-8b-instruct-tp2
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: 1.8.3
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama-31-8b-instruct-tp2
+      profile: ''
+  replicas: 1
+  draResources:
+  - resourceClaimTemplateName: gpux2-claim-template
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# NIMService with 2 1-GPU resource claim templates and a tp=2 model profile
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-31-8b-instruct-tp2
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: 1.8.3
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama-31-8b-instruct-tp2
+      profile: ''
+  replicas: 1
+  draResources:
+  - resourceClaimTemplateName: gpu-claim-template
+  - resourceClaimTemplateName: gpu-claim-template
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# non-LLM NIM with a single mig (1g.10gb) resource claim template
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: nvidia-nemoretriever-page-elements-v2
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
+    tag: 1.4.0
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: nvidia-nemoretriever-page-elements-v2
+      profile: ''
+  replicas: 1
+  draResources:
+  - resourceClaimTemplateName: mig-claim-template
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# 2 replicas of a non-LLM NIM with a single mig (1g.10gb) resource claim w/ MPS sharing strategy
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: nvidia-nemoretriever-page-elements-v2-x2
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
+    tag: 1.4.0
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: nvidia-nemoretriever-page-elements-v2
+      profile: ''
+  replicas: 2
+  draResources:
+  - resourceClaimName: mig-mps-claim
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# NIMService with the same 1-GPU resource claims and a tp=2 model profile
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-31-8b-instruct-tp2
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: 1.8.3
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama-31-8b-instruct-tp2
+      profile: ''
+  replicas: 1
+  draResources:
+  - resourceClaimName: gpu-claim-1
+  - resourceClaimName: gpu-claim-2
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# LLM NIMCache with tensorParallelism=1 filter
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: meta-llama-31-8b-instruct
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama-3.1-8b-instruct:1.8.3
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: tensorrt_llm
+        tensorParallelism: "1"
+  storage:
+    pvc:
+      create: true
+      storageClass: local-path
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+---
+# LLM NIMCache with tensorParallelism=2 filter
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: meta-llama-31-8b-instruct-tp2
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama-3.1-8b-instruct:1.8.3
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        engine: tensorrt_llm
+        tensorParallelism: "2"
+  storage:
+    pvc:
+      create: true
+      storageClass: local-path
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+---
+# non-llm NIM cache
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: nvidia-nemoretriever-page-elements-v2
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2:1.4.0
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:
+        precision: "fp16"
+  storage:
+    pvc:
+      create: true
+      storageClass: local-path
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+---
+# NIMService using auto-generated ResourceClaimTemplate
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama3-8b-instruct
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: "1.8.3"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama3-8b-instruct
+      profile: ''
+  replicas: 1
+  draResources:
+  - claimCreationSpec:
+      devices:
+      - name: gpu
+        count: 1
+        deviceClassName: gpu.nvidia.com
+        driverName: gpu.nvidia.com
+        attributeSelectors:
+        - key: driverVersion
+          op: GreaterThanOrEqual
+          value:
+            versionValue: "550.127.8"
+        - key: architecture
+          op: Equal
+          value:
+            stringValue: Ampere
+        capacitySelectors:
+        - key: memory
+          op: GreaterThanOrEqual
+          value: 40Gi
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---

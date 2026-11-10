@@ -1,0 +1,387 @@
+---
+title: "Caching Non-LLM NIM"
+description: "NVIDIA NIM microservices are a set of easy-to-use microservices for accelerating the deployment of foundation models on any cloud or data center. These microservices help keep your data secure. NIM mi"
+slug: cache-non-llm
+---
+
+<Anchor id="caching-non-llm-nim" />
+
+## About NVIDIA NIM Microservices
+
+NVIDIA NIM microservices are a set of easy-to-use microservices for accelerating the deployment of foundation models on any cloud or data center. These microservices help keep your data secure.
+NIM microservices have production-grade runtimes and support a wide variety of [domains](https://build.nvidia.com/),
+such as retrieval, vision, speech, biology, and safety and moderation.
+
+For more information, refer to [NVIDIA NIM](https://docs.nvidia.com/nim/index.html).
+
+<Anchor id="non-llm-nim-caching"></Anchor>
+
+<Anchor id="id1" />
+
+## Non-LLM NIM Caching
+
+NIM Cache supports non-LLM NIMs with and without model profiles.
+Choose the caching configuration based on whether the NIM uses model profiles.
+
+<Anchor id="cache-retriever-embedding-nim"></Anchor>
+
+<Anchor id="cache-nvidia-nemo-retriever-nim-2-x" />
+
+
+
+### Cache NVIDIA NeMo Retriever NIM 2.x+
+
+NVIDIA NeMo Retriever NIM 2.x+ containers introduce a purpose-built runtime.
+The NIM selects optimized CUDA kernels automatically at startup, so you do not need to list or select model profiles.
+The NIM downloads model weights on the first run.
+
+You can use a NIM Cache to download the model weights before you deploy the NIM and store the weights and runtime cache on persistent storage.
+The NIM Operator runs the NIM container in download-only mode, waits for the download to finish, and then uses the same persistent volume for the NIM Service.
+The Operator mounts the persistent volume at `/model` for model weights and `/opt/cache` for cached runtime artifacts, and configures the download-only mode and model path automatically.
+
+#### Choose a Model Download Provider
+
+The NeMo Retriever NIM 2.x+ containers pull the NIM container image from NGC.
+Independently, these containers can download model weights from Hugging Face or NGC.
+The `spec.source.ngc.modelPuller` field identifies the NIM container image.
+The field does not select the model download provider.
+
+The `spec.source.ngc.authSecret` field supplies the credential used by the selected provider.
+The NIM Service `spec.authSecret` field supplies the same credential to the running NIM.
+
+<table>
+<thead>
+<tr>
+<th>
+
+Model Download Provider
+
+</th>
+<th>
+
+Configuration
+
+</th>
+<th>
+
+Credential
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+Hugging Face (default)
+
+</td>
+<td>
+
+No provider setting is required.
+
+</td>
+<td>
+
+`HF_TOKEN`
+
+</td>
+</tr>
+<tr>
+<td>
+
+NGC
+
+</td>
+<td>
+
+Set `NIM_MODEL_DOWNLOAD_PROVIDER=ngc` for the NIM Cache and NIM Service.
+
+</td>
+<td>
+
+`NGC_API_KEY`
+
+</td>
+</tr>
+</tbody>
+</table>
+
+In both cases, you need to set `ngc-secret` to pull the NIM container image from NGC.
+The Operator also uses this secret to inspect the image before it creates the caching job.
+
+#### Use Hugging Face as the Model Download Provider
+
+The following sample uses Hugging Face, the default model download provider for NeMo Retriever NIM 2.x+.
+Before you apply the sample, create the following secrets in the `nim-service` namespace:
+
+- `ngc-secret` for pulling the NIM container image from NGC.
+
+- `hf-api-secret` containing `HF_TOKEN` for downloading model weights from Hugging Face.
+
+Refer to [Image Pull Secrets](/image-pull-secrets) for instructions.
+
+1. Create a file, such as `retriever-embedding.yaml`, with the following contents:
+
+   <Code src="../../manifests/docs/current/input/nim/serving/standalone/basic/retriever-embedding.yaml" language="yaml" startLine="1" />
+
+   The `spec.source.ngc.model` field is intentionally omitted because this NIM does not use model profiles.
+
+1. Create the NIM Cache and NIM Service:
+
+   ```console
+   $ kubectl apply -f retriever-embedding.yaml
+   ```
+
+1. Wait for the NIM Cache and NIM Service to report `Ready`:
+
+   ```console
+   $ kubectl get nimcache,nimservice -n nim-service
+   ```
+
+   The NIM Cache status does not list model profiles for this NIM.
+
+#### Use NGC as the Model Download Provider
+
+To download model weights from NGC instead, create `ngc-api-secret` containing `NGC_API_KEY` as described in [Image Pull Secrets](/image-pull-secrets).
+In the complete sample, replace `hf-api-secret` with `ngc-api-secret` and add `NIM_MODEL_DOWNLOAD_PROVIDER=ngc` to `spec.env` for both resources:
+
+```yaml
+# NIMCache fields
+spec:
+  source:
+    ngc:
+      authSecret: ngc-api-secret
+  env:
+    - name: NIM_MODEL_DOWNLOAD_PROVIDER
+      value: "ngc"
+---
+# NIMService fields
+spec:
+  authSecret: ngc-api-secret
+  env:
+    - name: NIM_MODEL_DOWNLOAD_PROVIDER
+      value: "ngc"
+```
+
+For details about model download providers and persistent storage paths, refer to [Get Started With NVIDIA NeMo Retriever Embedding NIM](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/getting-started.html#launch-the-nim).
+
+<Anchor id="non-llm-nim-cache-sources"></Anchor>
+
+
+
+### Cache NIMs That Use Model Profiles
+
+Use one of the following model sources:
+
+<Tabs>
+  <Tab title="NVIDIA NGC Catalog" language="ngc">
+When you create a NIM Cache resource with the NGC Catalog as the source, the NIM Operator starts a pod that lists the available model profiles.
+The Operator creates a config map of the model profiles.
+
+To pull models from the NGC Catalog production branch, you must have created Kubernetes secrets to hold your NGC Catalog API key and pass the secret names as `spec.source.ngc.pullSecret` and `spec.source.ngc.authSecret`.
+Refer to [Image Pull Secrets](/image-pull-secrets) for more details on creating these secrets.
+
+The following shows an example of using the NGC catalog as a cache source.
+
+```yaml
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: rerankqa-mistral-4b-v3
+  namespace: nim-service
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/nvidia/nv-rerankqa-mistral-4b-v3:1.0.2
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+      model:   #Include the model object to describe the model you want to pull from NGC
+        engine: tensorrt
+        tensorParallelism: "1"
+  storage:
+    pvc:
+      create: true
+      storageClass: ''
+      size: "50Gi"
+      volumeAccessMode: ReadWriteOnce
+```
+
+<Note>
+NVIDIA recommends that you use profile filtering when caching models using `source.ngc.model.`.
+Models can have several profiles, and without filtering by one or more parameters, you can download more models than intended, which can increase your storage requirements.
+For more information on NIM profiles and their model storage requirements, refer to the [NIM Models documentation](https://docs.nvidia.com/nim/large-language-models/latest/profiles.html).
+
+</Note>
+
+Refer to the following table for information about fields for NVIDIA NGC Catalog as a NIM Cache Source:
+
+<table>
+<thead>
+<tr>
+<th>
+
+Field
+
+</th>
+<th>
+
+Description
+
+</th>
+<th>
+
+Default Value
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`spec.source.ngc.model`
+
+</td>
+<td>
+
+Specifies an object of filtering information for the model and profile you want to cache.
+If you want to cache a Multi-LLM model, use `spec.source.ngc.modelEndpoint` instead.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.engine`
+
+</td>
+<td>
+
+Specifies a model caching constraint based on the engine.
+Common values are as follows:
+
+- `tensorrt` – optimized engine for embedding and reranking
+
+- `onnx` – community engine
+
+Each NIM microservice determines the supported engines.
+Refer to the microservice documentation for the latest information.
+
+By default, the caching job matches model profiles for all engines.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.profiles`
+
+</td>
+<td>
+
+Specifies an array of model profiles to cache.
+
+When you specify this field, automatic profile selection is disabled and all other `source.ngc.model` fields are ignored.
+
+The following partial specification requests a specific model profile.
+
+```yaml
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama3-8b-instruct:1.0.3
+      model:
+        profiles:
+        - 8835c31...
+```
+
+You can determine the model profiles by running the
+[list-model-profiles](https://docs.nvidia.com/nim/large-language-models/latest/reference/cli-reference.html#list-model-profiles)
+command.
+
+You can specify `all` to download all model profiles.
+Use the `all` parameter with care as some models have many profiles that will take several minutes to download and a large amount of storage space to cache.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.modelPuller`
+
+</td>
+<td>
+
+Specifies the NIM container image used to download model weights.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+</tbody>
+</table>
+
+  </Tab>
+  <Tab title="Mirrored Local Model Registries (S3, HTTPS, or JFrog)" language="mirrored-local">
+To use a NGC Mirrored Local Model Registry as a NIM Cache source, set `NIM_REPOSITORY_OVERRIDE` as an environment variable for the NIM.
+
+Refer to [Repository Override for NVIDIA NIM for LLMs](https://docs.nvidia.com/nim/large-language-models/latest/nim-repository-override.html)
+for more detailed instructions.
+
+Refer to [NIM for LLMs Environment Variables](https://docs.nvidia.com/nim/large-language-models/latest/reference/environment-variables.html)
+for more information on the `NIM_REPOSITORY_OVERRIDE` environment variable.
+
+<Note>
+The NIM Cache fields relevant to Mirrored Local Model Registries are the same as for NVIDIA NGC Catalog as a NIM Cache Source.
+
+</Note>
+
+The following sample manifests are available in the [config/samples/nim/caching/ngc-mirror](https://github.com/NVIDIA/k8s-nim-operator/tree/release-3.0/config/samples/nim/caching/ngc-mirror) directory.
+
+**S3**
+
+<Code src="../../manifests/docs/current/input/nim/caching/ngc-mirror/s3/nimcache-llm.yaml" language="yaml" highlight="{8,9,10,11,12,13}" startLine="1" lines="2-28" />
+
+<Note>
+You must specify your AWS credentials in the `aws-api-secret` using the following environment variables:
+
+```console
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+AWS_SESSION_TOKEN  # (if using temporary credentials)
+```
+
+For more information, refer to [Model Download: Amazon S3](https://docs.nvidia.com/nim/large-language-models/latest/deployment/model-download.html#amazon-s3).
+
+</Note>
+
+**HTTPS**
+
+<Code src="../../manifests/docs/current/input/nim/caching/ngc-mirror/https/nimcache-llm.yaml" language="yaml" highlight="{8,9}" startLine="1" lines="2-24" />
+
+**JFrog**
+
+<Code src="../../manifests/docs/current/input/nim/caching/ngc-mirror/jfrog/nimcache-llm.yaml" language="yaml" highlight="{8,9}" startLine="1" lines="2-24" />
+
+  </Tab>
+
+</Tabs>

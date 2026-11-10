@@ -1,0 +1,43 @@
+---
+title: "Upgrade NVIDIA NIM Microservices"
+license: Apache-2.0
+copyright: "Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "This page details how to upgrade your NVIDIA NIM models. Refer to the Upgrading NVIDIA NIM Operator for details on upgrading the NIM Operator."
+slug: nim-upgrade
+---
+
+<Anchor id="upgrade-nvidia-nim-microservices" />
+
+This page details how to upgrade your NVIDIA NIM models.
+Refer to the [Upgrading NVIDIA NIM Operator](/upgrade) for details on upgrading the NIM Operator.
+
+The NIM Operator performs Kubernetes rolling upgrades on NIM microservices.
+NIM availability is not impacted while updating NIMService and NIMPipelines to use new NIM cache instance if the number of replicas is greater than one.
+
+To upgrade to a new NIM microservice version you must upgrade both your NIMCache and NIMService or NIMPipeline instance.
+The NIM Operator does not support updating cached models with new profile versions after they are cached.
+To upgrade your NIM microservices to use newer NIM model versions, you must create a new NIMCache that references the newer model, then update your corresponding NIMService or NIMPipeline instances to use the new NIM cache and NIM model version.
+
+## Before Upgrading
+
+Refer to the NIM microservice release notes for details on what is different in your desired version of the NIM microservices
+Links to all supported NIM is available in the [NVIDIA NIM documentation](https://docs.nvidia.com/nim/large-language-models/latest/release-notes.html).
+
+## Upgrade NIM Models
+
+To upgrade your NIM model,
+
+1. Create a new NIMCache instance that is configured to use the updated NIM images.
+
+   Refer to the [Caching NIM Models](/cache) for details on configuring a NIMCache.
+You can re-use an existing PVC with the new NIMCache, by setting the `spec.storage.pvc.create` to `false` and the `spec.storage.pvc.name` field in the `NIMCache` custom resource to the existing PVC name.
+
+1. Update your corresponding NIMService or NIMPipeline instances to use the new NIMCache after it is in a `Ready` state.
+
+For examples of the latest NIM Operator custom resource, refer to the [NIM Operator repository samples folder](https://github.com/NVIDIA/k8s-nim-operator/tree/main/config/samples/nim).
+
+## Next Steps
+
+1. [Upgrading NVIDIA NIM Operator](/upgrade)
+
+1. [Caching NIM Models](/cache)

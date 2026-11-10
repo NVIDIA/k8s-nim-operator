@@ -1,0 +1,131 @@
+---
+title: "Kata Sandbox Workloads (Experimental)"
+description: "This feature is experimental and not fully supported. It is included here as a preview for testing environments and is not recommended for production use cases. There may be changes to functionality, "
+slug: kata-sandbox
+---
+
+<Anchor id="kata-sandbox-workloads-experimental" />
+
+<Warning>
+This feature is experimental and not fully supported.
+It is included here as a preview for testing environments and is not recommended for production use cases.
+There may be changes to functionality, implementation, and APIs in future releases.
+Kata Containers are the foundational technology for extending confidential computing to native Kubernetes deployments. This release adds support for the Kata sandbox.
+Support for Confidential Containers is planned for future releases of the NIM Operator.
+
+</Warning>
+
+The NIM Operator leverages the NVIDIA GPU Operator to run NIMs inside Kata Containers. This page outlines how to deploy a NIM workload inside a Kata Sandbox container.
+
+[Kata Containers](https://github.com/kata-containers/kata-containers) are lightweight Virtual Machines (VMs) that act like containers, but still provide the workload isolation and security advantages of VMs.
+A Kata container runs in a virtual machine on the host.
+The virtual machine has a separate operating system and kernel.
+Hardware virtualization and a separate kernel provide improved workload isolation
+in comparison with traditional containers.
+
+Running NIM inside Kata containers enables lightweight virtualized isolation for enhanced security.
+
+<Note>
+Confidential Containers and NIM Cache deployments have not been tested and are not supported in this release.
+This use case has been tested for NIM Service deployments using Kata sandbox containers only.
+Support for Confidential Containers is planned for a future release.
+
+</Note>
+
+Procedure:
+
+- Follow the [GPU Operator Kata Deploy guide](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/deploy-kata-containers.html) for details on configuring your cluster, deploying Kata, and installing the GPU Operator.
+
+- Install the NIM Operator.
+
+- [Run a NIMService in a Kata Container](#deploy-nim-in-a-kata-container)
+
+- [Validate Kata Container](#validate-nim-running-in-kata-container)
+
+## Install the NIM Operator
+
+After using the [GPU Operator Kata Deploy guide](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/deploy-kata-containers.html) to deploy Kata cCntainers and the GPU Operator to your cluster, install the the NIM Operator:
+
+1. Add the Helm repository for NVIDIA:
+
+```console
+$ helm repo add nvidia https://helm.ngc.nvidia.com/nvidia \
+    && helm repo update
+```
+
+1. Create the Operator namespace:
+
+   ```console
+   $ kubectl create namespace nim-operator
+   ```
+
+1. Install the Operator:
+
+   ```console
+   $ helm upgrade --install nim-operator nvidia/k8s-nim-operator -n nim-operator --version=3.1.3
+   ```
+
+For full install details, refer to the NIM Operator [installation instructions](/install).
+
+## Deploy NIM in a Kata Container
+
+1. Create the `nim-service` namespace:
+
+   ```console
+   $ kubectl create namespace nim-service
+   ```
+
+1. Create an image pull secret in the `nim-service` namespace for downloading the NIM container image from NVIDIA NGC:
+
+   ```console
+   $ kubectl create secret -n nim-service docker-registry ngc-secret \
+       --docker-server=nvcr.io \
+       --docker-username='$oauthtoken' \
+       --docker-password=<ngc-api-key>
+   ```
+
+   The sample manifest also references an `ngc-api-secret` for model downloads. Refer to [Image Pull Secrets](/image-pull-secrets) for the full set of secrets required by NIM Services.
+
+1. Create a file, `llm-kata-sandbox.yaml`, based on the [sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/confidential-computing/llm-kata-sandbox.yaml).
+
+   <Code src="../../../../manifests/docs/current/input/nim/serving/standalone/confidential-computing/llm-kata-sandbox.yaml" language="yaml" highlight="{17,18,29,30,31}" startLine="1" />
+
+   The following fields are required to deploy in a Kata container:
+
+   -    Set `spec.runtimeClassName` to `kata-qemu-nvidia-gpu`.
+This is the Kata runtime class.
+
+   -    Set `spec.userID` to 0 and `spec.groupID` to 0.
+
+   -    Use the `spec.storage.emptyDir` field to configure resource requirements for your NIM model.
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -f llm-kata-sandbox.yaml
+   ```
+
+## Validate NIM Running in Kata Container
+
+Confirm the NIMService is running in a Kata container by checking the kernel version in the pod.
+This should differ from the kernel version running on the host where the pod is running.
+
+1. Retrieve the NIM pod name and save it as POD.
+
+   ```console
+   $ POD=$(kubectl get pods -n nim-service -o name | grep meta-llama-3-2-1b-instruct-kata-sandbox | head -1 | cut -d/ -f2)
+   ```
+
+1. Verify the pod is running inside a Kata environment:
+
+   ```console
+   $ kubectl exec -it $POD -n nim-service -- uname -a
+   ```
+
+   Example output:
+
+   ```console
+   Linux meta-llama-3-2-1b-instruct-kata-sandbox-5689f9bc67-ljnlf 6.18.12-nvidia-gpu #1 SMP Fri Feb 27 09:33:52 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+   ```
+
+   Note that if you are using a non‑default Kata VM, the output will display the corresponding kernel.

@@ -1,0 +1,234 @@
+---
+title: "NVIDIA NIM Operator"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "The NVIDIA NIM Operator enables Kubernetes cluster administrators to operate the software components and services necessary to deploy NVIDIA NIMs microservices in Kubernetes."
+---
+
+<Warning>
+These docs track development on the `main` branch and can describe unreleased changes. Select a numbered version for a released snapshot.
+</Warning>
+
+<Anchor id="nvidia-nim-operator" />
+
+## About the Operator
+
+The NVIDIA NIM Operator enables Kubernetes cluster administrators to operate the software components and services necessary to deploy NVIDIA NIMs microservices in Kubernetes.
+
+NIM microservices deliver AI foundational models as accelerated inference microservices that are portable across data center, workstation, and cloud environments, accelerating flexible generative models. The NIM Operator supports deploying NIMs in various domains such as reasoning, retrieval, speech, and biology.
+
+The Operator can manage the lifecycle of the following microservices and the models they use:
+
+- NVIDIA NIM [models](https://build.nvidia.com/search/models?q=NVIDIA+NIM&amp;filters=nimType%3Anim_type_run_anywhere), such as:
+
+  -   Reasoning LLMs
+
+  -   Retrieval — embedding, reranking, and other functions
+
+  -   Speech
+
+  -   Biology
+
+## Benefits of Using the Operator
+
+NIM microservices are not typically deployed on their own.
+Instead, they are deployed and used together, along with other third-party dependencies, to complete AI workflows.
+The deployment and lifecycle management of these microservices and their dependencies for production generative AI pipelines can lead to additional toil for machine learning engineers, LLM engineers, and Kubernetes cluster administrators.
+
+Using the NIM Operator simplifies the operation and lifecycle management of NIM microservices at scale and at the cluster level by providing custom resources that enable you to define your NIM deployment requirements to cache models to your cluster, enable autoscaling of NIM microservices, and leverage the Kubernetes operator approach for lifecycle management of your AI inference pipelines.
+
+### Model Caching
+
+One key benefit of using the NIM Operator is its ability to pre-cache models and datasets.
+Models, their many available profiles, and training datasets are large and can take a long time to download.
+This adds initial inference service latency into your workflows.
+The NIM Operator allows you to select the models you need for your AI workflows by specifying NIM profiles and tags, or letting the Operator auto-detect the best model based on the GPUs available on the Kubernetes cluster in a cache custom resource.
+You can precache models on any available node based on your requirements, either on CPU-only or on GPU-accelerated nodes, enabling you to avoid long bootstrapping times and have your models ready when you need them.
+
+Deploying models into a cache will also unblock deploying into air-gapped environments by providing a place to store your models within your clusters.
+
+### Logging and Monitoring
+
+You can collect and visualize latency and throughput metrics to optimize model performance at the NIM Operator level.<br />
+This includes metrics for how many caches are deployed across different namespaces.
+Using these metrics along with the NIM Operator aggregated logs from model services makes it easier to see the health of the services deployed on your cluster, to debug issues on your cluster, or perform regular audits of deployed services.
+
+### Autoscaling
+
+The NIM Operator can also help to solve another common problem with inferencing services: autoscaling.
+You can scale based on different metrics, either based on DCG metrics or NIM-specific metrics for the service handling requests to your cached models.
+
+### Government Ready
+
+NVIDIA NIM Operator is government ready, NVIDIA’s designation for software that meets applicable security requirements for deployment in your FedRAMP High or equivalent sovereign use case.
+NVIDIA AI Enterpise customers can start using this feature by deploying government ready NIM Operator, NVIDIA GPU Operator, and NIM components.
+For more information on NVIDIA’s government ready support, refer to the white paper [AI Software for Regulated Environments](https://docs.nvidia.com/ai-enterprise/planning-resource/ai-software-regulated-environments-white-paper/latest/index.html).
+
+### Deploy Dynamo CRDs (Experimental)
+
+The NIM Operator experimentally supports deploying [Dynamo CRDs](https://github.com/ai-dynamo/dynamo/tree/main/deploy/operator/config/crd/bases) using the NIM Operator.
+This allows you to enable large-scale distributed and disaggregated inference serving using Dynamo.
+Refer to the [Dynamo (Experimental)](/dynamo) page for more details.
+
+### Kata Containers (Experimental)
+
+Experimental support for deploying NIMServices in Kata Containers.
+This feature leverages the GPU Operator and kata-deploy to enable lightweight virtualized isolation for enhanced security.
+
+Refer to [Kata Sandbox Workloads (Experimental)](/kata-sandbox) for more details.
+
+## NIM Operator Custom Resources
+
+The Operator uses the following custom resources:
+
+- `nimcaches.apps.nvidia.com`
+
+  This custom resource enables downloading models from NVIDIA NGC and persisting them on network storage.
+When multiple instances of the same NIM microservice start, they can use a single cached model that provides performance benefits.
+Caching is optional.
+Without caching, each NIM microservice instance downloads its own copy of the model when it starts.
+
+- `nimservices.apps.nvidia.com`
+
+  This custom resource represents a NIM microservice.
+Adding and updating a NIM service resource creates a Kubernetes deployment for the microservice in a namespace.
+
+  The custom resource supports using a model from an existing NIM cache resource or a persistent volume claim.
+
+  The custom resource also supports creating a horizontal pod autoscaler, ingress, and service monitor to simplify cluster administration.
+
+- `nimpipelines.apps.nvidia.com`
+
+  This custom resource represents a group of NIM service custom resources.
+
+- `nimbuild.apps.nvidia.com`
+
+  This custom resource generates optimized TensorRT-LLM (TRT-LLM) engine builds based on predefined model profiles within a given LLM NIM.
+Because TRT-LLM builds are compute and memory intensive, this custom resource allows users to prebuild required engines on desired GPUs.
+This approach improves startup times and reduces overall resource usage during final NIM deployments and autoscaling, making deployments more predictable.
+
+## Licenses
+
+The following table identifies the licenses for the software components related to the Operator.
+
+<table>
+<thead>
+<tr>
+<th>
+
+Component
+
+</th>
+<th>
+
+Artifact Type
+
+</th>
+<th>
+
+Artifact Licenses
+
+</th>
+<th>
+
+Source Code License
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+NVIDIA NIM Operator
+
+</td>
+<td>
+
+Helm Chart
+
+</td>
+<td>
+
+[NVIDIA AI Enterprise Software License Agreement](https://www.nvidia.com/en-us/data-center/products/nvidia-ai-enterprise/eula/)
+
+</td>
+<td>
+
+[Apache 2](https://www.apache.org/licenses/LICENSE-2.0)
+
+</td>
+</tr>
+<tr>
+<td>
+
+NVIDIA NIM Operator
+
+</td>
+<td>
+
+Container
+
+</td>
+<td>
+
+[NVIDIA AI Enterprise Software License Agreement](https://www.nvidia.com/en-us/data-center/products/nvidia-ai-enterprise/eula/)
+
+</td>
+<td>
+
+[Apache 2](https://www.apache.org/licenses/LICENSE-2.0)
+
+</td>
+</tr>
+<tr>
+<td>
+
+NVIDIA NIM
+
+</td>
+<td>
+
+Container
+
+</td>
+<td>
+
+[NVIDIA AI Enterprise Software License Agreement](https://www.nvidia.com/en-us/data-center/products/nvidia-ai-enterprise/eula/)
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+NVIDIA NeMo Retriever Text Embedding NIM
+
+</td>
+<td>
+
+Container
+
+</td>
+<td>
+
+[NVIDIA AI Enterprise Software License Agreement](https://www.nvidia.com/en-us/data-center/products/nvidia-ai-enterprise/eula/)
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## Third-Party Software
+
+The Chain Server that you can deploy with the sample pipeline uses third-party software.
+You can download the <Download src="_includes/downloads/third-party-licenses-chain-server.txt"><Button intent="primary">`Third-Party Licenses`</Button></Download>.

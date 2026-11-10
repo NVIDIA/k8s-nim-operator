@@ -1,0 +1,211 @@
+---
+title: "NVIDIA NIM Operator Observability"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "The NIM Operator provides Prometheus metrics to track NIM cache, service, and pipelines deployed to your cluster. It also provides several common Kubernetes operator metrics. To start using metrics wi"
+slug: observability
+---
+
+<Anchor id="nvidia-nim-operator-observability" />
+
+The NIM Operator provides [Prometheus](https://prometheus.io/docs/introduction/overview/) metrics to track NIM cache, service, and pipelines deployed to your cluster. It also provides several common Kubernetes operator metrics.
+To start using metrics with the NIM Operator, you must install Prometheus and add `spec.metrics` to your NIM Operator custom resources.
+
+To collect metrics for a Triton server for a non-LLM NIM microservice, expose the metrics port by setting `spec.expose.service.metricsPort` in your NIM service.
+Then refer to [NVIDIA Triton Inference Server Metrics documentation](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/metrics.html) for details on getting these metrics directly from the Triton server.
+
+## Install Prometheus
+
+Use Prometheus to scrape metric data from microservices.
+
+1. Install Prometheus with Helm.
+
+   ```console
+   $ helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+   $ helm repo update
+
+   $ helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace prometheus --create-namespace
+   ```
+
+   NVIDIA development and testing used the [Prometheus Community Kubernetes Helm Charts](https://github.com/prometheus-community/helm-charts?tab=readme-ov-file#prometheus-community-kubernetes-helm-charts).
+
+1. Optional: If you do not have a default storage class, add the following command-line arguments:
+
+   ```text
+   --set server.persistentVolume.storageClass=<storage-class> --set alertmanager.persistence.storageClass=<storage-class>
+   ```
+
+1. Install Prometheus Adapter.
+
+   ```console
+   helm upgrade --install prometheus-adapter prometheus-community/prometheus-adapter     --namespace prometheus-adapter     --create-namespace     --set prometheus.url=http://kube-prometheus-stack-prometheus.prometheus.svc.cluster.local     --set prometheus.port="9090"  
+   ```
+
+## Configure Metrics
+
+To enable metrics, add `spec.metrics` to your NIMService custom resource.
+
+```yaml
+  metrics:
+    enabled: true
+    serviceMonitor:
+      additionalLabels:
+        release: kube-prometheus-stack
+```
+
+Annotate the NIM Operator metrics service so that Prometheus scrapes metrics:
+
+```console
+$ kubectl annotate -n nim-operator svc k8s-nim-operator-metrics-service prometheus.io/scrape=true
+```
+
+## Metrics
+
+<table>
+<thead>
+<tr>
+<th>
+
+Metric Name
+
+</th>
+<th>
+
+Type
+
+</th>
+<th>
+
+Description
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`nimCache_status_total`
+
+</td>
+<td>
+
+gauge
+
+</td>
+<td>
+
+Specifies the number of NIM cache resources in each of the following states:
+
+- Failed
+
+- InProgress
+
+- NotReady
+
+- PVC-Created
+
+- Pending
+
+- Ready
+
+- Started
+
+- Unknown
+
+- all
+
+</td>
+</tr>
+<tr>
+<td>
+
+`nimService_status_total`
+
+</td>
+<td>
+
+gauge
+
+</td>
+<td>
+
+Specifies the number of NIM service resources in each of the following states:
+
+- Failed
+
+- NotReady
+
+- Pending
+
+- Ready
+
+- Unknown
+
+- all
+
+</td>
+</tr>
+<tr>
+<td>
+
+`nimPipeline_status_total`
+
+</td>
+<td>
+
+gauge
+
+</td>
+<td>
+
+Specifies the number of NIM pipeline resources in each of the following states:
+
+- Failed
+
+- NotReady
+
+- Ready
+
+- Unknown
+
+- all
+
+</td>
+</tr>
+</tbody>
+</table>
+
+In addition to the metrics for the custom resources in the preceding table, the Operator produces the following common Kubernetes controller metrics:
+
+- controller_runtime_active_workers
+
+- controller_runtime_max_concurrent_reconciles
+
+- controller_runtime_reconcile_errors_total
+
+- controller_runtime_reconcile_panics_total
+
+- controller_runtime_reconcile_time_seconds
+
+- controller_runtime_reconcile_total
+
+- controller_runtime_terminal_reconcile_errors_total
+
+- controller_runtime_webhook_panics_total
+
+- workqueue_adds_total
+
+- workqueue_depth
+
+- workqueue_longest_running_processor_seconds
+
+- workqueue_queue_duration_seconds
+
+- workqueue_retries_total
+
+- workqueue_unfinished_work_seconds
+
+- workqueue_work_duration_seconds
+
+Refer to [https://book.kubebuilder.io/reference/metrics-reference](https://book.kubebuilder.io/reference/metrics-reference) for information about the common metrics.
