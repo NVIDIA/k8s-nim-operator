@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: 'Preview Fern Docs: Delete'
+
+on: # zizmor: ignore[dangerous-triggers] -- only default-branch configuration is checked out
+  pull_request_target:
+    types: [closed]
+    paths:
+      - 'fern/docs.yml'
+      - 'fern/current.yml'
+      - 'fern/pages/**'
+      - 'fern/versions/**'
+
+permissions: {}
+
+jobs:
+  delete:
+    permissions:
+      contents: read
+      id-token: write
+    uses: NVIDIA/docs-builder/.github/workflows/_fern_docs_preview_delete_copy.yml@main # zizmor: ignore[unpinned-uses] -- Fern OIDC trust pins refs/heads/main
+    with:
+      fern-directory: fern
+      node-version: '24'
+      # Deletion uses the published CLI and does not render the custom substitutions.
+      fern-version: '5.143.2'
+    secrets:
+      DOCS_FERN_AWS_ROLE_TO_ASSUME: ${{ secrets.DOCS_FERN_AWS_ROLE_TO_ASSUME }}
+      DOCS_FERN_SECRET_ID: ${{ secrets.DOCS_FERN_SECRET_ID }}
