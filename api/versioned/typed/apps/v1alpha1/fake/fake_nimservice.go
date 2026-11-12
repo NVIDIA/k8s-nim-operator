@@ -18,129 +18,32 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeNIMServices implements NIMServiceInterface
-type FakeNIMServices struct {
+// fakeNIMServices implements NIMServiceInterface
+type fakeNIMServices struct {
+	*gentype.FakeClientWithList[*v1alpha1.NIMService, *v1alpha1.NIMServiceList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var nimservicesResource = v1alpha1.SchemeGroupVersion.WithResource("nimservices")
-
-var nimservicesKind = v1alpha1.SchemeGroupVersion.WithKind("NIMService")
-
-// Get takes name of the nIMService, and returns the corresponding nIMService object, and an error if there is any.
-func (c *FakeNIMServices) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NIMService, err error) {
-	emptyResult := &v1alpha1.NIMService{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(nimservicesResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeNIMServices(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.NIMServiceInterface {
+	return &fakeNIMServices{
+		gentype.NewFakeClientWithList[*v1alpha1.NIMService, *v1alpha1.NIMServiceList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("nimservices"),
+			v1alpha1.SchemeGroupVersion.WithKind("NIMService"),
+			func() *v1alpha1.NIMService { return &v1alpha1.NIMService{} },
+			func() *v1alpha1.NIMServiceList { return &v1alpha1.NIMServiceList{} },
+			func(dst, src *v1alpha1.NIMServiceList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.NIMServiceList) []*v1alpha1.NIMService { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1alpha1.NIMServiceList, items []*v1alpha1.NIMService) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.NIMService), err
-}
-
-// List takes label and field selectors, and returns the list of NIMServices that match those selectors.
-func (c *FakeNIMServices) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NIMServiceList, err error) {
-	emptyResult := &v1alpha1.NIMServiceList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(nimservicesResource, nimservicesKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.NIMServiceList{ListMeta: obj.(*v1alpha1.NIMServiceList).ListMeta}
-	for _, item := range obj.(*v1alpha1.NIMServiceList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested nIMServices.
-func (c *FakeNIMServices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(nimservicesResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a nIMService and creates it.  Returns the server's representation of the nIMService, and an error, if there is any.
-func (c *FakeNIMServices) Create(ctx context.Context, nIMService *v1alpha1.NIMService, opts v1.CreateOptions) (result *v1alpha1.NIMService, err error) {
-	emptyResult := &v1alpha1.NIMService{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(nimservicesResource, c.ns, nIMService, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMService), err
-}
-
-// Update takes the representation of a nIMService and updates it. Returns the server's representation of the nIMService, and an error, if there is any.
-func (c *FakeNIMServices) Update(ctx context.Context, nIMService *v1alpha1.NIMService, opts v1.UpdateOptions) (result *v1alpha1.NIMService, err error) {
-	emptyResult := &v1alpha1.NIMService{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(nimservicesResource, c.ns, nIMService, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMService), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNIMServices) UpdateStatus(ctx context.Context, nIMService *v1alpha1.NIMService, opts v1.UpdateOptions) (result *v1alpha1.NIMService, err error) {
-	emptyResult := &v1alpha1.NIMService{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(nimservicesResource, "status", c.ns, nIMService, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMService), err
-}
-
-// Delete takes name of the nIMService and deletes it. Returns an error if one occurs.
-func (c *FakeNIMServices) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(nimservicesResource, c.ns, name, opts), &v1alpha1.NIMService{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeNIMServices) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(nimservicesResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.NIMServiceList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched nIMService.
-func (c *FakeNIMServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NIMService, err error) {
-	emptyResult := &v1alpha1.NIMService{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(nimservicesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.NIMService), err
 }

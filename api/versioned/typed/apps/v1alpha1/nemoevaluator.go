@@ -18,9 +18,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	scheme "github.com/NVIDIA/k8s-nim-operator/api/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,33 +36,34 @@ type NemoEvaluatorsGetter interface {
 
 // NemoEvaluatorInterface has methods to work with NemoEvaluator resources.
 type NemoEvaluatorInterface interface {
-	Create(ctx context.Context, nemoEvaluator *v1alpha1.NemoEvaluator, opts v1.CreateOptions) (*v1alpha1.NemoEvaluator, error)
-	Update(ctx context.Context, nemoEvaluator *v1alpha1.NemoEvaluator, opts v1.UpdateOptions) (*v1alpha1.NemoEvaluator, error)
+	Create(ctx context.Context, nemoEvaluator *appsv1alpha1.NemoEvaluator, opts v1.CreateOptions) (*appsv1alpha1.NemoEvaluator, error)
+	Update(ctx context.Context, nemoEvaluator *appsv1alpha1.NemoEvaluator, opts v1.UpdateOptions) (*appsv1alpha1.NemoEvaluator, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, nemoEvaluator *v1alpha1.NemoEvaluator, opts v1.UpdateOptions) (*v1alpha1.NemoEvaluator, error)
+	UpdateStatus(ctx context.Context, nemoEvaluator *appsv1alpha1.NemoEvaluator, opts v1.UpdateOptions) (*appsv1alpha1.NemoEvaluator, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NemoEvaluator, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NemoEvaluatorList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1alpha1.NemoEvaluator, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1alpha1.NemoEvaluatorList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NemoEvaluator, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1alpha1.NemoEvaluator, err error)
 	NemoEvaluatorExpansion
 }
 
 // nemoEvaluators implements NemoEvaluatorInterface
 type nemoEvaluators struct {
-	*gentype.ClientWithList[*v1alpha1.NemoEvaluator, *v1alpha1.NemoEvaluatorList]
+	*gentype.ClientWithList[*appsv1alpha1.NemoEvaluator, *appsv1alpha1.NemoEvaluatorList]
 }
 
 // newNemoEvaluators returns a NemoEvaluators
 func newNemoEvaluators(c *AppsV1alpha1Client, namespace string) *nemoEvaluators {
 	return &nemoEvaluators{
-		gentype.NewClientWithList[*v1alpha1.NemoEvaluator, *v1alpha1.NemoEvaluatorList](
+		gentype.NewClientWithList[*appsv1alpha1.NemoEvaluator, *appsv1alpha1.NemoEvaluatorList](
 			"nemoevaluators",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.NemoEvaluator { return &v1alpha1.NemoEvaluator{} },
-			func() *v1alpha1.NemoEvaluatorList { return &v1alpha1.NemoEvaluatorList{} }),
+			func() *appsv1alpha1.NemoEvaluator { return &appsv1alpha1.NemoEvaluator{} },
+			func() *appsv1alpha1.NemoEvaluatorList { return &appsv1alpha1.NemoEvaluatorList{} },
+		),
 	}
 }

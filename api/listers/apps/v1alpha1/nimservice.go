@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NIMServiceLister helps list NIMServices.
@@ -29,7 +29,7 @@ import (
 type NIMServiceLister interface {
 	// List lists all NIMServices in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NIMService, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NIMService, err error)
 	// NIMServices returns an object that can list and get NIMServices.
 	NIMServices(namespace string) NIMServiceNamespaceLister
 	NIMServiceListerExpansion
@@ -37,17 +37,17 @@ type NIMServiceLister interface {
 
 // nIMServiceLister implements the NIMServiceLister interface.
 type nIMServiceLister struct {
-	listers.ResourceIndexer[*v1alpha1.NIMService]
+	listers.ResourceIndexer[*appsv1alpha1.NIMService]
 }
 
 // NewNIMServiceLister returns a new NIMServiceLister.
 func NewNIMServiceLister(indexer cache.Indexer) NIMServiceLister {
-	return &nIMServiceLister{listers.New[*v1alpha1.NIMService](indexer, v1alpha1.Resource("nimservice"))}
+	return &nIMServiceLister{listers.New[*appsv1alpha1.NIMService](indexer, appsv1alpha1.Resource("nimservice"))}
 }
 
 // NIMServices returns an object that can list and get NIMServices.
 func (s *nIMServiceLister) NIMServices(namespace string) NIMServiceNamespaceLister {
-	return nIMServiceNamespaceLister{listers.NewNamespaced[*v1alpha1.NIMService](s.ResourceIndexer, namespace)}
+	return nIMServiceNamespaceLister{listers.NewNamespaced[*appsv1alpha1.NIMService](s.ResourceIndexer, namespace)}
 }
 
 // NIMServiceNamespaceLister helps list and get NIMServices.
@@ -55,15 +55,15 @@ func (s *nIMServiceLister) NIMServices(namespace string) NIMServiceNamespaceList
 type NIMServiceNamespaceLister interface {
 	// List lists all NIMServices in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NIMService, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NIMService, err error)
 	// Get retrieves the NIMService from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NIMService, error)
+	Get(name string) (*appsv1alpha1.NIMService, error)
 	NIMServiceNamespaceListerExpansion
 }
 
 // nIMServiceNamespaceLister implements the NIMServiceNamespaceLister
 // interface.
 type nIMServiceNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.NIMService]
+	listers.ResourceIndexer[*appsv1alpha1.NIMService]
 }

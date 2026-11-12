@@ -18,9 +18,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
 	scheme "github.com/NVIDIA/k8s-nim-operator/api/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,33 +36,34 @@ type NemoEntitystoresGetter interface {
 
 // NemoEntitystoreInterface has methods to work with NemoEntitystore resources.
 type NemoEntitystoreInterface interface {
-	Create(ctx context.Context, nemoEntitystore *v1alpha1.NemoEntitystore, opts v1.CreateOptions) (*v1alpha1.NemoEntitystore, error)
-	Update(ctx context.Context, nemoEntitystore *v1alpha1.NemoEntitystore, opts v1.UpdateOptions) (*v1alpha1.NemoEntitystore, error)
+	Create(ctx context.Context, nemoEntitystore *appsv1alpha1.NemoEntitystore, opts v1.CreateOptions) (*appsv1alpha1.NemoEntitystore, error)
+	Update(ctx context.Context, nemoEntitystore *appsv1alpha1.NemoEntitystore, opts v1.UpdateOptions) (*appsv1alpha1.NemoEntitystore, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, nemoEntitystore *v1alpha1.NemoEntitystore, opts v1.UpdateOptions) (*v1alpha1.NemoEntitystore, error)
+	UpdateStatus(ctx context.Context, nemoEntitystore *appsv1alpha1.NemoEntitystore, opts v1.UpdateOptions) (*appsv1alpha1.NemoEntitystore, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NemoEntitystore, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NemoEntitystoreList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1alpha1.NemoEntitystore, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1alpha1.NemoEntitystoreList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NemoEntitystore, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1alpha1.NemoEntitystore, err error)
 	NemoEntitystoreExpansion
 }
 
 // nemoEntitystores implements NemoEntitystoreInterface
 type nemoEntitystores struct {
-	*gentype.ClientWithList[*v1alpha1.NemoEntitystore, *v1alpha1.NemoEntitystoreList]
+	*gentype.ClientWithList[*appsv1alpha1.NemoEntitystore, *appsv1alpha1.NemoEntitystoreList]
 }
 
 // newNemoEntitystores returns a NemoEntitystores
 func newNemoEntitystores(c *AppsV1alpha1Client, namespace string) *nemoEntitystores {
 	return &nemoEntitystores{
-		gentype.NewClientWithList[*v1alpha1.NemoEntitystore, *v1alpha1.NemoEntitystoreList](
+		gentype.NewClientWithList[*appsv1alpha1.NemoEntitystore, *appsv1alpha1.NemoEntitystoreList](
 			"nemoentitystores",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.NemoEntitystore { return &v1alpha1.NemoEntitystore{} },
-			func() *v1alpha1.NemoEntitystoreList { return &v1alpha1.NemoEntitystoreList{} }),
+			func() *appsv1alpha1.NemoEntitystore { return &appsv1alpha1.NemoEntitystore{} },
+			func() *appsv1alpha1.NemoEntitystoreList { return &appsv1alpha1.NemoEntitystoreList{} },
+		),
 	}
 }
