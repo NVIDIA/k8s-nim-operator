@@ -42,7 +42,7 @@ import (
 //
 // TODO: optionally isolate driver-only gates in their own registry so emulation can
 // stay purely on driver SemVer without sharing a single version stream with component-base.
-var featureGateEmulationVersion = version.MajorMinor(1, 36)
+var featureGateEmulationVersion = version.MajorMinor(1, 37)
 
 const (
 	// TimeSlicingSettings allows timeslicing settings to be customized.
@@ -74,6 +74,35 @@ const (
 	// DeviceMetadata allows the kubelet plugin to generate device metadata files
 	// in the workloads for prepared devices.
 	DeviceMetadata featuregate.Feature = "DeviceMetadata"
+
+	// FabricManagerPartitioning enables Fabric Manager (NVSwitch) partition
+	// management for full-GPU (gpu.nvidia.com) devices and Passthrough VFIO
+	// devices. When enabled, Prepare activates the FM partition whose member
+	// set exactly matches the claim's allocated physical GPUs; a non-matching
+	// set fails Prepare. ResourceClaims should constrain allocation with
+	// matchAttribute on gpu.nvidia.com/partitionN. Requires Fabric Manager
+	// running with FABRIC_MODE=1. Independent of PassthroughSupport: with both
+	// gates on, full-GPU and VFIO claims are partitioned; with only this gate
+	// on, only full-GPU claims are.
+	FabricManagerPartitioning featuregate.Feature = "FabricManagerPartitioning"
+
+	// HostManagedIMEXDaemon gates whether the imex deployment mode
+	// may be set to "hostManaged" (see pkg/imex). It does not directly change
+	// driver behavior, it only unlocks the mode for clusters where
+	// the cluster admin owns the host nvidia-imex daemon lifecycle.
+	HostManagedIMEXDaemon featuregate.Feature = "HostManagedIMEXDaemon"
+
+	// DRAListTypeAttributes allows the GPU kubelet plugin to publish list-valued
+	// DRA device attributes. The cluster must have the Kubernetes feature gate
+	// of the same name enabled before enabling this in the driver.
+	DRAListTypeAttributes featuregate.Feature = "DRAListTypeAttributes"
+
+	// ConsumableShares enables publishing consumable capacity and multi-allocation
+	// (AllowMultipleAllocations) support for devices in ResourceSlices, allowing
+	// multiple ResourceClaims to share the same GPU or MIG device when configured
+	// via --consumable-shares. Note: MPS sharing is not supported when consumable
+	// shares is enabled.
+	ConsumableShares featuregate.Feature = "ConsumableShares"
 )
 
 // Feature gate Version fields use driver SemVer major.minor.
@@ -146,6 +175,34 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 			Default:    false,
 			PreRelease: featuregate.Alpha,
 			Version:    version.MajorMinor(0, 4),
+		},
+	},
+	FabricManagerPartitioning: {
+		{
+			Default:    false,
+			PreRelease: featuregate.Alpha,
+			Version:    version.MajorMinor(0, 5),
+		},
+	},
+	HostManagedIMEXDaemon: {
+		{
+			Default:    false,
+			PreRelease: featuregate.Alpha,
+			Version:    version.MajorMinor(0, 5),
+		},
+	},
+	DRAListTypeAttributes: {
+		{
+			Default:    false,
+			PreRelease: featuregate.Alpha,
+			Version:    version.MajorMinor(0, 4),
+		},
+	},
+	ConsumableShares: {
+		{
+			Default:    false,
+			PreRelease: featuregate.Alpha,
+			Version:    version.MajorMinor(0, 5),
 		},
 	},
 }
