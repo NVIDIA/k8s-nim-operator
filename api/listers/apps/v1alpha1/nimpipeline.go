@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NIMPipelineLister helps list NIMPipelines.
@@ -29,7 +29,7 @@ import (
 type NIMPipelineLister interface {
 	// List lists all NIMPipelines in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NIMPipeline, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NIMPipeline, err error)
 	// NIMPipelines returns an object that can list and get NIMPipelines.
 	NIMPipelines(namespace string) NIMPipelineNamespaceLister
 	NIMPipelineListerExpansion
@@ -37,17 +37,17 @@ type NIMPipelineLister interface {
 
 // nIMPipelineLister implements the NIMPipelineLister interface.
 type nIMPipelineLister struct {
-	listers.ResourceIndexer[*v1alpha1.NIMPipeline]
+	listers.ResourceIndexer[*appsv1alpha1.NIMPipeline]
 }
 
 // NewNIMPipelineLister returns a new NIMPipelineLister.
 func NewNIMPipelineLister(indexer cache.Indexer) NIMPipelineLister {
-	return &nIMPipelineLister{listers.New[*v1alpha1.NIMPipeline](indexer, v1alpha1.Resource("nimpipeline"))}
+	return &nIMPipelineLister{listers.New[*appsv1alpha1.NIMPipeline](indexer, appsv1alpha1.Resource("nimpipeline"))}
 }
 
 // NIMPipelines returns an object that can list and get NIMPipelines.
 func (s *nIMPipelineLister) NIMPipelines(namespace string) NIMPipelineNamespaceLister {
-	return nIMPipelineNamespaceLister{listers.NewNamespaced[*v1alpha1.NIMPipeline](s.ResourceIndexer, namespace)}
+	return nIMPipelineNamespaceLister{listers.NewNamespaced[*appsv1alpha1.NIMPipeline](s.ResourceIndexer, namespace)}
 }
 
 // NIMPipelineNamespaceLister helps list and get NIMPipelines.
@@ -55,15 +55,15 @@ func (s *nIMPipelineLister) NIMPipelines(namespace string) NIMPipelineNamespaceL
 type NIMPipelineNamespaceLister interface {
 	// List lists all NIMPipelines in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NIMPipeline, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NIMPipeline, err error)
 	// Get retrieves the NIMPipeline from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NIMPipeline, error)
+	Get(name string) (*appsv1alpha1.NIMPipeline, error)
 	NIMPipelineNamespaceListerExpansion
 }
 
 // nIMPipelineNamespaceLister implements the NIMPipelineNamespaceLister
 // interface.
 type nIMPipelineNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.NIMPipeline]
+	listers.ResourceIndexer[*appsv1alpha1.NIMPipeline]
 }

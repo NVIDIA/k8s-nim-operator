@@ -18,8 +18,8 @@ limitations under the License.
 package versioned
 
 import (
-	"fmt"
-	"net/http"
+	fmt "fmt"
+	http "net/http"
 
 	appsv1alpha1 "github.com/NVIDIA/k8s-nim-operator/api/versioned/typed/apps/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
