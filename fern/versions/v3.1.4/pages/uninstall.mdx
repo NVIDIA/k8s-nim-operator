@@ -1,0 +1,84 @@
+---
+title: "Uninstalling the NVIDIA NIM Operator"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "Perform the following steps to uninstall the Operator."
+slug: uninstall
+---
+
+<Anchor id="uninstalling-the-nvidia-nim-operator" />
+
+Perform the following steps to uninstall the Operator.
+
+1. List and delete NIM pipeline custom resources:
+
+   ```console
+   $ kubectl get nimpipelines.apps.nvidia.com -A
+   ```
+
+   *Example Output*
+
+   ```output
+   NAMESPACE     NAME                 STATUS
+   nim-service   my-sample-pipeline   Ready
+   ```
+
+   If a pipeline is deployed, delete the pipeline:
+
+   ```console
+   $ kubectl delete nimpipeline -n nim-service my-sample-pipeline
+   ```
+
+1. List and delete NIM service custom resources:
+
+   ```console
+   $ kubectl get nimservices.apps.nvidia.com -A
+   ```
+
+   *Example Output*
+
+   ```output
+   NAMESPACE     NAME                      STATUS   AGE
+   nim-service   meta-llama3-8b-instruct   Ready    2024-08-19T19:14:58Z
+   ```
+
+   If a service is deployed, delete the service:
+
+   ```console
+   $ kubectl delete nimservice -n nim-service meta-llama3-8b-instruct
+   ```
+
+1. List and delete NIM cache custom resources:
+
+   ```console
+   $ kubectl get nimcaches.apps.nvidia.com -A
+   ```
+
+   *Example Output*
+
+   ```output
+   NAMESPACE     NAME                      STATUS   PVC                           AGE
+   nim-service   meta-llama3-8b-instruct   Ready    meta-llama3-8b-instruct-pvc   2024-08-19T17:30:40Z
+   nim-service   nv-embedqa-e5-v5          Ready    nv-embedqa-e5-v5-pvc          2024-08-19T17:30:40Z
+   ```
+
+   If a cache is deployed, delete the cache:
+
+   ```console
+   $ kubectl delete nimcache -n nim-service meta-llama3-8b-instruct nv-embedqa-e5-v5
+   ```
+
+1. Delete the Operator:
+
+   ```console
+   $ helm delete -n nim-operator $(helm list -n nim-operator --filter 'nim-operator' --short)
+   ```
+
+By default, Helm does not delete custom resource definitions (CRDs).
+You can delete the CRDs with the following commands:
+
+```console
+$ kubectl delete crd nimpipelines.apps.nvidia.com nimservices.apps.nvidia.com nimcaches.apps.nvidia.com
+```
+
+Refer to [Uninstalling the GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/uninstall.html) in the NVIDIA GPU Operator documentation.

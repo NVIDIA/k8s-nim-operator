@@ -1,0 +1,595 @@
+---
+title: "Caching Locally Built LLM NIM Engines"
+license: Apache-2.0
+copyright: "Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "NVIDIA NIM microservices typically use model engines that are tuned for specific NVIDIA GPU configurations. NVIDIA produces model engines for several popular combinations, and these are referred to as"
+slug: nim-build
+---
+
+<Anchor id="caching-locally-built-llm-nim-engines" />
+
+## About Buildable Profiles
+
+[NVIDIA NIM microservices](https://docs.nvidia.com/nim/index.html) typically use model engines that are tuned for specific NVIDIA GPU configurations.
+NVIDIA produces model engines for several popular combinations, and these are referred to as *model profiles*.
+
+*Buildable profiles* enable compilation on the fly and support broader compatibility with different GPU and model combinations by
+allowing you to build the profile on your cluster. They offer greater flexibility for deploying NIM microservices
+on a wider range of NVIDIA GPUs, especially when pre-optimized profiles for your specific GPU configuration are not available.
+
+To view all of the profiles for a given NIM, run the
+[list-model-profiles](https://docs.nvidia.com/nim/large-language-models/latest/utilities.html) utility.
+It lists all of the model profiles that are compatible with the system and are runnable.
+
+For example, run the following commands after you replace `<HF/NFC_or_local_path>` with your model path:
+
+```console
+$ export NIM_MODEL_NAME=<HF/NFC_or_local_path>
+$ docker run -it --rm --gpus=all -e NGC_API_KEY=$NGC_API_KEY -e HF_TOKEN=$HF_TOKEN -e NIM_MODEL_NAME=$NIM_MODEL_NAME $IMG_NAME list-model-profiles
+```
+
+<Accordion title="Example output">
+<Code src="../../manifests/docs/current/output/nimbuild-all.txt" language="console" lines="1-10" highlight="{3,4,5,6,7,8,9}" startLine="1" />
+
+</Accordion>
+
+<Note>
+Model profiles must be **compatible**, **runnable**, and **buildable** to be built and cached locally.
+To identify **buildable** profiles, refer to step [2. Identify Which Profiles Are Buildable Locally](#identify-which-profiles-are-buildable-locally) that is in the [example procedure](#example-procedure) below.
+
+</Note>
+
+## Benefits of Using NIM Build
+
+NIM Operator supports the
+[NIM Build custom resource](https://github.com/NVIDIA/k8s-nim-operator/blob/main/config/crd/bases/apps.nvidia.com_nimbuilds.yaml)
+that is responsible for initiating engine build jobs for buildable profiles.
+It enables you to pre-build and cache optimized TensorRT-LLM model engines for GPUs in the cluster before starting a NIM deployment.
+This helps improve startup times and reduce resource usage during NIM deployments and autoscaling, making the deployments more predictable.
+
+## About the NIM Build Custom Resource
+
+A NIM Build is a Kubernetes custom resource, `nimbuilds.apps.nvidia.com`.
+You create and delete NIM Build resources to manage buildable NIM.
+
+<Note>
+There is a one to one mapping between a NIM Build CRD and a profile for building an engine.
+
+</Note>
+
+Refer to the following table for information about the commonly modified fields:
+
+<table>
+<thead>
+<tr>
+<th>
+
+Field
+
+</th>
+<th>
+
+Description
+
+</th>
+<th>
+
+Default Value
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`spec.annotations`
+
+</td>
+<td>
+
+Specifies to add the user-supplied annotations to the Engine Build.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.env`
+
+</td>
+<td>
+
+Specifies environment variables for Engine Build pod.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.image`
+
+</td>
+<td>
+
+Specifies repository, tag, pull policy, and pull secret for the container image.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.labels`
+
+</td>
+<td>
+
+Specifies to add the user-supplied labels to the Engine Build pod.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.modelName`
+
+</td>
+<td>
+
+Specifies the name given to the locally built engine.
+
+</td>
+<td>
+
+If `modelName` is not specified, then the name of the NIMBuild CR is used to build the model.
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.nimCache.name` (required)
+
+</td>
+<td>
+
+Specifies the name of the NIM Cache resource.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.nimCache.profile`
+
+</td>
+<td>
+
+Specifies the name of the buildable profile used to build engine.
+
+</td>
+<td>
+
+If the NIM Cache has only one buildable profile, then NIM Build defaults to that profile name if none is specified.
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.nodeSelector`
+
+</td>
+<td>
+
+Specifies node selector labels to schedule the Engine Build pod.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.resources`
+
+</td>
+<td>
+
+Resources is the resource requirements for the NIM Build pod.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.tolerations`
+
+</td>
+<td>
+
+Specifies the tolerations for the NIM Build pod.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## Example Procedure
+
+### Summary
+
+To cache and serve a locally built LLM NIM engine, follow these steps:
+
+1. [Create a NIM Cache](#create-a-nim-cache-to-cache-model-profiles) that caches buildable model profiles.
+
+1. [Identify which profiles are buildable](#identify-which-profiles-are-buildable-locally) from NIM Cache.
+
+1. [Create a NIM Build resource](#create-a-nim-build-resource-to-build-an-engine-from-your-cached-profile) to build an engine from your cached profile.
+
+1. [Create a NIM Service](#create-a-nim-service-that-uses-the-built-engine-in-nim-cache) that uses the built engine.
+
+<Note>
+You can distinguish built engines from cached profiles by looking for `custom: "true"` in the profile metadata.
+
+</Note>
+
+<Anchor id="create-a-nim-cache-to-cache-model-profiles" />
+
+### 1. Create a NIM Cache to cache model profiles
+
+Create a [NIM Cache](/cache) to cache multiple buildable profiles.
+
+<Note>
+Refer to [Prerequisites](/cache#prerequisites) for more information on using NIM Cache.
+
+</Note>
+
+1. Create a file, such as `nimcache.yaml`, with contents like the following example:
+
+   <Code src="../../manifests/docs/current/input/nimbuild-all.yaml" language="yaml" highlight="{12,13}" startLine="1" lines="30-48" />
+
+   <Note>
+   If only caching a single profile, you can set `spec.source.ngc.model.profiles` to the name of the single buildable profile instead of using the `spec.source.ngc.model.buildable: true` filter.
+
+   </Note>
+
+1. Create the NIM Cache:
+
+   ```console
+   $ kubectl create -f nimcache.yaml -n nim-service
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   nimcache.apps.nvidia.com/meta-llama3-2-3b-instruct created
+   ```
+
+   </Accordion>
+
+1. Check the status of the NIM Cache:
+
+   <Note>
+   It can take several minutes to download the profiles into the cache, depending on their size.
+
+   </Note>
+
+   ```console
+   $ kubectl get nimcache -A -o yaml
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   # Example of NIM Cache status output (partial)
+   ...
+   status:
+     conditions:
+     ...
+     - lastTransitionTime: "2025-07-07T00:00:00Z"
+       message: The Job to cache NIM is in progress
+       reason: JobRunning
+       status: "False"
+       type: NIM_CACHE_JOB_PENDING
+     state: InProgress
+     ...
+   ```
+
+   </Accordion>
+
+   Note that the in-progress status type is `NIM_CACHE_JOB_PENDING`.
+
+   You can verify that the pod is running:
+
+   ```console
+   $ kubectl get pods -A | grep -i "instruct-job"
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   # Example of get pods output (partial)
+   NAMESPACE     NAME                                  READY   STATUS  
+   ...
+   nim-service   meta-llama3-2-3b-instruct-job-wz7kw   1/1     Running
+   ```
+
+   </Accordion>
+
+   You can also verify in the pod log that the profile is being downloaded. Replace meta-llama3-2-3b-instruct-job-wz7kw with the name of your instruct job pod.
+
+   ```console
+   $ kubectl logs meta-llama3-2-3b-instruct-job-wz7kw -n nim-service
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   # Example of pod log output (partial)
+   INFO] Fetching contents for profile ac34857f8dcbd174ad524974248f2faf271bd2a0355643b2cf1490d0fe7787c2
+   ...
+   ```
+
+   </Accordion>
+
+   When the NIM Cache is ready, the completed status type is `NIM_CACHE_JOB_COMPLETED`, and the profile configuration details are listed in the cache.
+
+   ```console
+   $ kubectl get nimcache -A -o yaml
+   ```
+
+   <Accordion title="Example output">
+   <Code src="../../manifests/docs/current/output/nimbuild-all.txt" language="console" lines="12-32" highlight="{10,18}" startLine="1" />
+
+   </Accordion>
+
+   Note that the profile is buildable if `trtllm_buildable: "true"` in the cache status.
+
+<Anchor id="identify-which-profiles-are-buildable-locally" />
+
+### 2. Identify Which Profiles Are Buildable Locally
+
+To retrieve the cached model names from NIM Cache, view the `.status.profiles` field of the NIM Cache
+to get the list of cached profile names for use in the NIMBuild CR in the next step.
+Replace meta-llama3-2-3b-instruct with the name of your NIM Cache.
+
+```console
+$ kubectl get nimcache meta-llama3-2-3b-instruct -n nim-service -o json | jq '.status.profiles'
+```
+
+<Accordion title="Example output">
+<Code src="../../manifests/docs/current/output/nimbuild-all.txt" language="console" lines="34-59" highlight="{11,22}" startLine="1" />
+
+</Accordion>
+
+<Anchor id="create-a-nim-build-resource-to-build-an-engine-from-your-cached-profile" />
+
+### 3. Create a NIM Build Resource to Build an Engine From Your Cached Profile
+
+1. Create a file, such as `nimbuild.yaml`, with contents like the following example:
+
+   <Code src="../../manifests/docs/current/input/nimbuild-all.yaml" language="yaml" highlight="{7,8,9}" startLine="1" lines="15-28" />
+
+   Select one of the cached profile names from the previous step and add it to the NIMBuild  `spec.nimCache.profile` field to select the engine to build.
+
+   <Note>
+
+   -    If the NIM Cache has only one buildable profile, then you do not need to specify a profile name because NIM Build defaults to using that profile.
+
+   -    However, if the NIM Cache has multiple profiles, then you must explicitly specify a buildable profile name in the NIMBuild CRD.
+
+   </Note>
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl create -f nimbuild.yaml -n nim-service
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   nimbuild.apps.nvidia.com/meta-llama3-2-3b-instruct created
+   ```
+
+   </Accordion>
+
+1. Check the status of the NIM Build:
+
+   <Note>
+   It can take several minutes to build the profiles, depending on their size.
+
+   </Note>
+
+   ```console
+   $ kubectl get nimbuild -A
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   NAMESPACE     NAME                        STATUS    AGE
+   nim-service   meta-llama3-2-3b-instruct  Pending   7s
+   ```
+
+   </Accordion>
+
+   You can verify that the pod is running:
+
+   ```console
+   $ kubectl get pods -A | grep -i "engine-build"
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   # Example of get pods output (partial)
+   NAMESPACE     NAME                                          READY   STATUS  
+   ...
+   nim-service   meta-llama3-2-3b-instruct-engine-build-pod   0/1     Running
+   ```
+
+   </Accordion>
+
+   You can also verify in the pod log that the profile is being built. Replace meta-llama3-2-3b-instruct-engine-build-pod with the name of your engine build pod.
+
+   ```console
+   $ kubectl logs meta-llama3-2-3b-instruct-engine-build-pod -n nim-service
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   # Example of pod log output (partial)
+   ...
+   INFO] Selected profile: ac34857f8dcbd174ad524974248f2faf271bd2a0355643b2cf1490d0fe7787c2 (tensorrt_llm_buildable-bf16-tpl-ppl)
+   INFO] Profile metadata: fea_lora: false
+   INFO] Profile metadata: llm_engine: tensorrt_llm
+   INFO] Profile metadata: pp: 1
+   INFO] Profile metadata: precision: bf16
+   INFO] Profile metadata: tp: 1
+   INFO] Profile metadata: trtllm_buildable: true
+   ...
+   ```
+
+   </Accordion>
+
+   When the profile is done being built, the engine build pod is terminated:
+
+   ```console
+   $ kubectl get pods -A
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   # Example of get pods (partial)
+   NAMESPACE     NAME                                          READY   STATUS  
+   ...
+   nim-service   meta-llama3-2-3b-instruct-engine-build-pod    1/1     Terminating
+   ```
+
+   </Accordion>
+
+   You can verify the status of the build:
+
+   ```console
+   $ kubectl get nimbuild -A -o yaml
+   ```
+
+   <Accordion title="Example output">
+   <Code src="../../manifests/docs/current/output/nimbuild-all.txt" language="console" lines="61-87" highlight="{7,15,16,19,26}" startLine="1" />
+
+   </Accordion>
+
+   Note that the NIM Build object status type is then `NIM_BUILD_MODEL_MANIFEST_POD_COMPLETED`.
+
+   You can then get the details of the newly built profiles in the NIM Cache:
+
+   ```console
+   $ kubectl get nimcache meta-llama3-2-3b-instruct -n nim-service -o json | jq '.status.profiles'
+   ```
+
+   <Accordion title="Example output">
+   <Code src="../../manifests/docs/current/output/nimbuild-all.txt" language="console" lines="89-128" highlight="{25,29,31,33,38}" startLine="1" />
+
+   </Accordion>
+
+<Anchor id="create-a-nim-service-that-uses-the-built-engine-in-nim-cache" />
+
+### 4. Create a NIM Service that uses the built engine in NIM Cache
+
+1. Create a file, such as `nimservice.yaml`, with contents like the following example:
+
+   <Code src="../../manifests/docs/current/input/nimbuild-all.yaml" language="yaml" highlight="{16,17,18}" startLine="1" lines="50-74" />
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl create -f nimservice.yaml -n nim-service
+   ```
+
+1. Wait for the NIM Service to be ready, view information about the service:
+
+   ```console
+   $ kubectl describe nimservices.apps.nvidia.com -n nim-service
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   # Example of NIM Service status output (partial)
+   ...
+   Conditions:
+     Last Transition Time:  2024-08-12T19:09:43Z
+     Message:               Deployment is ready
+     Reason:                Ready
+     Status:                True
+     Type:                  Ready
+   State:                  Ready
+   ```
+
+   </Accordion>
+
+## Troubleshooting
+
+This section explains some common troubleshooting steps to identify issues with caching locally built LLM NIM engines.
+
+- Ensure that the NIMCache referred in the NIMBuild is in ready state.
+
+- Ensure that the NIMCache referred in the NIMBuild has cached buildable profiles
+
+- Ensure that the model puller image is same on the NIMCache and NIMBuild
+
+- If the cluster contains heterogeneous GPU types, the `spec.nodeSelector` field in a NIMBuild must match that of the corresponding NIMService.
+This ensures both are scheduled onto nodes with the same GPU product type.
+For example:
+
+  ```yaml
+  spec:
+    nodeSelector:
+      nvidia.com/gpu.product: NVIDIA-A100-SXM4-80GB
+  ```
+
+### Logs and Messages to Gather
+
+- Logs for the NIMBuild pod can be gathered by running the following command:
+
+  ```console
+  $ kubectl logs <NIM-Build-Name>-engine-build-pod -n nim-service
+  ```
+
+- Additional information can be found by describing the NIM Build using the following command:
+
+  ```console
+  $ kubectl describe nimbuild <NIM-Build-Name> -n <Namespace>
+  ```

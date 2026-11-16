@@ -1,0 +1,11 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nemo-training-config
+  namespace: nemo
+data:
+  training: |
+    # Optional additional configuration for training jobs
+    container_defaults:
+      imagePullPolicy: IfNotPresent

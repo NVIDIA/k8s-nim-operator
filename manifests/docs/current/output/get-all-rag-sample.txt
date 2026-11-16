@@ -1,0 +1,15 @@
+NAME                                                READY   STATUS    RESTARTS   AGE
+pod/chain-server-multi-turn-9759ff9ff-62fdh         1/1     Running   0          99s
+pod/rag-playground-multiturn-rag-5cbdc574d6-tgb9l   1/1     Running   0          99s
+
+NAME                                   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/chain-server-multi-turn        ClusterIP   10.105.82.33    <none>        8082/TCP         99s
+service/rag-playground-multiturn-rag   NodePort    10.99.241.217   <none>        3001:30621/TCP   99s
+
+NAME                                           READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/chain-server-multi-turn        1/1     1            1           99s
+deployment.apps/rag-playground-multiturn-rag   1/1     1            1           99s
+
+NAME                                                      DESIRED   CURRENT   READY   AGE
+replicaset.apps/chain-server-multi-turn-9759ff9ff         1         1         1       99s
+replicaset.apps/rag-playground-multiturn-rag-5cbdc574d6   1         1         1       99s

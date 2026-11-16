@@ -1,0 +1,8 @@
+apiVersion: v1
+data: {}
+kind: ConfigMap
+metadata:
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+  name: ca-inject-cm
+  namespace: nim-service

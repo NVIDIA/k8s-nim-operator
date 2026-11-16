@@ -1,0 +1,31 @@
+install:
+  customizer: yes
+  datastore: yes
+  entity_store: yes
+  evaluator: yes
+  jupyter: yes # Deploys jupyter server to use with jupyter notebook tutorial. Change to `no` if you don't want this deployed.
+  guardrail: yes
+
+uninstall:
+  customizer: yes
+  datastore: yes
+  entity_store: yes
+  evaluator: yes
+  jupyter: yes
+  guardrail: yes
+
+installation_namespace: nemo
+
+# Specify a custom storage class and volume access mode for all PVCs, for e.g. ReadWriteMany for nfs storage class
+pvc:
+  # Ignored when localPathProvisioner.enabled is true — in which case these will default to:
+  # storage_class: "local-path" and volume_access_mode: "ReadWriteOnce"
+  storage_class: ""
+  volume_access_mode: ReadWriteOnce
+
+# Deploy a local-path CSI provisioner
+localPathProvisioner:
+  # disable it when a different CSI provisioner is already deployed in the cluster
+  enabled: true
+  default: true
+  version: v0.0.31

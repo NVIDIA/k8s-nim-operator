@@ -1,0 +1,716 @@
+---
+title: "Multi-Node NIM Deployment"
+description: "Multi-Node NIM Deployment addresses the problem of deploying massive LLMs that cannot fit on a single GPU or need to use older GPUs. This feature enables the distribution of model weights and computat"
+slug: multi-node
+---
+
+<Anchor id="multi-node-nim-deployment" />
+
+## About Multi-Node NIM Deployment
+
+[Multi-Node NIM Deployment](https://docs.nvidia.com/nim/large-language-models/latest/multi-node-deployment.html)
+addresses the problem of deploying massive LLMs that cannot fit on a single GPU or need to use older GPUs.
+This feature enables the distribution of model weights and computation across several interconnected nodes.
+
+NIM Operator supports deploying multi-node NIM on Kubernetes using [LeaderWorkerSets (LWS)](https://github.com/kubernetes-sigs/lws), as supported by NIM Helm Chart.
+
+NIM Operator supports multi-node deployments for both NIM version 2.0+ and earlier NIM versions.
+The configuration shape differs between the two: NIM 2.0+ uses the `spec.multiNode.ray` block on the NIMService, while earlier NIM versions use `spec.multiNode.mpi`.
+The two blocks are mutually exclusive on a single NIMService.
+Refer to [NIM Service Configuration Reference](/service#nim-service-configuration-reference) for the full list of multi-node configuration fields.
+
+For more information on multi-node deployments, refer to [Multi-Node Deployment for NVIDIA NIM for LLMs](https://docs.nvidia.com/nim/large-language-models/latest/multi-node-deployment.html) in the *NVIDIA NIM for LLMs* documentation.
+
+<Note>
+Upgrade and ingress of multi-node NIM are supported.
+However, auto-scaling, DRA, and Multi-LLM NIM are not yet supported for multi-node configurations.
+
+</Note>
+
+## Example Procedure
+
+### Summary
+
+To deploy a multi-node enabled NIM Service, follow these steps.
+The prerequisite and deployment steps differ by NIM version, so select the matching tab in each section.
+Your selection is synchronized between the tab sets on this page.
+
+1. [Complete the prerequisites](#complete-the-prerequisites) for your NIM version (NIM 2.0+ or NIM 1.x).
+
+1. [Deploy a multi-node enabled NIM Service](#deploy-a-multi-node-enabled-nim-service) using the manifests for your NIM version:
+
+   1.    Create a cache for the NIM.
+
+   1.    Create a NIM Service for the multi-node NIM.
+
+1. [Display LWS and NIM Service statuses](#display-lws-and-nim-service-statuses).
+
+<Anchor id="complete-the-prerequisites" />
+
+### 1. Complete the Prerequisites
+
+The prerequisites depend on the NIM version you are deploying.
+Select the tab that matches your target version.
+Your selection is synchronized with the deployment tabs in [Section 2](#deploy-a-multi-node-enabled-nim-service).
+
+<Tabs>
+  <Tab title="NIM 2.0+" language="nim-2">
+Before deploying a multi-node NIM, ensure the following:
+
+- A Kubernetes cluster with GPU nodes, where each node has the same number and type of GPUs.
+
+- Sufficient GPU resources across the nodes to satisfy the tensor parallelism × pipeline parallelism (TP × PP) requirement of your NIM.
+
+  Find the number of GPUs required for your desired model in [Support Matrix for NVIDIA NIM for LLMs: LLMs](https://docs.nvidia.com/nim/large-language-models/latest/reference/support-matrix.html#llms).
+
+- The [LeaderWorkerSet (LWS)](https://github.com/kubernetes-sigs/lws) CRD installed on the cluster:
+
+  ```console
+  $ kubectl apply --server-side -f https://github.com/kubernetes-sigs/lws/releases/latest/download/manifests.yaml
+  ```
+
+  <Note>
+  LWS version 0.6.2 or later is required.
+
+  </Note>
+
+- Shared storage (recommended): A PVC with `ReadWriteMany` access mode, `hostPath`, or NFS, so the leader downloads the model once and shares it with the workers.
+
+- High-speed networking (recommended): InfiniBand or [RDMA over Converged Ethernet (RoCE)](https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-516/Layer-1-and-Switch-Ports/Quality-of-Service/RDMA-over-Converged-Ethernet-RoCE/) for optimal NCCL performance.
+
+  For IPoIB with Mellanox NICs, refer to the [NVIDIA Network Operator documentation](https://docs.nvidia.com/networking/display/kubernetes2540/getting-started-kubernetes.html#network-operator-deployment-with-an-ip-over-infiniband-ipoib-network) for installation and configuration.
+
+- An NGC API key stored as a Kubernetes secret:
+
+  ```console
+  $ kubectl create secret generic ngc-api --from-literal=NGC_API_KEY=<your-key>
+  ```
+
+For more information, refer to [Prerequisites](https://docs.nvidia.com/nim/large-language-models/latest/deployment/multi-node-deployment.html#prerequisites) in the *NVIDIA NIM for LLMs* documentation.
+
+  </Tab>
+  <Tab title="NIM 1.x" language="nim-1">
+**Pre-Checks**
+
+<Anchor id="validate-reqs"></Anchor>
+
+- Validate that the NIM can be used with multi-node deployment and that your cluster meets the GPU hardware requirements.
+
+  Find the number of GPUs required for your desired model in [Support Matrix for NVIDIA NIM for LLMs: LLMs](https://docs.nvidia.com/nim/large-language-models/latest/reference/support-matrix.html#llms).
+If you do not have a single node with at least the specified number of GPUs, you must use multi-node deployment.
+
+<Anchor id="validate-csi"></Anchor>
+
+- Ensure the Container Storage Interface (CSI) driver supports ReadWriteMany Persistent Volume Claims (PVCs) and the storage capacity is sufficient for your multi-node.
+
+  Refer to the [Kubernetes CSI Drivers documentation](https://kubernetes-csi.github.io/docs/drivers.html) to check whether the CSI Driver is `Persistent` and
+supports the `Read/Write Multiple Pods` access modes.
+
+  The volume must be at least 700GB with `VolumeAccessMode` set to `ReadWriteMany`.
+
+<Anchor id="validate-nodes"></Anchor>
+
+- Check if the multi-nodes are network reachable.
+
+**Setup**
+
+Perform the following steps:
+
+<Anchor id="configure-network"></Anchor>
+
+1. Configure multi-node pod network connectivity with RDMA.
+
+   If you are using IPoIB with Mellanox NICs, you can use the following instructions:
+
+<Anchor id="uninstall-ofed"></Anchor>
+
+   1.    Uninstall inbox OFED driver in favor of NVIDIA MOFED/DOCA driver.
+
+      Check the status of the IB interfaces to determine if your system has `mlx5_core` kernel mod loaded.
+
+      ```console
+      $ ip link show | grep "link/infiniband" -B 1
+      ```
+
+      <Accordion title="Example output">
+      ```output
+      174: ibp24s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:10:47:fe:80:00:00:00:00:00:00:5c:25:73:03:00:48:34:2a brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      175: ibp41s0f0: <BROADCAST,MULTICAST> mtu 4092 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:09:0e:fe:80:00:00:00:00:00:00:9c:63:c0:03:00:a1:47:de brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      176: ibp41s0f1: <BROADCAST,MULTICAST> mtu 4092 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:09:42:fe:80:00:00:00:00:00:00:9c:63:c0:03:00:a1:47:df brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      177: ibp64s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:10:47:fe:80:00:00:00:00:00:00:5c:25:73:03:00:48:34:32 brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      178: ibp79s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:10:47:fe:80:00:00:00:00:00:00:5c:25:73:03:00:48:34:2e brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      179: ibp94s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:10:47:fe:80:00:00:00:00:00:00:5c:25:73:03:00:48:34:26 brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      180: ibp154s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:10:47:fe:80:00:00:00:00:00:00:5c:25:73:03:00:48:34:5a brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      181: ibp170s0f0: <BROADCAST,MULTICAST> mtu 4092 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:08:37:fe:80:00:00:00:00:00:00:9c:63:c0:03:00:a1:46:de brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      182: ibp170s0f1: <BROADCAST,MULTICAST> mtu 4092 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:07:f6:fe:80:00:00:00:00:00:00:9c:63:c0:03:00:a1:46:df brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      183: ibp192s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:10:47:fe:80:00:00:00:00:00:00:5c:25:73:03:00:48:34:62 brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      184: ibp206s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:10:47:fe:80:00:00:00:00:00:00:5c:25:73:03:00:48:34:5e brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      185: ibp220s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 1000
+          link/infiniband 00:00:10:47:fe:80:00:00:00:00:00:00:5c:25:73:03:00:48:34:56 brd 00:ff:ff:ff:ff:12:40:1b:ff:ff:00:00:00:00:00:00:ff:ff:ff:ff
+      ```
+
+      </Accordion>
+
+      If the statuses of the IB devices are DOWN, manually bring them up by using the `ip link set` command:
+
+      ```console
+      $ ip link set <ib-if-name> up
+      ```
+
+      Check if inbox OFED driver is installed.
+The presence of the `/usr/sbin/ofed_uninstall.sh` script indicates whether the inbox OFED driver is installed on the host.
+The script is part of the [ofed-scripts RPM](https://linux.mellanox.com/public/repo/mlnx_ofed/latest/SRPMS/) that gets installed as part of the inbox OFED installation.
+If the script is present, execute it to uninstall the inbox OFED driver.
+
+      For more detailed information, refer to the [Installation Results](https://docs.nvidia.com/networking/display/mlnxofedv587061lts/installing+mlnx_ofed#InstallingMLNX_OFED-InstallationResults) page in MLNX_OFED documentation.
+It will describe the installed binary locations after successful installation.
+Also refer to the [uninstallation](https://docs.nvidia.com/networking/display/mlnxofedv587061lts/uninstall) page for MLNX_OFED.
+
+<Anchor id="install-network-operator"></Anchor>
+
+   1.    Install NVIDIA Network Operator.
+
+      <Note>
+      IPoIB is preferred for multi-node setups. Otherwise, if the network interface is shared, the multi-node NIM workers can time out during weight transfer, which could cause the NIM pods to constantly restart, and the NIMService CR to never become ready.
+
+      </Note>
+
+      To set up IPoIB Network, use the following procedure:
+
+<Anchor id="verify-mellanox"></Anchor>
+
+      1.       Verify your system has Mellanox NICs installed.
+
+         ```console
+         $ lspci -v | grep Mellanox
+         ```
+
+         <Accordion title="Example output">
+         ```output
+         86:00.0 Network controller [0207]: Mellanox Technologies MT27620 Family
+                 Subsystem: Mellanox Technologies Device 0014
+         86:00.1 Network controller [0207]: Mellanox Technologies MT27620 Family
+                 Subsystem: Mellanox Technologies Device 0014
+         ```
+
+         </Accordion>
+
+<Anchor id="deploy-network-operator"></Anchor>
+
+      1.       Deploy NVIDIA Network Operator with NFD enabled.
+
+         NVIDIA Network Operator simplifies the provisioning and management of NVIDIA networking resources in a Kubernetes cluster to provide
+high-speed network connectivity, RDMA, and GPUDirect for workloads in a Kubernetes cluster.
+Network Operator works in conjunction with GPU Operator to enable GPU-Direct RDMA on compatible systems.
+
+         Install the NVIDIA Network Operator using the official helm chart with the following commands:
+
+         1.          Add repo:
+
+            ```console
+            $ helm repo add nvidia https://helm.ngc.nvidia.com/nvidia \
+              && helm repo update
+            ```
+
+         1.          Install operator:
+
+            ```console
+            $ helm install --wait network-operator \
+                -n nvidia-network-operator --create-namespace \
+                nvidia/network-operator
+            ```
+
+         1.          View deployed resources:
+
+            ```console
+            $ kubectl -n nvidia-network-operator get pods
+            ```
+
+<Anchor id="define-policy"></Anchor>
+
+      1.       Define NICClusterPolicy.
+
+         After Network Operator is installed, create a NICClusterPolicy CR to install the DOCA Driver (part of MLNX_OFED),
+RDMA Device Plugin, and secondary network with Multus and IPoIB CNI, as well as IPAM CNI plugin.
+
+         <Note>
+         If MOFED/DOCA driver is already pre-installed on the host, then remove the `ofedDriver` section in the below CR sample.
+This is typically required on NVIDIA DGX systems where NVIDIA BaseOS has the MOFED drivers pre-installed
+
+         </Note>
+
+         Configure the `rdmaSharedDevicePlugin` section with the IB interface on your system.
+
+         *Example NICClusterPolicy custom resource:*
+
+         ```yaml
+         apiVersion: mellanox.com/v1alpha1
+         kind: NicClusterPolicy
+         metadata:
+           name: nic-cluster-policy
+         spec:
+           ofedDriver:
+             image: doca-driver
+             repository: nvcr.io/nvidia/mellanox
+             version: 25.04-0.6.1.0-2
+             forcePrecompiled: false
+             imagePullSecrets: []
+             terminationGracePeriodSeconds: 300
+             startupProbe:
+               initialDelaySeconds: 10
+               periodSeconds: 20
+             livenessProbe:
+               initialDelaySeconds: 30
+               periodSeconds: 30
+             readinessProbe:
+               initialDelaySeconds: 10
+               periodSeconds: 30
+             upgradePolicy:
+               autoUpgrade: true
+               maxParallelUpgrades: 1
+               safeLoad: false
+               drain:
+                 enable: true
+                 force: true
+                 podSelector: ""
+                 timeoutSeconds: 300
+                 deleteEmptyDir: true
+           rdmaSharedDevicePlugin:
+             # [map[ifNames:[ibs1f0] name:rdma_shared_device_a]]
+             image: k8s-rdma-shared-dev-plugin
+             repository: ghcr.io/mellanox
+             version: v1.5.3
+             imagePullSecrets: []
+             # The config below directly propagates to k8s-rdma-shared-device-plugin configuration.
+             # Replace 'devices' with your (RDMA capable) netdevice name.
+             config: |
+               {
+                 "configList": [
+                   {
+                     "resourceName": "rdma_shared_device_a",
+                     "rdmaHcaMax": 63,
+                     "selectors": {
+                       "vendors": [],
+                       "deviceIDs": [],
+                       "drivers": [],
+                       "ifNames": ["ibs1f0"],
+                       "linkTypes": []
+                     }
+                   }
+                 ]
+               }
+           secondaryNetwork:
+             cniPlugins:
+               image: plugins
+               repository: ghcr.io/k8snetworkplumbingwg
+               version: v1.6.2-update.1
+               imagePullSecrets: []
+             multus:
+               image: multus-cni
+               repository: ghcr.io/k8snetworkplumbingwg
+               version: v4.1.0
+               imagePullSecrets: []
+             ipoib:
+               image: ipoib-cni
+               repository: ghcr.io/mellanox
+               version: 428715a57c0b633e48ec7620f6e3af6863149ccf
+             ipamPlugin:
+               image: whereabouts
+               repository: ghcr.io/k8snetworkplumbingwg
+               version: v0.7.0
+               imagePullSecrets: []
+         ```
+
+         Once Network Operator has reconciled the NICClusterPolicy CR, `rdma-shared-dp-ds`, `kube-multus-ds`, `kube-ipoib-cni-ds` and `whereabouts`
+should be deployed in the network operator namespace.
+
+         Use the following command to view the RDMA resource defined by the NICClusterPolicy:
+
+         ```console
+         $ kubectl get nodes -o json | jq '.items[0].status.capacity'
+         ```
+
+         <Accordion title="Example output">
+         ```output
+         {
+           "cpu": "224",
+           "ephemeral-storage": "1845230620Ki",
+           "hugepages-1Gi": "0",
+           "hugepages-2Mi": "0",
+           "memory": "2113470820Ki",
+           "nvidia.com/gpu": "8",
+           "pods": "110",
+           "rdma/rdma_shared_device_a": "63"
+         }
+         ```
+
+         </Accordion>
+
+<Anchor id="define-ipoib"></Anchor>
+
+      1.       Define an IP over IB Multus Network.
+
+         Use the sample CR below to define a IP over IB network:
+
+         ```yaml
+         apiVersion: mellanox.com/v1alpha1
+         kind: IPoIBNetwork
+         metadata:
+           name: example-ipoibnetwork
+         spec:
+           networkNamespace: "default"
+           master: "ibs1f0"
+           ipam: |
+             {
+               "type": "whereabouts",
+               "datastore": "kubernetes",
+               "kubernetes": {
+                 "kubeconfig": "/etc/cni/net.d/whereabouts.d/whereabouts.kubeconfig"
+               },
+               "range": "192.168.5.225/28",
+               "exclude": [
+               "192.168.6.229/30",
+               "192.168.6.236/32"
+               ],
+               "log_file" : "/var/log/whereabouts.log",
+               "log_level" : "info",
+               "gateway": "192.168.6.1"
+             }
+         ```
+
+         -          Configure `.spec.networkNamespace` to the namespace of the Kubernetes resources that will use the multus network. (It is the namespace that NetworkAttachmentDefinition will be created.)
+
+         -          Configure `.spec.master` to the IB interface you wish to enslave by the multus network on the host node.
+
+         -          Ensure the IP Cidr under `.spec.ipam` is not conflicting with the existing network (for example, default CNI podCidr and other networks).
+
+         Once the above CR is created, a Multus NetworkAttachmentDefintion will be created for consumption in the namespace specified in `.spec.networkNamespace`.
+
+         ```console
+         $ kubectl get network-attachment-definition -n nim-service
+         ```
+
+         <Accordion title="Example output">
+         ```output
+         NAME                    AGE
+         example-ipoibnetwork    24h
+         ```
+
+         </Accordion>
+
+         ```console
+         $ kubectl describe  network-attachment-definition -n nim-service
+         ```
+
+         <Accordion title="Example output">
+         ```output
+         Name:         example-ipoibnetwork
+         Namespace:    nim-service
+         Labels:       nvidia.network-operator.state=state-IPoIB-Network
+         Annotations:  nvidia.network-operator.revision: 2162029353
+         API Version:  k8s.cni.cncf.io/v1
+         Kind:         NetworkAttachmentDefinition
+         Metadata:
+           Creation Timestamp:  2025-07-17T17:18:15Z
+           Generation:          1
+           Owner References:
+             API Version:           mellanox.com/v1alpha1
+             Block Owner Deletion:  true
+             Controller:            true
+             Kind:                  IPoIBNetwork
+             Name:                  example-ipoibnetwork
+             UID:                   38a01091-896d-47d5-82cc-37689d14b9c8
+           Resource Version:        459806
+           UID:                     fe4644fd-85dd-408c-bc46-04d2c532af4f
+         Spec:
+           Config:  { "cniVersion":"0.3.1", "name":"example-ipoibnetwork", "type":"ipoib", "master": "ibp24s0", "ipam":{"type":"whereabouts","datastore":"kubernetes","kubernetes":{"kubeconfig":"/etc/cni/net.d/whereabouts.d/whereabouts.kubeconfig"},"range":"192.168.5.225/28","exclude":["192.168.6.229/30","192.168.6.236/32"],"log_file":"/var/log/whereabouts.log","log_level":"info","gateway":"192.168.6.1"} }
+         Events:    <none>
+         ```
+
+         </Accordion>
+
+<Anchor id="install-lws"></Anchor>
+
+1. Install LeaderWorkerSet (LWS).
+
+   <Note>
+   LWS version 0.6.2 or later must be installed.
+
+   </Note>
+
+   To install the LWS controller, use the following commands:
+
+   ```console
+   $ VERSION=v0.6.2
+   $ helm install lws https://github.com/kubernetes-sigs/lws/releases/download/$VERSION/lws-chart-$VERSION.tgz \
+      --namespace lws-system \
+      --create-namespace \
+      --wait --timeout 300s
+   ```
+
+   For more information, refer to [Installing LWS to a Kubernetes Cluster](https://lws.sigs.k8s.io/docs/installation/).
+
+  </Tab>
+
+</Tabs>
+
+<Anchor id="deploy-a-multi-node-enabled-nim-service" />
+
+### 2. Deploy a Multi-node enabled NIM Service
+
+Select the tab that matches the NIM version you are deploying.
+
+<Tabs>
+  <Tab title="NIM 2.0+" language="nim-2">
+<Anchor id="create-cache-nim-2"></Anchor>
+
+1. Create a cache for the NIM.
+
+   1.    Create a file, such as `nimcache.yaml`, with contents like the following:
+
+      ```yaml
+      apiVersion: apps.nvidia.com/v1alpha1
+      kind: NIMCache
+      metadata:
+        name: multi-node-nimcache
+        namespace: nim-service
+      spec:
+        source:
+          ngc:
+            modelPuller: nvcr.io/nim/openai/gpt-oss-20b:2.0.3
+            pullSecret: ngc-secret
+            authSecret: ngc-api-secret
+            model:
+        storage:
+          pvc:
+            create: true
+            storageClass: ''
+            size: "100Gi"
+            volumeAccessMode: ReadWriteMany
+      ```
+
+      Set `spec.storage.pvc.storageClass` to a storage class that supports dynamic provisioning and `ReadWriteMany` access.
+Leaving `spec.source.ngc.model` empty lets the Operator perform automatic profile selection for the available GPUs.
+
+   1.    Apply the manifest:
+
+      ```console
+      $ kubectl apply -n nim-service -f nimcache.yaml
+      ```
+
+   <Note>
+   The NIM Cache job might fail due to various reasons, such as from network issues.
+NIM Operator automatically retries 5 times to download the model.
+In such scenarios, you might see some cache jobs in error states.
+
+   </Note>
+
+<Anchor id="create-service-nim-2"></Anchor>
+
+1. Create a NIM Service that uses the NIM 2.0+ multi-node configuration.
+
+   1.    Create a file, such as `nimservice.yaml`, with contents like the following:
+
+      ```yaml
+      apiVersion: apps.nvidia.com/v1alpha1
+      kind: NIMService
+      metadata:
+        name: multi-node-nimservice
+        namespace: nim-service
+      spec:
+        image:
+          repository: nvcr.io/nim/openai/gpt-oss-20b
+          tag: "2.0.3"
+          pullPolicy: IfNotPresent
+          pullSecrets:
+            - ngc-secret
+        authSecret: ngc-api-secret
+        storage:
+          nimCache:
+            name: multi-node-nimcache
+        replicas: 1
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+        expose:
+          service:
+            type: ClusterIP
+            port: 8000
+        multiNode:
+          parallelism:
+            pipeline: 2
+            tensor: 1
+          ray:
+            rayPort: 6379
+      ```
+
+      The `spec.multiNode.ray` block selects the NIM 2.0+ multi-node configuration.
+`rayPort` defaults to `6379`.
+Set it explicitly only if you need to override the default.
+
+   1.    Apply the manifest:
+
+      ```console
+      $ kubectl create -f nimservice.yaml -n nim-service
+      ```
+
+  </Tab>
+  <Tab title="NIM 1.x" language="nim-1">
+<Anchor id="create-cache"></Anchor>
+
+1. Create a cache for the NIM.
+
+   1.    Create a file, such as `nimcache.yaml`, with contents like the following [sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml#L2):
+
+      <Code src="../../manifests/docs/current/input/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml" language="yaml" startLine="1" lines="2-21" />
+
+   1.    Apply the manifest:
+
+      ```console
+      $ kubectl apply -n nim-service -f nimcache.yaml
+      ```
+
+   <Note>
+   The NIM Cache job might fail due to various reasons, such as from network issues.
+NIM Operator automatically retries 5 times to download the model.
+In such scenarios, you might see some cache jobs in error states.
+
+   </Note>
+
+<Anchor id="create-service"></Anchor>
+
+1. Create a NIM Service to consume the GPU-NIC Remote Direct Memory Access (RDMA) resource and InfiniBand (IB) network on the multi-node NIM.
+
+   1.    Create a file, such as `nimservice.yaml`, with contents like the following [sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml#L23):
+
+      <Code src="../../manifests/docs/current/input/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml" language="yaml" startLine="1" lines="23-102" />
+
+   1.    Apply the manifest:
+
+      ```console
+      $ kubectl create -f nimservice.yaml -n nim-service
+      ```
+
+  </Tab>
+
+</Tabs>
+
+<Anchor id="display-lws-and-nim-service-statuses" />
+
+### 3. Display LWS and NIM Service Statuses
+
+- To view the status of LWS resources, use the following command:
+
+  ```console
+  $ kubectl get lws
+  ```
+
+  <Accordion title="Example output">
+  ```output
+  NAME                AGE
+  deepseek-r1-lws     20d
+  ```
+
+  </Accordion>
+
+- To view all LWS pods running, use the following command:
+
+  ```console
+  $ kubectl get pods -o wide
+  ```
+
+  <Accordion title="Example output">
+  ```output
+  NAME                    READY   STATUS      RESTARTS    AGE     IP                  NODE                NOMINATED NODE      READINESS GATES
+  deepseek-r1-lws-0       1/1     Running     0           30m     192.168.2.192       viking-prod-640     <none>              <none>
+  deepseek-r1-lws-0-1     1/1     Running     0           30m     192.168.0.46        viking-prod-642     <none>              <none>
+  ```
+
+  </Accordion>
+
+- To view the status of NIM Service, use the following command:
+
+  ```console
+  $ kubectl get nimservice
+  ```
+
+  <Accordion title="Example output">
+  ```output
+  NAME          STATUS   AGE
+  deepseek-r1   Ready    20d
+  ```
+
+  </Accordion>
+
+## Troubleshooting
+
+This section explains some common troubleshooting steps to identify issues with Multi-Node configurations.
+
+- If the system comes with Intel IB devices, the kernel module `irdma` is likely loaded. This will conflict with the Mellanox OFED driver, causing the below failure when installing MOFED:
+
+  ```output
+  Function: generate_ofed_modules_blacklist Unloading ib_uverbs [FAILED] rmmod: ERROR: Module ib_uverbs is in use by: irdma [16-Jul-25_16:25:49] Command "/etc/init.d/openibd restart" failed with exit code: 1 [16-Jul-25_16:25:49] Remove blacklisted mofed modules file from host
+  ```
+
+  To resolve the conflict, remove the `irdma` module and blacklist it:
+
+  ```console
+  $ sudo rmmod irdma
+  $ echo "blacklist irdma" | sudo tee /etc/modprobe.d/blacklist-irdma.conf
+  ```
+
+  Then reboot the node.
+
+- Ensure the LeaderWorkerSet controller is deployed onto the cluster before NIM Operator.
+If LeaderWorkerSet controller is deployed after NIM Operator, restart NIM Operator
+
+- Ensure that no existing GPU workloads are running on the nodes before deploying GPU Operator.
+
+- Ensure the NFS volume is accessible and has enough space, and its CSI driver is correctly set up.
+
+- Multi-node NIM without RoCE can experience frequent restart on the LWS leader and worker pods due to model shard loading timeout. NCCL with Infiniband connection is highly recommended
+
+- If using infiniband:
+
+  -   Ensure network operator is [deployed with IP over Infiniband network](https://docs.nvidia.com/networking/display/kubernetes2540/getting-started-kubernetes.html#network-operator-deployment-with-an-ip-over-infiniband-ipoib-network).
+
+  -   Refer to [`config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml`](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml) in the GitHub repository for a sample multi-node nim over IB network.
+
+- If the NIM Cache job failed while downloading the model, a new cache job is created.
+
+  The NIM Cache job might fail due to various reasons, such as from network issues.
+NIM Operator automatically retries 5 times to download the model.
+In such scenarios, you might see some cache jobs in error states.
+
+### Logs and Messages to Gather
+
+- NIM container logs, such as PyTorch, SGLang, and NCCL, can be viewed from the LWS leader pods, for example:
+
+  ```console
+  $ kubectl logs deepseek-r1-lws-0
+  ```
+
+- Kubernetes deployment logs can be found in the NIM operator using the following command:
+
+  ```console
+  $ kubectl logs -l app.kubernetes.io/instance=nim-operator
+  ```
+
+- Additional information can be found by describing the NIM Service using the following command:
+
+  ```console
+  $ kubectl describe nimservice
+  ```

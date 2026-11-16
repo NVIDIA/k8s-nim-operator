@@ -1,0 +1,2280 @@
+---
+title: "Managing NIM Services"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "A NIM service is a Kubernetes custom resource, nimservices.apps.nvidia.com. The NIM Service spec remains the same across non-LLM NIM, LLM-Specific NIM, and Multi-LLM NIM, except the repository name as"
+slug: service
+---
+
+<Anchor id="managing-nim-services" />
+
+## About NIM Services
+
+A NIM service is a Kubernetes custom resource, `nimservices.apps.nvidia.com`.
+The NIM Service spec remains the same across non-LLM NIM, LLM-Specific NIM, and Multi-LLM NIM, except the repository name as shown in the following examples.
+You create and delete NIM service resources to manage NVIDIA NIM microservices.
+
+Refer to the sample manifests below for examples for different deployment scenarios. For full information on available fields, see the [NIM Service Configuration Reference](#nim-service-configuration-reference).
+
+<Tabs>
+  <Tab title="Non-LLM NIM" language="non-llm">
+<Code src="../../../../manifests/docs/current/input/nimservice-all.yaml" language="yaml" startLine="1" lines="1-24" />
+
+  </Tab>
+  <Tab title="LLM-Specific NIM" language="llm-specific">
+<Code src="../../../../manifests/docs/current/input/nimservice-all.yaml" language="yaml" startLine="1" lines="26-49" />
+
+  </Tab>
+  <Tab title="Multi-LLM NIM" language="multi-llm">
+<Code src="../../../../manifests/docs/current/input/nimservice-all.yaml" language="yaml" startLine="1" lines="51-74" />
+
+  </Tab>
+
+</Tabs>
+
+## NIM Service Configuration Reference
+
+Refer to the following table for information about the available NIM Service fields:
+
+<table>
+<thead>
+<tr>
+<th>
+
+Field
+
+</th>
+<th>
+
+Description
+
+</th>
+<th>
+
+Default Value
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`spec.affinity`
+
+</td>
+<td>
+
+Defines rules for pod scheduling based on node or pod characteristics.
+
+Supports the following subfields:
+
+- `nodeAffinity`: Specifies node selection constraints.
+
+- `podAffinity`: Ensures pods are scheduled on nodes with specific other pods.
+
+- `podAntiAffinity`: Ensures pods are not scheduled on nodes with specific other pods.
+
+Refer to the [Kubernetes documentation on affinity and anti-affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity) for detailed configuration options.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.annotations`
+
+</td>
+<td>
+
+Specifies annotations to set on the Kubernetes resources that are created for a NIMService.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.authSecret`
+
+</td>
+<td>
+
+Specifies the name of a generic secret that contains the credential used to download model weights.
+Most NIMs use `NGC_API_KEY`.
+NVIDIA NeMo Retriever Embedding NIM 2.0.0 uses `HF_TOKEN` with its default Hugging Face model download provider, or `NGC_API_KEY` when `NIM_MODEL_DOWNLOAD_PROVIDER=ngc`.
+Learn more about [image pull secrets](/image-pull-secrets).
+
+This field is optional.
+If you omit this field, the Operator does not inject the `NGC_API_KEY` environment variable into the NIM pod.
+If you set this field, the Operator references the secret as optional, so the pod starts even if the secret or its `NGC_API_KEY` key does not exist.
+Omit the field only for [air-gapped deployments](/air-gap#serving-a-pre-cached-model-without-an-ngc-api-key) that serve a pre-cached model and never download from NGC.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.args`
+
+</td>
+<td>
+
+Specifies the arguments to pass to the command in NIM Service.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.command`
+
+</td>
+<td>
+
+Specifies the command to run in the NIM Service.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources`
+
+</td>
+<td>
+
+DRAResources is the list of DRA resource claims to be used for the NIMService deployment or leader worker set.
+
+Refer to the [NIM Operator DRA guide](/dra) for more information.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`
+
+</td>
+<td>
+
+ClaimCreationSpec is the spec to auto-generate a DRA resource claim template.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.attributeSelectors`
+
+</td>
+<td>
+
+Defines the criteria which must be satisfied by the device attributes of a device.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.attributeSelectors.key`
+
+</td>
+<td>
+
+Specifies the name of the device attribute.
+This is either a qualified name or a simple name.
+If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
+
+For example, “gpu.nvidia.com/productName” is equivalent to “productName” if the driver name is “gpu.nvidia.com”.
+Otherwise they are treated as 2 different attributes.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.attributeSelectors.op`
+
+</td>
+<td>
+
+Specifies the operator to use for comparing the device attribute value. Supported operators are:
+
+- *Equal*: The device attribute value must be equal to the value specified in the selector.
+
+- *NotEqual*: The device attribute value must not be equal to the value specified in the selector.
+
+- *GreaterThan*: The device attribute value must be greater than the value specified in the selector.
+
+- *GreaterThanOrEqual*: The device attribute value must be greater than or equal to the value specified in the selector.
+
+- *LessThan*: The device attribute value must be less than the value specified in the selector.
+
+- *LessThanOrEqual*: The device attribute value must be less than or equal to the value specified in the selector.
+
+</td>
+<td>
+
+`Equal`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.attributeSelectors.value` (required)
+
+</td>
+<td>
+
+Specifies the value to compare against the device attribute.
+
+Set exactly one of `boolValue`, `intValue`, `stringValue`, or `versionValue`.
+The CRD rejects an attribute selector that omits `value`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.capacitySelectors`
+
+</td>
+<td>
+
+Defines the criteria that must be satisfied by the device capacity of a device.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.capacitySelectors.key`
+
+</td>
+<td>
+
+Specifies the name of the resource.
+This is either a qualified name or a simple name.
+If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
+
+For example, “gpu.nvidia.com/memory” is equivalent to “memory” if the driver name is “gpu.nvidia.com”.
+Otherwise they are treated as 2 different attributes.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.capacitySelectors.op`
+
+</td>
+<td>
+
+Specifies the operator to use for comparing against the device capacity.
+Supported operators are:
+
+- *Equal*: The resource quantity value must be equal to the value specified in the selector.
+
+- *NotEqual*: The resource quantity value must not be equal to the value specified in the selector.
+
+- *GreaterThan*: The resource quantity value must be greater than the value specified in the selector.
+
+- *GreaterThanOrEqual*: The resource quantity value must be greater than or equal to the value specified in the selector.
+
+- *LessThan*: The resource quantity value must be less than the value specified in the selector.
+
+- *LessThanOrEqual*: The resource quantity value must be less than or equal to the value specified in the selector.
+
+</td>
+<td>
+
+`Equal`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.capacitySelectors.value`
+
+</td>
+<td>
+
+Specifies the resource quantity to compare against.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.celExpressions`
+
+</td>
+<td>
+
+Specifies a list of CEL expressions that must be satisfied by the DRA device.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.count`
+
+</td>
+<td>
+
+Specifies the number of devices to request.
+
+</td>
+<td>
+
+`1`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.deviceClassName`
+
+</td>
+<td>
+
+Specifies the DeviceClass to inherit configuration and selectors from.
+
+</td>
+<td>
+
+`gpu.nvidia.com`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.driverName`
+
+</td>
+<td>
+
+Specifies the name of the DRA driver providing the capacity information.
+
+Must be a DNS subdomain.
+
+</td>
+<td>
+
+`gpu.nvidia.com`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.claimCreationSpec`<br />
+`.devices.name`
+
+</td>
+<td>
+
+Specifies the name of the device request to use in the generated claim spec.
+
+Must be a valid DNS_LABEL.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.requests`
+
+</td>
+<td>
+
+Requests is the list of requests in the referenced ResourceClaim/ResourceClaimTemplate
+to be made available to the model container of the NIMService pods.
+
+If empty, everything from the claim is made available, otherwise
+only the result of this subset of requests.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.resourceClaimName`
+
+</td>
+<td>
+
+ResourceClaimName is the name of a ResourceClaim object in the same namespace as the NIMService.
+
+Exactly one of ResourceClaimName and ResourceClaimTemplateName must be set.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.draResources.resourceClaimTemplateName`
+
+</td>
+<td>
+
+ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+object in the same namespace as the pods for this NIMService.
+
+The template will be used to create a new ResourceClaim, which will
+be bound to the pods created for this NIMService.
+
+Exactly one of ResourceClaimName and ResourceClaimTemplateName must be set.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.env`
+
+</td>
+<td>
+
+Specifies environment variables to set in the NIM microservice container.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.initContainers`
+
+</td>
+<td>
+
+List of init containers to run before the main NIM container in the pod.
+Each item specifies `name`, `image`, and optionally `command`, `args`, `env`, and `workingDir`.
+Refer to the [Kubernetes documentation on init containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) for more details.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.sidecarContainers`
+
+</td>
+<td>
+
+List of sidecar containers to run alongside the main NIM container in the pod.
+Each item specifies `name`, `image`, and optionally `command`, `args`, `env`, and `workingDir`.
+Refer to the [Kubernetes documentation on sidecar containers](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) for more details.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.ingress.enabled` **Deprecated.**
+
+</td>
+<td>
+
+Use `spec.expose.router` to define ingress setup instead.
+
+When set to `true`, the Operator creates a Kubernetes Ingress resource for the NIM microservice.
+Specify the ingress specification in the `spec.expose.ingress.spec` field.
+
+If you have an ingress controller, values like the following sample configures an ingress for the `v1/chat/completions` endpoint.
+
+```yaml
+ingress:
+  enabled: true
+  spec:
+    ingressClassName: nginx
+    rules:
+      - host: demo.nvidia.example.com
+        http:
+          paths:
+          - backend:
+              service:
+                name: meta-llama3-8b-instruct
+                port:
+                  number: 8000
+            path: /v1/chat/completions
+            pathType: Prefix
+```
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router`
+
+</td>
+<td>
+
+Configures routing for the NIM service using either Ingress or [Gateway API](https://gateway-api.sigs.k8s.io/) resources.
+
+Use this field to expose the NIM service through an ingress controller or gateway.
+The router automatically generates hostnames in the format `<nimServiceName>.<namespace>.<hostDomainName>`.
+
+Refer to the router subfields below for configuration options.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.annotations`
+
+</td>
+<td>
+
+Specifies annotations to add to the router resources (Ingress, HTTPRoute, or GRPCRoute).
+
+Common use cases include configuring ingress-specific settings such as SSL redirects, rate limiting, or gateway metadata.
+
+Example for NGINX Ingress:
+
+```yaml
+annotations:
+  nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+```
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.gateway`
+
+</td>
+<td>
+
+Configures [Gateway API](https://gateway-api.sigs.k8s.io/) routing for the NIM service.
+When specified, the Operator creates HTTPRoute and/or GRPCRoute resources that reference the specified gateway.
+
+This field cannot be used at the same time as the `spec.expose.router.ingress` field.
+
+Before using this field, Gateway API controller must be installed and a Gateway resource created.
+
+```yaml
+router:
+  gateway:
+    namespace: nim-service
+    name: istio-gateway
+    httpRoutesEnabled: true
+  hostDomainName: demo.nvidia.example.com
+
+```
+
+Refer to the gateway subfields below for configuration options.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.gateway.grpcRoutesEnabled`
+
+</td>
+<td>
+
+When set to `true`, the Operator creates a GRPCRoute resource for the NIM service.
+
+This field requires the `spec.expose.service.grpcPort` to be specified, the Gateway must support GRPCRoute resources.
+
+Only use this field for NIMs running Triton gRPC Inference Server (non-LLM NIMs).
+
+```yaml
+expose:
+  service:
+    type: ClusterIP
+    port: 9000
+    grpcPort: 50051
+  router:
+    gateway:
+      namespace: nemo
+      name: istio-gateway
+      grpcRoutesEnabled: true
+    hostDomainName: demo.nvidia.example.com
+```
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.gateway.httpRoutesEnabled`
+
+</td>
+<td>
+
+When set to `true`, the Operator creates an HTTPRoute resource for the NIM service.
+
+The HTTPRoute matches requests with path prefix `/` and routes them to the NIM service.
+Your gateway must support HTTPRoute resources.
+
+</td>
+<td>
+
+`true`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.gateway.name`
+
+</td>
+<td>
+
+Specifies the name of the Gateway resource to attach the routes to.
+Required when using `spec.expose.router.gateway`.
+
+The referenced Gateway must exist in the namespace specified by `spec.expose.router.gateway.namespace`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.gateway.namespace`
+
+</td>
+<td>
+
+Specifies the namespace where the Gateway resource is located.
+Required when using `spec.expose.router.gateway`.
+
+The Gateway can be in a different namespace than the NIMService resource.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.hostDomainName`
+
+</td>
+<td>
+
+Specifies the base domain name of the hostname matched by the router.
+Required when using `spec.expose.router`.
+
+The Operator constructs the full hostname as: `<nimServiceName>.<namespace>.<hostDomainName>`
+
+If `hostDomainName: "example.com"`, NIMService name is `llama-3`, and namespace is `nim-service`,
+the generated hostname will be `llama-3.nim-service.example.com`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.ingress`
+
+</td>
+<td>
+
+Configures Ingress-based routing for the NIM service.
+When specified, the Operator creates a Kubernetes Ingress resource for the NIM microservice.
+Cannot be used with `spec.expose.router.gateway`.
+
+```yaml
+router:
+  ingress:
+    ingressClass: nginx
+  hostDomainName: demo.nvidia.example.com
+
+```
+
+Refer to the ingress subfields below for configuration options.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.ingress.ingressClass`
+
+</td>
+<td>
+
+Specifies the ingress class name to use for the created Kubernetes Ingress resource.
+Required when using `spec.expose.router.ingress`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.router.ingress.tlsSecretName`
+
+</td>
+<td>
+
+Specifies the name of a Kubernetes Secret containing TLS certificate and key for HTTPS termination.
+
+The secret must be of type `kubernetes.io/tls` and contain `tls.crt` and `tls.key` fields.
+
+When specified, the Operator configures the Ingress to terminate TLS for the generated hostname.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.annotations`
+
+</td>
+<td>
+
+Specifies annotations to add to the Kubernetes Service resource that is created for the NIM microservice.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.labels`
+
+</td>
+<td>
+
+Specifies labels to add to the Kubernetes Service resource that is created for the NIM microservice.
+Operator-generated labels and values from `spec.labels` take precedence when the same key is also present in this field.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.grpcPort`
+
+</td>
+<td>
+
+Specifies the Triton Inference Server gRPC service port number.
+Only use this port for non-LLM NIM microservice running a [Triton gRPC Inference Server](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/inference_protocols.html#http-rest-and-grpc-protocols).
+
+Required when using Gateway API with `spec.expose.router.gateway.grpcRoutesEnabled: true`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.metricsPort`
+
+</td>
+<td>
+
+Specifies the Triton Inference Server metrics port number for a non-LLM NIM microservice.
+Only use this port for non-LLM NIM running a separate [Triton Inference Server](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/metrics.html) metrics endpoint.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.name`
+
+</td>
+<td>
+
+Specifies a custom name for the Kubernetes Service resource.
+When not specified, the service name defaults to the NIMService resource name.
+
+Use this field to override the default service naming convention.
+
+</td>
+<td>
+
+NIMService resource name
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.port`
+
+</td>
+<td>
+
+Specifies the main API serving port number for the NIM microservice.
+
+</td>
+<td>
+
+`8000`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.expose.service.type`
+
+</td>
+<td>
+
+Specifies the Kubernetes service type to create for the NIM microservice.
+Valid values include:
+
+- `ClusterIP`: Exposes the service on an internal cluster IP (default)
+
+- `NodePort`: Exposes the service on each node’s IP at a static port
+
+- `LoadBalancer`: Exposes the service externally using a cloud provider’s load balancer
+
+**Note**: When set to `LoadBalancer` and `spec.expose.router` is also configured, a warning is issued because this creates two entry points for the service.
+
+</td>
+<td>
+
+`ClusterIP`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.groupID`
+
+</td>
+<td>
+
+Specifies the group for the pods.
+This value is used to set the security context of the pod in the `runAsGroup` and `fsGroup` fields.
+
+</td>
+<td>
+
+`2000`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.image`
+
+</td>
+<td>
+
+Specifies repository, tag, pull policy, and pull secret for the container image.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.inferencePlatform`
+
+</td>
+<td>
+
+Specifies the inference platform to use for deploying the NIM service.
+Valid values include `standalone` (default) and `kserve`.
+Use `standalone` to use traditional Kubernetes Deployment resources
+If you are deploying through KServe, set this field to `kserve`.
+
+For more information about KServe integration, refer to [KServe Support on NIM Operator](/kserve).
+
+</td>
+<td>
+
+`standalone`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.labels`
+
+</td>
+<td>
+
+Specifies user-supplied labels to add to resources that the Operator creates for the NIM service.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.livenessProbe`
+
+</td>
+<td>
+
+Specifies the liveness probe configuration for the NIM Service.
+Liveness probes determine when to restart a container.
+
+By default, the Operator configures an HTTP GET probe to `/v1/health/live` with the following settings:
+
+- Initial delay: 15 seconds
+
+- Timeout: 1 second
+
+- Period: 10 seconds
+
+- Failure threshold: 3
+
+To customize the probe, set `spec.livenessProbe.probe` with a Kubernetes probe specification.
+To disable the probe entirely, set `spec.livenessProbe.enabled: false`.
+
+Refer to the [Kubernetes documentation on probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) for detailed configuration options.
+
+</td>
+<td>
+
+Enabled by default with HTTP GET to `/v1/health/live`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.readinessProbe`
+
+</td>
+<td>
+
+Specifies the readiness probe configuration for the NIM Service.
+Readiness probes determine when a container is ready to accept traffic.
+
+By default, the Operator configures an HTTP GET probe to `/v1/health/ready` with the following settings:
+
+- Initial delay: 15 seconds
+
+- Timeout: 1 second
+
+- Period: 10 seconds
+
+- Failure threshold: 3
+
+To customize the probe, set `spec.readinessProbe.probe` with a Kubernetes probe specification.
+To disable the probe entirely, set `spec.readinessProbe.enabled: false`.
+
+Refer to the [Kubernetes documentation on probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) for detailed configuration options.
+
+</td>
+<td>
+
+Enabled by default with HTTP GET to `/v1/health/ready`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.startupProbe`
+
+</td>
+<td>
+
+Specifies the startup probe configuration for the NIM Service.
+Startup probes indicate when the application has started.
+All other probes are disabled until the startup probe succeeds.
+
+By default, the Operator configures an HTTP GET probe to `/v1/health/ready` with the following settings:
+
+- Initial delay: 30 seconds
+
+- Timeout: 1 second
+
+- Period: 10 seconds
+
+- Failure threshold: 120 (allows up to 20 minutes for startup)
+
+To customize the probe, set `spec.startupProbe.probe` with a Kubernetes probe specification.
+To disable the probe entirely, set `spec.startupProbe.enabled: false`.
+
+Refer to the [Kubernetes documentation on probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) for detailed configuration options.
+
+</td>
+<td>
+
+Enabled by default with HTTP GET to `/v1/health/ready`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.metrics.enabled`
+
+</td>
+<td>
+
+When set to `true`, the Operator configures a Prometheus service monitor for the service.
+Specify the service monitor specification in the `spec.metrics.serviceMonitor` field.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.metrics.serviceMonitor`
+
+</td>
+<td>
+
+Specifies the configuration for the Prometheus ServiceMonitor resource.
+The ServiceMonitor is a custom resource provided by the Prometheus Operator that specifies how to scrape metrics from the NIM service.
+
+Refer to [NVIDIA NIM Operator Observability](/observability) for more information on configuring metrics collection.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.metrics.serviceMonitor.additionalLabels`
+
+</td>
+<td>
+
+Specifies additional labels to add to the ServiceMonitor resource.
+These labels are commonly used to help Prometheus discover the ServiceMonitor.
+
+For example, when using the kube-prometheus-stack Helm chart, set `release: kube-prometheus-stack` to enable discovery:
+
+```yaml
+serviceMonitor:
+  additionalLabels:
+    release: kube-prometheus-stack
+```
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.metrics.serviceMonitor.annotations`
+
+</td>
+<td>
+
+Specifies annotations to add to the ServiceMonitor resource.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.metrics.serviceMonitor.interval`
+
+</td>
+<td>
+
+Specifies the interval at which Prometheus scrapes metrics from the service.
+Use duration format such as `30s`, `1m`, or `5m`.
+
+</td>
+<td>
+
+Prometheus default (typically `30s`)
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.metrics.serviceMonitor.scrapeTimeout`
+
+</td>
+<td>
+
+Specifies the timeout duration for a scrape request.
+Use duration format such as `10s`, `30s`, or `1m`.
+The timeout should be shorter than the scrape interval.
+
+</td>
+<td>
+
+Prometheus default (typically `10s`)
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.multiNode`
+
+</td>
+<td>
+
+NimServiceMultiNodeConfig defines the configuration for multi-node NIMService.
+
+Refer to [Multi-Node NIM Deployment](/multi-node) for more information.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.multiNode.backendType`
+
+</td>
+<td>
+
+BackendType specifies the backend type for the multi-node NIMService. Currently only LWS is supported.
+
+</td>
+<td>
+
+lws
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.multiNode.parallelism` (required)
+
+</td>
+<td>
+
+Specifies the parallelism strategy for multi-node NIM deployments.
+This field is required when deploying a NIM across multiple nodes.
+
+Configure the following subfields to define the parallelism topology:
+
+- `pipeline`: Pipeline parallelism size (number of pipeline stages)
+
+- `tensor`: Tensor parallelism size (number of GPUs per pipeline stage)
+
+Refer to [Multi-Node NIM Deployment](/multi-node) for detailed configuration examples.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.multiNode.parallelism.pipeline`
+
+</td>
+<td>
+
+Specifies the pipeline parallelism size for the multi-node NIM deployment.
+Pipeline parallelism splits the model across multiple pipeline stages, where each stage processes different layers of the model.
+
+This determines how many pipeline stages the model is split into.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.multiNode.parallelism.tensor`
+
+</td>
+<td>
+
+Specifies the tensor parallelism size for the multi-node NIM deployment.
+Tensor parallelism splits individual model layers across multiple GPUs within each pipeline stage.
+
+This determines how many GPUs are used per pipeline stage.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.multiNode.mpi`
+
+</td>
+<td>
+
+MPI config for NIMService using LeaderWorkerSet.
+Use this for NIM versions before 2.0.
+Mutually exclusive with `spec.multiNode.ray`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.multiNode.mpi.mpiStartTimeout`
+
+</td>
+<td>
+
+Specifies the timeout in seconds for starting the MPI cluster.
+The Operator waits up to this duration for all nodes in the multi-node cluster to initialize and establish communication via MPI before failing the deployment.
+
+</td>
+<td>
+
+`300`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.multiNode.ray`
+
+</td>
+<td>
+
+Ray config for NIMService using LeaderWorkerSet.
+Use this for NIM version 2.0 and later, which use Ray for cluster formation.
+Mutually exclusive with `spec.multiNode.mpi`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.multiNode.ray.rayPort`
+
+</td>
+<td>
+
+Specifies the port for the Ray cluster head.
+Must be in the range `1`-`65535`.
+
+</td>
+<td>
+
+`6379`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.nodeSelector`
+
+</td>
+<td>
+
+Specifies node selector labels to schedule the service.
+
+</td>
+<td>
+
+None, `{}`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.priorityClassName`
+
+</td>
+<td>
+
+Specifies the name of an existing, cluster-scoped Kubernetes `PriorityClass` to assign to pods that the `NIMService` creates.
+The field applies to standalone, multi-node, and KServe deployments.
+For serverless KServe deployments, enable the Knative `kubernetes.podspec-priorityclassname` feature flag.
+Refer to [KServe Deployment Modes Comparison](/kserve#kserve-deployment-modes-comparison) for details.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.proxy.certConfigMap`
+
+</td>
+<td>
+
+Specifies the name of the ConfigMap with CA certs for your proxy server.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.proxy.httpProxy`
+
+</td>
+<td>
+
+Specifies the address of a proxy server that should be used for outbound HTTP requests.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.proxy.httpsProxy`
+
+</td>
+<td>
+
+Specifies the address of a proxy server that should be used for outbound HTTPS requests
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.proxy.noProxy`
+
+</td>
+<td>
+
+Specifies a comma-separated list of domain names, IP addresses, or IP ranges for which proxying should be bypassed.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.resources`
+
+</td>
+<td>
+
+Specifies the resource requirements for the pods.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.replicas`
+
+</td>
+<td>
+
+Specifies the desired number of pods in the replica set for the NIM microservice.
+
+</td>
+<td>
+
+`1`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.runtimeClassName`
+
+</td>
+<td>
+
+Specifies the underlying container runtime class name to be used for running NIM with NVIDIA GPUs allocated.
+If not set, the default `nvidia` runtime class is assigned automatically. This runtime class is created by the NVIDIA GPU Operator.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.scale.enabled`
+
+</td>
+<td>
+
+When set to `true`, the Operator creates a Kubernetes horizontal pod autoscaler for the NIM microservice.
+Specify the HPA specification in the `spec.scale.hpa` field.
+
+The `spec.scale.hpa` field supports the following subfields: `minReplicas`, `maxReplicas`, `metrics`, and `behavior`.
+These fields correspond to the same fields in a horizontal pod autoscaler resource specification.
+If you define `spec.scale.enabled` and HPA values, you can’t have `spec.replicas` defined.
+To scale the NIM microservice to zero, set `minReplicas` to `0` and specify at least one `External` or `Object` metric in `metrics`.
+You can specify up to five metrics in `metrics`.
+Scaling to zero requires the Kubernetes `HPAScaleToZero` feature gate.
+Refer to [Scaling a NIM Service to Zero](#scaling-a-nim-service-to-zero).
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.nimCache`
+
+</td>
+<td>
+
+Specifies the name of the NIM cache that has the cached model profiles for the NIM microservice.
+Specify values for the `name` subfield and optionally, the `profile` subfield.
+This field has precedence over the `spec.storage.pvc` field.
+Refer to [Displaying Cached Model Profiles](/cache#displaying-cached-model-profiles) for details on viewing available models profile names in a NIM cache.
+Supported profiles for Multi-LLM NIM are `trtllm`, `sglang`, and `vllm`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.hostPath`
+
+</td>
+<td>
+
+HostPath is the host path volume for caching NIM microservices.
+Make sure the existing target directory has appropriate read/write permissions (typically `chmod 777`) before deployment to avoid caching failures.
+For Openshift, the host folder needs additional permission `sudo chcon -Rt container_file_t ${host_folder}`.
+Permission-related errors will be reported in the NIM Service status and pod events.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc`
+
+</td>
+<td>
+
+If you did not create a NIM cache resource to download and cache your model, you can specify this field to download model profiles.
+This field has the following subfields: `annotations`, `create`, `name`, `size`, `storageClass`, `volumeAccessMode`, and `subPath`.
+
+To have the Operator create a PVC for the model profiles, specify `pvc.create: true`.
+Refer to [Example: Create a PVC Instead of Using a NIM Cache](#example-create-a-pvc-instead-of-using-a-nim-cache).
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.emptyDir`
+
+</td>
+<td>
+
+Specifies ephemeral storage using an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir) volume for the NIM microservice.
+This enables fast temporary storage for testing, demos, or stateless workloads without requiring persistent volume claims.
+
+Data is not retained after pod restarts.
+This storage type is intended for temporary workloads only and should not be used for production deployments requiring data persistence.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.emptyDir.sizeLimit`
+
+</td>
+<td>
+
+Specifies the size limit for the emptyDir volume.
+If not specified, the emptyDir volume is created with no size limit.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.readOnly`
+
+</td>
+<td>
+
+When set to `true`, the Operator mounts the PVC from either the `pvc` or `nimCache` specification as read-only.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.sharedMemorySizeLimit`
+
+</td>
+<td>
+
+Specifies the max size of the shared memory volume ([emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir)) used by NIM for fast model runtime read and write operations.
+If not specified, the NIM Operator will create an emptyDir with no limit.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.schedulerName`
+
+</td>
+<td>
+
+Specifies the custom scheduler to use for NIM deployments.
+If no scheduler is specified, then your configured default scheduler is used.
+This could be the Kubernetes `default-scheduler`, or a custom default scheduler, for example if you have [configured Run:ai as the default scheduler](https://docs.run.ai/v2.18/admin/config/default-scheduler/) for the NIM Operator namespace.
+
+</td>
+<td>
+
+Kubernetes default scheduler.
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.tolerations`
+
+</td>
+<td>
+
+Specifies the tolerations for the pods.
+
+</td>
+<td>
+
+None, `[]`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.userID`
+
+</td>
+<td>
+
+Specifies the user ID for the pod.
+This value is used to set the security context of the pod in the `runAsUser` fields.
+
+</td>
+<td>
+
+`1000`
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## Prerequisites
+
+- Refer to the [NIM Service Configuration Reference](#nim-service-configuration-reference) for details on configurable fields.
+
+- Optional: Add a NIM cache resource for the NIM microservice.
+If you are using a NIM cache resource to store your model, specify the name in the `spec.nimCache.name` field.
+
+  If you prefer to have the service download a model directly to storage, refer to
+[Example: Create a PVC Instead of Using a NIM Cache](#example-create-a-pvc-instead-of-using-a-nim-cache)
+for a sample manifest.
+
+## Procedure
+
+1. Create a file, such as `service.yaml`, with contents like one of the following sample manifests:
+
+<Tabs>
+  <Tab title="Non-LLM NIM" language="non-llm">
+   <Code src="../../../../manifests/docs/current/input/nimservice-all.yaml" language="yaml" startLine="1" lines="1-24" />
+
+  </Tab>
+  <Tab title="LLM-Specific NIM" language="llm-specific">
+   <Code src="../../../../manifests/docs/current/input/nimservice-all.yaml" language="yaml" startLine="1" lines="26-49" />
+
+  </Tab>
+  <Tab title="Multi-LLM NIM" language="multi-llm">
+   <Code src="../../../../manifests/docs/current/input/nimservice-all.yaml" language="yaml" startLine="1" lines="51-74" />
+
+  </Tab>
+
+</Tabs>
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -n nim-service -f service.yaml
+   ```
+
+1. Optional: View information about the NIM services:
+
+   ```console
+   $ kubectl describe nimservices.apps.nvidia.com -n nim-service
+   ```
+
+   *Partial Output*
+
+   ```output
+   ...
+   Conditions:
+    Last Transition Time:  2024-08-12T19:09:43Z
+    Message:               Deployment is ready
+    Reason:                Ready
+    Status:                True
+    Type:                  Ready
+    Last Transition Time:  2024-08-12T19:09:43Z
+    Message:
+    Reason:                Ready
+    Status:                False
+    Type:                  Failed
+   State:                  Ready
+   ```
+
+## Verification
+
+1. Start a pod that has access to the `curl` command.
+Substitute any pod that has the command and meets your organization’s security requirements:
+
+   ```console
+   $ kubectl run --rm -it -n default curl --image=curlimages/curl:latest -- ash
+   ```
+
+   After the pod starts, you are connected to the `ash` shell in the pod.
+
+1. Connect to the chat completions endpoint on the NIM for LLMs container.
+
+   The command connects to the service in the `nim-service` namespace, in this example, `meta-llama3-8b-instruct.nim-service`.
+The command specifies the model to use, `meta/llama3.1-8b-instruct`.
+Replace these values if you use a different service name, namespace, or model.
+To find the model name, refer to [Displaying Model Status](#displaying-model-status).
+
+   ```shell startLine={1}
+   curl -X "POST" \
+    'http://meta-llama3-8b-instruct.nim-service:8000/v1/chat/completions' \
+     -H 'Accept: application/json' \
+     -H 'Content-Type: application/json' \
+     -d '{
+           "model": "meta/llama-3.1-8b-instruct",
+           "messages": [
+           {
+             "content":"What should I do for a 4 day vacation at Cape Hatteras National Seashore?",
+             "role": "user"
+           }],
+           "top_p": 1,
+           "n": 1,
+           "max_tokens": 1024,
+           "stream": false,
+           "frequency_penalty": 0.0,
+           "stop": ["STOP"]
+         }'
+   ```
+
+1. Press Ctrl+D to exit and delete the pod.
+
+## Displaying Model Status
+
+1. View the `.status.model` field of the custom resource.
+
+   Replace `meta-llama3-8b-instruct` with your NIM service name.
+
+   ```console
+   $ kubectl get nimservice.apps.nvidia.com -n nim-service \
+       meta-llama3-8b-instruct  -o=jsonpath="{.status.model}" | jq .
+   ```
+
+   *Example Output*
+
+   ```output
+
+     {
+       "clusterEndpoint": "",
+       "externalEndpoint": "",
+       "name": "meta/llama-3.1-8b-instruct"
+     }
+
+   ```
+
+## Configuring Horizontal Pod Autoscaling
+
+<Anchor id="prerequisites-hpa"></Anchor>
+
+
+
+<Anchor id="id1" />
+
+### Prerequisites
+
+- Prometheus installed on your cluster.
+Refer to the [Observability](/observability) page for details on installing and configuring Prometheus for the NIM Operator.
+
+<Anchor id="procedure-hpa"></Anchor>
+
+
+
+### Autoscaling NIM for LLMs
+
+NVIDIA NIM for LLMs provides several service metrics.
+Refer to [Observability](https://docs.nvidia.com/nim/large-language-models/latest/observability.html)
+in the *NVIDIA NIM for LLMs* documentation for information about the metrics.
+
+1. Create a file (such as `service-hpa.yaml`) or update your NIMService manifest to include `spec.metrics` and `spec.scale` configuration.
+The following example shows the `service-hpa.yaml` file:
+
+   <Code src="../../../../manifests/docs/current/input/service-hpa.yaml" language="yaml" highlight="{25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46}" startLine="1" />
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -n nim-service -f service-hpa.yaml
+   ```
+
+1. Annotate the service resource related to NIM for LLMs:
+
+   ```console
+   $ kubectl annotate -n nim-service svc meta-llama3-8b-instruct prometheus.io/scrape=true
+   ```
+
+   Prometheus might require several minutes to begin collecting metrics from the service.
+
+1. Optional: Confirm Prometheus collects the metrics.
+
+   -    If you have access to the Prometheus dashboard, search for a service metric such as `gpu_cache_usage_perc`.
+
+   -    You can query Prometheus Adapter:
+
+     ```console
+     $ kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/nim-service/services/*/gpu_cache_usage_perc" | jq .
+     ```
+
+     *Example Output*
+
+     ```json
+     {
+       "kind": "MetricValueList",
+       "apiVersion": "custom.metrics.k8s.io/v1beta1",
+       "metadata": {},
+       "items": [
+         {
+           "describedObject": {
+             "kind": "Service",
+             "namespace": "nim-service",
+             "name": "meta-llama3-8b-instruct",
+             "apiVersion": "/v1"
+           },
+           "metricName": "gpu_cache_usage_perc",
+           "timestamp": "2024-09-12T15:14:20Z",
+           "value": "0",
+           "selector": null
+         }
+       ]
+     }
+     ```
+
+1. Optional: Confirm the horizontal pod autoscaler resource is created:
+
+   ```console
+   $ kubectl get hpa -n nim-service
+   ```
+
+   *Example Output*
+
+   ```output
+   NAME                      REFERENCE                            TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+   meta-llama3-8b-instruct   Deployment/meta-llama3-8b-instruct   0/500m    1         2         1          40s
+   ```
+
+### Scaling a NIM Service to Zero
+
+A horizontal pod autoscaler can scale a NIM service to zero replicas when the NIM service has no demand, and scale the NIM service back up when demand returns.
+This configuration frees the GPUs that the NIM service uses while the NIM service is idle.
+
+Scaling to zero has the following requirements:
+
+- The Kubernetes `HPAScaleToZero` feature gate.
+Kubernetes v1.37 and later enable the feature gate by default.
+On earlier Kubernetes versions, set `HPAScaleToZero=true` on the kube-apiserver and the kube-controller-manager.
+
+- `spec.scale.hpa.minReplicas` set to `0` and at least one `External` or `Object` metric in `spec.scale.hpa.metrics`.
+The horizontal pod autoscaler scales up from zero replicas only by using `External` and `Object` metrics.
+
+- A demand metric that a component outside the NIM pods publishes, such as a gateway or a request queue.
+The NIM for LLMs service metrics, such as `gpu_cache_usage_perc`, come from the NIM pods, so these metrics are not available while the NIM service has zero replicas.
+
+- A metrics adapter that serves the demand metric through the Kubernetes external metrics API, `external.metrics.k8s.io`.
+The horizontal pod autoscaler reads `External` metrics only from the external metrics API.
+If only Prometheus collects the demand metric, the horizontal pod autoscaler cannot read the demand metric and cannot scale the NIM service up from zero replicas.
+For example, add an external rule for the demand metric to the Prometheus Adapter configuration, and keep the metric labels that `spec.scale.hpa.metrics[].external.metric.selector` matches, such as `model`.
+Refer to [Observability](/observability) for installing Prometheus Adapter.
+
+The following partial manifest scales a NIM service between zero and one replica based on an external metric named `nim_pending_requests`:
+
+```yaml
+spec:
+  scale:
+    enabled: true
+    hpa:
+      minReplicas: 0
+      maxReplicas: 1
+      metrics:
+      - type: External
+        external:
+          metric:
+            name: nim_pending_requests
+            selector:
+              matchLabels:
+                model: meta-llama3-8b-instruct
+          target:
+            type: Value
+            value: "1"
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 60
+```
+
+When the metric reports no demand, the horizontal pod autoscaler scales the NIM service deployment to zero replicas and sets the `ScaledToZero` condition to `True`.
+When the metric reports demand, the horizontal pod autoscaler scales the deployment to one replica, and the NIM microservice starts and loads the model before the NIM microservice serves requests.
+
+A request to the NIM service does not wake the NIM service.
+While the NIM service has zero replicas, requests to the NIM service fail.
+In production, send requests through a gateway or queue that publishes the demand metric and buffers or retries requests until the NIM microservice is ready.
+
+Let the horizontal pod autoscaler scale the deployment to zero.
+If you scale the deployment to zero manually, the horizontal pod autoscaler stops scaling the deployment.
+
+To check the horizontal pod autoscaler conditions, run the following command:
+
+```console
+$ kubectl describe hpa -n nim-service meta-llama3-8b-instruct
+```
+
+## Sample Manifests
+
+### Example: Assign a Priority Class
+
+Create a cluster-scoped Kubernetes `PriorityClass` before you deploy the `NIMService`.
+The following example creates a priority class named `nim-high-priority`:
+
+```yaml
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: nim-high-priority
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority class for NIM workloads."
+```
+
+Add the priority class name to your `NIMService` manifest:
+
+```yaml
+spec:
+  priorityClassName: nim-high-priority
+```
+
+<Warning>
+The priority class affects pod scheduling and can cause Kubernetes to preempt lower-priority pods.
+It does not guarantee that the NIM pods can be scheduled.
+Refer to the Kubernetes documentation for [Pod Priority and Preemption](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/) before you assign high-priority values.
+
+</Warning>
+
+### Example: Create a PVC Instead of Using a NIM Cache
+
+As an alternative to creating NIM cache resources to download and cache NIM model profiles,
+you can specify that the Operator create a PVC and the NIM service downloads and runs a NIM model profile.
+
+Create and apply a manifest like the following example:
+
+<Code src="../../../../manifests/docs/current/input/service-create-pvc.yaml" language="yaml" highlight="{14,15,16,17,18,19}" startLine="1" />
+
+### Example: Air-Gapped Environment
+
+For air-gapped environments, you must download the model profiles for the NIM microservices from a host that has internet access.
+You must manually create a PVC and then transfer the model profile files into the PVC.
+
+Typically, the Operator determines the PVC name by dereferencing it from the NIM cache resource.
+When there is no NIM cache resource, such as an air-gapped environment, you must specify the PVC name.
+
+Create and apply a manifest like the following example:
+
+<Code src="../../../../manifests/docs/current/input/service-existing-pvc.yaml" language="yaml" highlight="{14,15,16}" startLine="1" />
+
+### Example: Gateway API routing
+
+You can route traffic to a NIM Service by using Gateway API.
+Specify your Gateway configuration in the NIMService `spec.expose.router.gateway` field.
+
+Before using a Gateway to route traffic to a NIM Service:
+
+- Install a Gateway API controller on your cluster. For example, [Istio](https://istio.io/latest/docs/tasks/traffic-management/ingress/gateway-api/).
+
+- Deploy a Gateway to use.
+
+<Tabs>
+  <Tab title="HTTP Routes" language="http-routes">
+Use `spec.expose.router.gateway.httpRoutesEnabled: true` for HTTP traffic.
+The example below creates a NIM Cache and NIM Service for an LLM with Gateway API.
+
+<Code src="../../../../manifests/docs/current/input/nim/serving/standalone/routers/httproutes/multi-llm.yaml" language="yaml" highlight="{58,59,60,61,62,63}" startLine="1" />
+
+  </Tab>
+  <Tab title="gRPC Routes" language="grpc-routes">
+Use `spec.expose.router.gateway.grpcRoutesEnabled: true` for gRPC traffic.
+When using GRPC routes you must also specify `spec.expose.service.grpcPort` and your Gateway must support GRPCRoute resources.
+Only use this field for NIMs running Triton gRPC Inference Server (non-LLM NIMs).
+
+The example creates a NIM Cache and NIM Service for Riva TTS.
+
+<Code src="../../../../manifests/docs/current/input/nim/serving/standalone/routers/grpcroutes/llm.yaml" language="yaml" highlight="{48,49,50,51,52,53,54}" startLine="1" />
+
+  </Tab>
+
+</Tabs>
+
+## Deleting a NIM Service
+
+To delete a NIM service, complete the following steps:
+
+1. View the NIM services custom resources:
+
+   ```console
+   $ kubectl get nimservices.apps.nvidia.com -A
+   ```
+
+   *Example Output*
+
+   ```output
+   NAMESPACE     NAME                        STATUS   AGE
+   nim-service   meta-llama3-8b-instruct     Ready    2024-08-12T17:16:05Z
+   ```
+
+1. Delete the custom resource:
+
+   ```console
+   $ kubectl delete nimservice -n nim-service meta-llama3-8b-instruct
+   ```
+
+   If the Operator created the PVC when you created the NIM cache, the Operator deletes the PVC and the cached model profiles.
+To determine if the Operator created the PVC, run a command like the following example:
+
+   ```console
+   $ kubectl get nimcaches.apps.nvidia.com -n nim-service \
+      -o=jsonpath='{range .items[*]}{.metadata.name}: {.spec.storage.pvc.create}{"\n"}{end}'
+   ```
+
+   *Example Output*
+
+   ```output
+   meta-llama3-8b-instruct: true
+   ```

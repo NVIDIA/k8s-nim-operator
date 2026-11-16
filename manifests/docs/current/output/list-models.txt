@@ -1,0 +1,14 @@
++------------------------+------------------------+------------------------+------------------------+-----------+-----------+---------------+------------+
+| Name                   | Repository             | Latest Version         | Application            | Framework | Precision | Last Modified | Permission |
++------------------------+------------------------+------------------------+------------------------+-----------+-----------+---------------+------------+
+| Llama-2-13b-chat       | ohlfw0olaadg/ea-partic | h100x2_fp16_24.02      | Other                  | Other     | N/A       | Apr 12, 2024  | unlocked   |
+|                        | ipants/llama2-13b-chat |                        |                        |           |           |               |            |
+| Mixtral-8x7B-Instruct- | ohlfw0olaadg/ea-partic | h100x4_fp16_24.02      | Other                  | Other     | FP16      | Apr 12, 2024  | unlocked   |
+| v0.1                   | ipants/mixtral-8x7b-in |                        |                        |           |           |               |            |
+|                        | struct-v0-1            |                        |                        |           |           |               |            |
+| Llama-2-13b            | ohlfw0olaadg/ea-partic | h100x2_fp16_24.02      | Other                  | Other     | N/A       | Apr 12, 2024  | unlocked   |
+|                        | ipants/llama2-13b-base |                        |                        |           |           |               |            |
+| Mixtral-8x7B-v0.1      | ohlfw0olaadg/ea-partic | h100x4_fp16_24.02      | Other                  | Other     | FP16      | Apr 12, 2024  | unlocked   |
+|                        | ipants/mixtral-8x7b-v1 |                        |                        |           |           |               |            |
+|                        | -base                  |                        |                        |           |           |               |            |
++------------------------+------------------------+------------------------+------------------------+-----------+-----------+---------------+------------+

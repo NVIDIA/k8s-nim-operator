@@ -1,0 +1,51 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NemoGuardrail
+metadata:
+  name: nemoguardrails-sample
+  namespace: nemo
+spec:
+  configStore:
+    pvc:
+      name: "pvc-guardrail-config"
+      create: true
+      storageClass: "<storage-class>"
+      volumeAccessMode: ReadWriteMany
+      size: "1Gi"
+  nimEndpoint:
+    baseURL: "<https://integrate.api.nvidia.com/v1>"
+    #Required if you are using a hosted NIM endpoint. Create a secret with your API key.
+    apiKeySecret: "<nim-api-key>"
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+  image:
+    repository: nvcr.io/nvidia/nemo-microservices/guardrails
+    tag: "25.10"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  metrics:
+    serviceMonitor: {}
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1"
+      ephemeral-storage: 10Gi
+  # # Optional: OpenTelemetry tracing configuration
+  # otel:
+  #   enabled: true
+  #   exporterOtlpEndpoint: http://<guardrail-otel-opentelemetry-collector>.<nemo>.svc.cluster.local:4317
+  #   exporterConfig:
+  #     tracesExporter: otlp
+  #     metricsExporter: otlp
+  #     logsExporter: otlp
+  #   logLevel: INFO
+  #   excludedUrls:
+  #     - health
+  # # Required environment variables for OTEL
+  # env:
+  #   - name: OTEL_EXPORTER_OTLP_PROTOCOL
+  #     value: grpc
+  #   - name: OTEL_EXPORTER_OTLP_INSECURE
+  #     value: "true"

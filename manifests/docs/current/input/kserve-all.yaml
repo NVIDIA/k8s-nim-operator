@@ -1,0 +1,124 @@
+# NIM Service LLM-Specific NIM with Ingress
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-3-2-1b-instruct
+  namespace: nim-service
+spec:
+  inferencePlatform: kserve
+  scale:
+    enabled: true
+    hpa:
+      minReplicas: 1
+      maxReplicas: 3
+      metrics:
+      - type: "Resource"
+        resource:
+          name: "cpu"
+          target:
+            type: "Utilization"
+            averageUtilization: 80
+  userID: 2500
+  groupID: 2500
+  annotations:
+    serving.kserve.io/deploymentMode: 'RawDeployment'
+  env:
+  - name: MY_ENV
+    value: hf://meta-llama/Llama-3.1-8B-Instruct
+  image:
+    repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
+    tag: "1.8"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama-3-2-1b-instruct
+  replicas: 1
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      cpu: "12"
+      memory: 32Gi
+    requests:
+      nvidia.com/gpu: 1
+      cpu: "4"
+      memory: 6Gi
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+    router:
+      hostDomainName: example.com
+      ingress:
+        ingressClass: nginx
+---
+# NIM Cache for OpenShift
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: meta-llama3-1b-instruct
+  namespace: nim-service
+spec:
+  source:
+    ngc:
+      authSecret: ngc-api-secret
+      model:
+        engine: tensorrt_llm
+        tensorParallelism: '1'
+      modelPuller: 'nvcr.io/nim/meta/llama-3.2-1b-instruct:1.8.3'
+      pullSecret: ngc-secret
+  storage:
+    pvc:
+      create: true
+      size: 50Gi
+      volumeAccessMode: ReadWriteOnce
+---
+# NIM Service Raw Deployment Using OpenShift
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama-3-2-1b-instruct
+  namespace: nim-service
+spec:
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+  expose:
+    service:
+      port: 8000
+      type: ClusterIP
+  scale:
+    enabled: true
+    hpa:
+      maxReplicas: 3
+      metrics:
+        - resource:
+            name: cpu
+            target:
+              averageUtilization: 80
+              type: Utilization
+          type: Resource
+      minReplicas: 1
+  inferencePlatform: kserve
+  authSecret: ngc-api-secret
+  image:
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+    repository: nvcr.io/nim/meta/llama-3.2-1b-instruct
+    tag: 1.8.3
+  storage:
+    nimCache:
+      name: meta-llama3-1b-instruct
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      cpu: "12"
+      memory: 32Gi
+    requests:
+      nvidia.com/gpu: 1
+      cpu: "4"
+      memory: 6Gi
+  replicas: 1
+---

@@ -1,0 +1,129 @@
+# Example of list-model-profiles utility output
+MODEL PROFILES
+- Compatible with system and runnable:
+  - e2f00b2cbfb168f907c8d6d4d40406f7261111fbab8b3417a485dcd19d10cc98 (vllm)
+  - 668b575f1701fa70a97cfeeae998b5d70b048a9b917682291bb82b67f308f80c (tensorrt_llm)
+  - 50e138f94d85b97117e484660d13b6b54234e60c20584b1de6ed55d109ca4f21 (sglang)
+  - With LoRA support:
+    - 93c5e281d6616f45e2ef801abf4ed82fc65e38ec5f46e0664f340bad4f92d551 (vllm-lora)
+    - cdcd22d151713c8b91fcd279a4b5e021153e72ff5cf6ad5498aac96974f5b7d7 (tensorrt_llm-lora)
+- Compilable to TRT-LLM using just-in-time compilation of HF models to TRTLLM engines: <None>
+---
+# Example of NIM_CACHE_JOB_COMPLETED output (partial)
+...
+status:
+  conditions:
+  ...
+  - lastTransitionTime: "2025-07-07T00:01:00Z"
+    message: The Job to cache NIM has successfully completed
+    reason: JobCompleted
+    status: "True"
+    type: NIM_CACHE_JOB_COMPLETED
+  profiles:
+  - config:
+      feat_lora: "false"
+      llm_engine: tensorrt_llm
+      pp: "1"
+      precision: bf16
+      tp: "1"
+      trtllm_buildable: "true"  # This indicates the profile is buildable
+    name: ac34857f8dcbd174ad524974248f2faf271bd2a0355643b2cf1490d0fe7787c2
+  state: Ready
+  ...
+---
+# Example of buildable profiles output
+[
+  {
+    "config": {
+      "feat_lora": "true",
+      "feat_lora_max_rank": "32",
+      "llm_engine": "tensorrt_llm",
+      "pp": "1",
+      "precision": "bf16",
+      "tp": "1",
+      "trtllm_buildable": "true"
+    },
+    "name": "7b8458eb682edb0d2a48b4019b098ba0bfbc4377aadeeaa11b346c63c7adf724"
+  },
+  {
+    "config": {
+      "feat_lora": "false",
+      "llm_engine": "tensorrt_llm",
+      "pp": "1",
+      "precision": "bf16",
+      "tp": "1",
+      "trtllm_buildable": "true"
+    },
+    "name": "ac34857f8dcbd174ad524974248f2faf271bd2a0355643b2cf1490d0fe7787c2"
+  }
+]
+---
+# Example of completed build output
+...
+    - lastTransitionTime: "2025-07-23T05:58:40Z"
+      message: The Pod to read local model manifest is completed
+      reason: PodCompleted
+      status: "True"
+      type: NIM_BUILD_MODEL_MANIFEST_POD_COMPLETED
+    inputProfile:
+      config:
+        feat_lora: "false"
+        llm_engine: tensorrt_llm
+        pp: "1"
+        precision: bf16
+        tp: "1"
+        trtllm_buildable: "true"
+      name: ac34857f8dcbd174ad524974248f2faf271bd2a0355643b2cf1490d0fe7787c2
+    outputProfile:
+      config:
+        custom: "true"
+        feat_lora: "false"
+        llm_engine: tensorrt_llm
+        model_name: meta-llama3-2-3b-instruct
+        pp: "1"
+        precision: bf16
+        tp: "1"
+      name: 1595f282ae143f034a28997246a212c32e077e2c4ca144c27fc1ff834fd9b56c
+    state: Ready
+---
+# Example of newly built profile details output
+    ...
+    [
+      {
+        "config": {
+          "feat_lora": "true",
+          "feat_lora_max_rank": "32",
+          "llm_engine": "tensorrt_llm",
+          "pp": "1",
+          "precision": "bf16",
+          "tp": "1",
+          "trtllm_buildable": "true"
+        },
+        "name": "7b8458eb682edb0d2a48b4019b098ba0bfbc4377aadeeaa11b346c63c7adf724"
+      },
+      {
+        "config": {
+          "feat_lora": "false",
+          "llm_engine": "tensorrt_llm",
+          "pp": "1",
+          "precision": "bf16",
+          "tp": "1",
+          "trtllm_buildable": "true"
+        },
+        "name": "ac34857f8dcbd174ad524974248f2faf271bd2a0355643b2cf1490d0fe7787c2" # input profile name
+      },
+      {
+        "config": {
+          "custom": "true",
+          "feat_lora": "false",
+          "input_profile": "ac34857f8dcbd174ad524974248f2faf271bd2a0355643b2cf1490d0fe7787c2", # input profile name
+          "llm_engine": "tensorrt_llm",
+          "model_name": "meta-llama3-2-3b-instruct",
+          "pp": "1",
+          "precision": "bf16",
+          "tp": "1"
+        },
+        "name": "1595f282ae143f034a28997246a212c32e077e2c4ca144c27fc1ff834fd9b56c"
+      }
+    ]
+---

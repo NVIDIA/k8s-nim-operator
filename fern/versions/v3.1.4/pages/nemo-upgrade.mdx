@@ -1,0 +1,75 @@
+---
+title: "Upgrading NeMo Microservices"
+license: Apache-2.0
+copyright: "Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "The NIM Operator is deprecating support for the NeMo Microservices CRDs and deployments in the next release. The NeMo Microservices are transitioning into the NeMo Platform. Refer to the NeMo Platform"
+slug: nemo-upgrade
+---
+
+<Anchor id="upgrading-nemo-microservices" />
+
+<Warning>
+The NIM Operator is deprecating support for the NeMo Microservices CRDs and deployments in the next release.
+The NeMo Microservices are transitioning into the NeMo Platform.
+Refer to the [NeMo Platform documentation](https://docs.nvidia.com/nemo-platform/documentation/home#what-you-can-do) for details on continuing to use NeMo Microservices.
+
+</Warning>
+
+This page details performing rolling upgrades on NeMo microservices custom resources on your cluster.
+
+Refer to the [Upgrading NVIDIA NIM Operator](/upgrade) for details on upgrading the NIM Operator.
+
+## Before Upgrading
+
+Refer to the NeMo microservice [release notes](https://docs.nvidia.com/nemo/microservices/25.8.0/about/release-notes/index.html) for details on what is different in your desired version of the NeMo microservices.
+In particular, check for renamed or deprecated fields as those changes will also be reflected in the NIM Operator NeMo microservice custom resource.
+
+Each supported NeMo microservice version is available in a samples folder in the [NIM Operator repository](https://github.com/NVIDIA/k8s-nim-operator/tree/main/config/samples/nemo).
+Check the [compatibility matrix](https://github.com/NVIDIA/k8s-nim-operator/tree/main/config/samples/nemo) for details on which NIM Operator versions support a NeMo microservice version.
+
+### Validate NeMo Custom Resource
+
+Validate the new NeMo custom resource version against your NIM Operator version.
+The following command will perform a dry run on applying the NeMo custom resources to your cluster.
+Update `latest` to the verison folder name or specific NeMo custom resource sample file name you want to validate.
+
+```console
+$  kubectl apply --dry-run=server -f apps_v1alpha1_nemodatastore.yaml \
+    -f apps_v1alpha1_nemocustomizer.yaml \
+    -f apps_v1alpha1_nemoentitystore.yaml \
+    -f apps_v1alpha1_nemoguardrails.yaml \
+    -f apps_v1alpha1_nemoevaluator.yaml
+```
+
+*Example output*
+
+```output
+nemodatastore.apps.nvidia.com/nemodatastore-sample created (server dry run)
+nemocustomizer.apps.nvidia.com/nemocustomizer-sample created (server dry run)
+nemoentitystore.apps.nvidia.com/nemoentitystore-sample created (server dry run)
+nemoguardrail.apps.nvidia.com/nemoguardrails-sample configured (server dry run)
+nemoevaluator.apps.nvidia.com/nemoevaluator-sample created (server dry run)
+```
+
+## Upgrade NeMo Microservices
+
+1. Apply the new NeMo microservices sample files.
+
+   ```console
+   $ export NEMO_VERSION=latest
+
+   $  kubectl apply -f \
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/heads/main/config/samples/nemo/${NEMO_VERSION}/apps_v1alpha1_nemocustomizer.yaml
+
+   $ kubectl apply -f \
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/heads/main/config/samples/nemo/${NEMO_VERSION}/apps_v1alpha1_nemoevaluator.yaml
+
+   $ kubectl apply -f \
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/heads/main/config/samples/nemo/${NEMO_VERSION}/apps_v1alpha1_nemodatastore.yaml
+
+   $ kubectl apply -f \
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/heads/main/config/samples/nemo/${NEMO_VERSION}/apps_v1alpha1_nemoguardrails.yaml
+
+   $ kubectl apply -f \
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/heads/main/config/samples/nemo/${NEMO_VERSION}/apps_v1alpha1_nemoentitystore.yaml
+   ```

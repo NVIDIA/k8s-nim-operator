@@ -1,0 +1,2029 @@
+{
+  "source_commit": "b779730f9d068a58f137f3576888cc2fac6e387e",
+  "version": "3.1.3",
+  "source_markup_fixes": [
+    "data-store.md: indent State: within its list code fence"
+  ],
+  "pages": {
+    "air-gap": {
+      "source_sha256": "7af564749a30a1c0ba45b1502bd92c5e2d9965c777182641b590f937e9c7517d",
+      "code_blocks": 5,
+      "code_digest": "949f6b163bfc20dac0f2aec37cdf15a626f7d070c5adc7bad38a3e4cced1a41e",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Air-Gapped Environments",
+        "File Ownership and Permissions for Pre-Populated Caches",
+        "Serving a Pre-Cached Model Without an NGC API Key",
+        "Proxy Support"
+      ],
+      "section_ids": [
+        "air-gapped-environments",
+        "file-ownership-and-permissions-for-pre-populated-caches",
+        "serving-a-pre-cached-model-without-an-ngc-api-key",
+        "proxy-support"
+      ],
+      "mdx_sha256": "c6edf3d9a15f6b3e5669993e15fd51a10f987d5e9cda56a043cfce9b98c6ad96",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/ca-inject.yaml",
+          "origin": "manifests/input/ca-inject.yaml",
+          "sha256": "b97ad6013215f9c1f04e165629cbfd477ba11d6121ad45ede67a973f7bfdb8f2",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/ca-inject.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "cache": {
+      "source_sha256": "f63ab111cb366d439a770f45f180e6057721e2e4badec1b5d0e45e2acaa5544f",
+      "code_blocks": 23,
+      "code_digest": "079b639f3508a652120e9e5c7ba81fa2648f81aed5f47bd790ceb4b6645a661e",
+      "tables": 2,
+      "table_digest": "26f25332c7360b5f447d2cdf02c1401a3e94d4ae8b14f7d2cec32e69b17f317d",
+      "headings": [
+        "Caching NIM Models",
+        "Benefits of Caching Models",
+        "Prerequisites",
+        "About the NIM Cache Custom Resource Definition",
+        "NIM Cache configuration",
+        "Caching Non-LLM, LLM-Specific, and Multi-LLM NIM",
+        "Supported Sources and Protocols",
+        "Example Procedure",
+        "Summary",
+        "1. Create a Namespace",
+        "2. Create and Configure a NIM Cache Custom Resource",
+        "3. Optional: View Information About the Caching Progress",
+        "Support for Advanced Configurations",
+        "LoRA Models and Adapters",
+        "Air-Gapped and Proxy Environments",
+        "Caching Locally Built LLM NIM Engines",
+        "Displaying the NIM Cache Status",
+        "Displaying Cached Model Profiles",
+        "Troubleshooting",
+        "NIM Pods Show ContainerCreating Status for a Long Time",
+        "NIM Cache Reports No Status",
+        "NIM Cache Event Failures Report ReconcileFailed But NIM Pod is ContainerCreate",
+        "Deleting a NIM Cache",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "caching-nim-models",
+        "benefits-of-caching-models",
+        "prerequisites",
+        "about-the-nim-cache-custom-resource-definition",
+        "nim-cache-configuration",
+        "caching-non-llm-llm-specific-and-multi-llm-nim",
+        "supported-sources-and-protocols",
+        "example-procedure",
+        "summary",
+        "create-a-namespace",
+        "create-and-configure-a-nim-cache-custom-resource",
+        "optional-view-information-about-the-caching-progress",
+        "support-for-advanced-configurations",
+        "lora-models-and-adapters",
+        "air-gapped-and-proxy-environments",
+        "caching-locally-built-llm-nim-engines",
+        "displaying-the-nim-cache-status",
+        "displaying-cached-model-profiles",
+        "troubleshooting",
+        "nim-pods-show-containercreating-status-for-a-long-time",
+        "nim-cache-reports-no-status",
+        "nim-cache-event-failures-report-reconcilefailed-but-nim-pod-is-containercreate",
+        "deleting-a-nim-cache",
+        "next-steps"
+      ],
+      "mdx_sha256": "e3d904ba9daf1c8611cc5cf0241c8345d611280c703395c01227d0922d6ca556",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/cache-all.yaml",
+          "origin": "manifests/input/cache-all.yaml",
+          "sha256": "1e55b2038227eac30b35f3652d54824d3a8dc476bb985fd17f2036d2d9a76d40",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/cache-all.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "cache-llm": {
+      "source_sha256": "a20442262edb82b71518b8cf95b4e9085d8c213d6ed95cb9b127d2ee03f0e5a0",
+      "code_blocks": 21,
+      "code_digest": "ec208f481a1fd9773804e46f54bbda412dca0ae8daa001ed77ec8832ff21dc43",
+      "tables": 2,
+      "table_digest": "a75a8c62c12cbdf31701ea3ea45aeaa97c0184e861ab5fa7e43f26f950f3233b",
+      "headings": [
+        "Caching LLM NIM",
+        "Support for NVIDIA NIM for Multi-LLM and LLM-Specific NIM",
+        "Caching LLM-Specific NIM",
+        "LLM-Specific NIM Cache Sources",
+        "Caching Locally Built LLM NIM Engines",
+        "LoRA Models and Adapters",
+        "Caching Multi-LLM Compatible NIM",
+        "Multi-LLM NIM Cache Sources"
+      ],
+      "section_ids": [
+        "caching-llm-nim",
+        "support-for-nvidia-nim-for-multi-llm-and-llm-specific-nim",
+        "caching-llm-specific-nim",
+        "id1",
+        "llm-specific-nim-cache-sources",
+        "caching-locally-built-llm-nim-engines",
+        "lora-models-and-adapters",
+        "caching-multi-llm-compatible-nim",
+        "caching-multi-llm-nim",
+        "multi-llm-nim-cache-sources"
+      ],
+      "mdx_sha256": "85baa265760a7eda7ccfe3343159ab2622bef72f35009a1bf53866aff356e35d",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml",
+          "sha256": "81d2d70b51aefd090a4d2c94fa06f273801bb78590f6383047b4b820c8d240f9",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Cache for LLM specific NIM",
+            "emphasize-lines": "8-14",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml",
+            "language": "yaml",
+            "lines": "3-22",
+            "highlight": "{8,9,10,11,12,13,14}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml",
+          "sha256": "81d2d70b51aefd090a4d2c94fa06f273801bb78590f6383047b4b820c8d240f9",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Service for LLM specific NIM",
+            "emphasize-lines": "15-17"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml",
+            "language": "yaml",
+            "lines": "26-50",
+            "highlight": "{15,16,17}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/https/nimcache-llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/https/nimcache-llm.yaml",
+          "sha256": "89c0ba94f2c10ad479d8649debbbff4747e3c281ee808d8c246dfe91aee665b1",
+          "selection": {
+            "language": "yaml",
+            "emphasize-lines": "9-10"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/https/nimcache-llm.yaml",
+            "language": "yaml",
+            "highlight": "{9,10}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/cache-lora.yaml",
+          "origin": "manifests/input/cache-lora.yaml",
+          "sha256": "aaf75dd49190a507574c73922b4fd28b7234821749255152870e570caec5e171",
+          "selection": {
+            "language": "yaml",
+            "emphasize-lines": "13"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/cache-lora.yaml",
+            "language": "yaml",
+            "highlight": "{13}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/pod-ngc-cli.yaml",
+          "origin": "manifests/input/pod-ngc-cli.yaml",
+          "sha256": "c8b89569831e7a8231c980369e286c60bba39625749c8b71d2d5b6ce609fe0ea",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/pod-ngc-cli.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml",
+          "sha256": "eac0788cfbea2740d5e46b08121a4a103f71f1a4417ce6eca9c58af8c106dba2",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Cache for Multi-LLM NIM",
+            "emphasize-lines": "8-14",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml",
+            "language": "yaml",
+            "lines": "3-22",
+            "highlight": "{8,9,10,11,12,13,14}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml",
+          "sha256": "eac0788cfbea2740d5e46b08121a4a103f71f1a4417ce6eca9c58af8c106dba2",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Service with Multi-LLM NIM",
+            "emphasize-lines": "15-17"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml",
+            "language": "yaml",
+            "lines": "26-56",
+            "highlight": "{15,16,17}",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "cache-non-llm": {
+      "source_sha256": "70136b492a29d7e1b5808225017e31e38f743d6263a84b78e81f5657fa266821",
+      "code_blocks": 10,
+      "code_digest": "96224252f9aa3377c611872a34669d25548bc99fbc05524ae9486b095aba3a2a",
+      "tables": 2,
+      "table_digest": "6ff6374fafa0cd52dac27560478dd054bccf252e7defef33a9aa4b3df0ad7d74",
+      "headings": [
+        "Caching Non-LLM NIM",
+        "About NVIDIA NIM Microservices",
+        "Non-LLM NIM Caching",
+        "Cache NVIDIA NeMo Retriever NIM 2.x+",
+        "Choose a Model Download Provider",
+        "Use Hugging Face as the Model Download Provider",
+        "Use NGC as the Model Download Provider",
+        "Cache NIMs That Use Model Profiles"
+      ],
+      "section_ids": [
+        "caching-non-llm-nim",
+        "about-nvidia-nim-microservices",
+        "non-llm-nim-caching",
+        "id1",
+        "cache-nvidia-nemo-retriever-nim-2-x",
+        "cache-retriever-embedding-nim",
+        "choose-a-model-download-provider",
+        "use-hugging-face-as-the-model-download-provider",
+        "use-ngc-as-the-model-download-provider",
+        "cache-nims-that-use-model-profiles",
+        "non-llm-nim-cache-sources"
+      ],
+      "mdx_sha256": "b7af2c03e8a9db2fb3a47f9a2c65b9aa301f702228976c28f09b317de76b5ea2",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/retriever-embedding.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/retriever-embedding.yaml",
+          "sha256": "2dc583d9d2485237383eabee8652d2c5a8ec66343efd8b6d3c6967a2d8695a9d",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/basic/retriever-embedding.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/s3/nimcache-llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/s3/nimcache-llm.yaml",
+          "sha256": "09b9f886804e665c84c792d4432f37a645f4f20f6d2950ba6fad8bda91d83db0",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# LLM NIM Cache with Mirrored Local Model Registry",
+            "emphasize-lines": "8-13"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/s3/nimcache-llm.yaml",
+            "language": "yaml",
+            "lines": "2-28",
+            "highlight": "{8,9,10,11,12,13}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/https/nimcache-llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/https/nimcache-llm.yaml",
+          "sha256": "89c0ba94f2c10ad479d8649debbbff4747e3c281ee808d8c246dfe91aee665b1",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# LLM NIM Cache with Mirrored Local Model Registry",
+            "emphasize-lines": "8-9"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/https/nimcache-llm.yaml",
+            "language": "yaml",
+            "lines": "2-24",
+            "highlight": "{8,9}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/jfrog/nimcache-llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/jfrog/nimcache-llm.yaml",
+          "sha256": "9c7d468f39b08666a7cefe8b6a649ea7e80b245503a4fc6e19e15d6b26f5956e",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# LLM NIM Cache with Mirrored Local Model Registry",
+            "emphasize-lines": "8-9"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/caching/ngc-mirror/jfrog/nimcache-llm.yaml",
+            "language": "yaml",
+            "lines": "2-24",
+            "highlight": "{8,9}",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "configure-webhooks": {
+      "source_sha256": "cd29b88994b60002c562b45ae62c904356ec8a055f7ad0dac53587ebf24452cf",
+      "code_blocks": 10,
+      "code_digest": "b96c8a7392f0102575d1dd50c42dc8b1b33408f25f6ecd92536de4b66853c1c2",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Configuring Validation Webhooks",
+        "Install cert-manager",
+        "Enable Validation Webhooks",
+        "Validate Custom Resource Files",
+        "Disable Validation Webhooks"
+      ],
+      "section_ids": [
+        "configuring-validation-webhooks",
+        "install-cert-manager",
+        "enable-validation-webhooks",
+        "validate-custom-resource-files",
+        "disable-validation-webhooks"
+      ],
+      "mdx_sha256": "23fcd3c3c68354bacfaeabbb8e5f570b2c07544741afc2a6a73f9ce76dab2392"
+    },
+    "customizer": {
+      "source_sha256": "90693e4ea6978cf9beb67e2d5436c66b9cd1f3f21cc6d74a1697bd13bfc8acdf",
+      "code_blocks": 16,
+      "code_digest": "570f97cd21710dbb06b6fcc90aa4ad0a25fa1adca83a6b9679ec23f83c43fee8",
+      "tables": 1,
+      "table_digest": "0ad71c681241a3b32d8aa2a6ee32cc06b9d288e26d65c68dd68650813129f520",
+      "headings": [
+        "Managing NeMo Customizer",
+        "About NeMo Customizer",
+        "Prerequisites",
+        "Deploying a NeMo Customizer",
+        "Verify NeMo Customizer",
+        "Check NeMo Customizer Service is Reachable",
+        "Configure NeMo Customizer"
+      ],
+      "section_ids": [
+        "managing-nemo-customizer",
+        "about-nemo-customizer",
+        "prerequisites",
+        "deploying-a-nemo-customizer",
+        "verify-nemo-customizer",
+        "check-nemo-customizer-service-is-reachable",
+        "configure-nemo-customizer"
+      ],
+      "mdx_sha256": "147d5fabb6d5d2bb7142428a6756aa626e9295838b428dbcf41826c7b6fb1c36",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/nemo-customizer-secrets.yaml",
+          "origin": "manifests/input/nemo-customizer-secrets.yaml",
+          "sha256": "fbbbe81c32b05383ebb62e8c4ad7012d5183fe0cd639f1ab3fbb50f1d9e28083",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-customizer-secrets.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nemo-customizer-training-config.yaml",
+          "origin": "manifests/input/nemo-customizer-training-config.yaml",
+          "sha256": "d07df85d9010b5a237e01270c710a14474e1fc71c3df1672fbde672fb60eddc4",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-customizer-training-config.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nemo-customizer-model-config.yaml",
+          "origin": "manifests/input/nemo-customizer-model-config.yaml",
+          "sha256": "1f28897ca7f284779d19eba35a6fbdf22d319bdc8870195957fbede51d50d684",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-customizer-model-config.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nemo-customizer.yaml",
+          "origin": "manifests/input/nemo-customizer.yaml",
+          "sha256": "ea229f9f59d6521bae77bbbdbf2f91d035ab80b45a196da1e5f7c69456d74bba",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-customizer.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "data-store": {
+      "source_sha256": "9fbc486483a152fb267c42b1940e64fab2b3002ff65dbaf34382f4298f5b3ff3",
+      "code_blocks": 14,
+      "code_digest": "bf9c5ce57d480029887e9b41c43bb81a0bc758c310358ac4208aaa51cf8c596f",
+      "tables": 1,
+      "table_digest": "32c62aabce2597b8d081529c1072c4e25831617c94594370751f736b052571e7",
+      "headings": [
+        "Managing NeMo Data Stores",
+        "About NeMo Data Store",
+        "Prerequisites",
+        "Deploying a NeMo Datastore",
+        "Verify NeMo Data store",
+        "Configuring a NeMo Data Store",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "managing-nemo-data-stores",
+        "about-nemo-data-store",
+        "prerequisites",
+        "deploying-a-nemo-datastore",
+        "verify-nemo-data-store",
+        "configuring-a-nemo-data-store",
+        "next-steps"
+      ],
+      "mdx_sha256": "ebe4d096828cfb2ed6fa2ef5b29ad064538eba21ca0c73144740969e1ab651f4",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/nemo-datastore-secrets.yaml",
+          "origin": "manifests/input/nemo-datastore-secrets.yaml",
+          "sha256": "16d293ab884d84b5abf14d735c2363fc2894b4a9ac549c4c3e89d955a660eda6",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-datastore-secrets.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nemo-datastore.yaml",
+          "origin": "manifests/input/nemo-datastore.yaml",
+          "sha256": "2c32cc09e9984f92e8815fa95da5733e96b4aa5d7c36d112674ae27ebd900407",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-datastore.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "deploy-nemo-microservices": {
+      "source_sha256": "2e62837aa24c42fb71a48030212c06372eb1479d124a16c5b9c64b79c1c04579",
+      "code_blocks": 18,
+      "code_digest": "49f53e928089e0afa9af84c0719182d3ea8997fc650de9ced959a95d77c9a725",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Quick Start: Deploy All NeMo Microservices",
+        "1. Prerequisites",
+        "Minimum System Requirements",
+        "2. Deploy the NeMo Microservices",
+        "3. Verify the NeMo Microservices",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "quick-start-deploy-all-nemo-microservices",
+        "prerequisites",
+        "minimum-system-requirements",
+        "deploy-the-nemo-microservices",
+        "verify-the-nemo-microservices",
+        "next-steps"
+      ],
+      "source_code_digest": "605fb1589ede6749ee68e077e61abfb418cb430326870a53d6f095f5be47ecb8",
+      "mdx_sha256": "cab533a266ba8181d14fcc5e8ffa0477dcb3f3f16be07392132d5e7062121f26",
+      "replaced_source_variables": {
+        "nim_folder_version": 1,
+        "version": 1
+      }
+    },
+    "dra": {
+      "source_sha256": "e4dd3b8b27c39a68c851bdb0ab14e93bc62cc5e7081f1bec0d7549281d7c88ab",
+      "code_blocks": 37,
+      "code_digest": "41912891706723337f6e8bf24ac2160df1c45e76979e452cc99d912a0609b6f4",
+      "tables": 1,
+      "table_digest": "279455d5f9cfddf9bad4ca78300739af2e92818f72b6d66fb328578714db77e7",
+      "headings": [
+        "Dynamic Resource Allocation (DRA) Support for NIM",
+        "About Dynamic Resource Allocation (DRA)",
+        "Example Procedure",
+        "Summary",
+        "1. Configure Prerequisites and Deploy DRA Driver for GPUs",
+        "2. Decide on GPU Usage: Full GPU or MIG",
+        "3. Create a NIM Cache Custom Resource",
+        "4. Configure NIM Service to Use the DRA Resource",
+        "Option A: Auto-generate ResourceClaimTemplate",
+        "Option B: Use Pre-Created ResourceClaim or ResourceClaimTemplate",
+        "Displaying Statuses",
+        "Troubleshooting"
+      ],
+      "section_ids": [
+        "dynamic-resource-allocation-dra-support-for-nim",
+        "about-dynamic-resource-allocation-dra",
+        "example-procedure",
+        "summary",
+        "configure-prerequisites-and-deploy-dra-driver-for-gpus",
+        "decide-on-gpu-usage-full-gpu-or-mig",
+        "create-a-nim-cache-custom-resource",
+        "configure-nim-service-to-use-the-dra-resource",
+        "option-a-auto-generate-resourceclaimtemplate",
+        "id1",
+        "option-b-use-pre-created-resourceclaim-or-resourceclaimtemplate",
+        "id2",
+        "displaying-statuses",
+        "troubleshooting"
+      ],
+      "mdx_sha256": "5bdd57b36759db29e2eb88ab9bfda75c1d0070603c7f0f4ab5dc1003bc7ef1fa",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml",
+          "sha256": "21b925d754aba0a565f0b4252c29293705a999d5095c210e9fde9c2c5cfd7f51",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Cache",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml",
+            "language": "yaml",
+            "lines": "3-22",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml",
+          "sha256": "21b925d754aba0a565f0b4252c29293705a999d5095c210e9fde9c2c5cfd7f51",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Service",
+            "emphasize-lines": "19-33"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml",
+            "language": "yaml",
+            "lines": "26-62",
+            "highlight": "{19,20,21,22,23,24,25,26,27,28,29,30,31,32,33}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/dra-all.yaml",
+          "origin": "manifests/input/dra-all.yaml",
+          "sha256": "7bbe870046a0b5e3fc5acdb11e1029eb6c1dca2a35875a9ac3249c752922725e",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# Full GPU resource claim",
+            "emphasize-lines": "2,4,8-12",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/dra-all.yaml",
+            "language": "yaml",
+            "lines": "2-13",
+            "highlight": "{2,4,8,9,10,11,12}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/dra-all.yaml",
+          "origin": "manifests/input/dra-all.yaml",
+          "sha256": "7bbe870046a0b5e3fc5acdb11e1029eb6c1dca2a35875a9ac3249c752922725e",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIMService with a 1-GPU resource claim and a NIMCache with tp=1 model profiles",
+            "emphasize-lines": "18-19",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/dra-all.yaml",
+            "language": "yaml",
+            "lines": "70-92",
+            "highlight": "{18,19}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/manual/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/manual/llm.yaml",
+          "sha256": "81e53b651f934c3962881bd8108d521838a0732f94a5341d891d6a510a98e17e",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# Create a ResourceClaimTemplate for GPU allocation",
+            "emphasize-lines": "2,4,10-14",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/manual/llm.yaml",
+            "language": "yaml",
+            "lines": "3-16",
+            "highlight": "{2,4,10,11,12,13,14}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/manual/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/manual/llm.yaml",
+          "sha256": "81e53b651f934c3962881bd8108d521838a0732f94a5341d891d6a510a98e17e",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Service with a pre-created resource claim template",
+            "emphasize-lines": "19-20"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/dra/manual/llm.yaml",
+            "language": "yaml",
+            "lines": "42-65",
+            "highlight": "{19,20}",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "dynamo": {
+      "source_sha256": "b899f30d3165e1d4f48ad33024e510342f38dda1d347c8b6b166620204e6416a",
+      "code_blocks": 19,
+      "code_digest": "f83069791159eb0123d876e991733cb0e6de2ad621a5f7e922f205f74da02083",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Dynamo (Experimental)",
+        "Prerequisites",
+        "Configure NIM Operator with Dynamo Enabled",
+        "Verify Dynamo CRDs and NIM Operator",
+        "Dynamo vLLM Deployment (Qwen Example)",
+        "Testing the Deployment"
+      ],
+      "section_ids": [
+        "dynamo-experimental",
+        "prerequisites",
+        "configure-nim-operator-with-dynamo-enabled",
+        "verify-dynamo-crds-and-nim-operator",
+        "dynamo-vllm-deployment-qwen-example",
+        "testing-the-deployment"
+      ],
+      "source_code_digest": "893be7f39a801cd6d324c3995cfb4f36b077ee0e1031645dee73b10d00cf54da",
+      "mdx_sha256": "9d400663903b2c68bef22055f4f958fc5e97f85ae7620776ecfc7d0d986e88af",
+      "replaced_source_variables": {
+        "version": 1
+      }
+    },
+    "entity-store": {
+      "source_sha256": "283aad2c1a602e53893ecac35ca83d8efd7539df8152a3135687b698d8710b47",
+      "code_blocks": 11,
+      "code_digest": "e6556363cfbc25acca73fc85cca936ac5e50ac495d59c3a8d6984c2bc2a9d513",
+      "tables": 1,
+      "table_digest": "74c982430cea988fe3a95eef2dc838a76cb3b072f0b9e536c03c591c65839423",
+      "headings": [
+        "Managing NeMo Entity Store",
+        "About NeMo Entity Store",
+        "Prerequisites",
+        "Deploying a NeMo Entity Store",
+        "Verify NeMo Entity Store",
+        "Configuring a NeMo Entity Store",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "managing-nemo-entity-store",
+        "about-nemo-entity-store",
+        "prerequisites",
+        "deploying-a-nemo-entity-store",
+        "verify-nemo-entity-store",
+        "configuring-a-nemo-entity-store",
+        "next-steps"
+      ],
+      "mdx_sha256": "3984feddb940b040c6f4a0e808ef3fda88edf940591d7073b8474b52d76f8013",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/nemo-entitystore-secrets.yaml",
+          "origin": "manifests/input/nemo-entitystore-secrets.yaml",
+          "sha256": "116111bf5d1f651792f051e6ede3a96ec60d57502c67c75a38fbacea64383063",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-entitystore-secrets.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nemo-entitystore.yaml",
+          "origin": "manifests/input/nemo-entitystore.yaml",
+          "sha256": "908166f526daed8b0f7e6febe09921e656f14e8c13b2bc68169d5d8e7664ccdf",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-entitystore.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "evaluator": {
+      "source_sha256": "f2881ff450e522f50f195737504a93496ce7aadf2db4235fb39fab9e31db6096",
+      "code_blocks": 10,
+      "code_digest": "b45df62262b7d3aab7f1dfdef5a50a1bdf62a4db5db0fa8bbc0c5cad71a21442",
+      "tables": 1,
+      "table_digest": "6bc758ae4024eaa78f8a50ce30f18c5149ce2703711bb75c16d0bfe2931a7dc1",
+      "headings": [
+        "Managing NeMo Evaluator",
+        "About NeMo Evaluator",
+        "Prerequisites",
+        "Deploying NeMo Evaluator",
+        "Verify NeMo Evaluator",
+        "Configure NeMo Evaluator",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "managing-nemo-evaluator",
+        "about-nemo-evaluator",
+        "prerequisites",
+        "deploying-nemo-evaluator",
+        "verify-nemo-evaluator",
+        "configure-nemo-evaluator",
+        "next-steps"
+      ],
+      "mdx_sha256": "d8fb4c62d439323761a00d01e5d43e7f36845164da9299d81507fd494c85e1ad",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/nemo-evaluator-secrets.yaml",
+          "origin": "manifests/input/nemo-evaluator-secrets.yaml",
+          "sha256": "c7c3bb5034ac497511cc090ff1639fa4a82031d408ee43476a60c3c54de34cec",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-evaluator-secrets.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nemo-evaluator.yaml",
+          "origin": "manifests/input/nemo-evaluator.yaml",
+          "sha256": "5ff6874aeca836cdf01d38c8a4048af2ea9af7127b616b5a89305c9c423352c4",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-evaluator.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "guardrail": {
+      "source_sha256": "c0c21d47c7960ee4ff05ffb653c955984f95d042b8ccce66540eeb1516e4ff34",
+      "code_blocks": 13,
+      "code_digest": "7a20d13ea626fb4e581742cb358958ce9c43e439bade448719ff60080818a714",
+      "tables": 1,
+      "table_digest": "5dbdb8d9431fdf5a36cc4c986d7ad9eb51b0619a42192d413c72feec65f5caa8",
+      "headings": [
+        "Managing NeMo Guardrails",
+        "About NeMo Guardrails",
+        "Prerequisites",
+        "Deploy NeMo Guardrails",
+        "Verify NeMo Guardrails",
+        "Configure Observability with OpenTelemetry",
+        "Configuration Reference",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "managing-nemo-guardrails",
+        "about-nemo-guardrails",
+        "prerequisites",
+        "deploy-nemo-guardrails",
+        "verify-nemo-guardrails",
+        "configure-observability-with-opentelemetry",
+        "configuration-reference",
+        "next-steps"
+      ],
+      "mdx_sha256": "699e3e6b1b5725358771af90c06bd644000547a62a5bab1f335ee9d1eda0fac4",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/guardrail-pg-secret.yaml",
+          "origin": "manifests/input/guardrail-pg-secret.yaml",
+          "sha256": "814396a0c7ce5703c7cb3d0e0ca98f54c1a9723a222d3817fddf05d230d904a1",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/guardrail-pg-secret.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nemo-guardrail-secret.yaml",
+          "origin": "manifests/input/nemo-guardrail-secret.yaml",
+          "sha256": "edf54743e524f6d5fac8a657166ea9bef1d0b144d862096cd87bb997da1d1858",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-guardrail-secret.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nemo-guardrail.yaml",
+          "origin": "manifests/input/nemo-guardrail.yaml",
+          "sha256": "ffddc552cb131bb26ec96338c62dcb5e9fff8f60b51e50957aa8a7f76649593c",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nemo-guardrail.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "image-pull-secrets": {
+      "source_sha256": "63143c0c2a850b798bdb2788250f4a0954a7313967d4c7c40221d9130a559761",
+      "code_blocks": 4,
+      "code_digest": "29b7e4bbe845c18ea3fb97d24340277f4cf0f7c7281b79374c27acdb04167aef",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Image Pull Secrets",
+        "Create NGC API Key Image Pull Secrets"
+      ],
+      "section_ids": [
+        "image-pull-secrets",
+        "create-ngc-api-key-image-pull-secrets"
+      ],
+      "mdx_sha256": "bf9c72fc7ee1e22f6e2a8b676110b624f56079fdff4eacd795f162175d571834"
+    },
+    "index": {
+      "source_sha256": "bcc39eb8d649272866b391f9dc1ba44bf8a4d28c778194350d4398a88e36e0d5",
+      "code_blocks": 0,
+      "code_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "tables": 1,
+      "table_digest": "f87ea3f494f820dcc5ea42285d68aacb90b43c3eaff85a7fae6c9e081440098e",
+      "headings": [
+        "NVIDIA NIM Operator",
+        "About the Operator",
+        "Benefits of Using the Operator",
+        "Model Caching",
+        "Logging and Monitoring",
+        "Autoscaling",
+        "Government Ready",
+        "Deploy Dynamo CRDs (Experimental)",
+        "Kata Containers (Experimental)",
+        "NIM Operator Custom Resources",
+        "Sample Applications",
+        "Licenses",
+        "Third-Party Software"
+      ],
+      "section_ids": [
+        "nvidia-nim-operator",
+        "about-the-operator",
+        "benefits-of-using-the-operator",
+        "model-caching",
+        "logging-and-monitoring",
+        "autoscaling",
+        "government-ready",
+        "deploy-dynamo-crds-experimental",
+        "kata-containers-experimental",
+        "nim-operator-custom-resources",
+        "id2",
+        "licenses",
+        "third-party-software"
+      ],
+      "mdx_sha256": "09b450918203385b6fff912dae68a9252594c7d6efc710ceb1f76636362b31a7",
+      "replaced_source_variables": {
+        "index_apache2": 2,
+        "index_nvaieagree": 9
+      }
+    },
+    "install": {
+      "source_sha256": "262e820f459bdf3ad618a63bedc99b733cff0e99d1a63d5fc27ba0013f954144",
+      "code_blocks": 12,
+      "code_digest": "eb67e05c7ef57fd1ad5e373c86027b2f556f4c0577f626c8866bab93a9862e81",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Installing NVIDIA NIM Operator",
+        "Prerequisites",
+        "Install the NIM Operator on Any Kubernetes Platform",
+        "Installing NIM Operator on Red Hat OpenShift Using the Web Console",
+        "Installing NIM Operator on Red Hat OpenShift Using operator-sdk (for Development-Only)",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "installing-nvidia-nim-operator",
+        "prerequisites",
+        "install-the-nim-operator-on-any-kubernetes-platform",
+        "installing-nim-operator-on-red-hat-openshift-using-the-web-console",
+        "installing-nim-operator-on-red-hat-openshift-using-operator-sdk-for-development-only",
+        "next-steps"
+      ],
+      "source_code_digest": "09c84dab68366ae9cb4b5c9e612b2ccc77ebb473ff7b3a4778fe1e1cf6a5b80c",
+      "mdx_sha256": "885c4f6d6cb702ada3f127176f8440c11fdb8a0ac9b27f3d906e403fa9f84a6d",
+      "replaced_source_variables": {
+        "version": 1
+      }
+    },
+    "kata-sandbox": {
+      "source_sha256": "0c86d2c90401fd246c261258375d84dbdc63bf60eb5983f7dc8ce95891656dde",
+      "code_blocks": 10,
+      "code_digest": "735b893c4b01c93ffc5dc64fdc6b2e93faef82aac19905ac8229f23be0bb6cfd",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Kata Sandbox Workloads (Experimental)",
+        "Install the NIM Operator",
+        "Deploy NIM in a Kata Container",
+        "Validate NIM Running in Kata Container"
+      ],
+      "section_ids": [
+        "kata-sandbox-workloads-experimental",
+        "install-the-nim-operator",
+        "deploy-nim-in-a-kata-container",
+        "validate-nim-running-in-kata-container"
+      ],
+      "source_code_digest": "7856ec24b0c074656bb3c2156db983d80325aa90bf4b58a2f5353a51a347b470",
+      "mdx_sha256": "067604e0a63a72feb09a28485a232e60c6be7dfe2312bd0e1932193940b3bbe2",
+      "replaced_source_variables": {
+        "version": 1
+      },
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/confidential-computing/llm-kata-sandbox.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/standalone/confidential-computing/llm-kata-sandbox.yaml",
+          "sha256": "b47f6df0183fb5ceefea7f9751adbe4952f3fc64287a1627050c023825a9f462",
+          "selection": {
+            "language": "yaml",
+            "emphasize-lines": "17, 18, 29-31"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/confidential-computing/llm-kata-sandbox.yaml",
+            "language": "yaml",
+            "highlight": "{17,18,29,30,31}",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "kserve": {
+      "source_sha256": "e58732f642c54d1501eccc286ec169d7fee0e1c845a1bcb0e743b22d3f7eebcc",
+      "code_blocks": 43,
+      "code_digest": "3543ee5bbcd7d70eca8ec5b506df755bde5043d628430e2136828c53a12f4537",
+      "tables": 3,
+      "table_digest": "02af387931fb8bcb89e441ae921b98891c5fa7d99e009bacefaefa34c40c7a3a",
+      "headings": [
+        "KServe Support on NIM Operator",
+        "About KServe Support",
+        "KServe Deployment Modes Comparison",
+        "Select Your Deployment Environment and Type",
+        "Raw Deployment Example on Standard Kubernetes",
+        "Summary",
+        "1. Install KServe in Raw Deployment Mode",
+        "2. Optional: Create NIM Cache",
+        "3. Deploy NIM through KServe as a Raw Deployment",
+        "Raw Deployment Example on Red Hat OpenShift",
+        "Summary",
+        "1. Install KServe in Raw Deployment Mode Using OpenShift",
+        "2. Create NIM Cache Using OpenShift",
+        "3. Deploy NIM Through KServe as a Raw Deployment Using OpenShift",
+        "Serverless Deployment Example on Standard Kubernetes",
+        "Summary",
+        "1. Install KServe in Serverless Mode",
+        "2. Enable PVC Support",
+        "3. Optional: Create NIM Cache With Serverless Deployment",
+        "4. Deploy NIM through KServe as a Serverless Deployment",
+        "Uninstalling KServe"
+      ],
+      "section_ids": [
+        "kserve-support-on-nim-operator",
+        "about-kserve-support",
+        "kserve-deployment-modes-comparison",
+        "select-your-deployment-environment-and-type",
+        "raw-deployment-example-on-standard-kubernetes",
+        "summary",
+        "install-kserve-in-raw-deployment-mode",
+        "optional-create-nim-cache",
+        "deploy-nim-through-kserve-as-a-raw-deployment",
+        "raw-deployment-example-on-red-hat-openshift",
+        "id1",
+        "install-kserve-in-raw-deployment-mode-using-openshift",
+        "create-nim-cache-using-openshift",
+        "deploy-nim-through-kserve-as-a-raw-deployment-using-openshift",
+        "serverless-deployment-example-on-standard-kubernetes",
+        "id2",
+        "install-kserve-in-serverless-mode",
+        "enable-pvc-support",
+        "optional-create-nim-cache-with-serverless-deployment",
+        "deploy-nim-through-kserve-as-a-serverless-deployment",
+        "uninstalling-kserve"
+      ],
+      "mdx_sha256": "d6a4957d80628121369facb7413d6c8c07390c279e285ec7a4c276c7b54e3691",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/llm.yaml",
+          "sha256": "2d1d9d0ca2afe3dbea4d5c3dc463ca303a7f2a792857a028fe0d00a14ad52f8a",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Cache LLM-Specific NIM",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/llm.yaml",
+            "language": "yaml",
+            "lines": "3-21",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/multi-llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/multi-llm.yaml",
+          "sha256": "8a88235860a4f3f39d11d14eb693873267f058a222d92611c91ea9dfbeebba0b",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Cache Multi-LLM NIM",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/multi-llm.yaml",
+            "language": "yaml",
+            "lines": "3-22",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/llm.yaml",
+          "sha256": "2d1d9d0ca2afe3dbea4d5c3dc463ca303a7f2a792857a028fe0d00a14ad52f8a",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Service LLM-Specific NIM"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/llm.yaml",
+            "language": "yaml",
+            "lines": "25-71",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/multi-llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/multi-llm.yaml",
+          "sha256": "8a88235860a4f3f39d11d14eb693873267f058a222d92611c91ea9dfbeebba0b",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Service Multi-LLM NIM"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/standard/multi-llm.yaml",
+            "language": "yaml",
+            "lines": "26-61",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/kserve-all.yaml",
+          "origin": "manifests/input/kserve-all.yaml",
+          "sha256": "9cc43de321bdb61aa8e4dd9414fecbdb4f08157e610bc318f24e4883acef625b",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIM Cache for OpenShift",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/kserve-all.yaml",
+            "language": "yaml",
+            "lines": "57-76",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/kserve-all.yaml",
+          "origin": "manifests/input/kserve-all.yaml",
+          "sha256": "9cc43de321bdb61aa8e4dd9414fecbdb4f08157e610bc318f24e4883acef625b",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIM Service Raw Deployment Using OpenShift",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/kserve-all.yaml",
+            "language": "yaml",
+            "lines": "78-123",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/knative/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/kserve/knative/llm.yaml",
+          "sha256": "37883214df1fcc9b8d7ab9983e64d315c4a6a24913f647a2e2f03bb11f034d6c",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Cache LLM-Specific NIM",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/knative/llm.yaml",
+            "language": "yaml",
+            "lines": "3-23",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/knative/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/kserve/knative/llm.yaml",
+          "sha256": "37883214df1fcc9b8d7ab9983e64d315c4a6a24913f647a2e2f03bb11f034d6c",
+          "selection": {
+            "language": "yaml",
+            "start-after": "# NIM Service LLM-Specific NIM"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/kserve/knative/llm.yaml",
+            "language": "yaml",
+            "lines": "27-68",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "multi-node": {
+      "source_sha256": "d522d36626193a52d9d4165a8c1f027fbebe064ef902f99d8d57cae7e5ca5b3a",
+      "code_blocks": 38,
+      "code_digest": "26b087932101d54056964401d571fe22c63c9f946fc0ea99203b756b88037190",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Multi-Node NIM Deployment",
+        "About Multi-Node NIM Deployment",
+        "Example Procedure",
+        "Summary",
+        "1. Complete the Prerequisites",
+        "2. Deploy a Multi-node enabled NIM Service",
+        "3. Display LWS and NIM Service Statuses",
+        "Troubleshooting",
+        "Logs and Messages to Gather"
+      ],
+      "section_ids": [
+        "multi-node-nim-deployment",
+        "about-multi-node-nim-deployment",
+        "example-procedure",
+        "summary",
+        "complete-the-prerequisites",
+        "deploy-a-multi-node-enabled-nim-service",
+        "display-lws-and-nim-service-statuses",
+        "troubleshooting",
+        "logs-and-messages-to-gather"
+      ],
+      "mdx_sha256": "a4949e6137fbe57d57f6a122b5b373785927bc6266b3bab6e374cd7752927f7d",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml",
+          "sha256": "f43784e2497a5429807014a5cf54f162f4eed0918e818a43fd4762b631032cc0",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIM Cache",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml",
+            "language": "yaml",
+            "lines": "2-20",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml",
+          "sha256": "f43784e2497a5429807014a5cf54f162f4eed0918e818a43fd4762b631032cc0",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIM Service with multi-node deployment enabled using RDMA"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/advanced/multi-node/multi-node-nimservice-rdma.yaml",
+            "language": "yaml",
+            "lines": "23-102",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "nemo-prerequisites": {
+      "source_sha256": "e29ed56280afeed8303479c2b6a50cd6b025c2ec5c1950002f205b61a079ec12",
+      "code_blocks": 18,
+      "code_digest": "ecba8f643e0d271755df2abdba9765af7db5a412d2ce1e56f7c0c92d0d8740b6",
+      "tables": 1,
+      "table_digest": "379179352d94a3e150279c88526aa9901926f6227714b46e421aa32da99d2722",
+      "headings": [
+        "NeMo Microservices Prerequisites",
+        "1. Create NeMo Namespace",
+        "2. Create NGC API Key Image Pull Secrets",
+        "3. Deploy NeMo Dependencies With Ansible",
+        "Install Dependencies",
+        "Verify Dependencies",
+        "4. Install NeMo Operator",
+        "Prerequisites",
+        "Install the NeMo Operator With Helm",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "nemo-microservices-prerequisites",
+        "create-nemo-namespace",
+        "create-ngc-api-key-image-pull-secrets",
+        "deploy-nemo-dependencies-with-ansible",
+        "install-dependencies",
+        "verify-dependencies",
+        "install-nemo-operator",
+        "prerequisites",
+        "install-the-nemo-operator-with-helm",
+        "next-steps"
+      ],
+      "source_code_digest": "f5ca948ba595d33b10dda7e8b73ff58b959fe2a0d6a704431b05b4870c629151",
+      "mdx_sha256": "1f8e455169d3a0e59f39d342a1eaba9c7b24b8e631f9fd6e188cd99d706de324",
+      "replaced_source_variables": {
+        "nemo_operator_version": 1,
+        "version": 1
+      },
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/ansible-playbook-values.yaml",
+          "origin": "manifests/input/ansible-playbook-values.yaml",
+          "sha256": "8155b79b46af6888539d61767b8ce466602befb46741fff5fac07a1953660d3f",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/ansible-playbook-values.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "nemo-upgrade": {
+      "source_sha256": "15400b71f8742c40855a4554c410099948c8649ef10a12032f0e873ccf471ae5",
+      "code_blocks": 3,
+      "code_digest": "ea92044a3a4eb09c3f21fb7027891e194d30d7446261bdf8bd4e03f345238763",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Upgrading NeMo Microservices",
+        "Before Upgrading",
+        "Validate NeMo Custom Resource",
+        "Upgrade NeMo Microservices"
+      ],
+      "section_ids": [
+        "upgrading-nemo-microservices",
+        "before-upgrading",
+        "validate-nemo-custom-resource",
+        "upgrade-nemo-microservices"
+      ],
+      "mdx_sha256": "1bbbafd4b6f3ca712f7b5c6a1f367e6331870280f1d2f1d79b92f57ae6048529",
+      "replaced_source_variables": {
+        "nemo_upgrade_version": 1
+      }
+    },
+    "nim-build": {
+      "source_sha256": "ee8fce5f39e681e6076ad13b7f9682296b109e6be7b9a3bb44cdb7551b3c6c7e",
+      "code_blocks": 37,
+      "code_digest": "c6f08e7a4189ef1b5a66dbbf283d318ee00603c650cbbccd7ff871ce02354b84",
+      "tables": 1,
+      "table_digest": "d9120c260ecf33e3bc6cdd2b72dce4a596c5e7b774f29017ffe01aa098b92092",
+      "headings": [
+        "Caching Locally Built LLM NIM Engines",
+        "About Buildable Profiles",
+        "Benefits of Using NIM Build",
+        "About the NIM Build Custom Resource",
+        "Example Procedure",
+        "Summary",
+        "1. Create a NIM Cache to cache model profiles",
+        "2. Identify Which Profiles Are Buildable Locally",
+        "3. Create a NIM Build Resource to Build an Engine From Your Cached Profile",
+        "4. Create a NIM Service that uses the built engine in NIM Cache",
+        "Troubleshooting",
+        "Logs and Messages to Gather"
+      ],
+      "section_ids": [
+        "caching-locally-built-llm-nim-engines",
+        "about-buildable-profiles",
+        "benefits-of-using-nim-build",
+        "about-the-nim-build-custom-resource",
+        "example-procedure",
+        "summary",
+        "create-a-nim-cache-to-cache-model-profiles",
+        "identify-which-profiles-are-buildable-locally",
+        "create-a-nim-build-resource-to-build-an-engine-from-your-cached-profile",
+        "create-a-nim-service-that-uses-the-built-engine-in-nim-cache",
+        "troubleshooting",
+        "logs-and-messages-to-gather"
+      ],
+      "mdx_sha256": "fd54c5dd940746b10acd23f63df63190e08304c4c415fdbbe19a18b085e9cb1c",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/nimbuild-all.yaml",
+          "origin": "manifests/input/nimbuild-all.yaml",
+          "sha256": "eed3f1d756dcd822682e7cbe65fb619a56e58e9b5aa6dede97fae8b03b0b9889",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIM Cache Multiple Profiles",
+            "emphasize-lines": "12-13",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nimbuild-all.yaml",
+            "language": "yaml",
+            "lines": "30-48",
+            "highlight": "{12,13}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nimbuild-all.yaml",
+          "origin": "manifests/input/nimbuild-all.yaml",
+          "sha256": "eed3f1d756dcd822682e7cbe65fb619a56e58e9b5aa6dede97fae8b03b0b9889",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIMBuild Select Profile",
+            "emphasize-lines": "7-9",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nimbuild-all.yaml",
+            "language": "yaml",
+            "lines": "15-28",
+            "highlight": "{7,8,9}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nimbuild-all.yaml",
+          "origin": "manifests/input/nimbuild-all.yaml",
+          "sha256": "eed3f1d756dcd822682e7cbe65fb619a56e58e9b5aa6dede97fae8b03b0b9889",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIMService for LLM-specific",
+            "emphasize-lines": "16-18",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nimbuild-all.yaml",
+            "language": "yaml",
+            "lines": "50-74",
+            "highlight": "{16,17,18}",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "nim-upgrade": {
+      "source_sha256": "48128c99af002aaa5a893ba892e85609ec8bee3870ef9152dcdd9af1126f2e7b",
+      "code_blocks": 0,
+      "code_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Upgrade NVIDIA NIM Microservices",
+        "Before Upgrading",
+        "Upgrade NIM Models",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "upgrade-nvidia-nim-microservices",
+        "before-upgrading",
+        "upgrade-nim-models",
+        "next-steps"
+      ],
+      "mdx_sha256": "31672db943ce849277278c96546c9709271852c4ec965041e21642b3c7dcfbcb"
+    },
+    "observability": {
+      "source_sha256": "8dd7ed0f8321c61f8e64d4e832f4c95ebb8293c2834f1913bcc1adee32e0c407",
+      "code_blocks": 5,
+      "code_digest": "9bbe53ff6dfc9434e502f7ea76a3b4d8c305c637967e9e68460ede02d6ebdfad",
+      "tables": 1,
+      "table_digest": "7d044235d777eeb725bfe12ace5bb9a505ce2643077b3f3621262fcb8f6aed6c",
+      "headings": [
+        "NVIDIA NIM Operator Observability",
+        "Install Prometheus",
+        "Configure Metrics",
+        "Metrics"
+      ],
+      "section_ids": [
+        "nvidia-nim-operator-observability",
+        "install-prometheus",
+        "configure-metrics",
+        "metrics"
+      ],
+      "mdx_sha256": "1c0559f5cab87612a7faec1742985b98ffd7df68f84edbb2917b1867a19659fe"
+    },
+    "pipelines": {
+      "source_sha256": "67616f91b3d76448e0f483efc50c2bd2a0c08e08ebd988da4e20010ff4548355",
+      "code_blocks": 7,
+      "code_digest": "6204dbf3a9ea484e067ba1654225a7303c6c425f61df4cbd709c6c9a90f394d6",
+      "tables": 1,
+      "table_digest": "3e970d4a90ddda5e03bce5c22e30054db30034a5ff5f447e3462d683a2d774e0",
+      "headings": [
+        "Managing NIM Services as a NIM Pipeline",
+        "About NIM Pipelines",
+        "Prerequisites",
+        "Procedure",
+        "Deleting NIM Pipelines"
+      ],
+      "section_ids": [
+        "managing-nim-services-as-a-nim-pipeline",
+        "about-nim-pipelines",
+        "prerequisites",
+        "procedure",
+        "deleting-nim-pipelines"
+      ],
+      "mdx_sha256": "08a993c80a9136e8c2743a2f62df032194228ab23cd5627aeade682b13573911",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/pipeline-all.yaml",
+          "origin": "manifests/input/pipeline-all.yaml",
+          "sha256": "40adb0ab9e495bfb31ae51dfb6ff0fb8dc03835952afc0889139c11e3f793b9a",
+          "selection": {
+            "language": "yaml",
+            "end-before": "nv-embedqa-1b-v2"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/pipeline-all.yaml",
+            "language": "yaml",
+            "lines": "1-28",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/pipeline-all.yaml",
+          "origin": "manifests/input/pipeline-all.yaml",
+          "sha256": "40adb0ab9e495bfb31ae51dfb6ff0fb8dc03835952afc0889139c11e3f793b9a",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/pipeline-all.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "platform-prerequisites": {
+      "source_sha256": "414ade5d9a8bf0bc570d0b72d4b65996e91134c7a4442150d8b721623f86a1ac",
+      "code_blocks": 1,
+      "code_digest": "7ea30651a5ed07481302d29b7478fc93a33bf59a6c1af2f079b564d5554def39",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Platform-specific Prerequisites",
+        "Google Kubernetes Engine (GKE)",
+        "Red Hat OpenShift",
+        "VMware Tanzu",
+        "Next Steps"
+      ],
+      "section_ids": [
+        "platform-specific-prerequisites",
+        "google-kubernetes-engine-gke",
+        "red-hat-openshift",
+        "vmware-tanzu",
+        "next-steps"
+      ],
+      "mdx_sha256": "a8ae5c540966473ddae1bc59c830b0362acc9e972b57a8c962f59d4a47d17e59"
+    },
+    "platform-support": {
+      "source_sha256": "a324c749b24b22a48bced23199b5b19c15c6c57a55cef751ab4ef241063dc78f",
+      "code_blocks": 0,
+      "code_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "tables": 3,
+      "table_digest": "26c369bd848f81d81f29c4a71bd9c1472774a5feface68f5364f7c2bda110e17",
+      "headings": [
+        "Platform Support",
+        "NVIDIA NIM Operator Life Cycle",
+        "Support Status for Releases",
+        "NVIDIA NIM Microservices",
+        "NVIDIA NIM for LLMs Version Compatibility",
+        "NIM Microservice System Requirements",
+        "NVIDIA NeMo Microservices",
+        "NeMo Microservices System Requirements",
+        "Operating Systems and Kubernetes Platforms",
+        "Command-Line Tools"
+      ],
+      "section_ids": [
+        "platform-support",
+        "nvidia-nim-operator-life-cycle",
+        "support-status-for-releases",
+        "nvidia-nim-microservices",
+        "nvidia-nim-for-llms-version-compatibility",
+        "nim-microservice-system-requirements",
+        "nvidia-nemo-microservices",
+        "nemo-microservices-system-requirements",
+        "operating-systems-and-kubernetes-platforms",
+        "command-line-tools"
+      ],
+      "mdx_sha256": "661d668e38b983b42b9297c2212748c262fb75743c2f99261b22058bf6113f02",
+      "replaced_source_variables": {
+        "nemo_evaluator_version": 1,
+        "nemo_guardrails_version": 1,
+        "nemo_version": 3
+      }
+    },
+    "quickstart": {
+      "source_sha256": "60b803431a0a7f0cf8f4aedc768862b8fae5abdd46c7ae73fdd44fba62be8311",
+      "code_blocks": 0,
+      "code_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "NIM Operator Quick Start"
+      ],
+      "section_ids": [
+        "nim-operator-quick-start"
+      ],
+      "mdx_sha256": "5336d9b833b37e0a8350b1a2c4fd9b4fba1e224fb78ad7b0eda83d22e7fb699e"
+    },
+    "release-notes": {
+      "source_sha256": "6b8008a4a4411b369b8065d8fe96533586d129f14cd8304fe0cd160638fa5a23",
+      "code_blocks": 2,
+      "code_digest": "0956eae6b28eb4827abf06f205ae01bb06e64c85609e5b7ea2998a46ee666ad4",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Release Notes",
+        "v3.1.3",
+        "Features",
+        "Bug Fixes",
+        "v3.1.2",
+        "Features",
+        "Bug Fixes",
+        "v3.1.1",
+        "Features",
+        "Bug Fixes",
+        "v3.1.0",
+        "Features",
+        "Bug Fixes",
+        "v3.0.2",
+        "Features",
+        "Bug Fixes",
+        "v3.0.1",
+        "Features",
+        "v3.0.0",
+        "Features",
+        "Known Issues",
+        "v2.0.2",
+        "Bug Fixes",
+        "Known Issues",
+        "v2.0.1",
+        "Features",
+        "Bug Fixes",
+        "Removals and Deprecations",
+        "Known Issues",
+        "v2.0.0",
+        "Features",
+        "Bug Fixes",
+        "v1.0.1",
+        "Breaking Changes",
+        "Features",
+        "v1.0.0",
+        "Features",
+        "Known Issues"
+      ],
+      "section_ids": [
+        "release-notes",
+        "v3-1-3",
+        "id1",
+        "features",
+        "v3-1-3-features",
+        "bug-fixes",
+        "v3-1-3-fixes",
+        "v3-1-2",
+        "id2",
+        "v3-1-2-features",
+        "id3",
+        "v3-1-2-fixes",
+        "id4",
+        "v3-1-1",
+        "id5",
+        "v3-1-1-features",
+        "id6",
+        "id7",
+        "v3-1-0",
+        "id8",
+        "v3-1-0-features",
+        "id9",
+        "id10",
+        "v3-0-2",
+        "id11",
+        "v3-0-2-features",
+        "id12",
+        "id13",
+        "v3-0-1",
+        "id14",
+        "v3-0-1-features",
+        "id15",
+        "v3-0-0",
+        "id16",
+        "v3-0-0-features",
+        "id17",
+        "known-issues",
+        "v2-0-2",
+        "id18",
+        "id19",
+        "id20",
+        "v2-0-1",
+        "id21",
+        "v2-0-1-features",
+        "id22",
+        "id23",
+        "removals-and-deprecations",
+        "id24",
+        "v2-0-0",
+        "v2-0",
+        "v2-0-0-features",
+        "id25",
+        "id26",
+        "v1-0-1",
+        "id27",
+        "breaking-changes",
+        "v1-0-1-breaking-changes",
+        "v1-0-1-features",
+        "id28",
+        "v1-0-0",
+        "id29",
+        "v1-0-0-features",
+        "id30",
+        "v1-0-0-known-issues",
+        "id31"
+      ],
+      "mdx_sha256": "ff1784176bf518dc120ff94a2445422d2fc6fbce44fe74cd2fbb48d3561cda3e"
+    },
+    "resource-quotas": {
+      "source_sha256": "6ebaa1c718ba5ca8ed6ae0d32e3104129fc765f223bca1366622b11f831b794e",
+      "code_blocks": 4,
+      "code_digest": "468974f450cd0c9e907e6a63591a60027093edb3ae0c55eafda959d99ee648e8",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Configure Resource Quotas",
+        "Create a Namespace Quota"
+      ],
+      "section_ids": [
+        "configure-resource-quotas",
+        "create-a-namespace-quota"
+      ],
+      "mdx_sha256": "4cbcb65b8ba6159533efa6720207f444926a147264b5baf1fc097b9f7c380818",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/resource-quota.yaml",
+          "origin": "manifests/input/resource-quota.yaml",
+          "sha256": "3e768f5f3350a352fb45aa70f57ecab960a74ca52b0db873df05ba64d2e0883c",
+          "selection": {
+            "language": "yaml"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/resource-quota.yaml",
+            "language": "yaml",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "service": {
+      "source_sha256": "6686f6154e3284acec97cf39cd67a4bdd92fb42f125c4801f91fd4c7606a9ccf",
+      "code_blocks": 39,
+      "code_digest": "250aa10314fe9162a6893a6be172ed13daa87145b99e2adee6fe5644f8882c96",
+      "tables": 1,
+      "table_digest": "45604f73f78134df1273c1a2b941029abd7e639377685e06a23acf115456b797",
+      "headings": [
+        "Managing NIM Services",
+        "About NIM Services",
+        "NIM Service Configuration Reference",
+        "Prerequisites",
+        "Procedure",
+        "Verification",
+        "Displaying Model Status",
+        "Configuring Horizontal Pod Autoscaling",
+        "Prerequisites",
+        "Autoscaling NIM for LLMs",
+        "Scaling a NIM Service to Zero",
+        "Sample Manifests",
+        "Example: Assign a Priority Class",
+        "Example: Create a PVC Instead of Using a NIM Cache",
+        "Example: Air-Gapped Environment",
+        "Example: Gateway API routing",
+        "Deleting a NIM Service"
+      ],
+      "section_ids": [
+        "managing-nim-services",
+        "about-nim-services",
+        "nim-service-configuration-reference",
+        "prerequisites",
+        "procedure",
+        "verification",
+        "displaying-model-status",
+        "configuring-horizontal-pod-autoscaling",
+        "prerequisites-hpa",
+        "id1",
+        "autoscaling-nim-for-llms",
+        "procedure-hpa",
+        "scaling-a-nim-service-to-zero",
+        "sample-manifests",
+        "example-assign-a-priority-class",
+        "example-create-a-pvc-instead-of-using-a-nim-cache",
+        "example-air-gapped-environment",
+        "example-gateway-api-routing",
+        "deleting-a-nim-service"
+      ],
+      "mdx_sha256": "194a1d77ac8d30e68c1454f865202da822a0cb143b3e1904299e8ea421728bd0",
+      "code_includes": [
+        {
+          "src": "./_samples/manifests/input/nimservice-all.yaml",
+          "origin": "manifests/input/nimservice-all.yaml",
+          "sha256": "9aaf0caafb6514993b04cca2c75cd942539d7223e84192db2bf2545023f3fb9c",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIMService for Non-LLM",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nimservice-all.yaml",
+            "language": "yaml",
+            "lines": "1-24",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nimservice-all.yaml",
+          "origin": "manifests/input/nimservice-all.yaml",
+          "sha256": "9aaf0caafb6514993b04cca2c75cd942539d7223e84192db2bf2545023f3fb9c",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIMService for LLM-specific",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nimservice-all.yaml",
+            "language": "yaml",
+            "lines": "26-49",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nimservice-all.yaml",
+          "origin": "manifests/input/nimservice-all.yaml",
+          "sha256": "9aaf0caafb6514993b04cca2c75cd942539d7223e84192db2bf2545023f3fb9c",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIMService for Multi-LLM NGC NIMCache",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nimservice-all.yaml",
+            "language": "yaml",
+            "lines": "51-74",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nimservice-all.yaml",
+          "origin": "manifests/input/nimservice-all.yaml",
+          "sha256": "9aaf0caafb6514993b04cca2c75cd942539d7223e84192db2bf2545023f3fb9c",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIMService for Non-LLM",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nimservice-all.yaml",
+            "language": "yaml",
+            "lines": "1-24",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nimservice-all.yaml",
+          "origin": "manifests/input/nimservice-all.yaml",
+          "sha256": "9aaf0caafb6514993b04cca2c75cd942539d7223e84192db2bf2545023f3fb9c",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIMService for LLM-specific",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nimservice-all.yaml",
+            "language": "yaml",
+            "lines": "26-49",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/nimservice-all.yaml",
+          "origin": "manifests/input/nimservice-all.yaml",
+          "sha256": "9aaf0caafb6514993b04cca2c75cd942539d7223e84192db2bf2545023f3fb9c",
+          "selection": {
+            "language": "yaml",
+            "start-at": "# NIMService for Multi-LLM NGC NIMCache",
+            "end-before": "---"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/nimservice-all.yaml",
+            "language": "yaml",
+            "lines": "51-74",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/service-hpa.yaml",
+          "origin": "manifests/input/service-hpa.yaml",
+          "sha256": "52fda9a5ce1c74af924bd76da54f5a06611642a0315fc7cc5fa2d29fcae4589e",
+          "selection": {
+            "language": "yaml",
+            "emphasize-lines": "25-"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/service-hpa.yaml",
+            "language": "yaml",
+            "highlight": "{25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/service-create-pvc.yaml",
+          "origin": "manifests/input/service-create-pvc.yaml",
+          "sha256": "a66cf6194e907e30793481f70360b1d29201879db536d69d1d02dabb2277540a",
+          "selection": {
+            "language": "yaml",
+            "emphasize-lines": "14-19"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/service-create-pvc.yaml",
+            "language": "yaml",
+            "highlight": "{14,15,16,17,18,19}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/input/service-existing-pvc.yaml",
+          "origin": "manifests/input/service-existing-pvc.yaml",
+          "sha256": "b1724e1f1f35a823c6a002be557313afc54e5c1fc09087a7b235ec8342e0a9e2",
+          "selection": {
+            "language": "yaml",
+            "emphasize-lines": "14-16"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/input/service-existing-pvc.yaml",
+            "language": "yaml",
+            "highlight": "{14,15,16}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/routers/httproutes/multi-llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/standalone/routers/httproutes/multi-llm.yaml",
+          "sha256": "a358467c987e48bc303960269dfdd910c1ca1fea457018e1d8cb8a819e21c1e9",
+          "selection": {
+            "language": "yaml",
+            "emphasize-lines": "58-63"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/routers/httproutes/multi-llm.yaml",
+            "language": "yaml",
+            "highlight": "{58,59,60,61,62,63}",
+            "startLine": "1"
+          }
+        },
+        {
+          "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/routers/grpcroutes/llm.yaml",
+          "origin": "manifests/remote/release-3.0/config/samples/nim/serving/standalone/routers/grpcroutes/llm.yaml",
+          "sha256": "daa8e038c7e4a6cb6c540094e607da9066fd23356a72c2e1d9d3a57302d281a9",
+          "selection": {
+            "language": "yaml",
+            "emphasize-lines": "48-54"
+          },
+          "attributes": {
+            "src": "./_samples/manifests/remote/release-3.0/config/samples/nim/serving/standalone/routers/grpcroutes/llm.yaml",
+            "language": "yaml",
+            "highlight": "{48,49,50,51,52,53,54}",
+            "startLine": "1"
+          }
+        }
+      ]
+    },
+    "uninstall": {
+      "source_sha256": "10849269f5357d31c0492bbe1d7cae5eb4f313431b32753e4ae166c9164f21b3",
+      "code_blocks": 11,
+      "code_digest": "04d5c41dc444d5ab97645eb16d64cbc0e2dabf6f3e7a17f957c52cf29d78edd7",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Uninstalling the NVIDIA NIM Operator"
+      ],
+      "section_ids": [
+        "uninstalling-the-nvidia-nim-operator"
+      ],
+      "mdx_sha256": "a429316324e892b246947fc6df1b9e8542c687f166e706bc19a87dde1c7f2219"
+    },
+    "upgrade": {
+      "source_sha256": "82831b5496b41546d259316cfbf453c370c598d9fed4c93331ba10dd1373051a",
+      "code_blocks": 7,
+      "code_digest": "01eedbd11a38f9ab27170c831d4e305299ffc6fd237222d96ba96fe567c28395",
+      "tables": 0,
+      "table_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headings": [
+        "Upgrading NVIDIA NIM Operator",
+        "Using Helm",
+        "Procedure",
+        "Alternative: Manually Upgrading CRDs"
+      ],
+      "section_ids": [
+        "upgrading-nvidia-nim-operator",
+        "using-helm",
+        "procedure",
+        "alternative-manually-upgrading-crds"
+      ],
+      "source_code_digest": "b0cbc9214c51699b6751120119b4c6584449d9b1d983e2e1665f1b0aa2825995",
+      "mdx_sha256": "ec893bf9876271cfbebdab74f70ec5153e99915af10c17f31dbc295452183589",
+      "replaced_source_variables": {
+        "crd_url": 3,
+        "version": 9
+      }
+    }
+  },
+  "source_ref": "nim-operator-v3.1.3-1",
+  "status": "released",
+  "release_sync": {
+    "previous_source_commit": "bf2acd485ea1f4dac94598c13d143254f0a71d80",
+    "content_updates": [
+      "docs/service.md: external metrics adapter requirement and Observability link"
+    ],
+    "removed_draft_warnings": [
+      "index.mdx",
+      "release-notes.mdx"
+    ],
+    "audit_method": "Verified original source digests before deriving release code/table expectations from the same templates with the explicit version substitution override. Source page hashes match the final release tag."
+  },
+  "installation_version": "3.1.3",
+  "source_installation_version": "3.1.2",
+  "source_value_overrides": {
+    "version": "3.1.3"
+  },
+  "content_format": "Resolved MDX; source variables are replaced with literal values during conversion.",
+  "code_sample_format": "Historical import record: the include paths and hashes below describe the original Sphinx migration, before samples were consolidated.",
+  "current_sample_layout": {
+    "root": "manifests/docs/current",
+    "policy": "All documentation versions share the current Dev sample contents; changes are not frozen per release.",
+    "historical_records": "Original code and table digests, sample paths, and hashes are retained as conversion evidence, not live dependencies."
+  }
+}

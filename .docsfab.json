@@ -1,0 +1,13 @@
+{
+  "github": {
+    "defaultBranch": "main",
+    "remote": "upstream"
+  },
+  "provider": {
+    "configuration": "host"
+  },
+  "schemaVersion": 1,
+  "storage": {
+    "scope": "user-private"
+  }
+}

@@ -1,0 +1,780 @@
+---
+title: "Dynamic Resource Allocation (DRA) Support for NIM"
+description: "DRA is a built-in Kubernetes feature that simplifies GPU allocation for NIMService, NIMPipelines, and NIMBuild. It replaces traditional device plugins with a more flexible and unified approach. It ena"
+slug: dra
+---
+
+<Anchor id="dynamic-resource-allocation-dra-support-for-nim" />
+
+## About Dynamic Resource Allocation (DRA)
+
+[DRA](https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/)
+is a built-in Kubernetes feature that simplifies GPU allocation for NIMService, NIMPipelines, and NIMBuild.
+It replaces traditional device plugins with a more flexible and unified approach.
+It enables users to define GPU classes, request GPUs based on those classes,
+and filter them according to specific workload and business requirements.
+This extensibility makes DRA a powerful tool for managing GPU resources efficiently across diverse NIM use cases.
+
+NIM Operator supports the
+[NVIDIA DRA Driver for GPUs](https://github.com/NVIDIA/k8s-dra-driver-gpu)
+and enables you to dynamically allocate GPU using a ResourceClaim or ResourceClaimTemplate.
+
+NIM Operator supports DRA resource claims for two types of GPU usage:
+
+- Full GPU
+
+- Multi-Instance GPU (MIG)
+
+Additionally, the supported GPU sharing strategies are:
+
+- Time-slicing
+
+<Note>
+DRA support for NIM is currently a *Technology Preview* feature on NIM Operator,
+which means it is not fully supported and is not suitable for deployment in production.
+
+</Note>
+
+## Example Procedure
+
+### Summary
+
+To use Dynamic Resource Allocation for a NIM, follow these steps:
+
+1. [Configure Prerequisites and Deploy DRA Driver for GPUs](#configure-prerequisites-and-deploy-dra-driver-for-gpus).
+
+1. [Decide on GPU Usage: Full GPU or MIG](#decide-on-gpu-usage-full-gpu-or-mig).
+
+1. [Create a NIM Cache custom resource](#create-a-nim-cache-custom-resource).
+
+1. [Configure NIM Service to use the DRA resource](#configure-nim-service-to-use-the-dra-resource) with one of the following options:
+
+   1.    [Auto-generate ResourceClaimTemplate](#option-a-auto-generate-resourceclaimtemplate)
+
+   1.    [Use pre-created ResourceClaim or ResourceClaimTemplate](#option-b-use-pre-created-resourceclaim-or-resourceclaimtemplate)
+
+1. [Display DRA resource statuses](#displaying-statuses).
+
+<Note>
+The NIM Cache, ResourceClaim or ResourceClaimTemplate, and NIM Service must all be in the same Kubernetes namespace.
+The following examples use `nim-service` as the namespace.
+
+</Note>
+
+<Anchor id="configure-prerequisites-and-deploy-dra-driver-for-gpus" />
+
+### 1. Configure Prerequisites and Deploy DRA Driver for GPUs
+
+- Ensure you are using Kubernetes v1.34 or later.
+DRA is enabled by default in Kubernetes v1.34 and later.
+The NIM Operator supports the DRA `apiVersion: resource.k8s.io/v1`.
+
+- Configure the GPU Operator for DRA deployments using the [GPU Operator NVIDIA DRA Driver for GPUs deployment guide](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/dra-intro-install.html).
+
+- If using DRA with MIGs, configure MIG Manager using
+[GPU Operator with MIG deployment guide](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html).
+
+- Deploy the DRA driver helm chart with GPU DRA driver enabled.
+
+  ```console
+  $ helm repo add nvidia https://helm.ngc.nvidia.com/nvidia \
+      && helm repo update
+  ```
+
+  ```console
+  $ helm install nvidia-dra-driver-gpu nvidia/nvidia-dra-driver-gpu \
+      --version="25.12.0" \
+      --create-namespace \
+      --namespace nvidia-dra-driver-gpu \
+      --set gpuResourcesEnabledOverride=true \
+      --set nvidiaDriverRoot=/run/nvidia/driver
+  ```
+
+Refer to the GPU Operator NVIDIA DRA Driver [installation documentation](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/dra-intro-install.html) for full details on install options.
+
+<Note>
+The NVIDIA DRA driver deploys a default device class `gpu.nvidia.com` for GPU resources.
+
+Use the following command to view the device classes:
+
+```console
+$ kubectl get deviceclass
+
+NAME             AGE
+gpu.nvidia.com   78d
+```
+
+The `gpu.nvidia.com` DeviceClass represents physical NVIDIA GPUs managed by the NVIDIA GPU DRA driver.
+You can use this DeviceClass to create ResourceClaim objects to request specific GPUs.
+
+</Note>
+
+<Anchor id="decide-on-gpu-usage-full-gpu-or-mig" />
+
+### 2. Decide on GPU Usage: Full GPU or MIG
+
+You must decide whether to use Full GPU or Multi-Instance GPU (MIG) for the GPU usage. Generally, Full GPU is used for LLMs, whereas time-slicing or MIG can be used for non-LLMs or smaller NIMs. Using MIG is a more advanced configuration.
+
+If using MIG for the GPU usage, make sure you have enabled MIG and MIG Slicing. Refer to
+[GPU Operator with MIG](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html)
+for more detailed instructions.
+
+The GPU sharing strategy currently supported is time slicing.
+
+GPU time-slicing enables workloads that are scheduled on oversubscribed GPUs to interleave with one another.
+For more information, refer to [Time-Slicing GPUs in Kubernetes](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-sharing.html)
+
+<Anchor id="create-a-nim-cache-custom-resource" />
+
+### 3. Create a NIM Cache Custom Resource
+
+<Note>
+Refer to [Prerequisites](/cache#prerequisites) for more information on using NIM Cache.
+
+</Note>
+
+1. Create a NIM Cache manifest, such as `nimcache.yaml`, with contents like the following
+[sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml#L2):
+
+   <Code src="../../../../manifests/docs/current/input/nim/serving/advanced/dra/auto-creation/example1/llm.yaml" language="yaml" startLine="1" lines="3-23" />
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -n nim-service -f nimcache.yaml
+   ```
+
+<Anchor id="configure-nim-service-to-use-the-dra-resource" />
+
+### 4. Configure NIM Service to Use the DRA Resource
+
+There are two options for how NIM Service can use the DRA resource:
+
+- [**Option A: Auto-generate ResourceClaimTemplate**](#option-a-auto-generate-resourceclaimtemplate) (recommended).
+NIM Service automatically creates a ResourceClaimTemplate using the fields specified in `spec.draResources.claimCreationSpec`.
+
+- [**Option B: Use pre-created ResourceClaim or ResourceClaimTemplate**](#option-b-use-pre-created-resourceclaim-or-resourceclaimtemplate).
+First create a ResourceClaim or ResourceClaimTemplate, then configure NIM Service to use that ResourceClaim or ResourceClaimTemplate.
+
+<Anchor id="option-a-auto-generate-resourceclaimtemplate"></Anchor>
+
+<Anchor id="id1" />
+
+#### Option A: Auto-generate ResourceClaimTemplate
+
+<Note>
+Auto-generate only supports ResourceClaimTemplate.
+
+</Note>
+
+The following NIMService `spec.draResources.claimCreationSpec` fields can be configured to auto-generate a ResourceClaimTemplate:
+
+<table>
+<thead>
+<tr>
+<th>
+
+Field
+
+</th>
+<th>
+
+Description
+
+</th>
+<th>
+
+Default Value
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`.devices.attributeSelectors`
+
+</td>
+<td>
+
+Defines the criteria that must be satisfied by the device attributes of a device.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.attributeSelectors.key`
+
+</td>
+<td>
+
+Specifies the name of the device attribute.
+This is either a qualified name or a simple name.
+If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
+
+For example, “gpu.nvidia.com/productName” is equivalent to “productName” if the driver name is “gpu.nvidia.com”.
+Otherwise they are treated as 2 different attributes.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.attributeSelectors.op`
+
+</td>
+<td>
+
+Specifies the operator to use for comparing the device attribute value. Supported operators are:
+
+- *Equal*: The device attribute value must be equal to the value specified in the selector.
+
+- *NotEqual*: The device attribute value must not be equal to the value specified in the selector.
+
+- *GreaterThan*: The device attribute value must be greater than the value specified in the selector.
+
+- *GreaterThanOrEqual*: The device attribute value must be greater than or equal to the value specified in the selector.
+
+- *LessThan*: The device attribute value must be less than the value specified in the selector.
+
+- *LessThanOrEqual*: The device attribute value must be less than or equal to the value specified in the selector.
+
+</td>
+<td>
+
+`Equal`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.attributeSelectors.value` (required)
+
+</td>
+<td>
+
+Specifies the value to compare against the device attribute.
+
+Set exactly one of `boolValue`, `intValue`, `stringValue`, or `versionValue`.
+In releases after v3.1.2, the CRD rejects an attribute selector that omits `value`,
+and the NIM Service reports `attributeSelectors[N].value: value is required` in its status.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.capacitySelectors`
+
+</td>
+<td>
+
+Defines the criteria that must be satisfied by the device capacity of a device.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.capacitySelectors.key`
+
+</td>
+<td>
+
+Specifies the name of the resource.
+This is either a qualified name or a simple name.
+If it is a simple name, then it is assumed to be prefixed with the DRA driver name.
+
+For example, “gpu.nvidia.com/memory” is equivalent to “memory” if the driver name is “gpu.nvidia.com”.
+Otherwise they are treated as 2 different attributes.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.capacitySelectors.op`
+
+</td>
+<td>
+
+Specifies the operator to use for comparing against the device capacity.
+Supported operators are:
+
+- *Equal*: The resource quantity value must be equal to the value specified in the selector.
+
+- *NotEqual*: The resource quantity value must not be equal to the value specified in the selector.
+
+- *GreaterThan*: The resource quantity value must be greater than the value specified in the selector.
+
+- *GreaterThanOrEqual*: The resource quantity value must be greater than or equal to the value specified in the selector.
+
+- *LessThan*: The resource quantity value must be less than the value specified in the selector.
+
+- *LessThanOrEqual*: The resource quantity value must be less than or equal to the value specified in the selector.
+
+</td>
+<td>
+
+`Equal`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.capacitySelectors.value`
+
+</td>
+<td>
+
+Specifies the resource quantity to compare against.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.celExpressions`
+
+</td>
+<td>
+
+Specifies a list of CEL expressions that must be satisfied by the DRA device.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.count`
+
+</td>
+<td>
+
+Specifies the number of devices to request.
+
+</td>
+<td>
+
+`1`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.deviceClassName`
+
+</td>
+<td>
+
+Specifies the DeviceClass to inherit configuration and selectors from.
+
+</td>
+<td>
+
+`gpu.nvidia.com`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.driverName`
+
+</td>
+<td>
+
+Specifies the name of the DRA driver providing the capacity information.
+
+Must be a DNS subdomain.
+
+</td>
+<td>
+
+`gpu.nvidia.com`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`.devices.name` (required)
+
+</td>
+<td>
+
+Specifies the name of the device request to use in the generated claim spec.
+
+Must be a valid DNS_LABEL.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+</tbody>
+</table>
+
+**Create a NIM Service**
+
+1. Create a NIM Service manifest, such as `nimservice.yaml`, with contents like the following
+[sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation/example1/llm.yaml#L25):
+
+   <Code src="../../../../manifests/docs/current/input/nim/serving/advanced/dra/auto-creation/example1/llm.yaml" language="yaml" highlight="{19,20,21,22,23,24,25,26,27,28,29,30,31,32,33}" startLine="1" lines="26-62" />
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl create -f nimservice.yaml -n nim-service
+   ```
+
+For more sample manifests, refer to [config/samples/nim/serving/advanced/dra/auto-creation/](https://github.com/NVIDIA/k8s-nim-operator/tree/release-3.0/config/samples/nim/serving/advanced/dra/auto-creation).
+
+<Anchor id="option-b-use-pre-created-resourceclaim-or-resourceclaimtemplate"></Anchor>
+
+<Anchor id="id2" />
+
+#### Option B: Use Pre-Created ResourceClaim or ResourceClaimTemplate
+
+You can use a ResourceClaim for sharing GPUs. Alternatively, you can use a ResourceClaimTemplate that creates a ResourceClaim on the fly and assigns it to the pod before the pod starts.
+
+Refer to [Allocate Devices to Workloads with DRA](https://kubernetes.io/docs/tasks/configure-pod-container/assign-resources/allocate-devices-dra/)
+in the Kubernetes documentation for more detailed information.
+
+<Tabs>
+  <Tab title="ResourceClaim" language="resource-claim">
+**Create a ResourceClaim**
+
+Refer to the
+[Kubernetes ResourceClaim spec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#resourceclaim-v1-resource-k8s-io)
+for more detailed configuration options.
+
+1. Create a ResourceClaim, with contents like the following `resourceclaim.yaml` sample manifest, for sharing a full GPU:
+
+   <Code src="../../../../manifests/docs/current/input/dra-all.yaml" language="yaml" highlight="{2,4,8,9,10,11,12}" startLine="1" lines="2-13" />
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -n nim-service -f resourceclaim.yaml
+   ```
+
+**Create a NIM Service**
+
+1. Create a file, such as `nimservice.yaml`, with contents like the sample manifest.
+Set `spec.draResources.resourceClaimName` to `gpu-claim`,
+which is the name of ResourceClaim from the preceding `resourceclaim.yaml` example.
+
+   <Code src="../../../../manifests/docs/current/input/dra-all.yaml" language="yaml" highlight="{18,19}" startLine="1" lines="70-92" />
+
+   <Note>
+   If you only want to use a subset of devices from the claim, use the `requests` field.
+That specifies the subset of requests from the ResourceClaim that are made available to the service.
+
+   For example:
+
+   ```output
+   draResources:
+   - resourceClaimName: gpu-claim
+     requests:
+     - gpu-0
+   ```
+
+   </Note>
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl create -f nimservice.yaml -n nim-service
+   ```
+
+  </Tab>
+  <Tab title="ResourceClaimTemplate" language="resource-claim-template">
+**Create a ResourceClaimTemplate**
+
+Refer to the
+[Kubernetes ResourceClaimTemplate spec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#resourceclaimtemplate-v1-resource-k8s-io)
+for more detailed configuration options.
+
+1. Create a file, such as `resourceclaimtemplate.yaml`, with contents like the following
+[sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/dra/manual/llm.yaml#L2), for sharing a full GPU:
+
+   <Code src="../../../../manifests/docs/current/input/nim/serving/advanced/dra/manual/llm.yaml" language="yaml" highlight="{2,4,10,11,12,13,14}" startLine="1" lines="3-17" />
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -n nim-service -f resourceclaimtemplate.yaml
+   ```
+
+**Create a NIM Service**
+
+1. Create a file, such as `nimservice.yaml`, with contents like the following
+[sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/advanced/dra/manual/llm.yaml#L42).
+Set `spec.draResources.resourceClaimTemplateName` to `gpu-claim-template`,
+which is the name of ResourceClaimTemplate from the preceding `resourceclaimtemplate.yaml` example.
+
+   <Code src="../../../../manifests/docs/current/input/nim/serving/advanced/dra/manual/llm.yaml" language="yaml" highlight="{19,20}" startLine="1" lines="43-66" />
+
+   <Note>
+   If you only want to use a subset of devices from the claim, use the `requests` field.
+That specifies the subset of requests from the ResourceClaim that are made available to the service.
+
+   For example:
+
+   ```output
+   draResources:
+   - resourceClaimTemplateName: gpu-claim-template
+     requests:
+     - gpu-0
+   ```
+
+   </Note>
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl create -f nimservice.yaml -n nim-service
+   ```
+
+  </Tab>
+
+</Tabs>
+
+For more sample manifests, refer to [config/samples/nim/serving/advanced/dra/manual/](https://github.com/NVIDIA/k8s-nim-operator/tree/release-3.0/config/samples/nim/serving/advanced/dra/manual).
+
+<Note>
+
+- You can determine the `count` based on the model card resource requirements.
+
+- To change the GPU count, you must create and attach a new ResourceClaim or ResourceClaimTemplate, which triggers a rolling update in the NIM Service.
+
+</Note>
+
+## Displaying Statuses
+
+The NIMService status includes details about DRA resources, like the error statuses for GPU claims.
+Use the following examples to inspect DRA resource statuses.
+
+<Tabs>
+  <Tab title="For ResourceClaims" language="resource-claim">
+
+1. To view the referenced DRA resources:
+
+   ```console
+   $ kubectl get nimservices meta-llama-31-8b-instruct -o json | jq .spec.draResources
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   [
+     {
+       "resourceClaimName": "gpu-claim"
+     }
+   ]
+   ```
+
+   </Accordion>
+
+1. To view the statuses of the referenced DRA resources:
+
+   ```console
+   $ kubectl get nimservices meta-llama-31-8b-instruct -o json | jq .status.draResourceStatuses
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   [
+     {
+       "name": "claim-846549f86-1-5c79578868-0",
+       "resourceClaimStatus": {
+         "name": "gpu-claim",
+         "resourceClaimStatuses": [
+           {
+             "name": "meta-llama-31-8b-instruct-67bc4-claim-846549f86-1-5c796zw8m",
+             "state": "allocated,reserved"
+           }
+         ]
+       }
+     }
+   ]
+   ```
+
+   </Accordion>
+
+1. To view resource claims:
+
+   ```console
+   $ kubectl get resourceclaims
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   NAME                                                           STATE               AGE
+   meta-llama-31-8b-instruct-67bc4-claim-846549f86-1-5c796zw8m    allocated,reserved  91s
+   ```
+
+   </Accordion>
+
+  </Tab>
+  <Tab title="For ResourceClaimTemplates" language="resource-claim-template">
+
+1. To view the referenced DRA resources:
+
+   ```console
+   $ kubectl get nimservices meta-llama-31-8b-instruct -o json | jq .spec.draResources
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   [
+     {
+       "resourceClaimTemplateName": "gpu-claim-template"
+     }
+   ]
+   ```
+
+   </Accordion>
+
+1. To view the statuses of the referenced DRA resources:
+
+   ```console
+   $ kubectl get nimservices meta-llama-31-8b-instruct -o json | jq .status.draResourceStatuses
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   [
+     {
+       "name": "claim-846549f86-1-5c79578868-0",
+       "resourceClaimTemplateStatus": {
+         "name": "gpu-claim-template",
+         "resourceClaimStatuses": [
+           {
+             "name": "meta-llama-31-8b-instruct-67bc4-claim-846549f86-1-5c796zw8m",
+             "state": "allocated,reserved"
+           }
+         ]
+       }
+     }
+   ]
+   ```
+
+   </Accordion>
+
+1. To view resource claims:
+
+   ```console
+   $ kubectl get resourceclaims
+   ```
+
+   <Accordion title="Example output">
+   ```output
+   NAME                                                           STATE               AGE
+   meta-llama-31-8b-instruct-67bc4-claim-846549f86-1-5c796zw8m    allocated,reserved  91s
+   ```
+
+   </Accordion>
+
+  </Tab>
+
+</Tabs>
+
+## Troubleshooting
+
+This section explains some common troubleshooting steps to identify issues with DRA.
+
+- Ensure that DRA is enabled in the cluster.
+
+  ```console
+  $ kubectl get deviceclasses
+  ```
+
+  The preceding command should not throw an error.
+
+- Ensure that CDI is enabled and made the default runtime.
+
+  ```console
+  $ kubectl get clusterpolicy cluster-policy -o json | jq -r '.spec.cdi'
+  ```
+
+  Expected output:
+
+  ```output
+  {
+    "default": true,
+    "enabled": true
+  }
+  ```
+
+- Ensure the NVIDIA DRA driver is functional and has 1 resourceslice per node from the `gpu.nvidia.com` driver.
+
+  ```console
+  $ kubectl get resourceslice
+  ```
+
+- Check the status of the ResourceClaim from the nimservice `status.draResourceStatuses` - it should be `allocated,reserved` if successful.
+
+  ```console
+  $ kubectl get resourceclaim <claim>
+  ```
+
+- Additionally, verify that the ResourceClaim has valid devices allocated.
+
+  ```console
+  $ kubectl get resourceclaim <claim> -o json | jq -r '.status.allocation.devices.results'
+  ```
+
+- If the NIMService pods are stuck in Pending/ContainerCreating state, you can describe the pod to get additional information.
+
+  ```console
+  $ kubectl describe pod <NIMService-Pod-Name>
+  ```
+
+- ResourceClaim allocation logs can be collected from the NVIDIA DRA driver.
+
+  ```console
+  $ kubectl logs -l app.kubernetes.io/name=dra-driver-gpu -n dra-driver -c gpus
+  ```

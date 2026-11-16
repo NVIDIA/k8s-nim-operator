@@ -1,0 +1,3 @@
+nimservice.apps.nvidia.com/meta-llama3-8b-instruct created
+nimservice.apps.nvidia.com/nv-embedqa-e5-v5 created
+nimservice.apps.nvidia.com/nv-rerankqa-mistral-4b-v3 created

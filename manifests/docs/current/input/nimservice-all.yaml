@@ -1,0 +1,137 @@
+# NIMService for Non-LLM
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: nv-rerankqa-mistral-4b-v3
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/nv-rerankqa-mistral-4b-v3
+    tag: 1.0.2
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: nv-rerankqa-mistral-4b-v3
+      profile: ''
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# NIMService for LLM-specific
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: llama-3-1-8b-instruct
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: "1.3.3"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: llama-3-1-8b-instruct
+      profile: ''
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# NIMService for Multi-LLM NGC NIMCache
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: ngc-nim-service-multi
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/llm-nim
+    tag: "1.11.0"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: ngc-nim-cache-multi
+      profile: tensorrt_llm
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# NIMService for Multi-LLM HF NIMCache
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: hf-nim-service-multi
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/llm-nim
+    tag: "1.11.0"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: hf-nim-cache-multi
+      profile: tensorrt_llm
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---
+# NIMService for Multi-LLM HF without pre-caching
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: hf-nim-service-no-cache
+spec:
+  image:
+    repository: nvcr.io/nim/nvidia/llm-nim
+    tag: "1.12"
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: hf-secret # Secret must contain HF_TOKEN key
+  env:
+    - name: NIM_MODEL_NAME
+      value: hf://meta-llama/Llama-3.2-1B-Instruct
+  storage:
+    pvc:
+      create: true
+      storageClass: ''
+      size: 10Gi
+      volumeAccessMode: ReadWriteOnce
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      cpu: "12"
+      memory: 32Gi
+    requests:
+      nvidia.com/gpu: 1
+      cpu: "4"
+      memory: 6Gi
+  replicas: 1
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+---

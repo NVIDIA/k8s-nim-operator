@@ -1,0 +1,840 @@
+---
+title: "Caching NIM Models"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "NVIDIA recommends caching models locally on your cluster. Caching a model improves microservice startup time. When deployments scale to multiple NIM microservice pods, a single cached model can serve "
+slug: cache
+---
+
+<Anchor id="caching-nim-models" />
+
+## Benefits of Caching Models
+
+NVIDIA recommends caching models locally on your cluster.
+Caching a model improves microservice startup time.
+When deployments scale to multiple NIM microservice pods, a single cached model can serve multiple pods.
+This is achieved through a persistent volume that has network storage.
+
+For single node clusters, the Local Path Provisioner from Rancher Labs is sufficient for research and development.
+For production, NVIDIA recommends installing a provisioner that provides a network storage class.
+
+## Prerequisites
+
+- Installed the NVIDIA NIM Operator.
+
+- A persistent volume provisioner that uses network storage such as NFS, S3, or vSAN.
+The models are downloaded and stored in persistent storage.
+
+  You can create a PVC and specify the name when you create the NIM cache resource, or you can request that the Operator create the PVC.
+
+- The [required image pull secrets](/image-pull-secrets) with your NVIDIA NGC API Key.
+
+- The model name of the NVIDIA NIM you want to cache.
+The sample manifests on this page show commonly used container images in the `spec.source.ngc.modelPuller` field, but you can update this field to any supported NIM.
+When selecting a model, check the resource and supported GPU version for the model that you plan to use.
+This is typically available from the model card (on build.nvidia.com) or model overview (on NVIDIA NGC) pages.
+Refer to the [Platform Support](/platform-support) page for details on supported architectures or refer to the [NVIDIA NIM documentation](https://docs.nvidia.com/nim/) for more details on NIM.
+
+  You can learn about available models from the following sources:
+
+  -   Browse models at [NVIDIA AI Foundation Models](https://build.nvidia.com/models).
+To view models that you can run anywhere, click **NIM Type** then **run anywhere**.
+Use the search box to filter for specific NIM.
+
+  -   Browse [NVIDIA NGC Catalog containers](https://catalog.ngc.nvidia.com/containers).
+Use the search box to find the container you are looking for, or click the **NVIDIA NIM** checkbox to view all NVIDIA NIM.
+
+  -   Refer to [LLM-NIM Documentation](https://docs.nvidia.com/nim/large-language-models/latest/get-started/prerequisites.html) for additional prerequisites that are specific to the NIM container.
+
+  -   Run `ngc registry image list "nim/*"` to display NIM images.
+Refer to [ngc registry](https://docs.ngc.nvidia.com/cli/https://docs.ngc.nvidia.com/cli/cmd_registry.html)
+in the *NVIDIA NGC CLI User Guide* for information about the command.
+
+- To cache models or datasets from Hugging Face Hub, you must have a Hugging Face Hub account and an user access token.
+Your desired models or datasets should be available in your Hugging Face Hub account.
+Create a Kubernetes secret with your Hugging Face Hub user access token to use as the `spec.source.hf.authSecret`.
+
+## About the NIM Cache Custom Resource Definition
+
+A NIM cache is a Kubernetes custom resource, `nimcaches.apps.nvidia.com`.
+You create and delete NIM cache resources to manage model caching.
+
+### NIM Cache configuration
+
+If you delete a NIM cache resource that was created with `spec.storage.pvc.create: true`, the NIM Operator deletes
+the persistent volume (PV) and persistent volume claim (PVC).
+
+Refer to the following table for information about the commonly modified fields:
+
+<table>
+<thead>
+<tr>
+<th>
+
+Field
+
+</th>
+<th>
+
+Description
+
+</th>
+<th>
+
+Default Value
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`spec.certConfig`
+
+</td>
+<td>
+
+Deprecated. Use `spec.proxy` instead.
+Specifies custom CA certificates that might be required in environments with an HTTP proxy.
+Refer to [Proxy Support](/air-gap#proxy-support) for more information.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.env`
+
+</td>
+<td>
+
+Specifies environment variable names and values for the caching job.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.groupID`
+
+</td>
+<td>
+
+Specifies the group for the pods.
+This value is used to set the security context of the pod in the `runAsGroup` and `fsGroup` fields.
+
+</td>
+<td>
+
+`2000`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.nodeSelector`
+
+</td>
+<td>
+
+Specifies node selector labels to schedule the caching job.
+
+</td>
+<td>
+
+When `spec.nodeSelector` is absent, the NIMCache getter returns `feature.node.kubernetes.io/pci-10de.present: "true"`. An explicitly supplied map, including `{}`, overrides that selector.
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.proxy.certConfigMap`
+
+</td>
+<td>
+
+Specifies the name of the ConfigMap with CA certs for your proxy server.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.proxy.httpProxy`
+
+</td>
+<td>
+
+Specifies the address of a proxy server that should be used for outbound HTTP requests.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.proxy.httpsProxy`
+
+</td>
+<td>
+
+Specifies the address of a proxy server that should be used for outbound HTTPS requests.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.proxy.noProxy`
+
+</td>
+<td>
+
+Specifies a comma-separated list of domain names, IP addresses, or IP ranges for which proxying should be bypassed.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.resources`
+
+</td>
+<td>
+
+Specifies the resource requirements for the pods.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.runtimeClassName`
+
+</td>
+<td>
+
+Specifies the underlying container runtime class name to be used for running NIM with NVIDIA GPUs allocated.
+If you leave `spec.runtimeClassName` empty, the NIMCache getter returns no runtime class; set the field to select a runtime class.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc.annotations`
+
+</td>
+<td>
+
+Annotations to add to the NIM Operator created PVC.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc.create`
+
+</td>
+<td>
+
+When set to `true`, the Operator creates the PVC.
+If you delete a NIM cache resource and this field was set to `true`, the Operator deletes the PVC and the cached models.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc.name`
+
+</td>
+<td>
+
+Specifies the PVC name.
+
+This field is required if you specify `create: false`.
+
+</td>
+<td>
+
+The NIM cache resource name with a `-pvc` suffix.
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc.size`
+
+</td>
+<td>
+
+Specifies the size, in Gi, for the PVC to create.
+
+This field is required if you specify `create: true`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc.storageClass`
+
+</td>
+<td>
+
+Specifies the storage class for the PVC to create.
+Omit this field or set to an empty string, `""`, to use your cluster’s default [StorageClass](https://kubernetes.io/docs/concepts/storage/storage-classes/).
+
+</td>
+<td>
+
+None, `""`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc.subPath`
+
+</td>
+<td>
+
+Specifies to create a subpath on the PVC and cache the model profiles in the directory.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.storage.pvc.volumeAccessMode`
+
+</td>
+<td>
+
+Specifies the
+[access mode](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes)
+for the PVC to create.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.tolerations`
+
+</td>
+<td>
+
+Specifies the
+[tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)
+for the caching job.
+
+</td>
+<td>
+
+None, `[]`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.userID`
+
+</td>
+<td>
+
+Specifies the user ID for the pod.
+This value is used to set the security context of the pod in the `runAsUser` fields.
+
+</td>
+<td>
+
+`1000`
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## Caching Non-LLM, LLM-Specific, and Multi-LLM NIM
+
+NIM Cache supports different types of NIM, including non-LLM, LLM-Specific, and multi-LLM NIM.
+Each type has different caching source configuration options.
+
+**Select your NIM type for detailed caching instructions**:
+
+<CardGroup cols={3}>
+<Card href="/cache-non-llm" title="Non-LLM NIM">
+Cover a wide variety of domains,
+such as retrieval, vision, speech, biology, and safety and moderation.
+
+</Card>
+
+<Card href="/cache-llm#caching-llm-specific-nim" title="LLM-Specific NIM">
+Focus on individual Large Language Models or model families, offering maximum performance.
+
+</Card>
+
+<Card href="/cache-llm#caching-multi-llm-compatible-nim" title="Multi-LLM Compatible NIM">
+Enable the deployment of a broad range of Large Language Models, offering maximum flexibility.
+
+</Card>
+
+</CardGroup>
+
+### Supported Sources and Protocols
+
+{/* The API continues to accept spec.source.dataStore for compatibility, but NeMo microservices support is deprecated. Do not document or recommend dataStore as a supported source. */}
+
+You can easily deploy custom, fine-tuned models on NIM. NIM automatically builds an optimized TensorRT-LLM locally-built engine given the weights in the HuggingFace format.
+
+You can pull models from a variety of sources using various protocols:
+
+- For all NIM microservices, [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/) is supported.
+
+- For Multi-LLM NIM microservices, the following registry types are also supported:
+
+  -   Hugging Face Hub
+
+  -   Local File Data Store
+
+  Refer to [Caching Multi-LLM Compatible NIM](/cache-llm#caching-multi-llm-compatible-nim) for examples.
+
+- For LLM-Specific NIM microservices, the following protocols are also supported:
+
+  -   NGC Mirrored Local Model Registries (S3, HTTPS, JFrog)
+
+  Refer to [Caching LLM-Specific NIM](/cache-llm#id1) for examples.
+
+<Note>
+Each cache can only be configured to pull from one source.
+
+</Note>
+
+## Example Procedure
+
+### Summary
+
+To cache a NIM model, follow these steps:
+
+<Note>
+Ensure you have completed the [prerequisites](#prerequisites).
+
+</Note>
+
+1. [Create a namespace](#create-a-namespace).
+
+1. [Create and configure a NIM Cache custom resource](#create-and-configure-a-nim-cache-custom-resource).
+
+1. Optional: [View information about the caching progress](#optional-view-information-about-the-caching-progress)
+
+<Anchor id="create-a-namespace" />
+
+### 1. Create a Namespace
+
+```console
+$ kubectl create namespace nim-service
+```
+
+<Anchor id="create-and-configure-a-nim-cache-custom-resource" />
+
+### 2. Create and Configure a NIM Cache Custom Resource
+
+1. Create a file, such as `cache-all.yaml`, with contents like the following example:
+
+   <Code src="../../manifests/docs/current/input/cache-all.yaml" language="yaml" startLine="1" />
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -n nim-service -f cache-all.yaml
+   ```
+
+<Anchor id="optional-view-information-about-the-caching-progress" />
+
+### 3. Optional: View Information About the Caching Progress
+
+- Confirm a persistent volume and claim are created:
+
+  ```console
+  $ kubectl get -n nim-service pvc,pv
+  ```
+
+  <Accordion title="Example output">
+  ```output
+  NAME                                                STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+  persistentvolumeclaim/meta-llama3-8b-instruct-pvc   Bound    pvc-1d3f8d48-660f-4e44-9796-c80a4ed308ce   50Gi       RWO            nfs-client     <unset>                 10m
+
+  NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                                     STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+  persistentvolume/pvc-1d3f8d48-660f-4e44-9796-c80a4ed308ce   50Gi       RWO            Delete           Bound    nim-service/meta-llama3-8b-instruct-pvc   nfs-client     <unset>                          10m
+  ```
+
+  </Accordion>
+
+- View the NIM cache resource to view the status:
+
+  ```console
+  $ kubectl get nimcaches.apps.nvidia.com -n nim-service
+  ```
+
+  <Accordion title="Example output">
+  ```output
+  NAME                        STATUS   PVC                             AGE
+  meta-llama3-8b-instruct     Ready    meta-llama3-8b-instruct-pvc     2024-09-19T13:20:53Z
+  nv-embedqa-e5-v5            Ready    nv-embedqa-e5-v5-pvc            2024-09-18T21:11:37Z
+  nv-rerankqa-mistral-4b-v3   Ready    nv-rerankqa-mistral-4b-v3-pvc   2024-09-18T21:11:37Z
+  ```
+
+  </Accordion>
+
+## Support for Advanced Configurations
+
+### LoRA Models and Adapters
+
+NVIDIA NIM for LLMs supports LoRA parameter-efficient fine-tuning (PEFT) adapters trained by the NeMo Framework and Hugging Face Transformers libraries.
+
+Refer to [LoRA Models and Adapters](/cache-llm#lora-models-and-adapters) for detailed usage instructions.
+
+### Air-Gapped and Proxy Environments
+
+NVIDIA NIM for large language models (LLMs) supports serving models in an air-gapped system (also known as air wall, air-gapping, or disconnected network).
+In an air-gapped system, you can run a NIM with no internet connection and with no connection to the NGC registry or Hugging Face Hub.
+You have two options for air-gapped deployment: accessing NGC through proxy and serving model through local assets.
+
+Refer to [Air-Gapped Environments](/air-gap) for detailed usage instructions.
+
+### Caching Locally Built LLM NIM Engines
+
+NIM Operator supports the [NIM Build custom resource](https://github.com/NVIDIA/k8s-nim-operator/blob/main/config/crd/bases/apps.nvidia.com_nimbuilds.yaml),
+that allows end users to build and cache model engines before starting a NIM deployment. It helps improve startup times and reduce resource usage during NIM deployments
+and autoscaling, making the deployments more predictable.
+
+Refer to [Caching Locally Built LLM NIM Engines](/nim-build) for detailed usage instructions.
+
+## Displaying the NIM Cache Status
+
+Run the following command to display the NIM cache status:
+
+```console
+$ kubectl get nimcaches.apps.nvidia.com -n nim-service
+```
+
+<Accordion title="Example output">
+<Code src="../../manifests/docs/current/output/get-nimcache.txt" language="output" startLine="1" />
+
+</Accordion>
+
+The NIM cache object can report the following statuses:
+
+<table>
+<thead>
+<tr>
+<th>
+
+Status
+
+</th>
+<th>
+
+Description
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+Failed
+
+</td>
+<td>
+
+The job failed to download and cache the model profile.
+
+</td>
+</tr>
+<tr>
+<td>
+
+InProgress
+
+</td>
+<td>
+
+The job is downloading the model profile from NGC.
+
+</td>
+</tr>
+<tr>
+<td>
+
+NotReady
+
+</td>
+<td>
+
+The job is not ready.
+This status can be reported shortly after creating the NIM cache resource while the image for the pod is downloaded from NGC.
+
+For more information, run `kubectl describe nimcache -n nim-service <nim-cache-name>`.
+
+</td>
+</tr>
+<tr>
+<td>
+
+Pending
+
+</td>
+<td>
+
+The job is created, but has not yet started and become active.
+
+</td>
+</tr>
+<tr>
+<td>
+
+PVC-Created
+
+</td>
+<td>
+
+The Operator creates a PVC for the model profile cache if you set `spec.storage.pvc.create: true`.
+
+</td>
+</tr>
+<tr>
+<td>
+
+Ready
+
+</td>
+<td>
+
+The job downloaded and cached the model profile.
+
+</td>
+</tr>
+<tr>
+<td>
+
+Started
+
+</td>
+<td>
+
+The Operator creates a job to download the model profile from NGC.
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## Displaying Cached Model Profiles
+
+To view the `.status.profiles` field of the custom resource, use the following command and
+update `meta-llama3-8b-instruct` to your NIM cache name.
+
+```console
+$ kubectl get nimcaches.apps.nvidia.com -n nim-service \
+    meta-llama3-8b-instruct -o=jsonpath="{.status.profiles}" | jq .
+```
+
+<Accordion title="Example output">
+<Code src="../../manifests/docs/current/output/get-nimcache-status-profile.json" language="json" startLine="1" />
+
+</Accordion>
+
+The output shows an array of cached profiles, including the profile `name` for identification.
+
+## Troubleshooting
+
+This section explains some common troubleshooting steps to identify issues with caching models.
+
+### NIM Pods Show ContainerCreating Status for a Long Time
+
+After starting a NIM cache, you can check the cache pod status by running the following command:
+
+```console
+$ kubectl get pods -n nim-service
+```
+
+<Accordion title="Example output">
+```output
+meta-llama3-8b-instruct-pod         0/1     ContainerCreating   0          2m33s
+nv-embedqa-1b-v2-pod                0/1     ContainerCreating   0          2m33s
+nv-rerankqa-1b-v2-pod               0/1     ContainerCreating   0          2m33s
+```
+
+</Accordion>
+
+You might notice the init NIM cache pod show a status of `ContainerCreating` for several minutes.
+This can happen when the NIM container image takes a long time to download and can cause your NIM cache service to show no status or a status of `NotReady` while the NIM container is downloading.
+Refer to [NIM Cache Reports No Status](#nim-cache-reports-no-status) for more troubleshooting details.
+
+### NIM Cache Reports No Status
+
+If you run `kubectl get nimcache -n nim-service` and the output does not report a status, perform the following actions to get more information:
+
+- Determine the state of the caching jobs:
+
+  ```console
+  $ kubectl get jobs -n nim-service
+  ```
+
+  <Accordion title="Example output">
+  ```output
+  NAME                            COMPLETIONS   DURATION   AGE
+  meta-llama3-8b-instruct-job     1/1           8s         2m57s
+  ```
+
+  </Accordion>
+
+  View the logs from the job with a command like `kubectl logs -n nim-service job/meta-llama3-8b-instruct-job`.
+
+  If the caching job is no longer available, delete the NIM cache resource and reapply the manifest.
+
+- Describe the NIM cache resource and review the conditions:
+
+  ```console
+  $ kubectl describe nimcache -n nim-service <nim-cache-name>
+  ```
+
+  <Accordion title="Example output">
+  <Code src="../../manifests/docs/current/output/describe-nim-cache-conditions.txt" language="console" startLine="1" />
+
+  </Accordion>
+
+  The preceding output shows a NIM cache resource that eventually succeeded in downloading and caching a model profile.
+
+  The `NIM_CACHE_RECONCILE_FAILED` condition and `ReconcileFailed` event reason were reported during the interval that the caching job was created by the Operator, but before the pod was running because the image was downloading from NGC.
+In the output, the status for that condition is set to `False` to indicate that the condition is no longer accurate.
+
+- View the Operator logs by running `kubectl logs -n nim-operator -l app.kubernetes.io/name=k8s-nim-operator`.
+
+### NIM Cache Event Failures Report `ReconcileFailed` But NIM Pod is `ContainerCreate`
+
+Some NIM container images can take a long time to download the container image due to image size or network connectivity.
+If this happens, NIM cache can report no status, a status of `NotReady`, or event failures like `ReconcileFailed` reported while the pods for the caching job are still being created.
+
+Run `kubectl get pods -n <nim-namespace>` to check the status of the NIM Cache pod.
+Once the container download is completed, the pod will start normally, and the NIM Cache status should update to a running status.
+View [Displaying the NIM Cache Status](#displaying-the-nim-cache-status) for more details on statuses.
+
+## Deleting a NIM Cache
+
+To delete a NIM cache, perform the following steps.
+
+1. View the NIM cache custom resources:
+
+```console
+$ kubectl get nimcaches.apps.nvidia.com -A
+```
+
+<Accordion title="Example output">
+```output
+NAMESPACE     NAME                      STATUS   PVC           AGE
+nim-service   meta-llama3-8b-instruct   Ready    model-store   2024-08-08T13:14:30Z
+```
+
+</Accordion>
+
+1. Delete the custom resource:
+
+```console
+$ kubectl delete nimcache -n nim-service meta-llama3-8b-instruct
+```
+
+If the Operator created the PVC when you created the NIM cache, the Operator deletes the PVC and the cached model profiles.
+You can determine if the Operator created the PVC by running a command like the following example:
+
+```console
+$ kubectl get nimcaches.apps.nvidia.com -n nim-service \
+    -o=jsonpath='{range .items[*]}{.metadata.name}: {.spec.storage.pvc.create}{"\n"}{end}'
+```
+
+<Accordion title="Example output">
+```output
+meta-llama3-8b-instruct: true
+```
+
+</Accordion>
+
+## Next Steps
+
+- Deploy NIM microservices either by adding [NIM service](/service) custom resources or
+managing several services in a single [NIM pipeline](/pipelines) custom resource.

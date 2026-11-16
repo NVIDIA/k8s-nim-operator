@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ngc-cli
+spec:
+  containers:
+  - env:
+    - name: NGC_CLI_API_KEY
+      valueFrom:
+        secretKeyRef:
+          key: NGC_API_KEY
+          name: ngc-api-secret
+    - name: NGC_CLI_ORG
+      value: "nemo-microservices/ea-participants"
+    - name: NIM_PEFT_SOURCE
+      value: "/model-store/loras"
+    image: <private-registry>/<image-name>:<image-tag>
+    command: ["sleep"]
+    args: ["inf"]
+    name: ngc-cli
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+      runAsNonRoot: true
+    volumeMounts:
+    - mountPath: /model-store
+      name: model-store
+  restartPolicy: Never
+  securityContext:
+    fsGroup: 2000
+    runAsGroup: 2000
+    runAsUser: 1000
+    seLinuxOptions:
+      level: s0:c28,c2
+  volumes:
+  - name: model-store
+    persistentVolumeClaim:
+      claimName: meta-llama3-8b-instruct-pvc

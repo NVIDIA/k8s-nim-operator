@@ -1,0 +1,75 @@
+---
+title: "Configure Resource Quotas"
+license: Apache-2.0
+copyright: "Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "NVIDIA recommends that you create Kubernetes resource quotas for the namespace where the NVIDIA NIM Operator is deployed as well as any namespace where you deploy NIM Operator managed microservices."
+slug: resource-quotas
+---
+
+<Anchor id="configure-resource-quotas" />
+
+NVIDIA recommends that you create Kubernetes [resource quotas](https://kubernetes.io/docs/concepts/policy/resource-quotas/) for the namespace where the NVIDIA NIM Operator is deployed as well as any namespace where you deploy NIM Operator managed microservices.
+
+The following is a list of default namespaces where you should consider adding resource quotas.
+Your cluster can use different namespaces.
+
+- `nim-operator`: The namespace where the NIM Operator is deployed.
+
+- `nim-service`: The namespace where NIM microservices are deployed.
+
+- `nemo`: The namespace where NeMo microservices are deployed.
+
+In addition to using resource quotas, you should make sure that your cluster has enough available resources for the models and microservices that you are deploying.
+Resource quotas can help manage and prioritize resource consumption on your cluster. However, if a cluster’s available resources are much smaller than required, you can still experience pod evictions even with resource quotas applied.<br />
+Refer to the [Platform Support](/platform-support) page for details on resource requirements.
+
+<Info>
+Resource quotas are required when using the NIM Operator on GKE clusters.
+
+</Info>
+
+## Create a Namespace Quota
+
+The sample below configures a resource quota in the NIM Operator namespace, `nim-operator`.
+Update the namespace name to the namespace where you are applying the resource quota.
+
+1. Create a manifest for the resource quota like the `resource-quota.yaml` file below.
+
+   <Code src="../../../../manifests/docs/current/input/resource-quota.yaml" language="yaml" startLine="1" />
+
+   <Note>
+   This sample manifest uses PriorityClass to manage resource usage.
+
+   Refer to the [Kubernetes resource quota documentation](https://kubernetes.io/docs/concepts/policy/resource-quotas/) for more details on setting resource limits in your cluster.
+
+   </Note>
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -f resource-quota.yaml -n nim-operator
+   ```
+
+1. Optional: View the resource quota.
+
+   ```console
+   $ kubectl describe -n nim-operator resourcequota
+   ```
+
+   *Example Output*
+
+   ```output
+   Name:                   nim-operator-quota
+   Namespace:              nim-operator
+   Resource                Used   Hard
+   --------                ----   ----
+   configmaps              1      50
+   limits.cpu              1      40
+   limits.memory           256Mi  128Gi
+   persistentvolumeclaims  0      10
+   pods                    1      100
+   requests.cpu            500m   20
+   requests.memory         128Mi  64Gi
+   secrets                 1      50
+   services                1      20
+   ```

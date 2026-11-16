@@ -1,0 +1,144 @@
+---
+title: "Managing NIM Services as a NIM Pipeline"
+license: Apache-2.0
+copyright: "Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+description: "As an alternative to managing NIM services individually using multiple NIMService custom resources, you can manage multiple NIM services using one NIMPipeline custom resource."
+slug: pipelines
+---
+
+<Anchor id="managing-nim-services-as-a-nim-pipeline" />
+
+## About NIM Pipelines
+
+As an alternative to managing NIM services individually using multiple `NIMService` custom resources,
+you can manage multiple NIM services using one `NIMPipeline` custom resource.
+
+The following sample manifest deploys NIM for LLMs only.
+
+<Code src="../../../../manifests/docs/current/input/pipeline-all.yaml" language="yaml" startLine="1" lines="1-28" />
+
+Refer to the following table for information about the commonly modified fields:
+
+<table>
+<thead>
+<tr>
+<th>
+
+Field
+
+</th>
+<th>
+
+Description
+
+</th>
+<th>
+
+Default Value
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`spec.services.enabled`
+
+</td>
+<td>
+
+When set to `true`, the Operator deploys the NIM service.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.services.name`
+
+</td>
+<td>
+
+Specifies a name for the NIM service.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.services.spec`
+
+</td>
+<td>
+
+Specifies the `NIMService` configuration for the NIM microservice.
+This field accepts the fields in the [NIM Service Configuration Reference](/service#nim-service-configuration-reference), including `spec.services.spec.priorityClassName`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## Prerequisites
+
+- A NIM cache for each NIM microservice or a PVC that you can specify in the `spec.storage.pvc` field of the NIM service specification.
+
+## Procedure
+
+1. Create a file, such as `pipeline-all.yaml`, with contents like the following example:
+
+   <Code src="../../../../manifests/docs/current/input/pipeline-all.yaml" language="yaml" startLine="1" />
+
+1. Apply the manifest:
+
+   ```console
+   $ kubectl apply -n nim-service -f pipeline-all.yaml
+   ```
+
+1. Optional: View information about the pipeline:
+
+   ```console
+   $ kubectl describe nimpipelines.apps.nvidia.com -n nim-service
+   ```
+
+Refer to [Verification](/service#verification) to confirm the NIM for LLMs microservice is available.
+
+## Deleting NIM Pipelines
+
+To delete a pipeline and remove the resources and objects associated with the services,
+perform the following steps:
+
+1. View the pipeline custom resources:
+
+   ```console
+   $ kubectl get nimpipelines.apps.nvidia.com -A
+   ```
+
+   *Example Output*
+
+   ```output
+   NAMESPACE     NAME           STATUS
+   nim-service   pipeline-all   deployed
+   ```
+
+1. Delete the custom resource:
+
+   ```console
+   $ kubectl delete nimpipelines.apps.nvidia.com -n nim-service pipeline-all
+   ```

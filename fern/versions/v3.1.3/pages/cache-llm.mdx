@@ -1,0 +1,836 @@
+---
+title: "Caching LLM NIM"
+description: "NIM Cache supports two options for NVIDIA NIM for Large Language Models (LLMs):"
+slug: cache-llm
+---
+
+<Anchor id="caching-llm-nim" />
+
+## Support for NVIDIA NIM for Multi-LLM and LLM-Specific NIM
+
+NIM Cache supports two options for NVIDIA NIM for Large Language Models (LLMs):
+
+- [LLM-Specific NIM](#caching-llm-specific-nim): Each container is focused on individual models or model families, offering maximum performance
+
+- [Multi-LLM NIM](#caching-multi-llm-nim): A single container that enables the deployment of a broad range of models, offering maximum flexibility
+
+Refer to [Overview of NVIDIA NIM for Large Language Models (LLMs)](https://docs.nvidia.com/nim/large-language-models/latest/introduction.html)
+for more information.
+
+Refer to [Configure Your NIM for LLMs](https://docs.nvidia.com/nim/large-language-models/latest/configuration.html)
+for detailed configuration instructions.
+
+<Anchor id="caching-llm-specific-nim"></Anchor>
+
+<Anchor id="id1" />
+
+## Caching LLM-Specific NIM
+
+[NVIDIA LLM NIM microservices](https://docs.nvidia.com/nim/index.html) use model engines that are tuned for specific NVIDIA GPUs, number of GPUs, precision, and other resources.
+NVIDIA produces model engines for several popular combinations, and these are referred to as *model profiles*.
+
+NIM LLM microservices support automatic profile selection by determining the GPU model and count on the node and attempt to match the optimal model profile.
+Alternatively, NIM supports running a specified model profile, but this requires that you review the profiles and know the profile ID.
+For more information, refer to
+[Model Profiles](https://docs.nvidia.com/nim/large-language-models/latest/profiles.html)
+in the *NVIDIA NIM for LLMs* documentation.
+
+The Operator complements model selection by NIM microservices in the following ways:
+
+- Support for caching and running a specified model profile ID, like the NIM microservices
+
+- Support for caching all model profiles
+
+- Support for influencing model selection by specifying the engine, precision, tensor parallelism, and other parameters to match
+
+The NIM Cache custom resource manages model caching and provides the way to specify the model selection criteria.
+
+### LLM-Specific NIM Cache Sources
+
+You can pull from the following sources and protocols:
+
+<Tabs>
+  <Tab title="NVIDIA NGC Catalog" language="ngc">
+When you create a NIM Cache resource with the NGC Catalog as the source, the NIM Operator starts a pod that lists the available model profiles.
+The Operator creates a config map of the model profiles.
+
+LLM-Specific NIM provides NVIDIA-validated, optimized model profiles for popular data center GPU models, varying GPU counts, and specific numeric precisions.
+
+To pull models from the NGC Catalog, you must have created Kubernetes secrets to hold your NGC Catalog API key and pass the secret names as `source.ngc.model.pullSecret` and `source.ngc.model.authSecret`.
+For more details on creating these secrets, refer to [Image Pull Secrets](/image-pull-secrets).
+
+Refer to the following [sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml) using the NGC catalog as a cache source:
+
+<Code src="../../../../manifests/docs/current/input/nim/serving/standalone/basic/llm.yaml" language="yaml" highlight="{8,9,10,11,12,13,14}" startLine="1" lines="3-23" />
+
+Use `source.ngc.model.` object to describe the LLM-Specific model you want to pull from the NGC Catalog.
+
+When using `source.ngc.model.`, if you specify one or more model profile IDs to cache, the Operator starts a job that caches the model profiles that you specified.
+
+If you did not specify model profile IDs, but do specify `engine: tensorrt_llm` or `engine: tensorrt`, the Operator attempts to match the model profiles with the GPUs on the nodes in the cluster.
+The Operator uses the value of the `nvidia.com/gpu.product` node label that is set by Node Feature Discovery.
+
+You can let the Operator automatically detect the model profiles to cache or you can constrain the model profiles
+by specifying values for `spec.source.ngc.model`, such as the engine or GPU model, that must match the model profile.
+
+<Note>
+NVIDIA recommends that you use profile filtering when caching models using `source.ngc.model.`.
+Models can have several profiles, and without filtering by one or more parameters, you can download more models than intended, which can increase your storage requirements.
+For more information on NIM profiles and their model storage requirements, refer to the [NIM Models documentation](https://docs.nvidia.com/nim/large-language-models/latest/profiles.html).
+
+</Note>
+
+Refer to the following table for information about fields for NVIDIA NGC Catalog as a NIM Cache Source:
+
+<table>
+<thead>
+<tr>
+<th>
+
+Field
+
+</th>
+<th>
+
+Description
+
+</th>
+<th>
+
+Default Value
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`spec.source.ngc.model`
+
+</td>
+<td>
+
+Specifies an object of filtering information for the LLM-Specific model and profile you want to cache.
+If you want to cache a Multi-LLM model, use `spec.source.ngc.modelEndpoint` instead.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.buildable`
+
+</td>
+<td>
+
+When set to `true`, specifies to cache a model profile that can be optimized with an
+NVIDIA engine for any GPUs. This can be used in conjunction with [NIM Build](/nim-build) to cache built models.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.engine`
+
+</td>
+<td>
+
+Specifies a model caching constraint based on the engine.
+Common values are as follows:
+
+- `tensorrt_llm` – optimized engine for NIM for LLMs
+
+- `vllm` – community engine for NIM for LLMs
+
+- `tensorrt` – optimized engine for embedding and reranking
+
+- `onnx` – community engine
+
+Each NIM microservice determines the supported engines.
+Refer to the microservice documentation for the latest information.
+
+By default, the caching job matches model profiles for all engines.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.gpus`
+
+</td>
+<td>
+
+Specifies a list of model caching constraints to use the specified GPU model, by PCI ID or product name.
+
+By default, the caching job detects all GPU models in the cluster and matches model profiles for all GPUs.
+
+The following partial specification requests a model profile that is compatible with an NVIDIA L40S.
+
+```yaml
+spec:
+  source:
+    ngc:
+      model:
+        ...
+        gpus:
+        - ids:
+          - "26b5"
+```
+
+If GPU Operator or Node Feature Discovery is running on your cluster, you can determine the PCI IDs
+for the GPU models on your nodes by viewing the node labels that begin with `feature.node.kubernetes.io/pci-10de-`.
+Alternatively, if you know the device name, you can look up the PCI ID from the [table](https://github.com/NVIDIA/open-gpu-kernel-modules?tab=readme-ov-file#compatible-gpus) in the NVIDIA Open Kernel Modules repository on GitHub.
+
+The following partial specification requests a model profile that is compatible with an NVIDIA A100.
+
+```yaml
+spec:
+  source:
+    ngc:
+      model:
+        ...
+        gpus:
+        - product: "a100"
+```
+
+The product name, such as `h100`, `a100`, or `l40s` must match the model profile, as shown for the
+[list-model-profiles](https://docs.nvidia.com/nim/large-language-models/latest/reference/cli-reference.html#list-model-profiles)
+command in the *NVIDIA NIM for LLMs* documentation.
+The value is not case-sensitive.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.lora`
+
+</td>
+<td>
+
+When set to `true`, specifies to cache a model profile that is compatible with LoRA.
+
+Refer to [LoRA Models and Adapters](#lora-models-and-adapters) for more information.
+
+</td>
+<td>
+
+`false`
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.precision`
+
+</td>
+<td>
+
+Specifies the model profile quantization to match.
+Common values are `fp16`, `bf16`, and `fp8`.
+Like the GPU product name field, the value must match the model profile, such as shown in the `list-model-profiles` command.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.profiles`
+
+</td>
+<td>
+
+Specifies an array of model profiles to cache.
+
+When you specify this field, automatic profile selection is disabled and all other `source.ngc.model` fields are ignored.
+
+The following partial specification requests a specific model profile.
+
+```yaml
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/meta/llama3-8b-instruct:1.0.3
+      model:
+        profiles:
+        - 8835c31...
+```
+
+You can determine the model profiles by running the
+[list-model-profiles](https://docs.nvidia.com/nim/large-language-models/latest/reference/cli-reference.html#list-model-profiles)
+command.
+
+You can specify `all` to download all model profiles.
+Use the `all` parameter with care as some models have many profiles that may take several minutes to download and a large amount of storage space to cache.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.qosProfile`
+
+</td>
+<td>
+
+Specifies the model profile quality of service to match.
+Values are `latency` or `throughput`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.model.tensorParallelism`
+
+</td>
+<td>
+
+Specifies the model profile tensor parallelism to match.
+The node that runs the NIM microservice and serves the model must have at least the specified number of GPUs.
+Common values are `"1"`, `"2"`, and `"4"`.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.modelPuller`
+
+</td>
+<td>
+
+Specifies the container image that can cache model profiles.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.ngc.modelEndpoint`
+
+</td>
+<td>
+
+Specifies the endpoint of the Multi-LLM model you want to cache.
+Note that you cannot specify a model endpoint and a model in a NIM cache.
+If you want to cache a LLM-Specific model, use `spec.source.ngc.model` instead.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+</tbody>
+</table>
+
+You can then create a NIM Service using the NIM Cache.
+The following shows a [sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/basic/llm.yaml) of a NIM Service custom resource using the above NIM Cache:
+
+<Code src="../../../../manifests/docs/current/input/nim/serving/standalone/basic/llm.yaml" language="yaml" highlight="{15,16,17}" startLine="1" lines="26-50" />
+
+  </Tab>
+  <Tab title="JFrog Artifactory" language="jfrog">
+To use [JFrog Artifactory](https://jfrog.com/artifactory/) as a NIM Cache source, follow these steps:
+
+1. [Create an NVIDIA NIM Repository](https://jfrog.com/help/r/jfrog-artifactory-documentation/create-an-nvidia-nim-repository)
+using the instructions at the *JFrog Help Center*.
+
+   <Note>
+   You must have an NGC API Key for this step.
+
+   </Note>
+
+1. [Connect your NVIDIA NIM Model Client to Artifactory](https://jfrog.com/help/r/jfrog-artifactory-documentation/connect-your-nvidia-nim-model-client-to-artifactory)
+using the instructions at the *JFrog Help Center*.
+Setup a NIM Model Client to get your API Keys and set NGC Override values for JFrog.
+
+1. Use your JFrog API key and [create Image Pull Secrets](https://docs.nvidia.com/nim-operator/latest/image-pull-secrets.html).
+
+1. Create a NIM Cache with your JFrog Artifactory details.
+
+   1.    Create a file, such as `nimcache.yaml`, with contents like the following sample manifest:
+
+      ```yaml
+      apiVersion: apps.nvidia.com/v1alpha1
+      kind: NIMCache
+      metadata:
+        name: meta-llama3-8b-instruct
+      spec:
+        env:
+          - name: "NGC_API_ENDPOINT"
+            value: "<ARTIFACTORY-URL>/artifactory/api/nimmodel/<ARTIFACTORY-NIM-MODEL-REPO>"
+          - name: "NGC_AUTH_ENDPOINT"
+            value: "<ARTIFACTORY-URL>/artifactory/api/nimmodel/<ARTIFACTORY-NIM-MODEL-REPO>"
+          - name: "NGC_API_SCHEME"
+            value: "https"
+        source:
+          ngc:
+            modelPuller:  <ARTIFACTORY-URL>/<ARTIFACOTRY-NIM-DOCKER-REPO/nim/meta/llama-3.1-8b-instruct:latest
+            pullSecret: ngc-secret
+            authSecret: ngc-api-secret
+            model:
+              engine: tensorrt_llm
+              tensorParallelism: "1"
+        storage:
+          pvc:
+            create: true
+            storageClass: <storage-class-name>
+            size: "50Gi"
+            volumeAccessMode: ReadWriteMany
+        resources: {}
+      ```
+
+   1.    Apply the manifest:
+
+      ```console
+      $ kubectl apply -n nim-service -f nimcache.yaml
+      ```
+
+1. Create a NIM Service with your JFrog Artifactory details.
+
+   1.    Create a file, such as `nimservice.yaml`, with contents like the following sample manifest:
+
+      ```yaml
+      apiVersion: apps.nvidia.com/v1alpha1
+      kind: NIMService
+      metadata:
+        name: meta-llama3-8b-instruct
+      spec:
+        env:
+          - name: "NGC_API_ENDPOINT"
+            value: "<ARTIFACTORY-URL>/artifactory/api/nimmodel/<ARTIFACTORY-NIM-MODEL-REPO>"
+          - name: "NGC_AUTH_ENDPOINT"
+            value: "<ARTIFACTORY-URL>/artifactory/api/nimmodel/<ARTIFACTORY-NIM-MODEL-REPO>"
+          - name: "NGC_API_SCHEME"
+            value: "https"
+        image:
+          repository: <ARTIFACTORY-URL>/<ARTIFACOTRY-NIM-DOCKER-REPO/nim/meta/llama-3.1-8b-instruct
+          tag: latest
+          pullPolicy: IfNotPresent
+          pullSecrets:
+            - ngc-secret
+        authSecret: ngc-api-secret
+        replicas: 1
+        storage:
+          pvc:
+            create: true
+            storageClass: <storage-class-name>
+            size: 50Gi
+            volumeAccessMode: ReadWriteMany
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        expose:
+          service:
+            type: ClusterIP
+            port: 8000
+      ```
+
+   1.    Apply the manifest:
+
+      ```console
+      $ kubectl create -f nimservice.yaml -n nim-service
+      ```
+
+  </Tab>
+  <Tab title="Mirrored Local Model Registries (S3, HTTPS, or JFrog)" language="mirrored-local">
+To use a NGC Mirrored Local Model Registry as a NIM Cache source, set `NIM_REPOSITORY_OVERRIDE` as an environment variable for the NIM.
+
+Refer to [Repository Override for NVIDIA NIM for LLMs](https://docs.nvidia.com/nim/large-language-models/latest/nim-repository-override.html)
+for more detailed instructions.
+
+Refer to [NIM for LLMs Environment Variables](https://docs.nvidia.com/nim/large-language-models/latest/reference/environment-variables.html)
+for more information on the `NIM_REPOSITORY_OVERRIDE` environment variable.
+
+The following is a [sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/caching/ngc-mirror/https/nimcache-llm.yaml):
+
+<Code src="../../../../manifests/docs/current/input/nim/caching/ngc-mirror/https/nimcache-llm.yaml" language="yaml" highlight="{9,10}" startLine="1" />
+
+The NIM Cache fields relevant to Mirrored Local Model Registries are the same as for NVIDIA NGC Catalog as a NIM Cache Source.
+
+For more sample manifests, refer to the [config/samples/nim/caching/ngc-mirror/](https://github.com/NVIDIA/k8s-nim-operator/tree/release-3.0/config/samples/nim/caching/ngc-mirror) directory.
+
+  </Tab>
+
+</Tabs>
+
+### Caching Locally Built LLM NIM Engines
+
+NIM Operator can cache dynamically built TensorRT-LLM engines using NIM Build.
+This allows you to generate TensorRT-LLM engines for the specific GPUs that you might have.
+Refer to [Caching Locally Built LLM NIM Engines](/nim-build) for more information.
+
+### LoRA Models and Adapters
+
+NVIDIA NIM for LLMs supports LoRA parameter-efficient fine-tuning (PEFT) adapters trained by the NeMo Framework and Hugging Face Transformers libraries.
+
+You must download the LoRA adapters manually and make them available to the NIM microservice.
+The following steps describe one way to meet the requirement.
+
+<Anchor id="lora-nimcache"></Anchor>
+
+1. Specify `lora: true` in the NIM cache manifest that you apply:
+
+   <Code src="../../../../manifests/docs/current/input/cache-lora.yaml" language="yaml" highlight="{13}" startLine="1" />
+
+   Apply the manifest and wait until `kubectl get nimcache -n nim-service meta-llama3-8b-instruct` shows the NIM cache is `Ready`.
+
+1. Use the NGC CLI or Hugging Face CLI to download the LoRA adapters.
+
+   -    Build a container that includes the CLIs, such as the following example:
+
+     ```dockerfile startLine={1}
+     FROM nvcr.io/nvidia/base/ubuntu:22.04_20240212
+     ARG NGC_CLI_VERSION=3.50.0
+
+     RUN apt-get update && DEBIAN_FRONTEND=noninteractive && \
+           apt-get install --no-install-recommends -y \
+           wget \
+           unzip \
+           python3-pip
+
+     RUN useradd -m -s /bin/bash -u 1000 ubuntu
+     USER ubuntu
+
+     RUN wget --content-disposition --no-check-certificate \
+           https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/${NGC_CLI_VERSION}/files/ngccli_linux.zip -O /tmp/ngccli_linux.zip && \
+         unzip /tmp/ngccli_linux.zip -d ~ && \
+         rm /tmp/ngccli_linux.zip
+
+     ENV PATH=/home/ubuntu/ngc-cli:$PATH
+
+     RUN pip install -U "huggingface_hub[cli]"
+     ```
+
+     Push the container to a registry that the nodes in your cluster can access.
+
+   -    Apply a manifest like the following example that runs the container.
+
+     When you create your manifest, refer to the key considerations for the pod specification:
+
+     -      Mount the same PVC that the NIM microservice accesses for the model.
+
+     -      Specify the same user ID and group ID that the NIM cache container used.
+The following manifest shows the default values.
+
+     -      Specify the `NGC_CLI_API_KEY` and `NGC_CLI_ORG` environment variables.
+The value for the organization might be different.
+
+     -      Start the pod in the `nim-service` namespace so that the pod can access the `ngc-secret` secret.
+
+     <Code src="../../../../manifests/docs/current/input/pod-ngc-cli.yaml" language="yaml" startLine="1" />
+
+1. Access the pod:
+
+   ```console
+   $ kubectl exec -it -n nim-service ngc-cli -- bash
+   ```
+
+   The pod might report `groups: cannot find name for group ID 2000`.
+You can ignore the message.
+
+1. From the terminal in the pod, download the LoRA adapters.
+
+   -    Make a directory for the LoRA adapters:
+
+     ```console
+     $ mkdir $NIM_PEFT_SOURCE
+     $ cd $NIM_PEFT_SOURCE
+     ```
+
+   -    Download the adapters:
+
+     ```console
+     $ ngc registry model download-version "nim/meta/llama3-8b-instruct-lora:nemo-math-v1"
+     $ ngc registry model download-version "nim/meta/llama3-8b-instruct-lora:nemo-squad-v1"
+     ```
+
+   -    Rename the directories to match the naming convention for the LoRA model directory structure:
+
+     ```console
+     $ mv llama3-8b-instruct-lora_vnemo-math-v1 llama3-8b-math
+     $ mv llama3-8b-instruct-lora_vnemo-squad-v1 llama3-8b-squad
+     ```
+
+   -    Press Ctrl+D to exit the pod and then run `kubectl delete pod -n nim-service ngc-cli`.
+
+When you create a NIM service instance, specify the `NIM_PEFT_SOURCE` environment variable:
+
+```yaml {7,8,9}
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama3-8b-instruct
+spec:
+  ...
+  env:
+  - name: NIM_PEFT_SOURCE
+    value: "/model-store/loras"
+```
+
+After the NIM microservice is running, monitor the logs for records like the following:
+
+```output
+{"level": "INFO", ..., "message": "LoRA models synchronizer successfully initialized!"}
+{"level": "INFO", ..., "message": "Synchronizing LoRA models with local LoRA directory ..."}
+{"level": "INFO", ..., "message": "Done synchronizing LoRA models with local LoRA directory"}
+```
+
+The preceding steps are sample commands for downloading the NeMo format LoRA adapters.
+Refer to
+[Parameter-Efficient Fine-Tuning](https://docs.nvidia.com/nim/large-language-models/latest/peft.html)
+in the *NVIDIA NIM for LLMs* documentation for information about using the Hugging Face Transformers format, the model directory structure, and adapters for other models.
+
+<Anchor id="caching-multi-llm-nim"></Anchor>
+
+
+
+## Caching Multi-LLM Compatible NIM
+
+To get the container for the Multi-LLM NIM,
+refer to [LLM NIM Overview](https://catalog.ngc.nvidia.com/orgs/nim/teams/nvidia/containers/llm-nim)
+in the NVIDIA NGC Catalog.
+
+<Note>
+Model-Free NIM (introduced in NIM version 2.0) uses the same NIM Cache shape as Multi-LLM NIM.
+To cache a Model-Free NIM, use the Multi-LLM cache manifest shown in this section and replace the `spec.source.hf.modelPuller` image with the Model-Free NIM container, such as `nvcr.io/nim/nvidia/model-free-nim:2.0.2`.
+For more information about Model-Free NIM, refer to [Model-Free NIM](https://docs.nvidia.com/nim/large-language-models/latest/deployment/model-free-nim.html) in the *NVIDIA NIM for LLMs* documentation.
+
+</Note>
+
+### Multi-LLM NIM Cache Sources
+
+You can pull from registries using the following sources and protocols:
+
+<Tabs>
+  <Tab title="Hugging Face Hub" language="hf">
+When you create a NIM cache resource with the Hugging Face Hub as the source, the NIM Operator generates a Hugging Face CLI command to pull the requested model or dataset from Hugging Face, using the inputs from the `spec.source.hf` object.
+
+To cache models or datasets from Hugging Face Hub, you must have a Hugging Face Hub account and an [user access token](https://huggingface.co/docs/hub/en/security-tokens).
+Your desired models or datasets should be available in your Hugging Face Hub account.<br />
+Create a Kubernetes secret with your Hugging Face Hub [user access token](https://huggingface.co/docs/hub/en/security-tokens) to use as the `spec.source.hf.authSecret`.
+
+<Note>
+When downloading models from Hugging Face for Multi-LLM NIM, log files can show permission denied warnings that can be safely ignored.
+
+</Note>
+
+The following NIM Cache custom resource shows a [sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml) of using the Hugging Face Hub as a cache source:
+
+<Code src="../../../../manifests/docs/current/input/nim/serving/standalone/basic/multi-llm.yaml" language="yaml" highlight="{8,9,10,11,12,13,14}" startLine="1" lines="3-23" />
+
+If you want to cache a dataset, use `spec.source.hf.datasetName: "dataset-name"` instead of `spec.source.hf.modelName`.
+A cache can only be configured to pull a model or a dataset, not both.
+
+Refer to the following table for information about NIM Cache fields pertaining to Hugging Face Hub as a NIM Cache source:
+
+<table>
+<thead>
+<tr>
+<th>
+
+Field
+
+</th>
+<th>
+
+Description
+
+</th>
+<th>
+
+Default Value
+
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+
+`spec.source.hf.authSecret` (required)
+
+</td>
+<td>
+
+Specifies the name of the secret containing your “HF_TOKEN” token.
+Required if you are using Hugging Face Hub as a source of your model or dataset.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.hf.datasetName` (required)
+
+</td>
+<td>
+
+Specifies the name of the dataset from HuggingFace.
+Required if you are using Hugging Face Hub as a source of your dataset.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.hf.endpoint` (required)
+
+</td>
+<td>
+
+Specifies the HuggingFace endpoint.
+Required if you are using Hugging Face Hub as a source of your model or dataset.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.hf.modelName`
+
+</td>
+<td>
+
+Specifies the name of the model you want to use from HuggingFace.
+Required if you are using Hugging Face Hub as a source of your model.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.hf.modelPuller`
+
+</td>
+<td>
+
+Specifies the containerized huggingface-cli image to pull the data.
+Required if you are using Hugging Face Hub as a source of your model or dataset.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.hf.namespace`
+
+</td>
+<td>
+
+Specifies the namespace in the Hugging Face Hub.
+Required if you are using Hugging Face Hub as a source of your model or dataset.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+<tr>
+<td>
+
+`spec.source.hf.pullSecret`
+
+</td>
+<td>
+
+Specifies the name of the image pull secret for the modelPuller image.
+Required if you are using Hugging Face Hub as a source of your model or dataset.
+
+</td>
+<td>
+
+None
+
+</td>
+</tr>
+</tbody>
+</table>
+
+You can then create a NIM Service using the NIM Cache.
+The following shows a [sample manifest](https://github.com/NVIDIA/k8s-nim-operator/blob/release-3.0/config/samples/nim/serving/standalone/basic/multi-llm.yaml) of a NIM Service custom resource using the above NIM Cache:
+
+<Code src="../../../../manifests/docs/current/input/nim/serving/standalone/basic/multi-llm.yaml" language="yaml" highlight="{15,16,17}" startLine="1" lines="26-56" />
+
+  </Tab>
+
+</Tabs>

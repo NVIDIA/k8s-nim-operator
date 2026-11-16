@@ -1,0 +1,12 @@
+[
+  {
+    "config": {
+      "feat_lora": "false",
+      "llm_engine": "tensorrt_llm",
+      "precision": "bf16",
+      "tp": "1",
+      "trtllm_buildable": "true"
+    },
+    "name": "7cc8597690a35aba19a3636f35e7f1c7e7dbc005fe88ce9394cad4a4adeed414"
+  }
+]
