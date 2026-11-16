@@ -29,7 +29,7 @@ By default, the Helm chart enables a `pre-upgrade` Helm [hook](https://helm.sh/d
 1. Fetch the values from the chart:
 
    ```console
-   $ helm show values nvidia/k8s-nim-operator --version=v3.1.4 > values-3.1.4.yaml
+   $ helm show values nvidia/k8s-nim-operator --version=v${NIM_OPERATOR_VERSION} > values-${NIM_OPERATOR_VERSION}.yaml
    ```
 
 1. Update the values file as needed.
@@ -37,7 +37,7 @@ By default, the Helm chart enables a `pre-upgrade` Helm [hook](https://helm.sh/d
 1. Upgrade the Operator:
 
    ```console
-   $ helm upgrade nim-operator nvidia/k8s-nim-operator -n nim-operator -f values-3.1.4.yaml
+   $ helm upgrade nim-operator nvidia/k8s-nim-operator -n nim-operator -f values-${NIM_OPERATOR_VERSION}.yaml
    ```
 
 Helm hooks used with the Operator use the Operator image itself.
@@ -52,13 +52,13 @@ With this procedure, you can update all existing Operator custom resources.
 
    ```console
    $ kubectl apply -f \
-       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/tags/v3.1.4/deployments/helm/k8s-nim-operator/crds/apps.nvidia.com_nimcaches.yaml
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/tags/v${NIM_OPERATOR_VERSION}/deployments/helm/k8s-nim-operator/crds/apps.nvidia.com_nimcaches.yaml
 
    $ kubectl apply -f \
-       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/tags/v3.1.4/deployments/helm/k8s-nim-operator/crds/apps.nvidia.com_nimpipelines.yaml
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/tags/v${NIM_OPERATOR_VERSION}/deployments/helm/k8s-nim-operator/crds/apps.nvidia.com_nimpipelines.yaml
 
    $ kubectl apply -f \
-       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/tags/v3.1.4/deployments/helm/k8s-nim-operator/crds/apps.nvidia.com_nimservices.yaml
+       https://raw.githubusercontent.com/NVIDIA/k8s-nim-operator/refs/tags/v${NIM_OPERATOR_VERSION}/deployments/helm/k8s-nim-operator/crds/apps.nvidia.com_nimservices.yaml
    ```
 
 1. Update the information about the Operator chart:
@@ -70,7 +70,7 @@ With this procedure, you can update all existing Operator custom resources.
 1. Fetch the values from the chart:
 
    ```console
-   $ helm show values nvidia/k8s-nim-operator --version=v3.1.4 > values-3.1.4.yaml
+   $ helm show values nvidia/k8s-nim-operator --version=v${NIM_OPERATOR_VERSION} > values-${NIM_OPERATOR_VERSION}.yaml
    ```
 
 1. Update the values file as needed.
@@ -78,5 +78,5 @@ With this procedure, you can update all existing Operator custom resources.
 1. Upgrade the Operator:
 
    ```console
-   $ helm upgrade nim-operator nvidia/k8s-nim-operator -n nim-operator -f values-3.1.4.yaml
+   $ helm upgrade nim-operator nvidia/k8s-nim-operator -n nim-operator -f values-${NIM_OPERATOR_VERSION}.yaml
    ```

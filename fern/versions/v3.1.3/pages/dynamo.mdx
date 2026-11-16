@@ -98,7 +98,7 @@ The NIM Operator will deploy Dynamo CRDs v0.9.0.
    ```console
    $ helm upgrade --install nim-operator \
      nvidia/k8s-nim-operator -n nim-operator --create-namespace \
-     --version=3.1.3 --set dynamo.enabled=true
+     --version=${NIM_OPERATOR_VERSION} --set dynamo.enabled=true
    ```
 
    The NIM Operator supports configuring Dynamo values including `etcd`, `nats`, `dynamo-operator`, `grove`, and `kai-scheduler`.

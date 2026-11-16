@@ -62,7 +62,7 @@ $ helm repo add nvidia https://helm.ngc.nvidia.com/nvidia \
 1. Install the Operator:
 
    ```console
-   $ helm upgrade --install nim-operator nvidia/k8s-nim-operator -n nim-operator --version=3.1.4
+   $ helm upgrade --install nim-operator nvidia/k8s-nim-operator -n nim-operator --version=${NIM_OPERATOR_VERSION}
    ```
 
 For full install details, refer to the NIM Operator [installation instructions](/install).

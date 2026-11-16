@@ -17,12 +17,12 @@ Use Node.js 24 and the official Fern CLI. Run these commands from the repository
 root without creating local npm package files:
 
 ```sh
-npx --yes --package fern-api@5.193.2 fern check
-npx --yes --package fern-api@5.193.2 fern docs md check
-npx --yes --package fern-api@5.193.2 fern docs dev
+npx --yes --package fern-api@5.216.0 fern check
+npx --yes --package fern-api@5.216.0 fern docs md check
+npx --yes --package fern-api@5.216.0 fern docs dev
 ```
 
-`fern.config.json` selects CLI version `5.193.2`. The commands above run Fern's
+`fern.config.json` selects CLI version `5.216.0`. The commands above run Fern's
 native configuration checks, MDX checks, and local preview. No repository npm
 dependencies, custom scripts, or preprocessing are required.
 
@@ -41,10 +41,26 @@ Edit released pages under `versions/v<version>/pages/` and their navigation in
 `versions/v<version>.yml`. Preserve slugs and anchor aliases to keep links working.
 Versions are selected by `path:` entries in `docs.yml`.
 
-Use literal values in MDX, such as `--version=3.1.4`. Source substitutions have
-been replaced with their values; there are no substitution maps or documentation
-variable placeholders. Shell expressions such as `${NEMO_VERSION}` remain literal
-in code blocks.
+Write the NIM Operator release as `${NIM_OPERATOR_VERSION}`, such as
+`--version=${NIM_OPERATOR_VERSION}`. Fern fills the placeholder from the
+profile that each version selects in `docs.yml`:
+
+| Version | Profile | `NIM_OPERATOR_VERSION` |
+| --- | --- | --- |
+| 3.1.4 | `v3.1.4` | `3.1.4` |
+| 3.1.3 | `v3.1.3` | `3.1.3` |
+| Dev | `dev` | `3.1.4`, the latest release |
+
+To publish a release, copy `pages/` to `versions/v<version>/pages/`, add a
+profile with the new value, and set `profile:` on the new version entry. Update
+the `dev` profile to the new release. The copied pages need no edits.
+
+Keep literal versions in release notes and in statements about a specific
+release, such as the release that first supports NIM for LLMs 3.0.
+A placeholder whose name is not in the profile stays literal, so shell
+expressions such as `${NEMO_VERSION}` and `${host_folder}` remain as written.
+Do not add profile variables with the same names as shell variables in code
+blocks. To show a literal profile placeholder, write `\$\{NAME\}`.
 
 ## Manifest inputs and example output
 
@@ -102,7 +118,7 @@ This checkout contains the docs CI callers under `.github/workflows/`:
 - `fern-docs-publish.yml` publishes after pushes to `main`.
 
 They call NVIDIA/docs-builder's shared workflows and select the official Fern
-release `5.193.2`. Preview and cleanup filters include development pages,
+release `5.216.0`. Preview and cleanup filters include development pages,
 versioned pages, and `manifests/docs/**`.
 
 Docs CI runs Node.js and the Fern CLI directly on GitHub-hosted runners.
