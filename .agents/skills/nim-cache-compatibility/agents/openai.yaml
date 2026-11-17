@@ -1,0 +1,3 @@
+display_name: NIM Cache Compatibility
+short_description: Report a NIMCache's provenance and whether it covers a NIM service image's model artifacts.
+default_prompt: Use the NIM cache compatibility skill to check whether my NIMCache has every model file my NIM service image and profile need. Show me the verdict, reason, provenance and any missing files, and ask before creating inspection pods.
